@@ -29,7 +29,7 @@ The repo root IS the template. `project_name/` is renamed by `wagtail start`.
 ### Python (via Make)
 
 ```bash
-pip install -e ".[dev]"                  # Install with dev dependencies (once only)
+make venv                                # Create .venv and install all dependencies
 make migrate                             # Run migrations
 make createsuperuser                     # Create admin user
 make dev                                 # Dev server at localhost:8000

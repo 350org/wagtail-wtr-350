@@ -10,6 +10,8 @@ SECRET_KEY = os.environ["SECRET_KEY"]  # noqa: F405
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")  # noqa: F405
 
+WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
+
 DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
 
 # Whitenoise static file serving — SecurityMiddleware must be first, WhiteNoise second

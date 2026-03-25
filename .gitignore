@@ -1,6 +1,10 @@
 # websites-for-all just for reference - don't check it in!
 websites-for-all
 
+# wagtail start test output — never check generated projects into the template repo
+test-site/
+testproject/
+
 # Python
 __pycache__/
 *.py[cod]

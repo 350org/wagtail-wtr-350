@@ -13,7 +13,7 @@ Contains a `wtrx/` sub-app designed for eventual extraction as a pip package
 
 ## Requirements
 
-- Python 3.12+
+- Python 3.13+
 - Node 20+ (see `.nvmrc`)
 - PostgreSQL (production) or SQLite (dev)
 - [Wagtail CLI](https://docs.wagtail.org/en/stable/reference/management_commands.html#start)
@@ -30,10 +30,11 @@ wagtail start --template=https://github.com/withtheranks/wagtail-wtr/archive/mai
 cd /path/to/mysite
 ```
 
-### 2. Install dependencies
+### 2. Set up the virtual environment and install dependencies
 
 ```bash
-pip install -e ".[dev]"
+make venv
+source .venv/bin/activate
 npm install
 ```
 
@@ -106,6 +107,7 @@ Visit [http://localhost:8000/](http://localhost:8000/) for the site and
 ## Make commands
 
 ```
+make venv             Create .venv and install all dependencies
 make dev              Run development server (localhost:8000)
 make build            Build CSS — development (Tailwind CLI)
 make build-prod       Build CSS — production (minified)
@@ -236,7 +238,7 @@ DEBUG = True
 
 The template ships with:
 
-- `Dockerfile` (Python 3.12-slim)
+- `Dockerfile` (Python 3.13-slim)
 - `whitenoise` for static file serving
 - `gunicorn` as WSGI server
 - `dj-database-url` for `DATABASE_URL` env var

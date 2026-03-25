@@ -1,15 +1,15 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "wagtail-wtr"
 version = "0.1.0"
 description = "A Wagtail site powered by wagtail-wtr"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
-    "django>=5.1,<5.3",
-    "wagtail>=6.4,<6.5",
+    "django>=5.2,<5.3",
+    "wagtail>=7.0,<7.1",
     "wagtail-localize>=1.9,<2.0",
     "wagtailmedia",
     "dj-database-url",

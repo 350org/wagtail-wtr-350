@@ -13,7 +13,8 @@ class UrlResolutionTests(TestCase):
     def test_wagtail_admin_resolves(self):
         """Wagtail admin URL resolves correctly."""
         resolver = resolve("/admin/")
-        self.assertEqual(resolver.app_name, "wagtailadmin")
+        # wagtailadmin_urls does not set app_name; check the view module instead
+        self.assertIn("wagtail", resolver.func.__module__)
 
     def test_sitemap_resolves(self):
         """Sitemap URL resolves to the sitemap view."""

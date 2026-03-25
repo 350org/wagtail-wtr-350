@@ -1,5 +1,7 @@
 """
 Django settings for {{ project_name }} project.
+
+Requires Python 3.13+, Django 5.2 LTS, Wagtail 7.0 LTS.
 """
 
 import os
@@ -139,6 +141,7 @@ MEDIA_URL = "/media/"
 
 # Wagtail settings
 WAGTAIL_SITE_NAME = "{{ project_name }}"
+# WAGTAILADMIN_BASE_URL is set in dev.py and production.py
 # Uncomment after Phase 1 (CustomImage model must exist first):
 # WAGTAILIMAGES_IMAGE_MODEL = "{{ project_name }}_wtrx.CustomImage"
 

@@ -1,7 +1,8 @@
-.PHONY: help dev build build-prod watch migrate createsuperuser setup test load-data
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data
 
 help:
 	@echo "Available commands:"
+	@echo "  make venv             - Create .venv and install all dependencies"
 	@echo "  make dev              - Run development server"
 	@echo "  make build            - Build CSS (development)"
 	@echo "  make build-prod       - Build CSS (production, minified)"
@@ -11,6 +12,13 @@ help:
 	@echo "  make setup            - Interactive site setup"
 	@echo "  make test             - Run test suite"
 	@echo "  make load-data        - Migrate + load demo fixtures"
+
+venv:
+	python3 -m venv .venv
+	.venv/bin/pip install --upgrade pip
+	.venv/bin/pip install -e ".[dev]"
+	@echo ""
+	@echo "Virtual environment ready. Activate with: source .venv/bin/activate"
 
 dev:
 	python manage.py runserver
