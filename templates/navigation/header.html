@@ -1,0 +1,40 @@
+{% verbatim %}
+{% load i18n wagtailcore_tags %}
+<header class="bg-white border-b border-neutral-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            {# Logo — replaced with BrandingSEOSettings.logo in Phase 1 #}
+            <a href="/" class="flex items-center shrink-0">
+                <span class="font-heading font-bold text-xl text-neutral-900">{{ site.site_name }}</span>
+            </a>
+
+            {# Desktop nav #}
+            <nav class="hidden md:flex items-center space-x-6" aria-label="{% trans 'Primary navigation' %}">
+                {# Navigation links rendered in Phase 4 when NavigationSettings exist #}
+            </nav>
+
+            {# CTA button (desktop) + hamburger (mobile) #}
+            <div class="flex items-center gap-4">
+                <button
+                    type="button"
+                    class="md:hidden p-2 text-neutral-600 hover:text-neutral-900"
+                    aria-label="{% trans 'Open menu' %}"
+                    aria-expanded="false"
+                    aria-controls="mobile-menu"
+                    data-mobile-menu-toggle
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {# Mobile menu — wired up in Phase 4 #}
+    <div id="mobile-menu" class="hidden md:hidden border-t border-neutral-200" aria-label="{% trans 'Mobile navigation' %}">
+        <div class="px-4 py-4 space-y-2">
+        </div>
+    </div>
+</header>
+{% endverbatim %}

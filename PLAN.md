@@ -117,13 +117,12 @@ wagtail-wtr/
 │   │   └── components/
 │   │       ├── mobile-menu.js
 │   │       └── form-ajax.js        # AJAX form submission for FormPage/SignupBlock
-│   └── sass/
-│       └── main.scss               # Tailwind directives + component styles
-├── static_compiled/                # Webpack output (committed)
+│   └── css/
+│       └── main.css                # Tailwind directives + component styles
+├── static_compiled/                # Tailwind CLI output (committed)
 ├── fixtures/
 │   └── demo.json
 ├── tailwind.config.js
-├── webpack.config.js
 ├── package.json
 ├── pyproject.toml                  # Python dependencies and project metadata
 ├── manage.py
@@ -154,7 +153,7 @@ wagtail-wtr/
 | Form submission | AJAX | Form stays on page, thank-you text replaces form on success |
 | Platform integrations | Site-wide settings, defaults from `settings.py`, overridable in admin | One configuration point, not per-block |
 | Block field visibility | All SignupBlock variants always registered; irrelevant ones hidden via `wagtail_hooks.py` based on `IntegrationSettings` | Avoids DB access at import time |
-| Frontend build | Webpack + PostCSS + Tailwind + Sass | Matches news-template pattern |
+| Frontend build | Tailwind CLI (no webpack, no PostCSS config, no Sass) | Simpler pipeline, fewer deps, same semantic token output |
 | Settings panels | 5 clear panels under Settings | Each panel has a clear purpose, no grab-bags |
 | Python deps | `pyproject.toml` | Modern Python packaging standard |
 
@@ -611,20 +610,18 @@ base.html
 - CTA button: `hero_link_text` + `hero_link_page`/`hero_link_url`
 - Same template used by all page types
 
-HTML templates use standard Django template syntax. `{% load %}`, `{% trans %}`,
-and other template tags work normally. Only `.py` files contain
-`{{ project_name }}` substitution (handled by `wagtail start --template`).
-See AGENTS.md for the full explanation.
+HTML templates use standard Django template syntax wrapped in
+`{% verbatim %}{% endverbatim %}` (required for `wagtail start --template`
+compatibility — see AGENTS.md for the full explanation). Only `.py` files
+contain `{{ project_name }}` substitution.
 
 ---
 
 ## Frontend Build
 
-### Stack (matches news-template)
-- **Tailwind CSS 3.4** via PostCSS
-- **Webpack 5** as bundler
-- **Sass** for the entry point (imports Tailwind directives)
-- **autoprefixer**, **cssnano** for production
+### Stack
+- **Tailwind CSS 3.4** via Tailwind CLI
+- **Vanilla JS** served directly (no bundler)
 
 ### `tailwind.config.js` -- Semantic Design Tokens
 
@@ -655,14 +652,15 @@ change `font-heading`, etc.
 
 ```json
 {
-  "build": "webpack --mode development --progress",
-  "build:prod": "webpack --mode production",
-  "start": "webpack --mode development --progress --watch"
+  "build": "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css",
+  "build:prod": "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css --minify",
+  "start": "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css --watch"
 }
 ```
 
 ### Output
-`static_src/` -> Webpack -> `static_compiled/` (committed to repo)
+`static_src/css/main.css` -> Tailwind CLI -> `static_compiled/css/main.css` (committed to repo)
+`static_src/javascript/` -> served directly (no bundling)
 
 ---
 
@@ -696,10 +694,7 @@ dev = [
 ## Node Dependencies
 
 ```
-webpack, webpack-cli, webpack-dev-server
-tailwindcss, postcss-loader, autoprefixer, cssnano, postcss-custom-properties
-sass, sass-loader, css-loader, mini-css-extract-plugin
-copy-webpack-plugin, clean-webpack-plugin
+tailwindcss
 ```
 
 ---
@@ -711,7 +706,7 @@ copy-webpack-plugin, clean-webpack-plugin
 Interactive command run after `wagtail start`:
 
 ```
-$ python manage.py setup_site
+$ make setup
 Site name: My Campaign
 Site language (default: en) [en]:
 Donation platform (none/actblue) [none]: actblue
@@ -736,14 +731,14 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
   including i18n settings (`USE_I18N`, `WAGTAIL_I18N_ENABLED`, `LANGUAGES`)
 - `urls.py` with `i18n_patterns()` wrapper, `wsgi.py`
 - `pyproject.toml` (including `wagtail-localize`)
-- `package.json`, `webpack.config.js`, `tailwind.config.js` with semantic tokens
+- `package.json`, `tailwind.config.js` with semantic tokens
 - `Dockerfile`, `Makefile`, `.gitignore`, `.dockerignore`, `.nvmrc`
 - `wtrx/` app skeleton (`apps.py`, `__init__.py`)
 - `users/` app with custom user model
 - `search/` app with search view
 - Base templates (`base.html`, `base_page.html`, `404.html`, `500.html`)
-  with `{% load i18n %}` and `{% trans %}` on all UI strings
-  (no `{% verbatim %}` wrapping — see AGENTS.md)
+  with `{% load i18n %}` and `{% trans %}` on all UI strings,
+  all wrapped in `{% verbatim %}{% endverbatim %}`
 - Verify `wagtail start --template` works with the bare skeleton
 
 ### Phase 1: Core Models & Settings
@@ -781,7 +776,7 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 
 ### Phase 5: Frontend Build & Styling
 - Tailwind config with full semantic token system
-- `main.scss` with Tailwind directives
+- `static_src/css/main.css` with Tailwind directives
 - Style all block templates with semantic Tailwind utilities
 - Style page templates, header, footer, hero
 - `static_src/javascript/components/form-ajax.js` for AJAX form submission
@@ -829,6 +824,6 @@ These were analyzed during planning:
 - **[coderedcorp/coderedcms](https://github.com/coderedcorp/coderedcms)** -- Reusable
   blocks library, Bootstrap 5 layout blocks, snippets, project_template pattern.
 - **[torchbox/torchbox.com](https://github.com/torchbox/torchbox.com)** -- Production
-  Wagtail site with Tailwind, webpack, poetry, Docker.
+   Wagtail site with Tailwind, poetry, Docker.
 - **websites-for-all** (With the Ranks' previous project, cloned in `websites-for-all/`
   for reference) -- Carried forward feature set, redesigned architecture.

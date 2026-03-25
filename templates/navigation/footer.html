@@ -1,0 +1,11 @@
+{% verbatim %}
+{% load i18n wagtailcore_tags %}
+<footer class="bg-neutral-900 text-neutral-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {# Footer navigation sections rendered in Phase 4 #}
+        <div class="mt-8 border-t border-neutral-700 pt-8 text-sm text-neutral-400">
+            <p>&copy; {% now "Y" %} {{ site.site_name }}.</p>
+        </div>
+    </div>
+</footer>
+{% endverbatim %}

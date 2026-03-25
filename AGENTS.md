@@ -22,19 +22,24 @@ The repo root IS the template. `project_name/` is renamed by `wagtail start`.
 - `project_name/home/`, `pages/`, `forms/` -- Page type apps (site-specific layer).
 - `templates/` -- Global Django templates (NOT per-app).
 - `static_src/` -- Frontend source (Tailwind, JS, Sass).
-- `static_compiled/` -- Webpack output (committed to repo).
+- `static_compiled/` -- Tailwind CLI output (committed to repo).
 
 ## Build Commands
 
-### Python
+### Python (via Make)
 
 ```bash
-pip install -e ".[dev]"                  # Install with dev dependencies
-python manage.py migrate                 # Run migrations
-python manage.py createsuperuser         # Create admin user
-python manage.py runserver               # Dev server at localhost:8000
-python manage.py setup_site              # Interactive initial setup
-python manage.py test                    # Run all tests
+pip install -e ".[dev]"                  # Install with dev dependencies (once only)
+make migrate                             # Run migrations
+make createsuperuser                     # Create admin user
+make dev                                 # Dev server at localhost:8000
+make setup                               # Interactive initial setup
+make test                                # Run all tests
+```
+
+For granular test runs, call manage.py directly:
+
+```bash
 python manage.py test project_name.wtrx               # Run tests for wtrx app only
 python manage.py test project_name.wtrx.tests.test_blocks  # Run a single test module
 python manage.py test project_name.wtrx.tests.test_blocks.TestImageBlock  # Single test class
@@ -44,10 +49,10 @@ python manage.py test project_name.wtrx.tests.test_blocks.TestImageBlock.test_re
 ### Frontend
 
 ```bash
-npm install                              # Install Node dependencies
-npm run build                            # Dev build (webpack)
-npm run build:prod                       # Production build (minified)
-npm run start                            # Watch mode (rebuilds on change)
+npm install                              # Install Node dependencies (once only)
+make build                               # Dev CSS build (Tailwind CLI)
+make build-prod                          # Production CSS build (minified)
+make watch                               # Watch mode (rebuilds CSS on change)
 ```
 
 ### Docker
@@ -98,18 +103,29 @@ wagtail start --template=. testproject /tmp/testproject
 
 ### Templates (HTML)
 
-- **`{% verbatim %}` is NOT used in HTML template files.** Wagtail's `--template`
-  substitution only replaces `{{ project_name }}` in `.py` files (e.g., `manage.py`,
-  `settings/base.py`, `urls.py`, `wsgi.py`). Django template tags and
-  `{{ variable }}` expressions in `.html` files are not touched by the project
-  template mechanism. Wrapping HTML files in `{% verbatim %}` would break
-  `{% load %}`, `{% trans %}`, `{% if %}`, and every other template tag at runtime.
-  - If a template ever needs to literally output the text `{{ project_name }}`
-    (not as a substitution placeholder), wrap only that specific expression:
-    `{% verbatim %}{{ project_name }}{% endverbatim %}`.
+- **CRITICAL**: All `.html` template files MUST be wrapped in
+  `{% verbatim %}{% endverbatim %}` as the first and last lines.
+  This is required for `wagtail start --template` compatibility — the template
+  engine processes ALL files in the repo (including `.html`) when generating a
+  new project, and without `{% verbatim %}`, any `{% load %}` or `{{ variable }}`
+  tag in an HTML file will cause a `TemplateSyntaxError` and abort the project
+  creation. The `{% verbatim %}` wrapper prevents the engine from parsing those
+  tags during project creation; at runtime the outer `{% verbatim %}` tags are
+  not present (they were only in the template source).
+  - HTML files NEVER contain `{{ project_name }}` substitution — that only
+    happens in `.py` files (e.g., `manage.py`, `settings/base.py`, `urls.py`).
+    The `{% verbatim %}` wrapper is purely to prevent Django's template parser
+    from crashing on `{% load %}` calls during project creation.
   - Example `.py` usage (substituted at project creation):
     `os.environ.setdefault('DJANGO_SETTINGS_MODULE', '{{ project_name }}.settings.dev')`
-  - HTML templates use normal Django template syntax — no wrapping needed.
+  - Example `.html` file structure:
+    ```
+    {% verbatim %}
+    {% load i18n wagtailcore_tags %}
+    {% extends "base.html" %}
+    {% block content %}...{% endblock %}
+    {% endverbatim %}
+    ```
 - **Internationalization**: All user-facing UI strings in templates MUST use
   `{% trans "string" %}` (or `{% blocktrans %}...{% endblocktrans %}` for
   multi-word strings with variables). Add `{% load i18n %}` at the top of any
@@ -131,10 +147,12 @@ wagtail start --template=. testproject /tmp/testproject
 - Vanilla JS only (no frameworks). Class-based components with selector-based init.
 - ES module syntax. 4-space indentation. Semicolons required.
 
-### CSS / Sass
+### CSS
 
-- Entry point: `static_src/sass/main.scss`.
+- Entry point: `static_src/css/main.css`.
 - Use `@tailwind base; @tailwind components; @tailwind utilities;` directives.
+- Built with Tailwind CLI (`make build` / `make build-prod` / `make watch`).
+- Output goes to `static_compiled/css/main.css` (committed to repo).
 - Minimize custom CSS. Prefer Tailwind utilities in templates.
 - If component classes are needed, define in `@layer components {}`.
 
@@ -210,23 +228,25 @@ wagtail start --template=. testproject /tmp/testproject
 
    For `FormPage(BasePage, AbstractEmailForm)`, the full MRO resolves as:
    `FormPage → BasePage → TranslatableMixin → AbstractEmailForm → … → Page`.
-   Django handles this correctly because `TranslatableMixin` does not itself
-   inherit from `Page`. However, `TranslatableMixin` adds unique constraints
-   that can produce unexpected migration conflicts if not handled carefully — run
-   `python manage.py makemigrations --check` after adding any new page model.
+    Django handles this correctly because `TranslatableMixin` does not itself
+    inherit from `Page`. However, `TranslatableMixin` adds unique constraints
+    that can produce unexpected migration conflicts if not handled carefully — run
+    `make migrate` (or `python manage.py makemigrations --check`) after adding any new page model.
 
-4. **`{% verbatim %}` only in `.py` files, not `.html` files**: Wagtail's
-   `--template` substitution only applies to `.py` files (replacing
-   `{{ project_name }}`). HTML template files use normal Django template syntax
-   with no wrapping. Wrapping HTML files in `{% verbatim %}` would break all
-   template tags at runtime — `{% load %}`, `{% trans %}`, `{% if %}`, etc.
+4. **`{% verbatim %}` in HTML files**: Every `.html` file must start with
+   `{% verbatim %}` (first line) and end with `{% endverbatim %}` (last line).
+   `wagtail start --template` runs the Django template engine over every file
+   in the repo — including `.html` files — during project creation. Without
+   `{% verbatim %}`, any `{% load wagtailcore_tags %}` or similar tag causes a
+   `TemplateSyntaxError` and aborts project creation. The wrapper is only
+   present in the template source; the generated project's files do not need it.
    Python files do NOT use verbatim — they contain `{{ project_name }}`
    which IS substituted at project-creation time.
 
 5. **`hide_from_search` not `search_appearance`**: The field controlling search
    visibility on `BasePage` is named `hide_from_search` (boolean, default False).
 
-6. **`static_compiled/` is committed**: The Webpack output directory
+6. **`static_compiled/` is committed**: The Tailwind CLI output directory
    `static_compiled/` is intentionally committed to the repo so that new
    projects generated from the template have working CSS/JS immediately without
    needing to run `npm install` and `npm run build` first.
@@ -243,6 +263,20 @@ wagtail start --template=. testproject /tmp/testproject
 - Commit messages: imperative mood, concise. E.g., "Add CardGridBlock with
   auto-responsive columns" not "Added card grid block".
 - Do not commit `node_modules/`. Do commit `static_compiled/`.
+
+## Documentation Maintenance
+
+Keep the following files up to date whenever relevant changes are made:
+
+- **`PLAN.md`** — update the frontend build section, phases, and architecture notes
+  whenever the tech stack, file structure, or implementation decisions change.
+- **`AGENTS.md`** — update build commands, pitfalls, and architecture rules to match
+  the current state of the repo. This file is the source of truth for agents.
+- **`README.md`** — update commands, stack description, and project structure whenever
+  anything user-facing changes.
+
+These files should never fall out of sync with the actual repo. Update them in the
+same commit as the code change they describe.
 
 ## Code Review Requirement
 

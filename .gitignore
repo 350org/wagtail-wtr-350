@@ -1,2 +1,40 @@
 # websites-for-all just for reference - don't check it in!
 websites-for-all
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+.env
+
+# Django
+db.sqlite3
+static/
+media/
+*.log
+local_settings.py
+project_name/settings/local.py
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test coverage
+.coverage
+htmlcov/

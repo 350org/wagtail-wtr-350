@@ -1,0 +1,14 @@
+{% verbatim %}
+{% load i18n %}
+{% extends "base_page.html" %}
+
+{% block title %}{% trans "Page not found" %}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-16 text-center">
+    <h1 class="font-heading text-4xl font-bold mb-4">{% trans "Page not found" %}</h1>
+    <p class="text-neutral-600 mb-8">{% trans "The page you requested could not be found." %}</p>
+    <a href="/" class="bg-primary-600 text-white px-6 py-3 rounded hover:bg-primary-700">{% trans "Go to homepage" %}</a>
+</div>
+{% endblock %}
+{% endverbatim %}

@@ -1,0 +1,157 @@
+"""
+Django settings for {{ project_name }} project.
+"""
+
+import os
+
+from django.utils.translation import gettext_lazy as _
+
+PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(PROJECT_DIR)
+
+# Overridden by dev.py ({{ secret_key }}) and production.py (os.environ["SECRET_KEY"]).
+# base.py must never be used as DJANGO_SETTINGS_MODULE directly.
+# If SECRET_KEY is not overridden, Django's --deploy check will warn,
+# and production.py will crash with KeyError if SECRET_KEY env var is absent.
+SECRET_KEY = "base-settings-placeholder-not-for-use"
+
+DEBUG = False
+
+ALLOWED_HOSTS = []
+
+INSTALLED_APPS = [
+    "{{ project_name }}.home",
+    "{{ project_name }}.pages",
+    "{{ project_name }}.forms",
+    "{{ project_name }}.users",
+    "{{ project_name }}.search",
+    "{{ project_name }}.wtrx",
+    "wagtail.contrib.forms",
+    "wagtail.contrib.redirects",
+    "wagtail.contrib.settings",
+    "wagtail.contrib.table_block",
+    "wagtail.embeds",
+    "wagtail.sites",
+    "wagtail.users",
+    "wagtail.snippets",
+    "wagtail.documents",
+    "wagtail.images",
+    "wagtail.search",
+    "wagtail.admin",
+    "wagtail.locales",
+    "wagtail",
+    "wagtail_localize",
+    "modelcluster",
+    "taggit",
+    "wagtailmedia",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.sitemaps",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+]
+
+ROOT_URLCONF = "{{ project_name }}.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [
+            os.path.join(BASE_DIR, "templates"),
+        ],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "{{ project_name }}.wsgi.application"
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+    }
+}
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# Custom user model
+AUTH_USER_MODEL = "{{ project_name }}_users.User"
+
+# Internationalization
+USE_I18N = True
+WAGTAIL_I18N_ENABLED = True
+LANGUAGE_CODE = "en"
+TIME_ZONE = "UTC"
+USE_TZ = True
+
+WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
+    ("en", _("English")),
+    # Sites add languages as needed:
+    # ('es', _('Spanish')),
+    # ('fr', _('French')),
+]
+
+# Static files
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+]
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static_compiled"),
+]
+
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
+STATIC_URL = "/static/"
+
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_URL = "/media/"
+
+# Wagtail settings
+WAGTAIL_SITE_NAME = "{{ project_name }}"
+# Uncomment after Phase 1 (CustomImage model must exist first):
+# WAGTAILIMAGES_IMAGE_MODEL = "{{ project_name }}_wtrx.CustomImage"
+
+WAGTAILSEARCH_BACKENDS = {
+    "default": {
+        "BACKEND": "wagtail.search.backends.database",
+    }
+}
+
+WAGTAIL_ENABLE_UPDATE_CHECK = False
+
+# wtrx platform settings
+WTRX_DONATION_PLATFORM = "none"  # none, actblue
+WTRX_SIGNUP_PLATFORM = "wagtail_forms"  # wagtail_forms, action_network, none
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

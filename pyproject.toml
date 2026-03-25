@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "wagtail-wtr"
+version = "0.1.0"
+description = "A Wagtail site powered by wagtail-wtr"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.1,<5.3",
+    "wagtail>=6.4,<6.5",
+    "wagtail-localize>=1.9,<2.0",
+    "wagtailmedia",
+    "dj-database-url",
+    "psycopg[binary]",
+    "whitenoise",
+    "gunicorn",
+    "django-storages[s3]",
+    "wagtail-storages",
+]
+
+[project.optional-dependencies]
+dev = [
+    "coverage",
+    "django-debug-toolbar",
+    "factory-boy",
+    "wagtail-factories",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]

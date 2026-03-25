@@ -1,0 +1,47 @@
+{% verbatim %}
+{% load i18n %}
+{% extends "base_page.html" %}
+
+{% block title %}{% trans "Search" %}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-12">
+    <h1 class="font-heading text-3xl font-bold mb-8">{% trans "Search" %}</h1>
+    <form action="{% url 'search' %}" method="get" role="search">
+        <div class="flex gap-2 mb-8">
+            <input
+                type="search"
+                name="query"
+                value="{{ search_query }}"
+                placeholder="{% trans 'Search...' %}"
+                class="flex-1 border border-neutral-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                aria-label="{% trans 'Search query' %}"
+            />
+            <button type="submit" class="bg-primary-600 text-white px-6 py-2 rounded hover:bg-primary-700">
+                {% trans "Search" %}
+            </button>
+        </div>
+    </form>
+    {% if search_query %}
+        {% if search_results %}
+            <ul class="space-y-6">
+                {% for result in search_results %}
+                    <li>
+                        <a href="{{ result.url }}" class="text-primary-600 hover:underline font-heading text-lg font-semibold">
+                            {{ result.title }}
+                        </a>
+                        {% if result.search_description %}
+                            <p class="text-neutral-600 mt-1">{{ result.search_description }}</p>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-neutral-600">
+                {% blocktrans with query=search_query %}No results found for "{{ query }}".{% endblocktrans %}
+            </p>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
+{% endverbatim %}
