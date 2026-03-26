@@ -1,5 +1,5 @@
 {% load i18n wagtailimages_tags %}
-<div class="flex flex-col items-center rounded-lg border border-neutral-200 bg-light p-6 text-center shadow-sm">
+<div class="flex flex-col items-center rounded-lg border border-neutral-200 bg-light p-6 text-center shadow-xs">
     {% if person.image %}
         {% image person.image fill-192x192 as img %}
         <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ person.name }}" class="mb-4 h-24 w-24 rounded-full object-cover" loading="lazy">

@@ -93,7 +93,7 @@ Visit [http://localhost:8000/](http://localhost:8000/) for the site and
 ### Core features
 
 - Semantic Tailwind design tokens (`bg-primary-600`, `font-heading`, etc.) — customize
-  by editing `tailwind.config.js`
+  by editing `static_src/css/theme.css`
 - Multi-lingual from day one via [wagtail-localize](https://github.com/wagtail/wagtail-localize)
 - AJAX form submission (FormPage + SignupBlock)
 - Custom image model with focal point CSS
@@ -156,31 +156,32 @@ or new apps. Extend or override `wtrx/` models and blocks; don't edit them direc
 
 ## Customizing the theme
 
-Edit `tailwind.config.js` to change the semantic design tokens:
+Edit the `@theme {}` block in `static_src/css/theme.css` to change the semantic design tokens:
 
-```js
-theme: {
-  extend: {
-    colors: {
-      primary: { /* replace with your brand color scale */ },
-      secondary: { /* ... */ },
-      accent: { /* ... */ },
-      neutral: { /* ... */ },
-    },
-    fontFamily: {
-      heading: ['Your Heading Font', 'sans-serif'],
-      body: ['Your Body Font', 'sans-serif'],
-    },
-  },
-},
+```css
+@theme {
+  /* Replace these color scales with your brand palette */
+  --color-primary-50:  #f0f9ff;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  /* ... full scale 50–950 ... */
+
+  /* Font stacks */
+  --font-heading: 'Your Heading Font', system-ui, sans-serif;
+  --font-body:    'Your Body Font', system-ui, sans-serif;
+}
 ```
 
 All templates use only semantic tokens (`bg-primary-600`, `font-heading`, etc.), so
-changing the config immediately re-themes the entire site. Rebuild after changes:
+changing the `@theme {}` values immediately re-themes the entire site. Rebuild after changes:
 
 ```bash
 make build-prod
 ```
+
+`theme.css` also ships named theme presets (`[data-theme="grassroots"]`, etc.) as
+CSS overrides — no rebuild needed when switching between presets at runtime. Client
+forks that don't use these can delete those blocks.
 
 ---
 

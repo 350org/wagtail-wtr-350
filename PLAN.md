@@ -122,11 +122,11 @@ wagtail-wtr/
 │   │       ├── accordion.js         # Accordion toggle with aria-expanded
 │   │       └── form-ajax.js        # AJAX form submission for FormPage/SignupBlock
 │   └── css/
-│       └── main.css                # Tailwind directives + component styles
+│       ├── main.css                # Tailwind entry point — imports theme.css + tailwindcss
+│       └── theme.css               # Client-editable: @theme {} tokens + [data-theme] presets
 ├── static_compiled/                # Tailwind CLI output (committed)
 ├── fixtures/
 │   └── demo.json
-├── tailwind.config.js
 ├── package.json
 ├── pyproject.toml                  # Python dependencies and project metadata
 ├── manage.py
@@ -150,7 +150,7 @@ wagtail-wtr/
 | New client sites | Fork/clone this repo | Sites keep `wagtail_wtr` package name; site-specific work goes in `home/`, `pages/`, `forms/` |
 | Reusable app | `wtrx/` sub-app inside `wagtail_wtr/` | Visible boundary prevents mixing core + site-specific code. Designed for eventual pip extraction. |
 | Future pip package | `wagtail-wtrx` (CodeRed pattern) | Package provides base classes; site apps provide thin concrete subclasses. Extraction happens when wtrx is stable. |
-| CSS framework | Tailwind with semantic design tokens | `bg-primary`, `font-heading`, etc. Sites customize via `tailwind.config.js`. No raw color values in templates. |
+| CSS framework | Tailwind CSS v4 with semantic design tokens | `bg-primary`, `font-heading`, etc. Sites customize via `@theme {}` block in `static_src/css/theme.css`. No raw color values in templates. |
 | Dark mode | No (post-MVP) | Reduces CSS complexity |
 | Multi-lingual | Yes, via `wagtail-localize` | i18n infrastructure from day one. Sites default to English, add languages as needed. |
 | Layout philosophy | Opinionated composite blocks, no raw columns | Editors can't break layouts |
@@ -644,47 +644,76 @@ HTML templates use standard Django template syntax. No special wrappers needed.
 ## Frontend Build
 
 ### Stack
-- **Tailwind CSS 3.4** via Tailwind CLI
+- **Tailwind CSS v4** via `@tailwindcss/cli`
 - **Vanilla JS** served directly (no bundler)
 
-### `tailwind.config.js` -- Semantic Design Tokens
+### Theming — `static_src/css/theme.css`
 
-```javascript
-module.exports = {
-  content: ['./templates/**/*.html', './static_src/**/*.{js,ts}'],
-  theme: {
-    extend: {
-      colors: {
-        primary: { /* scale 50-950 */ },
-        secondary: { /* scale */ },
-        accent: { /* scale */ },
-        neutral: { /* scale */ },
-      },
-      fontFamily: {
-        heading: [/* heading font */],
-        body: [/* body font */],
-      },
-    },
-  },
-};
+In Tailwind v4 there is no `tailwind.config.js`. All theme customisation lives
+in `static_src/css/theme.css`, which is imported by `main.css` before Tailwind
+processes utilities:
+
+```css
+/* main.css */
+@import './theme.css';
+@import 'tailwindcss';
+
+@plugin '@tailwindcss/typography';
+@plugin '@tailwindcss/forms';
 ```
 
-Sites customize by editing `tailwind.config.js` -- change `primary` from blue to green,
-change `font-heading`, etc.
+```css
+/* theme.css */
+@theme {
+  /* Semantic color tokens — replace these to re-theme the site */
+  --color-primary-50:  #f0f9ff;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  /* ... full scale 50–950 ... */
+
+  --color-secondary-600: #7c3aed;
+  /* ... */
+
+  --color-accent-500: #f97316;
+  /* ... */
+
+  --color-neutral-50:  #fafafa;
+  /* ... */
+
+  /* Status tokens — used for error, success, warning UI */
+  --color-error-600:   #dc2626;
+  --color-success-600: #16a34a;
+  --color-warning-600: #d97706;
+
+  /* Font stacks */
+  --font-heading: system-ui, sans-serif;
+  --font-body:    system-ui, sans-serif;
+}
+
+/* Named preset — overrides at runtime via <html data-theme="grassroots"> */
+[data-theme="grassroots"] {
+  --color-primary-500: #22c55e;
+  /* ... */
+}
+```
+
+All templates use only semantic tokens (`bg-primary-600`, `font-heading`, etc.),
+so changing the `@theme {}` values and running `make build` re-themes the entire site.
+Named `[data-theme]` presets override tokens at runtime — no rebuild needed.
 
 ### npm scripts
 
 ```json
 {
-  "build": "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css",
+  "build":      "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css",
   "build:prod": "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css --minify",
-  "start": "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css --watch"
+  "start":      "tailwindcss -i ./static_src/css/main.css -o ./static_compiled/css/main.css --watch"
 }
 ```
 
 ### Output
-`static_src/css/main.css` -> Tailwind CLI -> `static_compiled/css/main.css` (committed to repo)
-`static_src/javascript/` -> copied to `static_compiled/js/` via `make build-js` (committed to repo)
+`static_src/css/main.css` → Tailwind CLI → `static_compiled/css/main.css` (committed to repo)
+`static_src/javascript/` → copied to `static_compiled/js/` via `make build-js` (committed to repo)
 
 ---
 
@@ -719,9 +748,10 @@ dev = [
 ## Node Dependencies
 
 ```
-tailwindcss
-@tailwindcss/typography
-@tailwindcss/forms
+tailwindcss              # v4 CSS framework
+@tailwindcss/cli         # v4 CLI binary (installs the `tailwindcss` command)
+@tailwindcss/typography  # prose classes for richtext
+@tailwindcss/forms       # base form element styling
 ```
 
 ---
@@ -818,7 +848,7 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 - [x] Fix `{# ... #}` multi-line comment in `hero.html` → `{% comment %}...{% endcomment %}`
 
 ### ✅ Phase 5: Frontend Build & Styling — COMPLETE (commit f56c74d)
-- [x] `tailwind.config.js` with full semantic token system (primary, secondary,
+- [x] `tailwind.config.js` (TW3) with full semantic token system (primary, secondary,
   accent, neutral + error, success, warning status tokens)
 - [x] `@tailwindcss/typography` and `@tailwindcss/forms` plugins installed and registered
 - [x] `static_src/css/main.css` with Tailwind directives and base layer customizations
@@ -882,7 +912,29 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 
 ---
 
-### Phase 7: Automated Visual Testing — NOT STARTED
+### Phase 7: Tailwind CSS v4 Upgrade — COMPLETE (branch feature/tailwind-4)
+- [x] Ran `npx @tailwindcss/upgrade` to migrate TW3 → TW4
+- [x] `tailwind.config.js` deleted; all theme config migrated to `@theme {}` block in
+  `static_src/css/theme.css` (split from `main.css` for cleaner client fork merges)
+- [x] `@tailwind` directives replaced with `@import "tailwindcss"`
+- [x] `@plugin` directives added for `@tailwindcss/typography` and `@tailwindcss/forms`
+- [x] All color scales and font tokens migrated to CSS custom properties under `@theme {}`
+  in `static_src/css/theme.css`; named `[data-theme]` presets (grassroots, solidarity)
+  included for future CMS theme switcher
+- [x] Compatibility `@layer base` block added for default border color
+- [x] Utility renames applied in templates: `shadow-sm`→`shadow-xs`, `rounded`→`rounded-sm`,
+  `outline-none`→`outline-hidden`, arbitrary variant syntax updated for TW4
+- [x] Added `@tailwindcss/cli: ^4.2.2` to `package.json` devDependencies (separate CLI
+  package required in TW4; `tailwindcss` alone no longer provides the binary)
+- [x] Reverted all bad changes from the upgrade tool:
+  - `'outline'` choice value in `BUTTON_STYLE_CHOICES` (tool confused it with CSS rename)
+  - All migration files (tool corrupted frozen `block_lookup` dicts)
+  - Docstring in `test_images.py` ("rounded to the nearest integer" mangled)
+- [x] `npm run build` succeeds: `≈ tailwindcss v4.2.2 / Done in 132ms`
+- [x] 189 Django tests pass
+- [x] PLAN.md, AGENTS.md, README.md updated for TW4
+
+### Phase 8: Automated Visual Testing — NOT STARTED
 
 The goal is to catch regressions in block rendering automatically — both at the
 HTML level (existing) and at the pixel level (visual regression).

@@ -182,13 +182,21 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
 ### CSS
 
 - Entry point: `static_src/css/main.css`.
-- Use `@tailwind base; @tailwind components; @tailwind utilities;` directives.
-- Built with Tailwind CLI (`make build` / `make build-prod` / `make watch`).
+- Uses Tailwind CSS v4: `@import 'tailwindcss'` at the top (no `@tailwind` directives).
+- Built with `@tailwindcss/cli` (`make build` / `make build-prod` / `make watch`).
 - Output goes to `static_compiled/css/main.css` (committed to repo).
-- Plugins: `@tailwindcss/typography` (prose classes for richtext) and
-  `@tailwindcss/forms` (base form element styling). Registered in `tailwind.config.js`.
+- Plugins: `@plugin '@tailwindcss/typography'` and `@plugin '@tailwindcss/forms'`
+  declared in `main.css` (no `tailwind.config.js` — that file does not exist in TW4).
+- Theme customisation: edit `static_src/css/theme.css`.
+  All semantic color scales (`--color-primary-*`, `--color-error-*`, etc.) and
+  font stacks (`--font-heading`, `--font-body`) live in the `@theme {}` block there.
+  `main.css` imports `theme.css` first, then `tailwindcss`, so tokens are available
+  when Tailwind processes utilities. Named theme presets (`[data-theme="grassroots"]`,
+  etc.) also live in `theme.css`.
 - Minimize custom CSS. Prefer Tailwind utilities in templates.
-- If component classes are needed, define in `@layer components {}`.
+- If component classes are needed, use the `@utility` directive (TW4 replaces
+  `@layer components {}` / `@layer utilities {}` with `@utility`).
+- **Never create `tailwind.config.js`**: TW4 does not use it. All config is in CSS.
 
 ## Architecture Rules
 

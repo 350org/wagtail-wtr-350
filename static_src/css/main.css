@@ -1,10 +1,28 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import './theme.css';
+@import 'tailwindcss';
 
+@plugin '@tailwindcss/typography';
+@plugin '@tailwindcss/forms';
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
 @layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentcolor);
+    }
+
     h1, h2, h3, h4, h5, h6 {
-        font-family: theme('fontFamily.heading');
+        font-family: var(--font-heading);
     }
 
     /* Focus ring defaults — consistent accessible focus across all interactive elements */
@@ -17,7 +35,8 @@
     [type='tel']:focus,
     select:focus,
     textarea:focus {
-        --tw-ring-color: theme('colors.primary.500');
-        border-color: theme('colors.primary.500');
+        border-color: var(--color-primary-500);
+        outline: 2px solid var(--color-primary-500);
+        outline-offset: 0px;
     }
 }

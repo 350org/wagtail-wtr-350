@@ -15,7 +15,7 @@ django.middleware.locale.LocaleMiddleware must be enabled.
             id="language-select"
             name="language"
             onchange="this.form.submit()"
-            class="text-sm text-neutral-700 bg-light border border-neutral-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="text-sm text-neutral-700 bg-light border border-neutral-300 rounded-md px-2 py-1"
         >
             {% for lang_code, lang_name in languages %}
                 <option value="{{ lang_code }}"{% if lang_code == current_lang %} selected{% endif %}>

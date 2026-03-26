@@ -44,13 +44,22 @@ class TestButtonBlockValidation(SimpleTestCase):
     def test_all_styles_accepted(self):
         block = ButtonBlock()
         for style in ("primary", "secondary", "outline"):
-            value = block.to_python(self._raw(link_url="https://example.com", style=style))
+            value = block.to_python(
+                self._raw(link_url="https://example.com", style=style)
+            )
             cleaned = block.clean(value)
             self.assertEqual(cleaned["style"], style)
 
     def test_text_is_required(self):
         block = ButtonBlock()
-        value = block.to_python({"text": "", "link_page": None, "link_url": "https://example.com", "style": "primary"})
+        value = block.to_python(
+            {
+                "text": "",
+                "link_page": None,
+                "link_url": "https://example.com",
+                "style": "primary",
+            }
+        )
         with self.assertRaises(ValidationError):
             block.clean(value)
 
@@ -63,7 +72,9 @@ class TestVideoBlockValidation(SimpleTestCase):
 
     def test_valid_with_embed_url(self):
         block = VideoBlock()
-        value = block.to_python(self._raw(embed_url="https://www.youtube.com/watch?v=test"))
+        value = block.to_python(
+            self._raw(embed_url="https://www.youtube.com/watch?v=test")
+        )
         cleaned = block.clean(value)
         self.assertEqual(cleaned["embed_url"], "https://www.youtube.com/watch?v=test")
 
@@ -75,16 +86,20 @@ class TestVideoBlockValidation(SimpleTestCase):
 
     def test_caption_is_optional(self):
         block = VideoBlock()
-        value = block.to_python(self._raw(embed_url="https://www.youtube.com/watch?v=test"))
+        value = block.to_python(
+            self._raw(embed_url="https://www.youtube.com/watch?v=test")
+        )
         cleaned = block.clean(value)
         self.assertEqual(cleaned["caption"], "")
 
     def test_caption_is_preserved(self):
         block = VideoBlock()
-        value = block.to_python(self._raw(
-            embed_url="https://www.youtube.com/watch?v=test",
-            caption="My video caption",
-        ))
+        value = block.to_python(
+            self._raw(
+                embed_url="https://www.youtube.com/watch?v=test",
+                caption="My video caption",
+            )
+        )
         cleaned = block.clean(value)
         self.assertEqual(cleaned["caption"], "My video caption")
 
@@ -112,15 +127,11 @@ class TestCalloutBlockValidation(SimpleTestCase):
         self.assertEqual(errors, {})
 
     def test_only_link_page_no_error(self):
-        errors = _validate_at_most_one_link(
-            {"link_page": object(), "link_url": ""}, {}
-        )
+        errors = _validate_at_most_one_link({"link_page": object(), "link_url": ""}, {})
         self.assertEqual(errors, {})
 
     def test_neither_link_no_error(self):
-        errors = _validate_at_most_one_link(
-            {"link_page": None, "link_url": ""}, {}
-        )
+        errors = _validate_at_most_one_link({"link_page": None, "link_url": ""}, {})
         self.assertEqual(errors, {})
 
     def test_block_has_expected_fields(self):
