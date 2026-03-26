@@ -1,5 +1,5 @@
 {% load i18n wagtailimages_tags %}
-<figure class="my-4">
+<figure>
     {% image value.image width-1200 as img %}
     <img
         src="{{ img.url }}"
@@ -10,7 +10,7 @@
         loading="lazy"
     />
     {% if value.caption %}
-        <figcaption class="mt-2 text-sm text-neutral-500 text-center">
+        <figcaption class="mt-2 text-sm opacity-60 text-center">
             {{ value.caption }}
         </figcaption>
     {% endif %}

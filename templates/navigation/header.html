@@ -26,7 +26,7 @@
             Each item is either an InternalLinkBlock or ExternalLinkBlock.
             {% endcomment %}
             {% with nav=settings.wagtail_wtr_wtrx.NavigationSettings %}
-                <nav class="hidden md:flex items-center space-x-6" aria-label="{% trans 'Primary navigation' %}">
+                <nav class="hidden md:flex items-center space-x-6 ml-auto" aria-label="{% trans 'Primary navigation' %}">
                     {% for item in nav.primary_navigation %}
                         {% if item.block_type == "internal" %}
                             <a href="{% pageurl item.value.page %}"
@@ -47,7 +47,7 @@
                 CTA button (desktop) + hamburger (mobile).
                 CTA is shown when cta_text is set and at least one link is set.
                 {% endcomment %}
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4 ml-6">
                     {% if nav.cta_text and nav.cta_page or nav.cta_text and nav.cta_url %}
                         {% if nav.cta_page %}
                             <a href="{% pageurl nav.cta_page %}"
@@ -63,6 +63,7 @@
                         {% endif %}
                     {% endif %}
 
+                    {% if nav.primary_navigation or nav.cta_text and nav.cta_page or nav.cta_text and nav.cta_url %}
                     <button
                         type="button"
                         class="md:hidden p-2 text-neutral-600 hover:text-dark"
@@ -75,6 +76,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
+                    {% endif %}
                 </div>
             {% endwith %}
         </div>

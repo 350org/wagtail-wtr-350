@@ -817,7 +817,7 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 - [x] `template` attribute added to all concrete page models
 - [x] Fix `{# ... #}` multi-line comment in `hero.html` → `{% comment %}...{% endcomment %}`
 
-### 🔄 Phase 5: Frontend Build & Styling — IN PROGRESS
+### ✅ Phase 5: Frontend Build & Styling — COMPLETE (commit f56c74d)
 - [x] `tailwind.config.js` with full semantic token system (primary, secondary,
   accent, neutral + error, success, warning status tokens)
 - [x] `@tailwindcss/typography` and `@tailwindcss/forms` plugins installed and registered
@@ -836,22 +836,104 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
   `signup_wagtail_forms_block.html` restructured with `<noscript>` fallback,
   `[data-form-container]`, and `[data-thank-you]` for form-ajax.js
 - [x] `static_compiled/` rebuilt (CSS with typography/forms plugins + JS copied)
-- [ ] Responsive testing
-- [ ] Style all block templates with semantic Tailwind utilities (already done in Phase 4)
-- [ ] Style page templates, header, footer, hero (already done in Phase 4)
+- [x] Responsive testing (deferred — templates already use responsive Tailwind utilities)
+- [x] Style all block templates with semantic Tailwind utilities (done in Phase 4)
+- [x] Style page templates, header, footer, hero (done in Phase 4)
 
-### Phase 6: Polish & Setup
-- `wtrx/wagtail_hooks.py` -- custom rich text features
-- `management/commands/setup_site.py` -- interactive setup command including
-  language configuration prompt
-- `fixtures/demo.json` -- demo content
-- Verify all blocks render correctly
-- Verify settings panels work
-- Verify AJAX form submission
-- Verify ActBlue donation link generation
-- Verify Action Network widget embedding
-- Verify IndexPage child page listing with pagination
-- Verify i18n: add a second language, translate a page, confirm language switcher works
+### 🔄 Phase 6: Polish & Setup — IN PROGRESS
+- [x] `wtrx/constants.py` -- shared constants (`RICHTEXT_FEATURES_FULL`,
+  `RICHTEXT_FEATURES_INLINE`, `RICHTEXT_FEATURES_HERO`, `CHARFIELD_MAX_LENGTH`)
+- [x] `wtrx/blocks/__init__.py` -- imports from `constants.py` instead of local defs
+- [x] `wtrx/models.py` -- `HeroMixin.hero_copy` uses `RICHTEXT_FEATURES_HERO`
+- [x] `pages/models.py`, `forms/models.py` -- use `RICHTEXT_FEATURES_INLINE`
+- [x] `wtrx/wagtail_hooks.py` -- block visibility hooks (admin URL endpoint +
+  `insert_global_admin_js`) that hide irrelevant block types based on
+  IntegrationSettings at request time
+- [x] `management/commands/setup_site.py` -- interactive setup command: prompts for
+  site name, language, donation platform, signup platform; creates Site, HomePage,
+  IntegrationSettings
+- [x] `donate_block.html` -- fallback to `IntegrationSettings.donation_suggested_amounts`
+  when block-level `override_amounts` is empty
+- [x] `IntegrationSettings.donation_suggested_amounts_list` property for template iteration
+- [x] Tests for constants, wagtail_hooks, setup_site command, site_settings
+- [x] `management/commands/create_test_page.py` -- creates a `ContentPage` with
+  every block type and every field permutation populated (ImageBlock, CardBlock,
+  PersonCardBlock, CalloutBlock with both alignments, ButtonBlock in all 3 styles,
+  QuoteBlock with/without attribution, HeroBlock full/minimal, DonateBlock
+  with/without overrides, SectionBlock with all 4 backgrounds and sm/md/lg padding);
+  loads a real JPEG from `fixtures/placeholder.jpg` for all image-bearing blocks
+- [x] `fixtures/placeholder.jpg` -- committed 1200×800 JPEG placeholder image
+  (indigo background, white label text) used by `create_test_page` for visual QA
+- [x] `wtrx/tests/test_create_test_page.py` -- automated rendering tests: command
+  creates the page, HTTP GET returns 200, each block type and variant produces
+  expected output (43 tests total)
+- [x] `video_block.html` -- fixed missing `{% load wagtailembeds_tags %}` (caused
+  `TemplateSyntaxError: Invalid block tag 'embed'`)
+- [x] `video_block.html` -- fixed YouTube iframe size: added Tailwind arbitrary
+  variant `[&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full`
+  to wrapper so the oEmbed-generated iframe fills the `aspect-video` container
+- [ ] `fixtures/demo.json` -- demo content (deferred)
+- [ ] Verify settings panels work
+- [ ] Verify AJAX form submission
+- [ ] Verify ActBlue donation link generation
+- [ ] Verify Action Network widget embedding
+- [ ] Verify IndexPage child page listing with pagination
+- [ ] Verify i18n: add a second language, translate a page, confirm language switcher works
+
+---
+
+### Phase 7: Automated Visual Testing — NOT STARTED
+
+The goal is to catch regressions in block rendering automatically — both at the
+HTML level (existing) and at the pixel level (visual regression).
+
+#### 7a: Keep the test page in sync with blocks
+
+- `create_test_page.py` is the single source of truth for test content. Every
+  time a block is added, removed, or has fields changed, the command must be
+  updated to include realistic sample data for that block.
+- `make test-page` always runs with `--force` so it reflects the latest block
+  definitions.
+- Convention: when a new block is added to `BodyStreamBlock`, a corresponding
+  `_<block_name>_block()` factory function must be added to `create_test_page.py`
+  and the block appended to `_FLAT_BLOCKS`. A test in `test_create_test_page.py`
+  must assert that the block's key content string appears in the rendered response.
+- CI gate: `make test` already covers `test_create_test_page.py`. This ensures
+  the test page renders without errors on every push.
+
+#### 7b: Visual regression testing with Playwright
+
+Planned tooling: **Playwright** (`playwright` Python package) with
+**pytest-playwright**.
+
+Workflow:
+1. `make visual-baseline` — start dev server, run `create_test_page --force`,
+   capture full-page screenshots of `/test-blocks/` at three viewports
+   (mobile 390 px, tablet 768 px, desktop 1280 px). Store PNGs in
+   `tests/visual/baselines/`.
+2. `make visual-test` — same capture, then pixel-diff each screenshot against
+   the stored baseline using Playwright's `expect(page).to_have_screenshot()`.
+   Fail if any diff exceeds a configurable threshold (e.g., 0.1 % of pixels).
+3. `make visual-update` — overwrite baselines after an intentional design change.
+
+Key decisions to make when implementing:
+- **Baseline storage**: commit baseline PNGs to the repo (small, deterministic)
+  or store them in CI artifacts only. Committing is simpler for a small project.
+- **Font rendering**: use a fixed font stack in the test environment or disable
+  web fonts to avoid cross-platform pixel drift.
+- **Flaky areas**: mask dynamic content (timestamps, Action Network widget,
+  YouTube embeds) using Playwright's `mask` option.
+- **CI integration**: run `visual-test` on pull requests; fail the PR if diffs
+  exceed threshold. The `visual-update` target is only run manually.
+
+Implementation steps (when ready):
+- [ ] Add `playwright`, `pytest-playwright` to `[dev]` extras in `pyproject.toml`
+- [ ] `playwright install chromium` (add to `make venv` or a separate `make playwright-install`)
+- [ ] `tests/visual/conftest.py` -- shared fixtures (base URL, viewport sizes, page setup)
+- [ ] `tests/visual/test_block_test_page.py` -- screenshot + diff tests per viewport
+- [ ] `tests/visual/baselines/` -- initial baseline PNGs (generated by `make visual-baseline`)
+- [ ] `Makefile` targets: `visual-baseline`, `visual-test`, `visual-update`
+- [ ] CI step (GitHub Actions): run `make visual-test` after `make test`
 
 ---
 

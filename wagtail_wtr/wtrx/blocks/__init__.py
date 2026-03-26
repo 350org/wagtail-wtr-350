@@ -13,13 +13,15 @@ Block categories (in definition order):
 All blocks are assembled into BodyStreamBlock at the bottom of this file.
 """
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import (
     CharBlock,
     ChoiceBlock,
+    DecimalBlock,
     EmailBlock,
-    IntegerBlock,
     ListBlock,
     PageChooserBlock,
     RichTextBlock,
@@ -34,12 +36,10 @@ from wagtail.contrib.table_block.blocks import TableBlock as WagtailTableBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtailmedia.blocks import VideoChooserBlock
 
-# ---------------------------------------------------------------------------
-# Rich text feature sets
-# ---------------------------------------------------------------------------
-
-RICHTEXT_FEATURES_FULL = ["h2", "h3", "h4", "bold", "italic", "link", "ol", "ul", "blockquote"]
-RICHTEXT_FEATURES_INLINE = ["bold", "italic", "link"]
+from wagtail_wtr.wtrx.constants import (
+    RICHTEXT_FEATURES_FULL,
+    RICHTEXT_FEATURES_INLINE,
+)
 
 # ---------------------------------------------------------------------------
 # Choice constants
@@ -128,7 +128,9 @@ class ImageBlock(StructBlock):
     alt_text = CharBlock(
         required=False,
         label=_("Alt text"),
-        help_text=_("Overrides the image title for screen readers. Leave blank to use the image title."),
+        help_text=_(
+            "Overrides the image title for screen readers. Leave blank to use the image title."
+        ),
     )
     caption = CharBlock(
         required=False,
@@ -175,7 +177,9 @@ class VideoBlock(StructBlock):
             errors["embed_url"] = msg
             errors["media_file"] = msg
         elif has_embed and has_file:
-            msg = ValidationError(_("Provide either an embed URL or a media file, not both."))
+            msg = ValidationError(
+                _("Provide either an embed URL or a media file, not both.")
+            )
             errors["embed_url"] = msg
             errors["media_file"] = msg
         if errors:
@@ -222,7 +226,9 @@ class ButtonBlock(StructBlock):
             errors["link_page"] = msg
             errors["link_url"] = msg
         elif has_page and has_url:
-            msg = ValidationError(_("Provide either a link page or a link URL, not both."))
+            msg = ValidationError(
+                _("Provide either a link page or a link URL, not both.")
+            )
             errors["link_page"] = msg
             errors["link_url"] = msg
         if errors:
@@ -237,7 +243,7 @@ class ButtonBlock(StructBlock):
 
 class QuoteBlock(StructBlock):
     """
-    A pull quote with optional attribution and title/role.
+    A pull quote with optional attribution.
     """
 
     quote = WagtailTextBlock(
@@ -248,11 +254,6 @@ class QuoteBlock(StructBlock):
         required=False,
         label=_("Attribution"),
         help_text=_("Who said it (e.g. 'Jane Smith')."),
-    )
-    title = CharBlock(
-        required=False,
-        label=_("Title / role"),
-        help_text=_("Optional title or role of the person quoted."),
     )
 
     class Meta:
@@ -598,7 +599,9 @@ class SectionBlock(StructBlock):
     anchor_id = CharBlock(
         required=False,
         label=_("Anchor ID"),
-        help_text=_("Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."),
+        help_text=_(
+            "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
+        ),
     )
 
     class Meta:
@@ -639,11 +642,12 @@ class DonateBlock(StructBlock):
         help_text=_("Leave blank to use the site default button label."),
     )
     override_amounts = ListBlock(
-        IntegerBlock(min_value=1),
+        DecimalBlock(min_value=Decimal("0.01"), decimal_places=2),
+        required=False,
         label=_("Override amounts"),
         help_text=_(
-            "Optional list of suggested donation amounts (integers). "
-            "Overrides the site-wide default amounts from IntegrationSettings."
+            "Optional list of suggested donation amounts. "
+            "Leave empty to use the site-wide defaults."
         ),
     )
     override_url = URLBlock(
@@ -687,13 +691,16 @@ class SignupWagtailFormsBlock(StructBlock):
         help_text=_("Leave blank to use the site default button label."),
     )
     form_page = PageChooserBlock(
+        page_type="wagtail_wtr_forms.FormPage",
         label=_("Form page"),
         help_text=_("The FormPage whose form will be rendered inline."),
     )
     success_message = CharBlock(
         required=False,
         label=_("Success message"),
-        help_text=_("Message shown after successful submission. Leave blank for a generic thank-you."),
+        help_text=_(
+            "Message shown after successful submission. Leave blank for a generic thank-you."
+        ),
     )
 
     class Meta:
@@ -787,8 +794,9 @@ class BodyStreamBlock(StreamBlock):
 
     All block types — including all SignupBlock variants — are always
     registered here. Hiding irrelevant variants from editors is controlled
-    via wagtail_hooks.py (Phase 5), which reads IntegrationSettings at
-    request time. Never omit a block here to hide it.
+    via wagtail_hooks.py, which reads IntegrationSettings at request time
+    and injects CSS to hide the block-type buttons. Never omit a block
+    here to hide it.
     """
 
     text = TextBlock()

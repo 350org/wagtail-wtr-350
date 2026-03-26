@@ -1,17 +1,17 @@
 {% load i18n table_block_tags %}
-<div class="my-4 overflow-x-auto">
+<div class="overflow-x-auto">
     <table class="w-full border-collapse text-sm">
         {% if table_caption %}
-            <caption class="mb-2 text-sm text-neutral-500 text-left">{{ table_caption }}</caption>
+            <caption class="mb-2 text-sm opacity-60 text-left">{{ table_caption }}</caption>
         {% endif %}
         {% if table_header %}
-            <thead class="bg-neutral-100">
+            <thead class="bg-neutral-500/10">
                 <tr>
                     {% for column in table_header %}
                         {% with forloop.counter0 as col_index %}
                             {% cell_hidden 0 col_index as is_hidden %}
                             {% if not is_hidden %}
-                                <th scope="col" class="px-4 py-2 text-left font-semibold text-neutral-700 border border-neutral-200" {% cell_classname 0 col_index %} {% cell_span 0 col_index %}>
+                                <th scope="col" class="px-4 py-2 text-left font-semibold border border-neutral-500/20" {% cell_classname 0 col_index %} {% cell_span 0 col_index %}>
                                     {% if column.strip %}
                                         {% if html_renderer %}
                                             {{ column.strip|safe|linebreaksbr }}
@@ -29,13 +29,13 @@
         <tbody>
             {% for row in data %}
                 {% with forloop.counter0 as row_index %}
-                    <tr class="{% cycle 'bg-light' 'bg-neutral-50' %}">
+                    <tr class="{% cycle '' 'bg-neutral-500/5' %}">
                         {% for column in row %}
                             {% with forloop.counter0 as col_index %}
                                 {% cell_hidden row_index col_index table_header as is_hidden %}
                                 {% if not is_hidden %}
                                     {% if first_col_is_header and forloop.first %}
-                                        <th scope="row" class="px-4 py-2 text-left font-semibold text-neutral-700 border border-neutral-200" {% cell_classname row_index col_index table_header %} {% cell_span row_index col_index table_header %}>
+                                        <th scope="row" class="px-4 py-2 text-left font-semibold border border-neutral-500/20" {% cell_classname row_index col_index table_header %} {% cell_span row_index col_index table_header %}>
                                             {% if column.strip %}
                                                 {% if html_renderer %}
                                                     {{ column.strip|safe|linebreaksbr }}
@@ -45,7 +45,7 @@
                                             {% endif %}
                                         </th>
                                     {% else %}
-                                        <td class="px-4 py-2 text-neutral-700 border border-neutral-200" {% cell_classname row_index col_index table_header %} {% cell_span row_index col_index table_header %}>
+                                        <td class="px-4 py-2 border border-neutral-500/20" {% cell_classname row_index col_index table_header %} {% cell_span row_index col_index table_header %}>
                                             {% if column.strip %}
                                                 {% if html_renderer %}
                                                     {{ column.strip|safe|linebreaksbr }}

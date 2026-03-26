@@ -4,6 +4,7 @@ from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 
+from .constants import RICHTEXT_FEATURES_HERO
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .site_settings import (  # noqa: F401 — register with Django ORM
     BrandingSEOSettings,
@@ -88,7 +89,7 @@ class HeroMixin(models.Model):
     )
     hero_copy = RichTextField(
         blank=True,
-        features=["bold", "italic", "link", "ol", "ul"],
+        features=RICHTEXT_FEATURES_HERO,
         verbose_name=_("hero copy"),
         help_text=_("Optional subtext displayed below the headline."),
     )

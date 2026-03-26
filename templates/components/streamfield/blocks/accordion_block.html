@@ -1,19 +1,19 @@
-{% load i18n %}
-<div class="my-8 divide-y divide-neutral-200 rounded-lg border border-neutral-200" data-accordion>
+{% load i18n wagtailcore_tags %}
+<div class="divide-y divide-neutral-200 rounded-lg border border-neutral-200" data-accordion>
     {% for item in value.items %}
         <div class="accordion-item">
             <button
                 type="button"
-                class="flex w-full items-center justify-between px-5 py-4 text-left font-heading font-semibold text-dark hover:bg-neutral-50"
+                class="flex w-full items-center justify-between px-5 py-4 text-left font-heading font-semibold hover:bg-neutral-50/20"
                 aria-expanded="false"
                 data-accordion-toggle
             >
                 <span>{{ item.title }}</span>
-                <svg class="h-5 w-5 shrink-0 text-neutral-500 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <svg class="h-5 w-5 shrink-0 opacity-60 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <div class="hidden px-5 py-4 text-neutral-700 prose prose-neutral max-w-none" data-accordion-content>
+            <div class="hidden px-5 py-4 prose prose-neutral max-w-none [[data-bg=dark]_&]:prose-invert [[data-bg=primary]_&]:prose-invert" data-accordion-content>
                 {% include_block item.content %}
             </div>
         </div>

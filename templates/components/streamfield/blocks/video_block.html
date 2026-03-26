@@ -1,7 +1,7 @@
-{% load i18n wagtailcore_tags %}
-<figure class="my-4">
+{% load i18n wagtailcore_tags wagtailembeds_tags %}
+<figure>
     {% if value.embed_url %}
-        <div class="relative aspect-video w-full overflow-hidden rounded-lg">
+        <div class="relative aspect-video w-full overflow-hidden rounded-lg [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full">
             {% embed value.embed_url %}
         </div>
     {% elif value.media_file %}
@@ -17,7 +17,7 @@
         </video>
     {% endif %}
     {% if value.caption %}
-        <figcaption class="mt-2 text-sm text-neutral-500 text-center">
+        <figcaption class="mt-2 text-sm opacity-60 text-center">
             {{ value.caption }}
         </figcaption>
     {% endif %}

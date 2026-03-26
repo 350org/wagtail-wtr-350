@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -30,7 +32,7 @@ class InternalLinkBlock(StructBlock):
 
     class Meta:
         icon = "link"
-        label = _("internal link")
+        label = _("Internal Link")
 
 
 class ExternalLinkBlock(StructBlock):
@@ -41,7 +43,7 @@ class ExternalLinkBlock(StructBlock):
 
     class Meta:
         icon = "link"
-        label = _("external link")
+        label = _("External Link")
 
 
 class FooterColumnBlock(StructBlock):
@@ -96,14 +98,16 @@ class SocialLinkBlock(StructBlock):
 # ---------------------------------------------------------------------------
 
 
-def validate_comma_separated_integers(value):
-    """Validate that value is a comma-separated list of integers."""
+def validate_comma_separated_amounts(value):
+    """Validate that value is a comma-separated list of positive numbers."""
     if value:
         try:
-            [int(x.strip()) for x in value.split(",") if x.strip()]
-        except ValueError:
+            parsed = [Decimal(x.strip()) for x in value.split(",") if x.strip()]
+            if any(v <= 0 for v in parsed):
+                raise ValidationError(_("All amounts must be greater than zero."))
+        except InvalidOperation:
             raise ValidationError(
-                _("Enter a comma-separated list of integers, e.g. 10,25,50,100.")
+                _("Enter a comma-separated list of amounts, e.g. 10,25,50,100.")
             )
 
 
@@ -112,7 +116,7 @@ def validate_comma_separated_integers(value):
 # ---------------------------------------------------------------------------
 
 
-@register_setting
+@register_setting(icon="image", order=10)
 class BrandingSEOSettings(BaseSiteSetting):
     """Settings > Branding & SEO — logo, favicon, default meta image, site description."""
 
@@ -175,7 +179,7 @@ class BrandingSEOSettings(BaseSiteSetting):
         verbose_name = _("Branding & SEO")
 
 
-@register_setting
+@register_setting(icon="list-ul", order=20)
 class NavigationSettings(BaseSiteSetting):
     """Settings > Navigation — primary nav links, CTA button."""
 
@@ -222,11 +226,22 @@ class NavigationSettings(BaseSiteSetting):
         ),
     ]
 
+    def clean(self):
+        errors = {}
+        if self.cta_text and not self.cta_page and not self.cta_url:
+            msg = _(
+                "Set either a CTA page or CTA URL when CTA button text is provided."
+            )
+            errors["cta_page"] = msg
+            errors["cta_url"] = msg
+        if errors:
+            raise ValidationError(errors)
+
     class Meta:
         verbose_name = _("Navigation")
 
 
-@register_setting
+@register_setting(icon="bars", order=30)
 class FooterSettings(BaseSiteSetting):
     """Settings > Footer — footer nav columns, copyright text."""
 
@@ -257,7 +272,7 @@ class FooterSettings(BaseSiteSetting):
         verbose_name = _("Footer")
 
 
-@register_setting
+@register_setting(icon="globe", order=40)
 class SocialSettings(BaseSiteSetting):
     """Settings > Social — social media links."""
 
@@ -286,7 +301,7 @@ SIGNUP_PLATFORM_CHOICES = [
 ]
 
 
-@register_setting
+@register_setting(icon="cogs", order=50)
 class IntegrationSettings(BaseSiteSetting):
     """Settings > Integrations — donation and signup platform configuration."""
 
@@ -312,7 +327,7 @@ class IntegrationSettings(BaseSiteSetting):
             "Comma-separated integers, e.g. 10,25,50,100. "
             "Used by DonateBlock when no override amounts are set."
         ),
-        validators=[validate_comma_separated_integers],
+        validators=[validate_comma_separated_amounts],
     )
     donation_default_recurring = models.BooleanField(
         default=False,
@@ -329,8 +344,8 @@ class IntegrationSettings(BaseSiteSetting):
         blank=True,
         verbose_name=_("Action Network API key"),
         help_text=_(
-            "Stored in the database. For production, prefer setting "
-            "WTRX_ACTION_NETWORK_API_KEY as an environment variable and leaving this blank."
+            "Required for server-side Action Network integrations. "
+            "Leave blank if using the embed widget approach."
         ),
     )
 
@@ -356,20 +371,44 @@ class IntegrationSettings(BaseSiteSetting):
     def get_donation_platform(self):
         """
         Return the effective donation platform.
-        Admin setting takes precedence; falls back to WTRX_DONATION_PLATFORM Django setting.
+
+        If the admin has set a value (including "none"), use it.
+        Falls back to WTRX_DONATION_PLATFORM Django setting.
         """
-        if self.donation_platform and self.donation_platform != "none":
+        if self.donation_platform:
             return self.donation_platform
         return getattr(settings, "WTRX_DONATION_PLATFORM", "none")
 
     def get_signup_platform(self):
         """
         Return the effective signup platform.
-        Admin setting takes precedence; falls back to WTRX_SIGNUP_PLATFORM Django setting.
+
+        If the admin has set a value (including "none"), use it.
+        Falls back to WTRX_SIGNUP_PLATFORM Django setting.
         """
-        if self.signup_platform and self.signup_platform != "none":
+        if self.signup_platform:
             return self.signup_platform
         return getattr(settings, "WTRX_SIGNUP_PLATFORM", "wagtail_forms")
+
+    @property
+    def donation_suggested_amounts_list(self):
+        """
+        Return donation_suggested_amounts as a list of Decimals.
+
+        Used in templates to iterate over amounts when the block-level
+        override_amounts is empty and the site-wide default is set.
+        Returns an empty list if the field is blank or contains invalid data.
+        """
+        if not self.donation_suggested_amounts:
+            return []
+        try:
+            return [
+                Decimal(x.strip())
+                for x in self.donation_suggested_amounts.split(",")
+                if x.strip()
+            ]
+        except (InvalidOperation, AttributeError):
+            return []
 
     def get_action_network_api_key(self):
         """

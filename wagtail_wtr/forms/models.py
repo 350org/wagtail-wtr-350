@@ -12,6 +12,7 @@ from wagtail.admin.panels import (
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.fields import RichTextField
 
+from wagtail_wtr.wtrx.constants import RICHTEXT_FEATURES_INLINE
 from wagtail_wtr.wtrx.models import BasePage
 
 
@@ -54,13 +55,13 @@ class FormPage(BasePage, AbstractEmailForm):
 
     intro = RichTextField(
         blank=True,
-        features=["bold", "italic", "link"],
+        features=RICHTEXT_FEATURES_INLINE,
         verbose_name=_("intro"),
         help_text=_("Optional introductory text displayed above the form."),
     )
     thank_you_text = RichTextField(
         blank=True,
-        features=["bold", "italic", "link"],
+        features=RICHTEXT_FEATURES_INLINE,
         verbose_name=_("thank you text"),
         help_text=_("Text displayed after a successful form submission."),
     )

@@ -1,4 +1,4 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js test-page
 
 help:
 	@echo "Available commands:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make setup            - Interactive site setup"
 	@echo "  make test             - Run test suite"
 	@echo "  make load-data        - Migrate + load demo fixtures"
+	@echo "  make test-page        - Create (or refresh) the block test page"
 
 venv:
 	python3 -m venv .venv
@@ -44,7 +45,7 @@ createsuperuser:
 	python manage.py createsuperuser
 
 setup:
-	python manage.py setup_site  # implemented in Phase 6 (not yet available)
+	python manage.py setup_site
 
 test:
 	python manage.py test wagtail_wtr
@@ -53,3 +54,6 @@ load-data:
 	python manage.py migrate
 	@test -f fixtures/demo.json && python manage.py loaddata fixtures/demo.json || echo "No demo fixtures yet — skipping loaddata"
 	python manage.py collectstatic --noinput
+
+test-page:
+	python manage.py create_test_page --force

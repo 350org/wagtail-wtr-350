@@ -12,126 +12,549 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('taggit', '0006_rename_taggeditem_content_type_object_id_taggit_tagg_content_8fc721_idx'),
-        ('wagtailcore', '0094_alter_page_locale'),
+        (
+            "taggit",
+            "0006_rename_taggeditem_content_type_object_id_taggit_tagg_content_8fc721_idx",
+        ),
+        ("wagtailcore", "0094_alter_page_locale"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CustomImage',
+            name="CustomImage",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=255, verbose_name='title')),
-                ('file', wagtail.images.models.WagtailImageField(height_field='height', upload_to=wagtail.images.models.get_upload_to, verbose_name='file', width_field='width')),
-                ('description', models.CharField(blank=True, default='', max_length=255, verbose_name='description')),
-                ('width', models.IntegerField(editable=False, verbose_name='width')),
-                ('height', models.IntegerField(editable=False, verbose_name='height')),
-                ('created_at', models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='created at')),
-                ('focal_point_x', models.PositiveIntegerField(blank=True, null=True)),
-                ('focal_point_y', models.PositiveIntegerField(blank=True, null=True)),
-                ('focal_point_width', models.PositiveIntegerField(blank=True, null=True)),
-                ('focal_point_height', models.PositiveIntegerField(blank=True, null=True)),
-                ('file_size', models.PositiveIntegerField(editable=False, null=True)),
-                ('file_hash', models.CharField(blank=True, db_index=True, editable=False, max_length=40)),
-                ('credit', models.CharField(blank=True, help_text="Photographer or source attribution (e.g. 'Photo: Jane Smith').", max_length=255, verbose_name='credit')),
-                ('collection', models.ForeignKey(default=wagtail.models.media.get_root_collection_id, on_delete=django.db.models.deletion.CASCADE, related_name='+', to='wagtailcore.collection', verbose_name='collection')),
-                ('tags', taggit.managers.TaggableManager(blank=True, help_text=None, through='taggit.TaggedItem', to='taggit.Tag', verbose_name='tags')),
-                ('uploaded_by_user', models.ForeignKey(blank=True, editable=False, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL, verbose_name='uploaded by user')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("title", models.CharField(max_length=255, verbose_name="title")),
+                (
+                    "file",
+                    wagtail.images.models.WagtailImageField(
+                        height_field="height",
+                        upload_to=wagtail.images.models.get_upload_to,
+                        verbose_name="file",
+                        width_field="width",
+                    ),
+                ),
+                (
+                    "description",
+                    models.CharField(
+                        blank=True,
+                        default="",
+                        max_length=255,
+                        verbose_name="description",
+                    ),
+                ),
+                ("width", models.IntegerField(editable=False, verbose_name="width")),
+                ("height", models.IntegerField(editable=False, verbose_name="height")),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, db_index=True, verbose_name="created at"
+                    ),
+                ),
+                ("focal_point_x", models.PositiveIntegerField(blank=True, null=True)),
+                ("focal_point_y", models.PositiveIntegerField(blank=True, null=True)),
+                (
+                    "focal_point_width",
+                    models.PositiveIntegerField(blank=True, null=True),
+                ),
+                (
+                    "focal_point_height",
+                    models.PositiveIntegerField(blank=True, null=True),
+                ),
+                ("file_size", models.PositiveIntegerField(editable=False, null=True)),
+                (
+                    "file_hash",
+                    models.CharField(
+                        blank=True, db_index=True, editable=False, max_length=40
+                    ),
+                ),
+                (
+                    "credit",
+                    models.CharField(
+                        blank=True,
+                        help_text="Photographer or source attribution (e.g. 'Photo: Jane Smith').",
+                        max_length=255,
+                        verbose_name="credit",
+                    ),
+                ),
+                (
+                    "collection",
+                    models.ForeignKey(
+                        default=wagtail.models.media.get_root_collection_id,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="+",
+                        to="wagtailcore.collection",
+                        verbose_name="collection",
+                    ),
+                ),
+                (
+                    "tags",
+                    taggit.managers.TaggableManager(
+                        blank=True,
+                        help_text=None,
+                        through="taggit.TaggedItem",
+                        to="taggit.Tag",
+                        verbose_name="tags",
+                    ),
+                ),
+                (
+                    "uploaded_by_user",
+                    models.ForeignKey(
+                        blank=True,
+                        editable=False,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="uploaded by user",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'image',
-                'verbose_name_plural': 'images',
-                'abstract': False,
+                "verbose_name": "image",
+                "verbose_name_plural": "images",
+                "abstract": False,
             },
-            bases=(wagtail.images.models.ImageFileMixin, wagtail.search.index.Indexed, models.Model),
+            bases=(
+                wagtail.images.models.ImageFileMixin,
+                wagtail.search.index.Indexed,
+                models.Model,
+            ),
         ),
         migrations.CreateModel(
-            name='BrandingSEOSettings',
+            name="BrandingSEOSettings",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('site_description', models.TextField(blank=True, help_text='Default meta description for the site.', verbose_name='site description')),
-                ('site', models.OneToOneField(editable=False, on_delete=django.db.models.deletion.CASCADE, to='wagtailcore.site')),
-                ('dark_logo', models.ForeignKey(blank=True, help_text='Logo variant for dark backgrounds.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='wagtail_wtr_wtrx.customimage', verbose_name='dark logo')),
-                ('default_meta_image', models.ForeignKey(blank=True, help_text='Fallback OG / Twitter card image used when a page has no meta image set.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='wagtail_wtr_wtrx.customimage', verbose_name='default meta image')),
-                ('favicon', models.ForeignKey(blank=True, help_text='Browser favicon (square image, 32×32 px or SVG).', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='wagtail_wtr_wtrx.customimage', verbose_name='favicon')),
-                ('logo', models.ForeignKey(blank=True, help_text='Primary site logo. Displayed in the header.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='wagtail_wtr_wtrx.customimage', verbose_name='logo')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "site_description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Default meta description for the site.",
+                        verbose_name="site description",
+                    ),
+                ),
+                (
+                    "site",
+                    models.OneToOneField(
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="wagtailcore.site",
+                    ),
+                ),
+                (
+                    "dark_logo",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Logo variant for dark backgrounds.",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to="wagtail_wtr_wtrx.customimage",
+                        verbose_name="dark logo",
+                    ),
+                ),
+                (
+                    "default_meta_image",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Fallback OG / Twitter card image used when a page has no meta image set.",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to="wagtail_wtr_wtrx.customimage",
+                        verbose_name="default meta image",
+                    ),
+                ),
+                (
+                    "favicon",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Browser favicon (square image, 32×32 px or SVG).",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to="wagtail_wtr_wtrx.customimage",
+                        verbose_name="favicon",
+                    ),
+                ),
+                (
+                    "logo",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Primary site logo. Displayed in the header.",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to="wagtail_wtr_wtrx.customimage",
+                        verbose_name="logo",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Branding & SEO',
+                "verbose_name": "Branding & SEO",
             },
         ),
         migrations.CreateModel(
-            name='FooterSettings',
+            name="FooterSettings",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('footer_navigation', wagtail.fields.StreamField([('column', 7)], blank=True, block_lookup={0: ('wagtail.blocks.CharBlock', (), {'label': 'column heading', 'required': False}), 1: ('wagtail.blocks.CharBlock', (), {'label': 'link text'}), 2: ('wagtail.blocks.PageChooserBlock', (), {'label': 'page'}), 3: ('wagtail.blocks.StructBlock', [[('text', 1), ('page', 2)]], {}), 4: ('wagtail.blocks.URLBlock', (), {'label': 'URL'}), 5: ('wagtail.blocks.StructBlock', [[('text', 1), ('url', 4)]], {}), 6: ('wagtail.blocks.StreamBlock', [[('internal', 3), ('external', 5)]], {'label': 'links'}), 7: ('wagtail.blocks.StructBlock', [[('heading', 0), ('links', 6)]], {})}, help_text='Footer link columns. Each column has a heading and a list of links.', verbose_name='footer navigation')),
-                ('copyright_text', models.CharField(blank=True, help_text='Optional. Overrides the default "© {year} {site name}" copyright line.', max_length=255, verbose_name='copyright text')),
-                ('site', models.OneToOneField(editable=False, on_delete=django.db.models.deletion.CASCADE, to='wagtailcore.site')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "footer_navigation",
+                    wagtail.fields.StreamField(
+                        [("column", 7)],
+                        blank=True,
+                        block_lookup={
+                            0: (
+                                "wagtail.blocks.CharBlock",
+                                (),
+                                {"label": "column heading", "required": False},
+                            ),
+                            1: ("wagtail.blocks.CharBlock", (), {"label": "link text"}),
+                            2: (
+                                "wagtail.blocks.PageChooserBlock",
+                                (),
+                                {"label": "page"},
+                            ),
+                            3: (
+                                "wagtail.blocks.StructBlock",
+                                [[("text", 1), ("page", 2)]],
+                                {},
+                            ),
+                            4: ("wagtail.blocks.URLBlock", (), {"label": "URL"}),
+                            5: (
+                                "wagtail.blocks.StructBlock",
+                                [[("text", 1), ("url", 4)]],
+                                {},
+                            ),
+                            6: (
+                                "wagtail.blocks.StreamBlock",
+                                [[("internal", 3), ("external", 5)]],
+                                {"label": "links"},
+                            ),
+                            7: (
+                                "wagtail.blocks.StructBlock",
+                                [[("heading", 0), ("links", 6)]],
+                                {},
+                            ),
+                        },
+                        help_text="Footer link columns. Each column has a heading and a list of links.",
+                        verbose_name="footer navigation",
+                    ),
+                ),
+                (
+                    "copyright_text",
+                    models.CharField(
+                        blank=True,
+                        help_text='Optional. Overrides the default "© {year} {site name}" copyright line.',
+                        max_length=255,
+                        verbose_name="copyright text",
+                    ),
+                ),
+                (
+                    "site",
+                    models.OneToOneField(
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="wagtailcore.site",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Footer',
+                "verbose_name": "Footer",
             },
         ),
         migrations.CreateModel(
-            name='IntegrationSettings',
+            name="IntegrationSettings",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('donation_platform', models.CharField(choices=[('none', 'None'), ('actblue', 'ActBlue')], default='none', max_length=50, verbose_name='donation platform')),
-                ('donation_base_url', models.URLField(blank=True, help_text='e.g. https://secure.actblue.com/donate/mycampaign. Used by DonateBlock when no override URL is set.', verbose_name='donation base URL')),
-                ('donation_suggested_amounts', models.CharField(blank=True, help_text='Comma-separated integers, e.g. 10,25,50,100. Used by DonateBlock when no override amounts are set.', max_length=255, validators=[wagtail_wtr.wtrx.site_settings.validate_comma_separated_integers], verbose_name='suggested donation amounts')),
-                ('donation_default_recurring', models.BooleanField(default=False, verbose_name='default to recurring donation')),
-                ('signup_platform', models.CharField(choices=[('wagtail_forms', 'Wagtail Forms (built-in)'), ('action_network', 'Action Network'), ('none', 'None')], default='wagtail_forms', max_length=50, verbose_name='signup platform')),
-                ('action_network_api_key', models.CharField(blank=True, help_text='Stored in the database. For production, prefer setting WTRX_ACTION_NETWORK_API_KEY as an environment variable and leaving this blank.', max_length=255, verbose_name='Action Network API key')),
-                ('site', models.OneToOneField(editable=False, on_delete=django.db.models.deletion.CASCADE, to='wagtailcore.site')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "donation_platform",
+                    models.CharField(
+                        choices=[("none", "None"), ("actblue", "ActBlue")],
+                        default="none",
+                        max_length=50,
+                        verbose_name="donation platform",
+                    ),
+                ),
+                (
+                    "donation_base_url",
+                    models.URLField(
+                        blank=True,
+                        help_text="e.g. https://secure.actblue.com/donate/mycampaign. Used by DonateBlock when no override URL is set.",
+                        verbose_name="donation base URL",
+                    ),
+                ),
+                (
+                    "donation_suggested_amounts",
+                    models.CharField(
+                        blank=True,
+                        help_text="Comma-separated integers, e.g. 10,25,50,100. Used by DonateBlock when no override amounts are set.",
+                        max_length=255,
+                        validators=[
+                            wagtail_wtr.wtrx.site_settings.validate_comma_separated_amounts
+                        ],
+                        verbose_name="suggested donation amounts",
+                    ),
+                ),
+                (
+                    "donation_default_recurring",
+                    models.BooleanField(
+                        default=False, verbose_name="default to recurring donation"
+                    ),
+                ),
+                (
+                    "signup_platform",
+                    models.CharField(
+                        choices=[
+                            ("wagtail_forms", "Wagtail Forms (built-in)"),
+                            ("action_network", "Action Network"),
+                            ("none", "None"),
+                        ],
+                        default="wagtail_forms",
+                        max_length=50,
+                        verbose_name="signup platform",
+                    ),
+                ),
+                (
+                    "action_network_api_key",
+                    models.CharField(
+                        blank=True,
+                        help_text="Stored in the database. For production, prefer setting WTRX_ACTION_NETWORK_API_KEY as an environment variable and leaving this blank.",
+                        max_length=255,
+                        verbose_name="Action Network API key",
+                    ),
+                ),
+                (
+                    "site",
+                    models.OneToOneField(
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="wagtailcore.site",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Integrations',
+                "verbose_name": "Integrations",
             },
         ),
         migrations.CreateModel(
-            name='NavigationSettings',
+            name="NavigationSettings",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('primary_navigation', wagtail.fields.StreamField([('internal', 2), ('external', 4)], blank=True, block_lookup={0: ('wagtail.blocks.CharBlock', (), {'label': 'link text'}), 1: ('wagtail.blocks.PageChooserBlock', (), {'label': 'page'}), 2: ('wagtail.blocks.StructBlock', [[('text', 0), ('page', 1)]], {}), 3: ('wagtail.blocks.URLBlock', (), {'label': 'URL'}), 4: ('wagtail.blocks.StructBlock', [[('text', 0), ('url', 3)]], {})}, help_text='Links shown in the main navigation bar.', verbose_name='primary navigation')),
-                ('cta_text', models.CharField(blank=True, help_text='Text for the header call-to-action button.', max_length=100, verbose_name='CTA button text')),
-                ('cta_url', models.URLField(blank=True, help_text='External link for the CTA button. Set either this or CTA page, not both.', verbose_name='CTA URL')),
-                ('cta_page', models.ForeignKey(blank=True, help_text='Internal link for the CTA button. Set either this or CTA URL, not both.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='wagtailcore.page', verbose_name='CTA page')),
-                ('site', models.OneToOneField(editable=False, on_delete=django.db.models.deletion.CASCADE, to='wagtailcore.site')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "primary_navigation",
+                    wagtail.fields.StreamField(
+                        [("internal", 2), ("external", 4)],
+                        blank=True,
+                        block_lookup={
+                            0: ("wagtail.blocks.CharBlock", (), {"label": "link text"}),
+                            1: (
+                                "wagtail.blocks.PageChooserBlock",
+                                (),
+                                {"label": "page"},
+                            ),
+                            2: (
+                                "wagtail.blocks.StructBlock",
+                                [[("text", 0), ("page", 1)]],
+                                {},
+                            ),
+                            3: ("wagtail.blocks.URLBlock", (), {"label": "URL"}),
+                            4: (
+                                "wagtail.blocks.StructBlock",
+                                [[("text", 0), ("url", 3)]],
+                                {},
+                            ),
+                        },
+                        help_text="Links shown in the main navigation bar.",
+                        verbose_name="primary navigation",
+                    ),
+                ),
+                (
+                    "cta_text",
+                    models.CharField(
+                        blank=True,
+                        help_text="Text for the header call-to-action button.",
+                        max_length=100,
+                        verbose_name="CTA button text",
+                    ),
+                ),
+                (
+                    "cta_url",
+                    models.URLField(
+                        blank=True,
+                        help_text="External link for the CTA button. Set either this or CTA page, not both.",
+                        verbose_name="CTA URL",
+                    ),
+                ),
+                (
+                    "cta_page",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="Internal link for the CTA button. Set either this or CTA URL, not both.",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to="wagtailcore.page",
+                        verbose_name="CTA page",
+                    ),
+                ),
+                (
+                    "site",
+                    models.OneToOneField(
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="wagtailcore.site",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Navigation',
+                "verbose_name": "Navigation",
             },
         ),
         migrations.CreateModel(
-            name='SocialSettings',
+            name="SocialSettings",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('social_links', wagtail.fields.StreamField([('link', 2)], blank=True, block_lookup={0: ('wagtail.blocks.ChoiceBlock', [], {'choices': [('facebook', 'Facebook'), ('twitter', 'Twitter / X'), ('instagram', 'Instagram'), ('tiktok', 'TikTok'), ('linkedin', 'LinkedIn'), ('youtube', 'YouTube'), ('threads', 'Threads'), ('bluesky', 'Bluesky'), ('mastodon', 'Mastodon')], 'label': 'platform'}), 1: ('wagtail.blocks.URLBlock', (), {'label': 'URL'}), 2: ('wagtail.blocks.StructBlock', [[('platform', 0), ('url', 1)]], {})}, verbose_name='social links')),
-                ('site', models.OneToOneField(editable=False, on_delete=django.db.models.deletion.CASCADE, to='wagtailcore.site')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "social_links",
+                    wagtail.fields.StreamField(
+                        [("link", 2)],
+                        blank=True,
+                        block_lookup={
+                            0: (
+                                "wagtail.blocks.ChoiceBlock",
+                                [],
+                                {
+                                    "choices": [
+                                        ("facebook", "Facebook"),
+                                        ("twitter", "Twitter / X"),
+                                        ("instagram", "Instagram"),
+                                        ("tiktok", "TikTok"),
+                                        ("linkedin", "LinkedIn"),
+                                        ("youtube", "YouTube"),
+                                        ("threads", "Threads"),
+                                        ("bluesky", "Bluesky"),
+                                        ("mastodon", "Mastodon"),
+                                    ],
+                                    "label": "platform",
+                                },
+                            ),
+                            1: ("wagtail.blocks.URLBlock", (), {"label": "URL"}),
+                            2: (
+                                "wagtail.blocks.StructBlock",
+                                [[("platform", 0), ("url", 1)]],
+                                {},
+                            ),
+                        },
+                        verbose_name="social links",
+                    ),
+                ),
+                (
+                    "site",
+                    models.OneToOneField(
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="wagtailcore.site",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Social',
+                "verbose_name": "Social",
             },
         ),
         migrations.CreateModel(
-            name='CustomRendition',
+            name="CustomRendition",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('filter_spec', models.CharField(db_index=True, max_length=255)),
-                ('file', wagtail.images.models.WagtailImageField(height_field='height', storage=wagtail.images.models.get_rendition_storage, upload_to=wagtail.images.models.get_rendition_upload_to, width_field='width')),
-                ('width', models.IntegerField(editable=False)),
-                ('height', models.IntegerField(editable=False)),
-                ('focal_point_key', models.CharField(blank=True, default='', editable=False, max_length=16)),
-                ('image', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='renditions', to='wagtail_wtr_wtrx.customimage')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("filter_spec", models.CharField(db_index=True, max_length=255)),
+                (
+                    "file",
+                    wagtail.images.models.WagtailImageField(
+                        height_field="height",
+                        storage=wagtail.images.models.get_rendition_storage,
+                        upload_to=wagtail.images.models.get_rendition_upload_to,
+                        width_field="width",
+                    ),
+                ),
+                ("width", models.IntegerField(editable=False)),
+                ("height", models.IntegerField(editable=False)),
+                (
+                    "focal_point_key",
+                    models.CharField(
+                        blank=True, default="", editable=False, max_length=16
+                    ),
+                ),
+                (
+                    "image",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="renditions",
+                        to="wagtail_wtr_wtrx.customimage",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
-                'unique_together': {('image', 'filter_spec', 'focal_point_key')},
+                "abstract": False,
+                "unique_together": {("image", "filter_spec", "focal_point_key")},
             },
             bases=(wagtail.images.models.ImageFileMixin, models.Model),
         ),

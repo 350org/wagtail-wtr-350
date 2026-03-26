@@ -9,8 +9,9 @@
            {% elif value.padding == 'lg' %}py-24
            {% else %}py-16{% endif %}"
     {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}
+    data-bg="{{ value.background }}"
 >
-    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-8">
         {% for block in value.content %}
             {% include_block block %}
         {% endfor %}

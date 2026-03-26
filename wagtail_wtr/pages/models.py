@@ -6,6 +6,7 @@ from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
 
 from wagtail_wtr.wtrx.blocks import BodyStreamBlock
+from wagtail_wtr.wtrx.constants import RICHTEXT_FEATURES_INLINE
 from wagtail_wtr.wtrx.models import BasePage, HeroMixin
 
 ITEMS_PER_PAGE = 12
@@ -30,16 +31,22 @@ class ContentPage(BasePage, HeroMixin):
         use_json_field=True,
     )
 
-    content_panels = Page.content_panels + HeroMixin.hero_panels + [
-        FieldPanel("body"),
-    ]
+    content_panels = (
+        Page.content_panels
+        + HeroMixin.hero_panels
+        + [
+            FieldPanel("body"),
+        ]
+    )
 
     promote_panels = BasePage.promote_panels
 
-    edit_handler = TabbedInterface([
-        ObjectList(content_panels, heading=_("Content")),
-        ObjectList(promote_panels, heading=_("Promote")),
-    ])
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+        ]
+    )
 
     parent_page_types = [
         "wagtail_wtr_home.HomePage",
@@ -85,9 +92,11 @@ class IndexPage(BasePage, HeroMixin):
 
     intro = RichTextField(
         blank=True,
-        features=["bold", "italic", "link"],
+        features=RICHTEXT_FEATURES_INLINE,
         verbose_name=_("intro"),
-        help_text=_("Optional introductory text displayed above the child page listing."),
+        help_text=_(
+            "Optional introductory text displayed above the child page listing."
+        ),
     )
     body = StreamField(
         BodyStreamBlock(),
@@ -97,17 +106,23 @@ class IndexPage(BasePage, HeroMixin):
         use_json_field=True,
     )
 
-    content_panels = Page.content_panels + HeroMixin.hero_panels + [
-        FieldPanel("intro"),
-        FieldPanel("body"),
-    ]
+    content_panels = (
+        Page.content_panels
+        + HeroMixin.hero_panels
+        + [
+            FieldPanel("intro"),
+            FieldPanel("body"),
+        ]
+    )
 
     promote_panels = BasePage.promote_panels
 
-    edit_handler = TabbedInterface([
-        ObjectList(content_panels, heading=_("Content")),
-        ObjectList(promote_panels, heading=_("Promote")),
-    ])
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+        ]
+    )
 
     parent_page_types = [
         "wagtail_wtr_home.HomePage",
