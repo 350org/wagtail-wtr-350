@@ -1,13 +1,16 @@
 # wagtail-wtr
 
-A Wagtail website used by With the Ranks for campaign, nonprofit, and organizer
-websites. Fork or clone this repo to start a new site.
+Wagtail build with common organizing features, web best practices, and modern dev tools out of the box.
 
-Includes semantic Tailwind design tokens, multi-lingual support via wagtail-localize,
-AJAX form submission, a 15-block StreamField library, and 4 page types ready to extend.
+Built by [With the Ranks](https://withtheranks.com), used as a starting point for campaign, nonprofit, and organizer websites, and updated with new features periodically.
 
-The `wtrx/` sub-app is designed for eventual extraction as a standalone pip package
-(`wagtail-wtrx`), following the CodeRed CMS pattern.
+Fork this repo and customize via Tailwind theme to build your own site, and merge upstream changes to get new features as they're released. See [#Customization](#customization) for more information.
+
+Supports theming via semantic Tailwind design tokens, supports multiple languages,
+contains a StreamField library with common organizing blocks like Signup and Donate, has integrations with common organizing platforms like Action Network and Actblue, features custom page types ready to extend and more.
+
+The `wtrx/` sub-app contains core shared features and is designed for eventual extraction as a standalone pip package
+(`wagtail-wtrx`), inspired by [CodeRed Extensions](https://github.com/coderedcorp/coderedcms), so that sites built on top of  `wagtail-wtr` can utilize future platform updates.
 
 ---
 
@@ -58,6 +61,97 @@ make dev
 
 Visit [http://localhost:8000/](http://localhost:8000/) for the site and
 [http://localhost:8000/admin/](http://localhost:8000/admin/) for the Wagtail admin.
+
+---
+
+## Customization
+
+### 1. Fork the repo on GitHub
+
+Use the **Fork** button on GitHub, or with the GitHub CLI:
+
+```bash
+gh repo fork With-the-Ranks/wagtail-wtr --clone --remote
+cd wagtail-wtr   # use your fork's name here if you renamed it on GitHub
+```
+
+If you fork manually, clone your fork and add the upstream remote:
+
+```bash
+git clone git@github.com:yourorg/your-site.git
+cd your-site
+git remote add upstream git@github.com:With-the-Ranks/wagtail-wtr.git
+```
+
+### 2. Complete initial setup
+
+Follow the [Quickstart](#quickstart) steps above. The short version:
+
+```bash
+make venv
+source .venv/bin/activate
+npm install
+make build
+make migrate
+make setup          # sets site name, donation platform, signup platform
+make createsuperuser
+make dev
+```
+
+### 3. Brand and configure your fork
+
+- **Public site name**: set during `make setup` — stored in the Wagtail `Site` model
+  (also editable later in Wagtail admin → Settings → Sites).
+- **Admin interface label**: update `WAGTAIL_SITE_NAME` in `wagtail_wtr/settings/base.py`.
+- **Brand colors and fonts**: edit `static_src/css/theme.css` (see [Customizing the theme](#customizing-the-theme)).
+
+Everything else is covered in [What to customize](#what-to-customize) below.
+
+### 4. Pulling upstream updates
+
+When new blocks, bug fixes, or features land in this repo, pull them into your fork:
+
+```bash
+git fetch upstream
+git merge upstream/main
+```
+
+Most upstream changes land in `wagtail_wtr/wtrx/`, `templates/`, and
+`static_src/css/main.css` — none of which you should be editing on your fork.
+The only file likely to produce a conflict is `static_src/css/theme.css` if you
+have customised your brand colors. Resolve by keeping your `@theme {}` block and
+accepting upstream additions (e.g. new `[data-theme]` presets) from the merge.
+After merging, run `make build` to regenerate `static_compiled/` from your local `theme.css`.
+
+---
+
+## What to customize
+
+### Edit freely — this is your site
+
+| File / directory | What to change |
+|---|---|
+| `static_src/css/theme.css` | Brand colors (`--color-primary-*`, etc.), fonts, theme presets |
+| `wagtail_wtr/settings/base.py` | `WAGTAIL_SITE_NAME`, `WTRX_DONATION_PLATFORM`, `WTRX_SIGNUP_PLATFORM`, `LANGUAGES` |
+| `wagtail_wtr/home/` | `HomePage` model and template |
+| `wagtail_wtr/pages/` | Add or modify page types (`ContentPage`, `IndexPage`, new types) |
+| `wagtail_wtr/forms/` | Customise form page behavior |
+| `templates/` | Override or extend any template |
+| `static_src/javascript/` | Add site-specific JS components |
+| Wagtail admin | Settings > Branding, Navigation, Footer, Social, Integrations |
+
+### Don't edit — pull upstream cleanly
+
+| File / directory | Why |
+|---|---|
+| `wagtail_wtr/wtrx/` | Core reusable app — blocks, base models, settings models, hooks. Upstream changes land here. |
+| `static_src/css/main.css` | Tailwind infrastructure — imports, plugins, base layer. Leaving it unedited ensures conflict-free upstream merges. |
+
+### Extend, don't modify
+
+- **Page models**: subclass `BasePage` and `HeroMixin` from `wtrx/` in your own apps (`home/`, `pages/`, etc.)
+- **StreamField blocks**: use `BodyStreamBlock` as-is, or subclass it to add site-specific blocks
+- **Settings models**: create new `BaseSiteSetting` subclasses (from `wagtail.contrib.settings`) in your own apps if you need additional settings panels beyond what `wtrx/` already provides.
 
 ---
 
