@@ -16,6 +16,8 @@ All blocks are assembled into BodyStreamBlock at the bottom of this file.
 """
 
 from decimal import Decimal
+import re
+from urllib.parse import urlparse
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
@@ -71,17 +73,76 @@ SECTION_PADDING_CHOICES = [
     ("lg", _("Large")),
 ]
 
-ACTION_NETWORK_ACTION_TYPE_CHOICES = [
-    ("petition", _("Petition")),
-    ("form", _("Signup form")),
-    ("fundraising_page", _("Fundraising page")),
-    ("ticketed_event", _("Ticketed event")),
-    ("letter", _("Letter")),
-]
+# Mapping of Action Network URL path segments (plural) to embed types (singular).
+# Only 'forms' is supported initially; others will be added as needed.
+ACTION_NETWORK_URL_TYPES = {
+    "forms": "form",
+}
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+
+def parse_action_network_url(url):
+    """
+    Parse an Action Network URL and return ``{'action_type': ..., 'slug': ...}``.
+
+    Accepted formats:
+      - https://actionnetwork.org/forms/my-form-slug
+      - https://actionnetwork.org/forms/my-form-slug?source=direct_link&
+      - https://www.actionnetwork.org/forms/my-form-slug/
+
+    Raises ``ValidationError`` with a user-friendly message if the URL is not
+    a valid Action Network form URL.
+    """
+    parsed = urlparse(url)
+
+    # Validate hostname
+    hostname = (parsed.hostname or "").lower()
+    if hostname not in ("actionnetwork.org", "www.actionnetwork.org"):
+        raise ValidationError(
+            _(
+                "This does not appear to be an Action Network URL. "
+                "Expected a URL like https://actionnetwork.org/forms/your-form-slug"
+            )
+        )
+
+    # Split path into non-empty segments
+    segments = [s for s in parsed.path.strip("/").split("/") if s]
+    if len(segments) < 2:
+        raise ValidationError(
+            _(
+                "Could not find a form slug in this URL. "
+                "Expected a URL like https://actionnetwork.org/forms/your-form-slug"
+            )
+        )
+
+    url_type = segments[0].lower()
+    slug = segments[1]
+
+    if url_type not in ACTION_NETWORK_URL_TYPES:
+        supported = ", ".join(sorted(ACTION_NETWORK_URL_TYPES.keys()))
+        raise ValidationError(
+            _(
+                "Unsupported Action Network action type '%(url_type)s'. "
+                "Currently supported: %(supported)s."
+            ),
+            params={"url_type": url_type, "supported": supported},
+        )
+
+    # Validate slug format — AN slugs are lowercase alphanumeric + hyphens.
+    # This also prevents injection via the slug into template JS/HTML contexts.
+    if not re.match(r"^[a-z0-9][a-z0-9\-]*$", slug):
+        raise ValidationError(
+            _("The URL slug '%(slug)s' contains unexpected characters."),
+            params={"slug": slug},
+        )
+
+    return {
+        "action_type": ACTION_NETWORK_URL_TYPES[url_type],
+        "slug": slug,
+    }
 
 
 def _validate_at_most_one_link(cleaned, errors):
@@ -296,12 +357,21 @@ class TableBlock(WagtailTableBlock):
 
 class CardBlock(StructBlock):
     """
-    A content card with a heading, optional image, description, and link.
+    A content card with a heading, optional icon, optional image, description,
+    and link.
 
-    Used directly in the StreamField and as the child block of CardGridBlock.
-    At most one of link_page or link_url may be set. clean() enforces this.
+    When an icon is set, it renders at 24x24 beside the heading. Used directly
+    in the StreamField and as the child block of CardGridBlock. At most one of
+    link_page or link_url may be set. clean() enforces this.
     """
 
+    icon = ImageChooserBlock(
+        required=False,
+        label=_("Icon"),
+        help_text=_(
+            "Optional small icon image (ideally square) displayed beside the heading."
+        ),
+    )
     heading = CharBlock(label=_("Heading"))
     description = WagtailTextBlock(
         required=False,
@@ -662,13 +732,59 @@ class SignupWagtailFormsBlock(StructBlock):
         template = "components/streamfield/blocks/signup_wagtail_forms_block.html"
 
 
+class SuccessMessageBlock(StreamBlock):
+    """
+    StreamBlock for the optional thank-you content shown after a successful
+    Action Network signup.
+
+    Intentionally limited to content blocks (text, image, button, quote) —
+    no action blocks, layout blocks, or section nesting.
+
+    ``to_python`` coerces legacy non-list values (old RichTextBlock empty
+    strings) to an empty list so existing pages load without error.
+    """
+
+    text = TextBlock()
+    image = ImageBlock()
+    button = ButtonBlock()
+    quote = QuoteBlock()
+
+    @staticmethod
+    def _coerce(value):
+        """Return value as a list, coercing legacy RichTextBlock strings to []."""
+        if isinstance(value, list):
+            return value
+        return []
+
+    def to_python(self, value):
+        # Old RichTextBlock stored a plain string (e.g. "" or "<p>...</p>").
+        # Coerce any non-list value to an empty list so legacy data doesn't
+        # cause "string indices must be integers" errors.
+        return super().to_python(self._coerce(value))
+
+    def bulk_to_python(self, values):
+        # bulk_to_python bypasses to_python entirely; apply the same coercion
+        # here so revision loading doesn't crash on legacy string values.
+        return super().bulk_to_python([self._coerce(v) for v in values])
+
+    class Meta:
+        label = _("Success message content")
+        required = False
+
+
 class SignupActionNetworkBlock(StructBlock):
     """
-    Renders an Action Network JS widget.
+    Renders an Action Network form embed widget.
 
-    The action_network_id is the identifier for the specific Action Network
-    action (petition, signup form, etc.). The JS widget is embedded in the
-    template using Action Network's standard embed code.
+    The editor pastes a full Action Network URL (e.g.
+    ``https://actionnetwork.org/forms/join-30?source=direct_link&``). The block
+    auto-extracts the action type and slug, then renders the v6 JS embed with
+    custom styling (no Action Network CSS is loaded).
+
+    An optional success_message field lets editors override Action Network's
+    default thank-you screen. When provided, a MutationObserver in the template
+    detects the AN widget's blocks and replaces it with the custom StreamField
+    content.
     """
 
     heading = CharBlock(
@@ -681,19 +797,50 @@ class SignupActionNetworkBlock(StructBlock):
         label=_("Description"),
         help_text=_("Optional supporting text below the heading."),
     )
-    action_type = ChoiceBlock(
-        choices=ACTION_NETWORK_ACTION_TYPE_CHOICES,
-        default="petition",
-        label=_("Action type"),
-        help_text=_("The type of Action Network action being embedded."),
-    )
-    action_network_id = CharBlock(
-        label=_("Action Network ID"),
+    action_url = URLBlock(
+        label=_("Action Network URL"),
         help_text=_(
-            "The Action Network action identifier (e.g. 'abc12345-...'). "
-            "Found in the Action Network embed code."
+            "Paste the full Action Network form URL "
+            "(e.g. https://actionnetwork.org/forms/your-form-slug)."
         ),
     )
+    success_message = SuccessMessageBlock(
+        required=False,
+        label=_("Success message"),
+        help_text=_(
+            "Optional. Replaces Action Network's default thank-you screen "
+            "after a successful signup."
+        ),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        action_url = cleaned.get("action_url", "")
+        if action_url:
+            try:
+                parse_action_network_url(action_url)
+            except ValidationError as exc:
+                raise StructBlockValidationError(block_errors={"action_url": exc})
+        return cleaned
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        action_url = value.get("action_url", "")
+        if action_url:
+            try:
+                parsed = parse_action_network_url(action_url)
+                ctx["action_type"] = parsed["action_type"]
+                ctx["slug"] = parsed["slug"]
+            except ValidationError:
+                ctx["action_type"] = ""
+                ctx["slug"] = ""
+        else:
+            ctx["action_type"] = ""
+            ctx["slug"] = ""
+        # Pass success_message to template context for the conditional
+        # thank-you override logic.
+        ctx["success_message"] = value.get("success_message")
+        return ctx
 
     class Meta:
         icon = "form"
@@ -742,42 +889,57 @@ class SignupLinkBlock(StructBlock):
 # ---------------------------------------------------------------------------
 
 
+class SectionContentBlock(StreamBlock):
+    """
+    StreamBlock used inside SectionBlock.
+
+    Contains all BodyStreamBlock block types except SectionBlock itself
+    (to prevent infinite nesting). Declared as a named class so that
+    fork sites can subclass it and override individual block types
+    (e.g. swap CardBlock for a site-specific subclass) without
+    duplicating the entire block list.
+
+    Wagtail's DeclarativeSubBlocksMetaclass merges parent and child
+    declared_blocks via the MRO, so a subclass only needs to redeclare
+    the block(s) it wants to change.
+    """
+
+    text = TextBlock()
+    image = ImageBlock()
+    video = VideoBlock()
+    button = ButtonBlock()
+    quote = QuoteBlock()
+    raw_html = RawHTMLBlock()
+    table = TableBlock()
+    card = CardBlock()
+    person_card = PersonCardBlock()
+    card_grid = CardGridBlock()
+    accordion = AccordionBlock()
+    callout = CalloutBlock()
+    hero = HeroBlock()
+    donate = DonateBlock()
+    signup_wagtail_forms = SignupWagtailFormsBlock()
+    signup_action_network = SignupActionNetworkBlock()
+    signup_link = SignupLinkBlock()
+
+    class Meta:
+        label = _("Content")
+
+
 class SectionBlock(StructBlock):
     """
     A full-width page section with configurable background, padding, and content.
 
-    Content is a nested StreamBlock accepting all blocks except SectionBlock
-    itself (to prevent infinite nesting). No explicit heading field — editors
-    use an h2 TextBlock inside the content. All action blocks (donate, signup
-    variants) are included so a section can be fully self-contained.
+    Content is a SectionContentBlock (a StreamBlock accepting all block types
+    except SectionBlock itself, to prevent infinite nesting). No explicit
+    heading field — editors use an h2 TextBlock inside the content. All action
+    blocks (donate, signup variants) are included so a section can be fully
+    self-contained.
 
     anchor_id enables deep-linking (e.g. #contact).
     """
 
-    # Mirrors BodyStreamBlock exactly, minus ("section", SectionBlock())
-    # to prevent infinite nesting.
-    content = StreamBlock(
-        [
-            ("text", TextBlock()),
-            ("image", ImageBlock()),
-            ("video", VideoBlock()),
-            ("button", ButtonBlock()),
-            ("quote", QuoteBlock()),
-            ("raw_html", RawHTMLBlock()),
-            ("table", TableBlock()),
-            ("card", CardBlock()),
-            ("person_card", PersonCardBlock()),
-            ("card_grid", CardGridBlock()),
-            ("accordion", AccordionBlock()),
-            ("callout", CalloutBlock()),
-            ("hero", HeroBlock()),
-            ("donate", DonateBlock()),
-            ("signup_wagtail_forms", SignupWagtailFormsBlock()),
-            ("signup_action_network", SignupActionNetworkBlock()),
-            ("signup_link", SignupLinkBlock()),
-        ],
-        label=_("Content"),
-    )
+    content = SectionContentBlock()
     background = ChoiceBlock(
         choices=SECTION_BACKGROUND_CHOICES,
         default="light",

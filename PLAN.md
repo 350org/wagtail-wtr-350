@@ -27,7 +27,7 @@ wagtail-wtr/
 │   │   ├── __init__.py
 │   │   ├── apps.py
 │   │   ├── blocks/
-│   │   │   ├── __init__.py         # Exports BodyStreamBlock
+│   │   │   ├── __init__.py         # Exports BodyStreamBlock, SectionContentBlock
 │   │   │   ├── content.py          # TextBlock, ImageBlock, VideoBlock, ButtonBlock,
 │   │   │   │                       #   QuoteBlock, RawHTMLBlock, TableBlock
 │   │   │   ├── layout.py           # SectionBlock, CardGridBlock, AccordionBlock
@@ -293,11 +293,15 @@ Custom `clean()` validates at most one of `link_page` or `link_url` is set
 
 | Field | Type | Required |
 |---|---|---|
+| icon | ImageChooserBlock | No |
 | heading | CharBlock | **Yes** |
 | description | TextBlock (plain) | No |
 | image | ImageChooserBlock | No |
 | link_page | PageChooserBlock | No |
 | link_url | URLBlock | No |
+
+Optional icon image displayed beside the heading. Rendered at 24x24px with
+`alt=""` (decorative). When omitted, the heading renders without any icon.
 
 **14. PersonCardBlock** (StructBlock)
 
@@ -344,9 +348,18 @@ AJAX handler submits to `form_page.url`.
 |---|---|---|
 | heading | CharBlock | **Yes** |
 | description | RichTextBlock | No |
-| action_network_id | CharBlock | **Yes** |
+| action_url | URLBlock | **Yes** |
+| success_message | RichTextBlock | No |
 
-Renders Action Network's JS widget.
+Editor pastes a full Action Network URL (e.g.
+`https://actionnetwork.org/forms/join-30?source=direct_link&`). The block
+auto-extracts the action type and slug via `parse_action_network_url()`, then
+renders the v6 JS embed widget with fully custom CSS styling (no AN CSS loaded).
+All form styles are scoped under `.wtr-action-network-embed` using the project's
+design tokens. When `success_message` is provided, a MutationObserver detects
+AN's `.can_thank_you_wrap` element and replaces it with the custom message.
+Only `/forms/` URLs are supported initially; other AN action types can be added
+by extending the `ACTION_NETWORK_URL_TYPES` dict.
 
 **15d. SignupBlock -- none/link variant** (StructBlock)
 
@@ -943,16 +956,27 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
   default False) — makes header `position:absolute` over hero, transparent bg, light
   text; automatically uses `BrandingSEOSettings.dark_logo` when enabled
 - [x] `wtr-*` CSS class hooks on all critical elements: `wtr-header`, `wtr-footer`,
-  `wtr-hero`, `wtr-section`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`,
+  `wtr-hero`, `wtr-section`, `wtr-card`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`,
   `wtr-quote`, `wtr-donate`, `wtr-signup`, `wtr-social-links` — no default styles,
   pure theme override hooks
 - [x] Block/settings label capitalization normalized to sentence case throughout
   `site_settings.py`
+- [x] `SectionContentBlock` — extracted the inline tuple-list `StreamBlock` inside
+  `SectionBlock` into a named declarative `StreamBlock` subclass. Fork sites can now
+  subclass `SectionContentBlock` and override individual child blocks (e.g. swap
+  `CardBlock` for a site-specific subclass) without duplicating the entire 17-entry
+  block list. Migration-neutral: Wagtail's `deconstruct()` serializes both forms
+  identically as `wagtail.blocks.StreamBlock`.
+- [x] `CardBlock.icon` — optional `ImageChooserBlock` displayed beside the card
+  heading. Rendered at 24x24px with `alt=""` (decorative). `card.html` template
+  updated with conditional icon rendering. `create_test_page` and tests updated.
+- [x] README `Customizing Blocks` section — documents the subclass-and-override
+  pattern for fork sites, with a concrete example of adding a field to `CardBlock`
 - [ ] `fixtures/demo.json` -- demo content (deferred)
 - [ ] Verify settings panels work
 - [ ] Verify AJAX form submission
 - [ ] Verify ActBlue donation link generation
-- [ ] Verify Action Network widget embedding
+- [x] Verify Action Network widget embedding
 - [ ] Verify IndexPage child page listing with pagination
 - [ ] Verify i18n: add a second language, translate a page, confirm language switcher works
 

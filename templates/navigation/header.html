@@ -91,18 +91,18 @@ and the dark_logo variant is used if available.
                 {% if nav.cta_text %}
                     {% if nav.cta_page %}
                         <a href="{% pageurl nav.cta_page %}"
-                           class="inline-block rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-light transition hover:bg-primary-700">
+                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_url %}
                         <a href="{{ nav.cta_url }}"
                            rel="noopener noreferrer"
-                           class="inline-block rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-light transition hover:bg-primary-700">
+                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_anchor %}
                         <a href="#{{ nav.cta_anchor }}"
-                           class="inline-block rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-light transition hover:bg-primary-700">
+                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
                             {{ nav.cta_text }}
                         </a>
                     {% endif %}

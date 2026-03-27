@@ -1,5 +1,5 @@
 {% load i18n wagtailimages_tags %}
-<div class="flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-light shadow-xs">
+<div class="wtr-card flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-light shadow-xs">
     {% if card.image %}
         {% image card.image fill-640x360 as img %}
         <div class="aspect-video overflow-hidden">
@@ -7,9 +7,17 @@
         </div>
     {% endif %}
     <div class="flex flex-1 flex-col p-5">
-        <h3 class="font-heading text-lg font-semibold text-dark">{{ card.heading }}</h3>
+        {% if card.icon %}
+            {% image card.icon fill-24x24 as icon_img %}
+            <div class="flex items-center gap-3">
+                <img src="{{ icon_img.url }}" width="{{ icon_img.width }}" height="{{ icon_img.height }}" alt="" class="h-6 w-6 shrink-0" loading="lazy">
+                <h3 class="font-heading text-lg font-semibold text-dark">{{ card.heading }}</h3>
+            </div>
+        {% else %}
+            <h3 class="font-heading text-lg font-semibold text-dark">{{ card.heading }}</h3>
+        {% endif %}
         {% if card.description %}
-            <p class="mt-2 flex-1 text-sm text-neutral-600">{{ card.description }}</p>
+            <p class="mt-2 flex-1 text-sm text-dark">{{ card.description }}</p>
         {% endif %}
         {% if card.link_page or card.link_url %}
             <div class="mt-4">

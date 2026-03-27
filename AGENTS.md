@@ -174,7 +174,7 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
   they exist solely as stable hooks for client theme overrides. Convention:
   - `wtr-header`, `wtr-footer` — top-level layout regions
   - `wtr-hero` — hero component (both `HeroMixin` pages and `HeroBlock`)
-  - `wtr-section`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`, `wtr-quote` — layout blocks
+  - `wtr-section`, `wtr-card`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`, `wtr-quote` — layout blocks
   - `wtr-donate`, `wtr-signup` — conversion blocks
   - `wtr-social-links` — social icons container (in header menu panel and footer)
   Always add the `wtr-*` class in addition to any Tailwind utility classes — never
@@ -267,6 +267,15 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
    ship with their own migrations when extracted. Abstract models (BasePage,
    HeroMixin) will be provided for site apps to subclass. Follow the CodeRed CMS
    pattern: package provides base classes, site apps provide thin concrete subclasses.
+9. **SectionContentBlock for fork extensibility**: `SectionBlock.content` uses a
+   named declarative `StreamBlock` subclass (`SectionContentBlock`) instead of an
+   inline tuple-list. This allows fork sites to subclass `SectionContentBlock` and
+   override individual child blocks (e.g. swap `CardBlock` for a site-specific
+   subclass) without duplicating the full 17-entry block list. Wagtail's
+   `DeclarativeSubBlocksMetaclass` merges parent and child `declared_blocks` via
+   the MRO, so a subclass only needs to redeclare the block(s) it wants to change.
+   The same metaclass pattern works for `BodyStreamBlock` (override individual
+   block attributes) and `CardGridBlock` (override the `cards` ListBlock).
 
 ## Error Handling
 
@@ -464,6 +473,35 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     Always guard social icon rendering with
     `{% if social.show_in_header and social.social_links %}` (header) and
     `{% if social.show_in_footer and social.social_links %}` (footer).
+
+21. **Action Network embed — URL-based, no AN CSS**: `SignupActionNetworkBlock`
+    accepts a full AN URL (`https://actionnetwork.org/forms/your-slug`), not a
+    manual action-type + UUID. The `parse_action_network_url()` helper in
+    `blocks/__init__.py` extracts the action type and slug. Only `/forms/` is
+    supported initially; extend `ACTION_NETWORK_URL_TYPES` for other types.
+    Key implementation details:
+    - **AN CSS is loaded** — `style-embed-v3.css` is loaded by the template
+      and handles structural layout (float-labels, country selector, spinner,
+      two-column form layout). Custom styles scoped under `.wtr-action-network-embed`
+      in `static_src/css/main.css` override only visual tokens (fonts, colours,
+      submit button) and hide AN branding. **Do not remove the `<link>` tag** —
+      the form layout will break without it.
+    - **Embed pattern**: `<script src='https://actionnetwork.org/widgets/v6/form/{slug}?format=js&source=widget'>`
+      + `<div id='can-form-area-{slug}'>`. Note the plural-to-singular mapping
+      (`/forms/` URL → `form` embed type) and the div ID format `can-{type}-area-{slug}`.
+    - **Slug validation**: `parse_action_network_url()` validates slugs against
+      `^[a-z0-9][a-z0-9\-]*$` to prevent JS/HTML injection via the template.
+    - **Success message**: optional `SuccessMessageBlock` (StreamBlock: text, image,
+      button, quote). When provided, inline JS in the
+      template uses a `MutationObserver` to detect AN's `.can_thank_you_wrap` and
+      replace it with the custom message. The JS targets the embed by its unique
+      `can-{type}-area-{slug}` ID + `.closest()`, so multiple AN blocks on one
+      page work correctly.
+    - **`get_context()` wraps parsing in try/except** to prevent 500 errors at
+      render time if a bad URL somehow gets saved.
+    - **Template guards**: embed `<script>`/`<div>` are wrapped in
+      `{% if action_type and slug %}` to prevent broken markup.
+    - **`<noscript>` fallback**: links to the original AN form URL.
 
 ## Git Conventions
 
