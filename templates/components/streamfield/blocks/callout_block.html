@@ -1,5 +1,5 @@
 {% load i18n wagtailimages_tags wagtailcore_tags %}
-<div class="flex flex-col gap-8 {% if value.alignment == 'image-right' %}md:flex-row-reverse{% else %}md:flex-row{% endif %} items-center">
+<div class="wtr-callout flex flex-col gap-8 {% if value.alignment == 'image-right' %}md:flex-row-reverse{% else %}md:flex-row{% endif %} items-center">
     <div class="w-full md:w-1/2 overflow-hidden rounded-lg">
         {% image value.image fill-800x600 as img %}
         <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}" class="h-full w-full object-cover" loading="lazy">

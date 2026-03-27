@@ -55,6 +55,16 @@ class BasePage(Page):
         ),
     ]
 
+    def get_context(self, request, *args, **kwargs):
+        ctx = super().get_context(request, *args, **kwargs)
+        # Ensure transparent_header is always present in context so header.html
+        # never relies on implicit falsy-absent behaviour. setdefault is used
+        # intentionally: HomePage.get_context() calls super() first and then
+        # sets ctx["transparent_header"] = self.use_transparent_header, so this
+        # default is only applied for non-home pages where the key is absent.
+        ctx.setdefault("transparent_header", False)
+        return ctx
+
     def get_sitemap_urls(self, request=None):
         if self.hide_from_search:
             return []

@@ -5,7 +5,7 @@
 {% endcomment %}
 {% trans "Donate" as default_donate_text %}
 {% with donate_url=value.override_url|default:settings.wagtail_wtr_wtrx.IntegrationSettings.donation_base_url %}
-<div class="rounded-lg bg-primary-50 px-6 py-10 text-center">
+<div class="wtr-donate rounded-lg bg-primary-50 px-6 py-10 text-center">
     <h2 class="font-heading text-2xl font-bold text-primary-900 md:text-3xl">{{ value.heading }}</h2>
     {% if value.description %}
         <div class="prose prose-neutral mx-auto mt-4 max-w-2xl">

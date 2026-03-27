@@ -27,40 +27,55 @@ from .images import CustomImage
 class InternalLinkBlock(StructBlock):
     """A navigation link to an internal Wagtail page."""
 
-    text = CharBlock(label=_("link text"))
-    page = PageChooserBlock(label=_("page"))
+    text = CharBlock(label=_("Link text"))
+    page = PageChooserBlock(label=_("Page"))
 
     class Meta:
         icon = "link"
-        label = _("Internal Link")
+        label = _("Internal link")
 
 
 class ExternalLinkBlock(StructBlock):
     """A navigation link to an external URL."""
 
-    text = CharBlock(label=_("link text"))
+    text = CharBlock(label=_("Link text"))
     url = URLBlock(label=_("URL"))
 
     class Meta:
         icon = "link"
-        label = _("External Link")
+        label = _("External link")
+
+
+class AnchorLinkBlock(StructBlock):
+    """A navigation link to an anchor on the current page (e.g. #about)."""
+
+    text = CharBlock(label=_("Link text"))
+    anchor = CharBlock(
+        label=_("Anchor"),
+        help_text=_("Anchor ID without the # symbol, e.g. 'about'."),
+    )
+
+    class Meta:
+        icon = "link"
+        label = _("Anchor link")
 
 
 class FooterColumnBlock(StructBlock):
     """A column of links in the footer."""
 
-    heading = CharBlock(label=_("column heading"), required=False)
+    heading = CharBlock(label=_("Column heading"), required=False)
     links = StreamBlock(
         [
             ("internal", InternalLinkBlock()),
             ("external", ExternalLinkBlock()),
+            ("anchor", AnchorLinkBlock()),
         ],
-        label=_("links"),
+        label=_("Links"),
     )
 
     class Meta:
         icon = "list-ul"
-        label = _("footer column")
+        label = _("Footer column")
 
 
 # Module-level so it can be reused in templates/filters if needed.
@@ -85,12 +100,20 @@ class SocialLinkBlock(StructBlock):
     serialization can reference it by dotted path.
     """
 
-    platform = ChoiceBlock(choices=SOCIAL_PLATFORM_CHOICES, label=_("platform"))
+    platform = ChoiceBlock(choices=SOCIAL_PLATFORM_CHOICES, label=_("Platform"))
     url = URLBlock(label=_("URL"))
 
     class Meta:
         icon = "site"
-        label = _("social link")
+        label = _("Social link")
+
+
+# Module-level per AGENTS.md pitfall #10 — gettext_lazy in choices requires
+# module-level definition to avoid migration serialization failures.
+FOOTER_LAYOUT_CHOICES = [
+    ("columns", _("Columns")),
+    ("minimal", _("Minimal")),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +159,9 @@ class BrandingSEOSettings(BaseSiteSetting):
         on_delete=models.SET_NULL,
         related_name="+",
         verbose_name=_("dark logo"),
-        help_text=_("Logo variant for dark backgrounds."),
+        help_text=_(
+            "Logo variant for dark or transparent backgrounds (e.g. transparent header)."
+        ),
     )
     favicon = models.ForeignKey(
         CustomImage,
@@ -181,12 +206,13 @@ class BrandingSEOSettings(BaseSiteSetting):
 
 @register_setting(icon="list-ul", order=20)
 class NavigationSettings(BaseSiteSetting):
-    """Settings > Navigation — primary nav links, CTA button."""
+    """Settings > Navigation — primary nav links, CTA button, layout options."""
 
     primary_navigation = StreamField(
         [
             ("internal", InternalLinkBlock()),
             ("external", ExternalLinkBlock()),
+            ("anchor", AnchorLinkBlock()),
         ],
         blank=True,
         verbose_name=_("primary navigation"),
@@ -217,23 +243,70 @@ class NavigationSettings(BaseSiteSetting):
             "External link for the CTA button. Set either this or CTA page, not both."
         ),
     )
+    cta_anchor = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("CTA anchor"),
+        help_text=_(
+            "Anchor link for the CTA button (without the # symbol, e.g. 'donate'). "
+            "Set this instead of CTA page or CTA URL to link to an anchor on the current page."
+        ),
+    )
+    collapse_desktop_menu = models.BooleanField(
+        default=False,
+        verbose_name=_("collapse desktop menu"),
+        help_text=_(
+            "Always show the hamburger menu icon, even on desktop. "
+            "Navigation links are hidden behind the menu toggle at all screen sizes."
+        ),
+    )
 
     panels = [
         FieldPanel("primary_navigation"),
         MultiFieldPanel(
-            [FieldPanel("cta_text"), FieldPanel("cta_page"), FieldPanel("cta_url")],
+            [
+                FieldPanel("cta_text"),
+                FieldPanel("cta_page"),
+                FieldPanel("cta_url"),
+                FieldPanel("cta_anchor"),
+            ],
             heading=_("CTA button"),
+        ),
+        MultiFieldPanel(
+            [FieldPanel("collapse_desktop_menu")],
+            heading=_("Layout"),
         ),
     ]
 
     def clean(self):
         errors = {}
-        if self.cta_text and not self.cta_page and not self.cta_url:
+        if (
+            self.cta_text
+            and not self.cta_page
+            and not self.cta_url
+            and not self.cta_anchor
+        ):
             msg = _(
-                "Set either a CTA page or CTA URL when CTA button text is provided."
+                "Set either a CTA page, CTA URL, or CTA anchor when CTA button text is provided."
             )
             errors["cta_page"] = msg
             errors["cta_url"] = msg
+            errors["cta_anchor"] = msg
+        cta_targets_set = sum(
+            [
+                bool(self.cta_page),
+                bool(self.cta_url),
+                bool(self.cta_anchor),
+            ]
+        )
+        if cta_targets_set > 1:
+            msg = _("Set only one of CTA page, CTA URL, or CTA anchor — not multiple.")
+            errors["cta_url"] = msg
+            errors["cta_anchor"] = msg
+        if cta_targets_set > 0 and not self.cta_text:
+            errors["cta_text"] = _(
+                "CTA button text is required when a CTA page, URL, or anchor is set."
+            )
         if errors:
             raise ValidationError(errors)
 
@@ -243,14 +316,37 @@ class NavigationSettings(BaseSiteSetting):
 
 @register_setting(icon="bars", order=30)
 class FooterSettings(BaseSiteSetting):
-    """Settings > Footer — footer nav columns, copyright text."""
+    """Settings > Footer — layout mode, footer nav columns, minimal links, copyright text."""
 
+    layout = models.CharField(
+        max_length=20,
+        choices=FOOTER_LAYOUT_CHOICES,
+        default="columns",
+        verbose_name=_("footer layout"),
+        help_text=_(
+            "Columns: multi-column navigation grid. "
+            "Minimal: single-row bar with logo, copyright, social icons, and inline links."
+        ),
+    )
     footer_navigation = StreamField(
         [("column", FooterColumnBlock())],
         blank=True,
         verbose_name=_("footer navigation"),
         help_text=_(
             "Footer link columns. Each column has a heading and a list of links."
+        ),
+        use_json_field=True,
+    )
+    minimal_links = StreamField(
+        [
+            ("internal", InternalLinkBlock()),
+            ("external", ExternalLinkBlock()),
+            ("anchor", AnchorLinkBlock()),
+        ],
+        blank=True,
+        verbose_name=_("minimal footer links"),
+        help_text=_(
+            "Flat list of links displayed inline in the minimal footer layout."
         ),
         use_json_field=True,
     )
@@ -264,7 +360,15 @@ class FooterSettings(BaseSiteSetting):
     )
 
     panels = [
-        FieldPanel("footer_navigation"),
+        FieldPanel("layout"),
+        MultiFieldPanel(
+            [FieldPanel("footer_navigation")],
+            heading=_("Columns layout"),
+        ),
+        MultiFieldPanel(
+            [FieldPanel("minimal_links")],
+            heading=_("Minimal layout"),
+        ),
         FieldPanel("copyright_text"),
     ]
 
@@ -274,7 +378,7 @@ class FooterSettings(BaseSiteSetting):
 
 @register_setting(icon="globe", order=40)
 class SocialSettings(BaseSiteSetting):
-    """Settings > Social — social media links."""
+    """Settings > Social — social media links and display options."""
 
     social_links = StreamField(
         [("link", SocialLinkBlock())],
@@ -282,8 +386,24 @@ class SocialSettings(BaseSiteSetting):
         verbose_name=_("social links"),
         use_json_field=True,
     )
+    show_in_header = models.BooleanField(
+        default=False,
+        verbose_name=_("show in header"),
+        help_text=_("Display social media icons in the site header."),
+    )
+    show_in_footer = models.BooleanField(
+        default=True,
+        verbose_name=_("show in footer"),
+        help_text=_("Display social media icons in the site footer."),
+    )
 
-    panels = [FieldPanel("social_links")]
+    panels = [
+        FieldPanel("social_links"),
+        MultiFieldPanel(
+            [FieldPanel("show_in_header"), FieldPanel("show_in_footer")],
+            heading=_("Display options"),
+        ),
+    ]
 
     class Meta:
         verbose_name = _("Social")

@@ -169,6 +169,16 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
   - Wrong: `bg-blue-600`, `font-serif`, `text-gray-800`, `text-red-600`
   - **Status colors**: Use `error-*`, `success-*`, `warning-*` tokens for
     validation messages, alerts, and feedback — never raw red/green/yellow.
+- **`wtr-*` CSS class hooks**: Every major layout region and block must have a
+  semantic `wtr-<name>` class on its outermost element. These carry no styles —
+  they exist solely as stable hooks for client theme overrides. Convention:
+  - `wtr-header`, `wtr-footer` — top-level layout regions
+  - `wtr-hero` — hero component (both `HeroMixin` pages and `HeroBlock`)
+  - `wtr-section`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`, `wtr-quote` — layout blocks
+  - `wtr-donate`, `wtr-signup` — conversion blocks
+  - `wtr-social-links` — social icons container (in header menu panel and footer)
+  Always add the `wtr-*` class in addition to any Tailwind utility classes — never
+  replace utilities with it.
 - **Components**: Reusable UI lives in `templates/components/`. Block templates
   live in `templates/components/streamfield/blocks/`.
 - **Indentation**: 4 spaces for HTML. Use Wagtail template tags
@@ -412,6 +422,48 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     available in all `{% include %}`-d templates (header, footer, etc.) via context
     inheritance. The value comes from the Wagtail `Site` model in the database
     (set in Wagtail admin under Settings → Sites).
+
+16. **`AnchorLinkBlock` must be a named class**: Do not use an anonymous StructBlock
+    inline for anchor links in `NavigationSettings.primary_navigation` or
+    `FooterColumnBlock.links`. Define `class AnchorLinkBlock(blocks.StructBlock)`
+    explicitly at module level so it serializes correctly in migrations and the
+    Wagtail editor. The same rule applies to all StructBlock subclasses used in
+    StreamField definitions on settings models.
+
+17. **Footer layout choices must be module-level**: `FOOTER_LAYOUT_CHOICES` (and any
+    other `choices=` list that uses `gettext_lazy`) must be defined at module level
+    in `site_settings.py`, not inside a class body. Django cannot serialize lazy
+    translations at class-definition time and will raise a `MigrationError`. This is
+    a special case of pitfall #10.
+
+18. **`collapse_desktop_menu` is CSS-only**: The `NavigationSettings.collapse_desktop_menu`
+    boolean controls whether the desktop nav is hidden and the hamburger is shown at
+    all breakpoints. This is implemented purely with Tailwind responsive classes in
+    `header.html` — when `collapse_desktop_menu` is True, remove `md:hidden` from
+    the hamburger and menu panel so they display at all sizes. The existing
+    `mobile-menu.js` is breakpoint-agnostic and requires zero JS changes.
+
+19. **Transparent header is `HomePage` only**: The `use_transparent_header` boolean
+    field lives on `HomePage`, not on `HeroMixin`. Only the home page can opt into
+    a transparent/overlay header. `HeroMixin` subclasses always use the normal
+    header. Pass `ctx["transparent_header"] = self.use_transparent_header` in
+    `HomePage.get_context()`.
+
+    When `transparent_header` is True, `header.html` automatically switches to the
+    `BrandingSEOSettings.dark_logo` — no separate toggle is needed. The logo swap
+    logic lives entirely in the template.
+
+20. **Social display toggles live on `SocialSettings`**: The `show_in_header` and
+    `show_in_footer` booleans that control where social icons appear are fields on
+    `SocialSettings` — not on `NavigationSettings` or `FooterSettings`. Social icon
+    placement in the header follows this rule:
+    - **Desktop**: icons always appear in the **visible header bar** (`hidden md:flex`)
+      when `show_in_header` is True, regardless of `collapse_desktop_menu`.
+    - **Mobile**: icons appear in the **menu panel** only (the panel is always
+      `md:hidden` on mobile, opened by the hamburger).
+    Always guard social icon rendering with
+    `{% if social.show_in_header and social.social_links %}` (header) and
+    `{% if social.show_in_footer and social.social_links %}` (footer).
 
 ## Git Conventions
 

@@ -31,7 +31,7 @@
     {# ------------------------------------------------------------------ #}
     {# VIDEO LAYOUT — two-column: text left, video right                  #}
     {# ------------------------------------------------------------------ #}
-    <div class="bg-dark text-light">
+    <div class="wtr-hero bg-dark text-light">
         <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
             <div class="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
 
@@ -51,10 +51,13 @@
                         </div>
                     {% endif %}
 
-                    {% if hero.link_text and hero.link_page or hero.link_text and hero.link_url %}
-                        <div class="mt-8">
-                            {% include "components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
-                        </div>
+                    {# CTA guard: identical in both layout branches — update both if changed. #}
+                    {% if hero.link_text %}
+                        {% if hero.link_page or hero.link_url %}
+                            <div class="mt-8">
+                                {% include "components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
+                            </div>
+                        {% endif %}
                     {% endif %}
                 </div>
 
@@ -114,7 +117,7 @@
     {# ------------------------------------------------------------------ #}
     {# STANDARD LAYOUT — centered text over optional background image     #}
     {# ------------------------------------------------------------------ #}
-    <div class="relative overflow-hidden bg-dark">
+    <div class="wtr-hero relative overflow-hidden bg-dark">
 
         {% if hero.image %}
             {% image hero.image fill-1600x700 as bg %}
@@ -139,10 +142,13 @@
                 </div>
             {% endif %}
 
-            {% if hero.link_text and hero.link_page or hero.link_text and hero.link_url %}
-                <div class="mt-8">
-                    {% include "components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
-                </div>
+            {# CTA guard: identical in both layout branches — update both if changed. #}
+            {% if hero.link_text %}
+                {% if hero.link_page or hero.link_url %}
+                    <div class="mt-8">
+                        {% include "components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
+                    </div>
+                {% endif %}
             {% endif %}
 
         </div>
