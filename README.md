@@ -217,8 +217,84 @@ fork-specific configuration stay on your fork.
 ### Extend, don't modify
 
 - **Page models**: subclass `BasePage` and `HeroMixin` from `wtrx/` in your own apps (`home/`, `pages/`, etc.)
-- **StreamField blocks**: use `BodyStreamBlock` as-is, or subclass it to add site-specific blocks
+- **StreamField blocks**: use `BodyStreamBlock` as-is, or subclass it to add site-specific blocks (see [Customizing blocks](#customizing-blocks))
 - **Settings models**: create new `BaseSiteSetting` subclasses (from `wagtail.contrib.settings`) in your own apps if you need additional settings panels beyond what `wtrx/` already provides.
+
+### Customizing blocks
+
+If your fork needs a modified version of an existing block (e.g. adding a field to
+`CardBlock`), subclass it at the site level rather than editing `wtrx/` directly.
+Wagtail's `DeclarativeSubBlocksMetaclass` merges parent and child block definitions
+via the MRO, so a subclass only needs to redeclare the blocks it wants to change.
+
+**Example: adding a subtitle to CardBlock**
+
+Create a site-level blocks module (e.g. `wagtail_wtr/pages/blocks.py`):
+
+```python
+from django.utils.translation import gettext_lazy as _
+from wagtail.blocks import CharBlock, ListBlock
+
+from wagtail_wtr.wtrx.blocks import (
+    BodyStreamBlock,
+    CardBlock,
+    CardGridBlock,
+    SectionBlock,
+    SectionContentBlock,
+)
+
+
+class SiteCardBlock(CardBlock):
+    """CardBlock with an additional subtitle field."""
+    subtitle = CharBlock(required=False, label=_("Subtitle"))
+
+
+class SiteCardGridBlock(CardGridBlock):
+    """CardGridBlock that uses SiteCardBlock."""
+    cards = ListBlock(SiteCardBlock(), min_num=2, max_num=12, label=_("Cards"))
+
+
+class SiteSectionContentBlock(SectionContentBlock):
+    """Override card inside sections."""
+    card = SiteCardBlock()
+    card_grid = SiteCardGridBlock()
+
+
+class SiteSectionBlock(SectionBlock):
+    content = SiteSectionContentBlock()
+
+
+class SiteBodyStreamBlock(BodyStreamBlock):
+    """Site-level override that swaps in custom blocks."""
+    card = SiteCardBlock()
+    card_grid = SiteCardGridBlock()
+    section = SiteSectionBlock()
+```
+
+Then update page models to use `SiteBodyStreamBlock`:
+
+```python
+# wagtail_wtr/home/models.py (and pages/models.py)
+from wagtail_wtr.pages.blocks import SiteBodyStreamBlock
+
+class HomePage(BasePage, HeroMixin):
+    body = StreamField(SiteBodyStreamBlock(), ...)
+```
+
+**Key points:**
+
+- `wtrx/` stays untouched — upstream merges are clean.
+- `SiteCardBlock` inherits all upstream fields, validation, and template from
+  `CardBlock`. If upstream adds a field, your subclass gets it automatically.
+- `SectionContentBlock` exists specifically to support this pattern — it's a named
+  `StreamBlock` subclass so you can override individual child blocks without
+  duplicating the full 17-entry block list.
+- The only merge friction is the import-line changes in `home/models.py` and
+  `pages/models.py` — trivial one-line conflicts.
+- **Template overrides**: block templates live in `templates/components/streamfield/blocks/`.
+  You can modify them directly on your fork. When `wtrx` is extracted to a pip
+  package, Django's template resolution will prefer your project-level templates
+  over the package defaults.
 
 ---
 

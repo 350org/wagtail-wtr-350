@@ -301,6 +301,11 @@ class TestCreateTestPageRendering(TestCase):
         response = self._get()
         self.assertContains(response, "Standalone Card (with image)")
 
+    def test_card_block_with_icon_renders(self):
+        """Full card includes an icon — verify the flex icon+heading layout."""
+        response = self._get()
+        self.assertContains(response, 'class="flex items-center gap-3"')
+
     def test_card_block_minimal_renders(self):
         response = self._get()
         self.assertContains(response, "Standalone Card (minimal)")

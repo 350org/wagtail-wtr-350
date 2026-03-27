@@ -4,6 +4,54 @@
 @plugin '@tailwindcss/typography';
 @plugin '@tailwindcss/forms';
 
+/* ============================================================
+ * Button utility — wtr-btn
+ * ============================================================
+ *
+ * Base class for all site buttons. Uses --color-primary (the
+ * unsuffixed brand token) so a single token change re-themes
+ * every button across the site.
+ *
+ * Usage in templates:
+ *   <a class="wtr-btn hover:bg-primary-500">Label</a>
+ *   <a class="wtr-btn wtr-btn-sm hover:bg-primary-500">Label</a>
+ *   <a class="wtr-btn wtr-btn-outline hover:bg-primary-50">Label</a>
+ *   <a class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">Label</a>
+ * ============================================================ */
+
+@utility wtr-btn {
+    display: inline-block;
+    padding: 0.625rem 1.25rem;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--color-dark);
+    background-color: var(--color-primary);
+    border: 2px solid transparent;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    white-space: nowrap;
+}
+
+@utility wtr-btn-sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+@utility wtr-btn-outline {
+    background-color: transparent;
+    border-color: var(--color-primary);
+    color: var(--color-primary-700);
+}
+
+@utility wtr-btn-secondary {
+    background-color: var(--color-secondary-600);
+    color: var(--color-light);
+}
+
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
@@ -39,4 +87,210 @@
         outline: 2px solid var(--color-primary-500);
         outline-offset: 0px;
     }
+}
+
+/* ============================================================
+ * Action Network embed — theme overrides
+ * ============================================================
+ *
+ * Action Network's style-embed-v3.css is loaded by the block template
+ * and handles all structural layout, float-label behaviour, country
+ * selector show/hide, validation error labels, spinner, and the
+ * two-column form layout.
+ *
+ * These rules override only what we want to differ from AN's defaults:
+ *   - Font and colour design tokens (body font, input colours, etc.)
+ *   - Submit button (swap AN's red for our primary colour token)
+ *   - Hide AN branding / logo / share blocks
+ *   - "Not in US?" link colour
+ *   - Country selector: position:relative on wrapper so the overlay
+ *     select is correctly contained; token colours on span.can_select
+ *   - Thank-you screen token overrides
+ *
+ * AN DOM structure (v6 widget):
+ *   .can_embed.v6.form
+ *     #can_embed_form .can_float
+ *       #can_embed_form_inner
+ *         h2 / h4  (form title — hidden by AN's own CSS when used as embed)
+ *         form#new_answer
+ *           #form_col1
+ *             li.core_field | li.control-group (per field)
+ *               .floatlabel-wrapper > label.floatlabel-label + input.floatlabel-input
+ *             .international_link-wrap  (country toggle link)
+ *             .country_drop_wrap        (country dropdown — hidden by AN, jQuery slideDown/Up)
+ *           #form_col2
+ *             input[type="submit"]
+ *             .ajax-loading (spinner)
+ *             #d_sharing (opt-in checkboxes)
+ *           #action_info (branding — hidden)
+ *           #logo_wrap   (AN logo — hidden)
+ * ============================================================ */
+
+/* --- Font and colour tokens --- */
+.wtr-action-network-embed .can_embed {
+    font-family: var(--font-body) !important;
+    color: var(--color-neutral-800) !important;
+}
+
+.wtr-action-network-embed #can_embed_form {
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+.wtr-action-network-embed #can_embed_form input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="hidden"]),
+.wtr-action-network-embed #can_embed_form textarea,
+.wtr-action-network-embed #can_embed_form select {
+    font-family: var(--font-body) !important;
+    color: var(--color-neutral-800) !important;
+    border: 1px solid var(--color-neutral-300) !important;
+    background-color: var(--color-light) !important;
+    border-radius: 0.375rem !important;
+}
+
+.wtr-action-network-embed #can_embed_form input[type="text"]:focus,
+.wtr-action-network-embed #can_embed_form input[type="email"]:focus,
+.wtr-action-network-embed #can_embed_form input[type="tel"]:focus,
+.wtr-action-network-embed #can_embed_form input[type="url"]:focus,
+.wtr-action-network-embed #can_embed_form input[type="number"]:focus,
+.wtr-action-network-embed #can_embed_form input[type="password"]:focus,
+.wtr-action-network-embed #can_embed_form textarea:focus {
+    border-color: var(--color-primary-500) !important;
+    outline: none !important;
+}
+
+/* --- Float labels ---
+ * AN shows these as animated placeholder overlays. We hide them and rely on
+ * the placeholder attributes that AN also sets on each input. If AN removes
+ * placeholder attributes in a future widget version, inputs will be unlabelled.
+ */
+.wtr-action-network-embed .floatlabel-label,
+.wtr-action-network-embed label.control-label.disabled {
+    display: none !important;
+}
+
+/* --- Checkboxes and radios ---
+ * @tailwindcss/forms sets appearance:none on all checkboxes/radios globally,
+ * which makes them invisible. Restore native appearance inside the AN embed
+ * so AN's own checkbox layout and styling works correctly.
+ */
+.wtr-action-network-embed #can_embed_form input[type="checkbox"],
+.wtr-action-network-embed #can_embed_form input[type="radio"] {
+    appearance: auto !important;
+    -webkit-appearance: auto !important;
+    width: auto !important;
+    height: auto !important;
+    background-color: revert !important;
+    border-color: revert !important;
+    border-width: revert !important;
+}
+
+/* --- Submit button — mirrors wtr-btn utility --- */
+.wtr-action-network-embed #can_embed_form input[type="submit"],
+.wtr-action-network-embed #can_embed_form button[type="submit"] {
+    display: inline-block !important;
+    padding: 0.625rem 1.25rem !important;
+    font-family: var(--font-heading) !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    line-height: 1.5 !important;
+    color: var(--color-dark) !important;
+    background-color: var(--color-primary) !important;
+    border: 2px solid transparent !important;
+    border-radius: 0.375rem !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease-in-out !important;
+    white-space: nowrap !important;
+}
+
+.wtr-action-network-embed #can_embed_form input[type="submit"]:hover,
+.wtr-action-network-embed #can_embed_form button[type="submit"]:hover {
+    background-color: var(--color-primary-500) !important;
+    color: var(--color-dark) !important;
+}
+
+/* --- "Not in US?" link --- */
+.wtr-action-network-embed .international_link {
+    color: var(--color-primary-600) !important;
+}
+
+/* --- Country selector ---
+ * AN's CSS already sets display:none on .country_drop_wrap (jQuery slideDown/Up
+ * handles show/hide). We add position:relative so the overlay select.can_select
+ * (which AN positions absolute with top:0 left:0) is contained within the wrapper
+ * rather than the nearest positioned ancestor.
+ * span.can_select gets our token colours; the structural height/width/opacity rules
+ * on select.can_select already come from AN's stylesheet.
+ */
+.wtr-action-network-embed .country_drop_wrap {
+    position: relative;
+}
+
+.wtr-action-network-embed #can_embed_form span.can_select {
+    font-family: var(--font-body) !important;
+    color: var(--color-neutral-800) !important;
+    background-color: var(--color-light) !important;
+    border: 1px solid var(--color-neutral-300) !important;
+    border-radius: 0.375rem !important;
+}
+
+/* --- Validation errors --- */
+.wtr-action-network-embed .error_msg,
+.wtr-action-network-embed .errors,
+.wtr-action-network-embed .has-error .help-block,
+.wtr-action-network-embed label.error {
+    color: var(--color-error-600) !important;
+    display: block !important;
+}
+
+.wtr-action-network-embed input.error,
+.wtr-action-network-embed textarea.error {
+    border-color: var(--color-error-600) !important;
+}
+
+/* --- Hide AN branding, sponsor info, and logo --- */
+.wtr-action-network-embed #action_info,
+.wtr-action-network-embed #logo_wrap,
+.wtr-action-network-embed .action_info_user {
+    display: none !important;
+}
+
+/* --- Thank-you screen token overrides --- */
+.wtr-action-network-embed .can_thank_you_wrap {
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.wtr-action-network-embed .can_thank_you_wrap h1 {
+    font-family: var(--font-heading) !important;
+    color: var(--color-neutral-800) !important;
+}
+
+.wtr-action-network-embed .can_thank_you_wrap h4 {
+    color: var(--color-neutral-600) !important;
+}
+
+/* Hide the share / email-a-friend blocks from AN's thank-you screen */
+.wtr-action-network-embed .can_thank_you-block {
+    display: none !important;
+}
+
+/* --- Hide form title/subtitle — we use our own heading above the embed --- */
+.wtr-action-network-embed #can_embed_form_inner > h2,
+.wtr-action-network-embed #can_embed_form_inner > h4 {
+    display: none !important;
+}
+
+/* --- Stack AN's two-column form layout ---
+ * AN renders .can_float #form_col1 / #form_col2 as floated columns.
+ * The .can_float qualifier is present in AN's own CSS so we must match
+ * it to achieve sufficient specificity to override the float and width. */
+.wtr-action-network-embed #can_embed_form.can_float #form_col1,
+.wtr-action-network-embed #can_embed_form.can_float #form_col2,
+.wtr-action-network-embed #form_col1,
+.wtr-action-network-embed #form_col2 {
+    float: none !important;
+    width: 100% !important;
 }

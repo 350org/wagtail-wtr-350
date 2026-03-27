@@ -173,10 +173,11 @@ def _table_block():
 
 
 def _card_block_full(image_id):
-    """Standalone CardBlock with image, description, and link."""
+    """Standalone CardBlock with image, icon, description, and link."""
     return {
         "type": "card",
         "value": {
+            "icon": image_id,
             "heading": "Standalone Card (with image)",
             "description": "This is a standalone card with an image and an external link.",
             "image": image_id,
@@ -187,10 +188,11 @@ def _card_block_full(image_id):
 
 
 def _card_block_minimal():
-    """Standalone CardBlock — heading only, no image, no link."""
+    """Standalone CardBlock — heading only, no image, no icon, no link."""
     return {
         "type": "card",
         "value": {
+            "icon": None,
             "heading": "Standalone Card (minimal)",
             "description": "",
             "image": None,
@@ -233,12 +235,13 @@ def _person_card_block_minimal():
 
 
 def _card_grid_block(image_id):
-    """CardGridBlock with a mix of cards: image/no-image, link/no-link."""
+    """CardGridBlock with a mix of cards: image/no-image, icon/no-icon, link/no-link."""
     return {
         "type": "card_grid",
         "value": {
             "cards": [
                 {
+                    "icon": image_id,
                     "image": image_id,
                     "heading": "Card Grid — With Image",
                     "description": "This card has an image and an external link.",
@@ -246,6 +249,7 @@ def _card_grid_block(image_id):
                     "link_url": "https://example.com",
                 },
                 {
+                    "icon": None,
                     "image": None,
                     "heading": "Card Grid — No Image",
                     "description": "This card has no image but still has a link.",
@@ -253,6 +257,7 @@ def _card_grid_block(image_id):
                     "link_url": "https://example.com",
                 },
                 {
+                    "icon": None,
                     "image": None,
                     "heading": "Card Grid — Description Only",
                     "description": "This card has no image and no link — description only.",
@@ -388,8 +393,8 @@ def _signup_action_network_block():
         "value": {
             "heading": "Action Network Signup",
             "description": "<p>Sign up via Action Network.</p>",
-            "action_network_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-            "action_type": "petition",
+            "action_url": "https://actionnetwork.org/forms/join-30",
+            "success_message": "",
         },
     }
 

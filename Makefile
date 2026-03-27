@@ -1,4 +1,4 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js test-page
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts test-page
 
 help:
 	@echo "Available commands:"
@@ -8,6 +8,7 @@ help:
 	@echo "  make build-prod       - Build CSS and JS (production, minified)"
 	@echo "  make watch            - Watch and rebuild CSS on change"
 	@echo "  make build-js         - Copy JS source to static_compiled"
+	@echo "  make build-fonts      - Copy font files to static_compiled"
 	@echo "  make migrate          - Run database migrations"
 	@echo "  make createsuperuser  - Create admin user"
 	@echo "  make setup            - Interactive site setup"
@@ -29,10 +30,14 @@ build-js:
 	rm -rf static_compiled/js/*
 	cp -r static_src/javascript/* static_compiled/js/
 
-build: build-js
+build-fonts:
+	mkdir -p static_compiled/fonts/fonts
+	cp static_src/fonts/fonts/*.woff* static_compiled/fonts/fonts/
+
+build: build-js build-fonts
 	npm run build
 
-build-prod: build-js
+build-prod: build-js build-fonts
 	npm run build:prod
 
 watch:

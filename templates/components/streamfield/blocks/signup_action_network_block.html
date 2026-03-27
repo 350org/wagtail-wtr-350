@@ -1,5 +1,5 @@
 {% load i18n wagtailcore_tags %}
-<div class="wtr-signup rounded-lg bg-neutral-50 px-6 py-10">
+<div class="wtr-signup wtr-signup-action-network rounded-lg bg-neutral-50 px-6 py-10">
     <div class="mx-auto max-w-2xl">
         <h2 class="font-heading text-2xl font-bold text-dark md:text-3xl">{{ value.heading }}</h2>
         {% if value.description %}
@@ -7,12 +7,64 @@
                 {{ value.description|richtext }}
             </div>
         {% endif %}
-        <div class="mt-8">
-            {# Action Network embed widget — replace XXXXXXXX with the action ID. #}
-            <link href="https://actionnetwork.org/css/style.en_US.css" rel="stylesheet" type="text/css" />
-            <div id="can-{{ value.action_network_id }}"></div>
-            <script>window.ANOptions = window.ANOptions || {};</script>
-            <script src="https://actionnetwork.org/widgets/v5/{{ value.action_type }}/{{ value.action_network_id }}?format=js&source=widget" async></script>
-        </div>
+        {% if action_type and slug %}
+            <div class="wtr-action-network-embed mt-8">
+                <link rel="stylesheet" href="https://actionnetwork.org/css/style-embed-v3.css">
+                <script src="https://actionnetwork.org/widgets/v6/{{ action_type }}/{{ slug }}?format=js&source=widget"></script>
+                <div id="can-{{ action_type }}-area-{{ slug }}" style="width: 100%">
+                    {# Action Network widget renders here #}
+                </div>
+                {% if success_message %}
+                    <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
+                         data-thank-you>
+                        {% include_block success_message %}
+                    </div>
+                {% endif %}
+            </div>
+            <noscript>
+                <div class="mt-8">
+                    <p class="text-sm text-neutral-500">
+                        {% trans "JavaScript is required to load the signup form." %}
+                    </p>
+                    <a href="{{ value.action_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="wtr-btn mt-4 hover:bg-primary-500">
+                        {% trans "Sign Up" %}
+                    </a>
+                </div>
+            </noscript>
+        {% endif %}
     </div>
 </div>
+{% if action_type and slug and success_message %}
+<script type="module">
+    (function() {
+        var target = document.getElementById('can-{{ action_type }}-area-{{ slug }}');
+        if (!target) return;
+        var embed = target.closest('.wtr-action-network-embed');
+        if (!embed) return;
+
+        // When a custom success_message is set, watch for AN's thank-you screen
+        // (either .can_thank_you_wrap or #can_thank_you) and swap it for our message.
+        // We observe the embed container so we catch thank-you elements injected
+        // anywhere inside it, not just inside the target div.
+        var thankYou = embed.querySelector('[data-thank-you]');
+        if (thankYou) {
+            var watchdog = setTimeout(function() { thankObserver.disconnect(); }, 60000);
+            var thankObserver = new MutationObserver(function() {
+                var anThankYou = embed.querySelector('.can_thank_you_wrap, #can_thank_you');
+                if (anThankYou) {
+                    clearTimeout(watchdog);
+                    thankObserver.disconnect();
+                    // Hide the entire AN embed area and show our message instead.
+                    anThankYou.style.display = 'none';
+                    target.style.display = 'none';
+                    thankYou.classList.remove('hidden');
+                }
+            });
+            thankObserver.observe(embed, { childList: true, subtree: true });
+        }
+    })();
+</script>
+{% endif %}
