@@ -370,10 +370,12 @@ always registered in `BodyStreamBlock` — hiding is purely a UI concern.
 
 ### HomePage
 - **Inherits**: BasePage + HeroMixin
-- **Fields**: body (BodyStreamBlock)
+- **Fields**: body (BodyStreamBlock), use_transparent_header (BooleanField)
 - **Template**: `pages/home_page.html`
 - **Parent**: Root (Site root page)
-- **Notes**: Hero at top (from HeroMixin), StreamField body below
+- **Notes**: Hero at top (from HeroMixin), StreamField body below.
+  `use_transparent_header=True` makes the header `position:absolute` so the hero
+  image extends behind it; automatically uses `BrandingSEOSettings.dark_logo` if set.
 
 ### ContentPage
 - **Inherits**: BasePage + HeroMixin
@@ -498,23 +500,32 @@ class BasePage(Page):
 
 | Field | Type | Required |
 |---|---|---|
-| primary_navigation | StreamField (InternalLinkBlock, ExternalLinkBlock) | No |
+| primary_navigation | StreamField (InternalLinkBlock, ExternalLinkBlock, AnchorLinkBlock) | No |
 | cta_text | CharField | No |
 | cta_page | ForeignKey to Page | No |
 | cta_url | URLField | No |
+| cta_anchor | CharField | No — anchor ID (no #) for same-page CTA link |
+| collapse_desktop_menu | BooleanField | No, default False — always show hamburger icon |
 
 ### Settings > Footer (`FooterSettings`)
 
 | Field | Type | Required |
 |---|---|---|
-| footer_navigation | StreamField (FooterSectionBlock: heading + ListBlock of links) | No |
+| layout | CharField (choices: columns, minimal) | No, default: columns |
+| footer_navigation | StreamField (FooterColumnBlock: heading + links) | No — used by columns layout |
+| minimal_links | StreamField (InternalLinkBlock, ExternalLinkBlock, AnchorLinkBlock) | No — used by minimal layout |
 | copyright_text | CharField | No, falls back to "(c) {year} {site name}" |
+
+**Columns layout**: multi-column navigation grid, logo at top, social links + copyright in bottom bar.
+**Minimal layout**: single row — `[logo + copyright] [social icons] [inline links]`, stacking on mobile.
 
 ### Settings > Social (`SocialSettings`)
 
 | Field | Type | Required |
 |---|---|---|
 | social_links | StreamField of SocialLinkBlock (platform: ChoiceBlock, url: URLBlock) | No |
+| show_in_header | BooleanField | No, default False — show social icons in header menu panel |
+| show_in_footer | BooleanField | No, default True — show social icons in footer |
 
 `SocialLinkBlock` is an explicitly named `StructBlock` subclass. Use a `StreamField`,
 not a `ListBlock`, so each item is independently typed and editable in the admin.
@@ -615,14 +626,18 @@ base.html
 ```
 
 ### Header (`navigation/header.html`)
-- Logo left (from BrandingSEOSettings.logo)
-- Nav links right (from NavigationSettings.primary_navigation)
-- CTA button right (from NavigationSettings.cta_text/cta_page/cta_url)
-- Mobile: logo left, CTA button, hamburger right. Hamburger opens nav overlay.
+- Logo left (from BrandingSEOSettings.logo; uses dark_logo when transparent header active)
+- Nav links right (from NavigationSettings.primary_navigation — InternalLink, ExternalLink, AnchorLink)
+- CTA button right (from NavigationSettings.cta_text/cta_page/cta_url/cta_anchor)
+- Social icons in menu panel (from SocialSettings when show_in_header=True)
+- Collapsed desktop menu option (NavigationSettings.collapse_desktop_menu) — hides desktop nav, shows hamburger at all breakpoints
+- Transparent header option (HomePage.use_transparent_header) — absolute position, transparent bg, light text colors
+- Mobile: logo left, hamburger right. Hamburger opens nav panel (same JS, breakpoint-agnostic).
 
 ### Footer (`navigation/footer.html`)
-- Footer nav sections (from FooterSettings.footer_navigation)
-- Social links (from SocialSettings.social_links)
+- **Columns layout** (default): logo at top, multi-column navigation grid (FooterSettings.footer_navigation), social links + copyright in bottom bar
+- **Minimal layout**: single row — `[logo + copyright] [social icons] [inline links]`
+- Social icons guarded by SocialSettings.show_in_footer (default True)
 - Copyright line (from FooterSettings.copyright_text, fallback: "(c) {year} {site name}")
 
 ### Hero (`components/hero.html`)
@@ -909,6 +924,30 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 - [x] `video_block.html` -- fixed YouTube iframe size: added Tailwind arbitrary
   variant `[&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full`
   to wrapper so the oEmbed-generated iframe fills the `aspect-video` container
+- [x] Social icon display toggles: `SocialSettings.show_in_header` (default False),
+  `SocialSettings.show_in_footer` (default True) — social icons rendered in header
+  menu panel and/or footer based on these flags
+- [x] Footer layout modes: `FooterSettings.layout` choice (columns/minimal) +
+  `FooterSettings.minimal_links` StreamField — minimal layout is a single-row bar
+  with logo, copyright, social icons, and inline links
+- [x] Footer logo: `BrandingSEOSettings.logo` shown at top of columns-layout footer
+  and left of minimal-layout footer when set
+- [x] Anchor links in nav: `AnchorLinkBlock` added to NavigationSettings.primary_navigation,
+  FooterColumnBlock.links, and FooterSettings.minimal_links; renders as `<a href="#anchor">`
+- [x] Collapsed desktop menu: `NavigationSettings.collapse_desktop_menu` (BooleanField,
+  default False) — when True, desktop nav is hidden and hamburger is shown at all
+  breakpoints; uses existing mobile-menu.js (no JS changes needed)
+- [x] CTA anchor link: `NavigationSettings.cta_anchor` — CTA button can link to an
+  anchor instead of a page or URL
+- [x] Transparent header on HomePage: `HomePage.use_transparent_header` (BooleanField,
+  default False) — makes header `position:absolute` over hero, transparent bg, light
+  text; automatically uses `BrandingSEOSettings.dark_logo` when enabled
+- [x] `wtr-*` CSS class hooks on all critical elements: `wtr-header`, `wtr-footer`,
+  `wtr-hero`, `wtr-section`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`,
+  `wtr-quote`, `wtr-donate`, `wtr-signup`, `wtr-social-links` — no default styles,
+  pure theme override hooks
+- [x] Block/settings label capitalization normalized to sentence case throughout
+  `site_settings.py`
 - [ ] `fixtures/demo.json` -- demo content (deferred)
 - [ ] Verify settings panels work
 - [ ] Verify AJAX form submission

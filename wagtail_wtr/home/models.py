@@ -1,5 +1,11 @@
+from django.db import models
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList
+from wagtail.admin.panels import (
+    FieldPanel,
+    MultiFieldPanel,
+    TabbedInterface,
+    ObjectList,
+)
 from wagtail.fields import StreamField
 from wagtail.models import Page
 
@@ -24,12 +30,24 @@ class HomePage(BasePage, HeroMixin):
         help_text=_("Page body content."),
         use_json_field=True,
     )
+    use_transparent_header = models.BooleanField(
+        default=False,
+        verbose_name=_("transparent header"),
+        help_text=_(
+            "Make the header transparent so the hero image extends behind it. "
+            "Automatically uses the dark logo variant when enabled."
+        ),
+    )
 
     content_panels = (
         Page.content_panels
         + HeroMixin.hero_panels
         + [
             FieldPanel("body"),
+            MultiFieldPanel(
+                [FieldPanel("use_transparent_header")],
+                heading=_("Header options"),
+            ),
         ]
     )
 
@@ -73,4 +91,5 @@ class HomePage(BasePage, HeroMixin):
             "link_page": self.hero_link_page,
             "link_url": self.hero_link_url,
         }
+        ctx["transparent_header"] = self.use_transparent_header
         return ctx
