@@ -330,7 +330,6 @@ class HomePage(BasePage, HeroMixin):
 - Multi-lingual from day one via [wagtail-localize](https://github.com/wagtail/wagtail-localize)
 - AJAX form submission (FormPage + SignupBlock)
 - Custom image model with focal point CSS
-- Custom user model
 - Production-ready: WhiteNoise, gunicorn, django-storages (S3), dj-database-url
 
 ---
@@ -371,8 +370,8 @@ wagtail-wtr/
 │       ├── dev.py
 │       └── production.py
 ├── templates/
-├── static_src/             # Tailwind CSS source + vanilla JS
-├── static_compiled/        # Tailwind CLI output (committed)
+├── static_src/             # Tailwind CSS source + vanilla JS + font files
+├── static_compiled/        # Tailwind CLI output (gitignored; run make build)
 ├── Makefile
 ├── pyproject.toml
 └── package.json
@@ -472,21 +471,68 @@ DEBUG = True
 
 ## Deployment
 
+### Render (recommended)
+
+A `render.yaml` Blueprint is included. To deploy:
+
+1. Push your fork to GitHub.
+2. In the Render dashboard, click **New → Blueprint** and connect your repo.
+3. Render auto-provisions a PostgreSQL database and generates a `SECRET_KEY`.
+4. Set the required env vars in the Render dashboard (or in `render.yaml` before importing):
+   - `ALLOWED_HOSTS` — your Render hostname, e.g. `mysite.onrender.com`
+   - `WAGTAILADMIN_BASE_URL` — full public URL, e.g. `https://mysite.onrender.com`
+5. Deploy. The Docker build compiles CSS/JS, installs Python deps, and runs `collectstatic`.
+   On startup, `bin/start.sh` runs `migrate` then starts gunicorn.
+
+Copy `.env.example` to `.env` (gitignored) for local production-settings overrides.
+
+### How it works
+
 Ships with:
 
-- `Dockerfile` (Python 3.13-slim)
-- `whitenoise` for static file serving
+- Two-stage `Dockerfile`: Node 20 (Tailwind CLI build) → Python 3.13-slim (app)
+- `bin/start.sh` entrypoint: runs `migrate --noinput` then starts gunicorn
+- `/_health/` endpoint for zero-downtime deploy health checks
+- `whitenoise` for static file serving from the container
 - `gunicorn` as WSGI server
 - `dj-database-url` for `DATABASE_URL` env var
-- `django-storages[s3]` + `wagtail-storages` for S3 media
+- `django-storages[s3]` + `wagtail-storages` for S3 media (optional — see below)
 
-Required environment variables in production:
+### Required environment variables
 
 ```
-SECRET_KEY=...
-DATABASE_URL=postgres://...
+SECRET_KEY=...                          # auto-generated on Render
+DATABASE_URL=postgres://...             # auto-wired on Render
 ALLOWED_HOSTS=mysite.com,www.mysite.com
 WAGTAILADMIN_BASE_URL=https://mysite.com
+DJANGO_SETTINGS_MODULE=wagtail_wtr.settings.production
+```
+
+### AWS S3 media storage (optional)
+
+When `AWS_STORAGE_BUCKET_NAME` is set, user-uploaded media (images, documents) is
+stored in S3. Omit the variable to use local filesystem storage instead.
+
+```
+AWS_STORAGE_BUCKET_NAME=mysite-media
+AWS_S3_REGION_NAME=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_S3_CUSTOM_DOMAIN=media.mysite.com   # optional: CloudFront or custom domain
+```
+
+### SMTP email (optional)
+
+When `EMAIL_HOST` is set, Django sends mail via SMTP (compatible with Mailgun,
+AWS SES, Postmark, or any standard SMTP provider). Without it, emails are printed
+to container logs (console backend).
+
+```
+EMAIL_HOST=smtp.mailgun.org
+EMAIL_PORT=587
+EMAIL_HOST_USER=postmaster@mg.mysite.com
+EMAIL_HOST_PASSWORD=...
+DEFAULT_FROM_EMAIL=hello@mysite.com
 ```
 
 ### Cloudflare cache invalidation (optional)
