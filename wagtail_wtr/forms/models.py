@@ -51,7 +51,7 @@ class FormPage(BasePage, AbstractEmailForm):
     See PLAN.md FormPage notes for the full forwarding design.
     """
 
-    template = "pages/form_page.html"
+    template = "wtrx/pages/form_page.html"
 
     intro = RichTextField(
         blank=True,

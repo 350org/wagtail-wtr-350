@@ -23,6 +23,7 @@ wagtail-wtr/
 │   │   ├── blocks/         # StreamField blocks, one file per category
 │   │   ├── migrations/
 │   │   ├── templatetags/
+│   │   ├── templates/wtrx/ # All upstream templates live here (APP_DIRS)
 │   │   ├── tests/
 │   │   ├── apps.py
 │   │   ├── images.py       # CustomImage, CustomRendition
@@ -39,7 +40,7 @@ wagtail-wtr/
 │   │   └── production.py
 │   ├── urls.py
 │   └── wsgi.py
-├── templates/              # Global Django templates (NOT per-app)
+├── templates/              # Fork override templates (empty in upstream; forks shadow wtrx/ templates here)
 ├── static_src/             # Frontend source (Tailwind, JS)
 ├── static_compiled/        # Tailwind CLI output (committed to repo)
 ├── fixtures/
@@ -55,7 +56,7 @@ wagtail-wtr/
 - `wagtail_wtr/wtrx/models.py` -- BasePage, HeroMixin, core abstract models.
 - `wagtail_wtr/wtrx/images.py` -- CustomImage model.
 - `wagtail_wtr/home/`, `pages/`, `forms/` -- Page type apps (site-specific layer).
-- `templates/` -- Global Django templates (NOT per-app).
+- `templates/` -- Fork override templates (empty in upstream). Forks place shadow templates here to override `wtrx/` defaults. Django's `DIRS` resolver checks this directory first.
 - `static_src/` -- Frontend source (Tailwind, JS).
 - `static_compiled/` -- Tailwind CLI output (committed to repo).
 
@@ -140,7 +141,7 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
   Always set `related_name='+'` on ForeignKeys that don't need reverse relations.
   Use `on_delete=models.SET_NULL` for optional image/page ForeignKeys.
 - **Blocks**: Each block class must have a docstring and a `class Meta` with `icon`
-  and `template` pointing to `components/streamfield/blocks/<name>.html`
+  and `template` pointing to `wtrx/components/streamfield/blocks/<name>.html`
   (relative to the Django templates root — do not include a `templates/` prefix).
   Organize blocks by category in separate files under `wtrx/blocks/`.
 - **Constants**: Define field length constants (e.g., `CHARFIELD_MAX_LENGTH = 255`)
@@ -179,8 +180,9 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
   - `wtr-social-links` — social icons container (in header menu panel and footer)
   Always add the `wtr-*` class in addition to any Tailwind utility classes — never
   replace utilities with it.
-- **Components**: Reusable UI lives in `templates/components/`. Block templates
-  live in `templates/components/streamfield/blocks/`.
+- **Components**: Reusable UI lives in `wagtail_wtr/wtrx/templates/wtrx/components/`. Block templates
+  live in `wagtail_wtr/wtrx/templates/wtrx/components/streamfield/blocks/`.
+  Fork override templates live in `templates/` (project root, checked first by Django's DIRS resolver).
 - **Indentation**: 4 spaces for HTML. Use Wagtail template tags
   (`wagtailcore_tags`, `wagtailimages_tags`, etc.) as needed.
 
@@ -392,10 +394,11 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
 13. **Page models need explicit `template`**: Wagtail derives the default template
     path as `<app_label>/<model_snake_case>.html`. Because app labels use the
     `wagtail_wtr_` prefix (e.g. `wagtail_wtr_home`), Wagtail would look for
-    `wagtail_wtr_home/home_page.html`. This project stores all page templates
-    under `templates/pages/` instead. Every concrete page model **must** declare:
+    `wagtail_wtr_home/home_page.html`. All page templates live in the `wtrx` app
+    under `wagtail_wtr/wtrx/templates/wtrx/pages/`. Every concrete page model
+    **must** declare:
     ```python
-    template = "pages/<model_name>.html"
+    template = "wtrx/pages/<model_name>.html"
     ```
     Without this, visiting any published page raises `TemplateDoesNotExist`.
 

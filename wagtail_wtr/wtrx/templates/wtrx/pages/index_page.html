@@ -1,8 +1,8 @@
-{% extends "base_page.html" %}
+{% extends "wtrx/base_page.html" %}
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 
 {% block hero %}
-    {% include "components/hero.html" %}
+    {% include "wtrx/components/hero.html" %}
 {% endblock %}
 
 {% block content %}
@@ -18,11 +18,11 @@
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {% for child in children %}
                 {% page_as_card child as card %}
-                {% include "components/card.html" %}
+                {% include "wtrx/components/card.html" %}
             {% endfor %}
         </div>
 
-        {% include "components/pagination.html" with page_obj=children %}
+        {% include "wtrx/components/pagination.html" with page_obj=children %}
     {% else %}
         <p class="text-neutral-600">{% trans "No pages found." %}</p>
     {% endif %}

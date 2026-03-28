@@ -182,7 +182,7 @@ class TestCreateTestPageRendering(TestCase):
 
     def test_page_uses_content_page_template(self):
         response = self._get()
-        self.assertTemplateUsed(response, "pages/content_page.html")
+        self.assertTemplateUsed(response, "wtrx/pages/content_page.html")
 
     def test_page_title_in_response(self):
         response = self._get()

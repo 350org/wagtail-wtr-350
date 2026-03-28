@@ -55,7 +55,7 @@
                     {% if hero.link_text %}
                         {% if hero.link_page or hero.link_url %}
                             <div class="mt-8">
-                                {% include "components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
+                                {% include "wtrx/components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
                             </div>
                         {% endif %}
                     {% endif %}
@@ -146,7 +146,7 @@
             {% if hero.link_text %}
                 {% if hero.link_page or hero.link_url %}
                     <div class="mt-8">
-                        {% include "components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
+                        {% include "wtrx/components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
                     </div>
                 {% endif %}
             {% endif %}

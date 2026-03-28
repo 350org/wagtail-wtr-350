@@ -21,7 +21,7 @@ class ContentPage(BasePage, HeroMixin):
     content that doesn't need automatic child-page listing.
     """
 
-    template = "pages/content_page.html"
+    template = "wtrx/pages/content_page.html"
 
     body = StreamField(
         BodyStreamBlock(),
@@ -89,7 +89,7 @@ class IndexPage(BasePage, HeroMixin):
     optional StreamField body appears below the child listing.
     """
 
-    template = "pages/index_page.html"
+    template = "wtrx/pages/index_page.html"
 
     intro = RichTextField(
         blank=True,

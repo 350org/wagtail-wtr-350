@@ -11,8 +11,10 @@
             <link rel="icon" href="{{ fav_img.url }}" />
         {% endif %}
     {% endwith %}
-    {% block extra_head %}{% endblock %}
+    {% block fonts %}{% endblock %}
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_stylesheets %}{% endblock %}
+    {% block extra_head %}{% endblock %}
 </head>
 <body class="font-body text-dark bg-light">
     {% block header %}{% endblock %}

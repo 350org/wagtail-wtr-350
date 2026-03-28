@@ -177,7 +177,7 @@ class TextBlock(RichTextBlock):
     class Meta:
         icon = "pilcrow"
         label = _("Text")
-        template = "components/streamfield/blocks/text_block.html"
+        template = "wtrx/components/streamfield/blocks/text_block.html"
 
 
 class ImageBlock(StructBlock):
@@ -204,7 +204,7 @@ class ImageBlock(StructBlock):
     class Meta:
         icon = "image"
         label = _("Image")
-        template = "components/streamfield/blocks/image_block.html"
+        template = "wtrx/components/streamfield/blocks/image_block.html"
 
 
 class VideoBlock(StructBlock):
@@ -252,7 +252,7 @@ class VideoBlock(StructBlock):
     class Meta:
         icon = "media"
         label = _("Video")
-        template = "components/streamfield/blocks/video_block.html"
+        template = "wtrx/components/streamfield/blocks/video_block.html"
 
 
 class ButtonBlock(StructBlock):
@@ -301,7 +301,7 @@ class ButtonBlock(StructBlock):
     class Meta:
         icon = "link"
         label = _("Button")
-        template = "components/streamfield/blocks/button_block.html"
+        template = "wtrx/components/streamfield/blocks/button_block.html"
 
 
 class QuoteBlock(StructBlock):
@@ -322,7 +322,7 @@ class QuoteBlock(StructBlock):
     class Meta:
         icon = "openquote"
         label = _("Quote")
-        template = "components/streamfield/blocks/quote_block.html"
+        template = "wtrx/components/streamfield/blocks/quote_block.html"
 
 
 class RawHTMLBlock(WagtailRawHTMLBlock):
@@ -336,7 +336,7 @@ class RawHTMLBlock(WagtailRawHTMLBlock):
     class Meta:
         icon = "code"
         label = _("Raw HTML")
-        template = "components/streamfield/blocks/raw_html_block.html"
+        template = "wtrx/components/streamfield/blocks/raw_html_block.html"
 
 
 class TableBlock(WagtailTableBlock):
@@ -347,7 +347,7 @@ class TableBlock(WagtailTableBlock):
     class Meta:
         icon = "table"
         label = _("Table")
-        template = "components/streamfield/blocks/table_block.html"
+        template = "wtrx/components/streamfield/blocks/table_block.html"
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ class CardBlock(StructBlock):
     class Meta:
         icon = "doc-full"
         label = _("Card")
-        template = "components/streamfield/blocks/card_block.html"
+        template = "wtrx/components/streamfield/blocks/card_block.html"
 
 
 class PersonCardBlock(StructBlock):
@@ -439,7 +439,7 @@ class PersonCardBlock(StructBlock):
     class Meta:
         icon = "user"
         label = _("Person")
-        template = "components/streamfield/blocks/person_card_block.html"
+        template = "wtrx/components/streamfield/blocks/person_card_block.html"
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ class CardGridBlock(StructBlock):
     class Meta:
         icon = "grip"
         label = _("Card Grid")
-        template = "components/streamfield/blocks/card_grid_block.html"
+        template = "wtrx/components/streamfield/blocks/card_grid_block.html"
 
 
 class AccordionBlock(StructBlock):
@@ -509,7 +509,7 @@ class AccordionBlock(StructBlock):
     class Meta:
         icon = "list-ul"
         label = _("Accordion")
-        template = "components/streamfield/blocks/accordion_block.html"
+        template = "wtrx/components/streamfield/blocks/accordion_block.html"
 
 
 class CalloutBlock(StructBlock):
@@ -557,7 +557,7 @@ class CalloutBlock(StructBlock):
     class Meta:
         icon = "image"
         label = _("Callout")
-        template = "components/streamfield/blocks/callout_block.html"
+        template = "wtrx/components/streamfield/blocks/callout_block.html"
 
 
 class HeroBlock(StructBlock):
@@ -630,7 +630,7 @@ class HeroBlock(StructBlock):
     class Meta:
         icon = "image"
         label = _("Hero")
-        template = "components/streamfield/blocks/hero_block.html"
+        template = "wtrx/components/streamfield/blocks/hero_block.html"
 
 
 # ---------------------------------------------------------------------------
@@ -685,7 +685,7 @@ class DonateBlock(StructBlock):
     class Meta:
         icon = "pick"
         label = _("Donate")
-        template = "components/streamfield/blocks/donate_block.html"
+        template = "wtrx/components/streamfield/blocks/donate_block.html"
 
 
 class SignupWagtailFormsBlock(StructBlock):
@@ -729,7 +729,7 @@ class SignupWagtailFormsBlock(StructBlock):
     class Meta:
         icon = "form"
         label = _("Sign Up (Wagtail Forms)")
-        template = "components/streamfield/blocks/signup_wagtail_forms_block.html"
+        template = "wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html"
 
 
 class SuccessMessageBlock(StreamBlock):
@@ -845,7 +845,7 @@ class SignupActionNetworkBlock(StructBlock):
     class Meta:
         icon = "form"
         label = _("Sign Up (Action Network)")
-        template = "components/streamfield/blocks/signup_action_network_block.html"
+        template = "wtrx/components/streamfield/blocks/signup_action_network_block.html"
 
 
 class SignupLinkBlock(StructBlock):
@@ -880,7 +880,7 @@ class SignupLinkBlock(StructBlock):
     class Meta:
         icon = "link"
         label = _("Sign Up (Link)")
-        template = "components/streamfield/blocks/signup_link_block.html"
+        template = "wtrx/components/streamfield/blocks/signup_link_block.html"
 
 
 # ---------------------------------------------------------------------------
@@ -961,7 +961,7 @@ class SectionBlock(StructBlock):
     class Meta:
         icon = "placeholder"
         label = _("Section")
-        template = "components/streamfield/blocks/section_block.html"
+        template = "wtrx/components/streamfield/blocks/section_block.html"
 
 
 # ---------------------------------------------------------------------------

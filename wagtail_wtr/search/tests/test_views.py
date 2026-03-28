@@ -7,7 +7,7 @@ class SearchViewTests(TestCase):
         """GET /search/ with no query renders the template with empty results."""
         response = self.client.get(reverse("search"))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "search/search.html")
+        self.assertTemplateUsed(response, "wtrx/search/search.html")
         self.assertIsNone(response.context["search_query"])
         self.assertFalse(response.context["search_results"])
 

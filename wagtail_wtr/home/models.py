@@ -21,7 +21,7 @@ class HomePage(BasePage, HeroMixin):
     body. Intended as the root page of the site.
     """
 
-    template = "pages/home_page.html"
+    template = "wtrx/pages/home_page.html"
 
     body = StreamField(
         BodyStreamBlock(),

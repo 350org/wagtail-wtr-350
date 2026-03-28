@@ -1,6 +1,6 @@
 {% load i18n %}
 <div class="wtr-card-grid grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
     {% for card in value.cards %}
-        {% include "components/card.html" with card=card %}
+        {% include "wtrx/components/card.html" with card=card %}
     {% endfor %}
 </div>
