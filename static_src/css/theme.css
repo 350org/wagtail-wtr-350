@@ -1,6 +1,3 @@
-/* Google Fonts — Alegreya (heading font) */
-@import url("https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400..900;1,400..900&display=swap");
-
 /*
  * ============================================================
  * SITE THEME
@@ -13,10 +10,12 @@
  * To re-theme a fork:
  *   1. Replace the --color-primary-* scale with your brand color.
  *   2. Replace --color-secondary-* and --color-accent-* as needed.
- *   3. Update --font-heading and --font-body. For Google Fonts, add
- *      @import url("https://fonts.googleapis.com/...") at the top of
- *      theme.css — do NOT shadow base.html with a <link> tag, as that
- *      causes infinite template recursion (DIRS is checked before APP_DIRS).
+ *   3. Update --font-heading and --font-body. For self-hosted fonts,
+ *      add @font-face declarations here (above the @theme block).
+ *      For Google Fonts, add @import url("https://fonts.googleapis.com/...")
+ *      at the very top of theme.css — do NOT shadow base.html with a
+ *      <link> tag, as that causes infinite template recursion (DIRS is
+ *      checked before APP_DIRS).
  *   4. Run: make build
  *
  * Status colors (error, success, warning) are intentionally
@@ -38,136 +37,69 @@
  */
 
 /* ------------------------------------------------------------
- * Font face declarations — GT America
- * ------------------------------------------------------------ */
-@font-face {
-  font-family: "GT America";
-  src:
-    url("../fonts/GTAmerica-Regular.woff2") format("woff2"),
-    url("../fonts/GTAmerica-Regular.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "GT America";
-  src:
-    url("../fonts/GTAmerica-Bold.woff2") format("woff2"),
-    url("../fonts/GTAmerica-Bold.woff") format("woff");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "GT America Condensed";
-  src:
-    url("../fonts/GTAmerica-CondensedRegular.woff2") format("woff2"),
-    url("../fonts/GTAmerica-CondensedRegular.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "GT America Condensed";
-  src:
-    url("../fonts/GTAmerica-CondensedBold.woff2") format("woff2"),
-    url("../fonts/GTAmerica-CondensedBold.woff") format("woff");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "GT America Mono";
-  src:
-    url("../fonts/GTAmericaMono-Rg.woff2") format("woff2"),
-    url("../fonts/GTAmericaMono-Rg.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* ------------------------------------------------------------
- * Base theme — MPUniversity (dark navy text / mint green CTA)
+ * Base theme — WTR default (sky blue / violet / orange)
  * This is the fallback when no [data-theme] is set.
  * ------------------------------------------------------------ */
 @theme {
   /* Utility colors */
   --color-light: #ffffff;
-  --color-dark: #010726;
-  --color-cloud: #f5fafc;
+  --color-dark:  #171717;
 
-  /* ── Brand palette (named variables for direct use) ── */
-  --color-brand-yellow: #e3fa6a;
-  --color-brand-grapefruit: #ff7556;
-  --color-brand-bright-blue: #00ffec;
-  --color-brand-light-purple: #ccbdff;
-  --color-brand-light-green: #22ffa5;
-  --color-brand-blurple: #3e08c1;
+  /* Primary brand color — sky blue */
+  --color-primary:     #0284c7;  /* Alias for wtr-btn and single-token re-theming */
+  --color-primary-50:  #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  --color-primary-950: #082f49;
 
-  /* Primary brand color — mint green (#22FFA5)
-   * Scale generated from the brand anchor:
-   *   50  = near-white tint   950 = near-black shade
-   */
-  --color-primary: #22ffa5; /* canonical single token — same as -400 */
-  --color-primary-50: #f0fff8;
-  --color-primary-100: #ccffe9;
-  --color-primary-200: #99ffd4;
-  --color-primary-300: #5cffbb;
-  --color-primary-400: #22ffa5; /* brand anchor */
-  --color-primary-500: #00e88d;
-  --color-primary-600: #00c274;
-  --color-primary-700: #009659;
-  --color-primary-800: #006b40;
-  --color-primary-900: #004529;
-  --color-primary-950: #002516;
+  /* Secondary brand color — violet */
+  --color-secondary-50:  #f5f3ff;
+  --color-secondary-100: #ede9fe;
+  --color-secondary-200: #ddd6fe;
+  --color-secondary-300: #c4b5fd;
+  --color-secondary-400: #a78bfa;
+  --color-secondary-500: #8b5cf6;
+  --color-secondary-600: #7c3aed;
+  --color-secondary-700: #6d28d9;
+  --color-secondary-800: #5b21b6;
+  --color-secondary-900: #4c1d95;
+  --color-secondary-950: #2e1065;
 
-  /* Secondary brand color — blurple (#3E08C1)
-   * Scale generated from the brand anchor:
-   */
-  --color-secondary-50: #f0ecff;
-  --color-secondary-100: #ddd4ff;
-  --color-secondary-200: #bfaaff;
-  --color-secondary-300: #9e7fff;
-  --color-secondary-400: #7c52f5;
-  --color-secondary-500: #5f2ee8;
-  --color-secondary-600: #3e08c1; /* brand anchor */
-  --color-secondary-700: #3006a0;
-  --color-secondary-800: #22047a;
-  --color-secondary-900: #150256;
-  --color-secondary-950: #0b0133;
+  /* Accent color — orange */
+  --color-accent-50:  #fff7ed;
+  --color-accent-100: #ffedd5;
+  --color-accent-200: #fed7aa;
+  --color-accent-300: #fdba74;
+  --color-accent-400: #fb923c;
+  --color-accent-500: #f97316;
+  --color-accent-600: #ea580c;
+  --color-accent-700: #c2410c;
+  --color-accent-800: #9a3412;
+  --color-accent-900: #7c2d12;
+  --color-accent-950: #431407;
 
-  /* Accent color — grapefruit (#FF7556) */
-  --color-accent-50: #fff4f1;
-  --color-accent-100: #ffe5de;
-  --color-accent-200: #ffcabd;
-  --color-accent-300: #ffa48d;
-  --color-accent-400: #ff7556; /* brand anchor */
-  --color-accent-500: #f95330;
-  --color-accent-600: #e03415;
-  --color-accent-700: #bc2510;
-  --color-accent-800: #8f1e10;
-  --color-accent-900: #621410;
-  --color-accent-950: #360908;
-
-  /* Neutral — dark-navy-tinted grays derived from #010726 */
-  --color-neutral-50: #f4f5f9;
-  --color-neutral-100: #e8eaf2;
-  --color-neutral-200: #cdd1e3;
-  --color-neutral-300: #a8aecb;
-  --color-neutral-400: #7a82ab;
-  --color-neutral-500: #565d88;
-  --color-neutral-600: #3e4469;
-  --color-neutral-700: #2b304e;
-  --color-neutral-800: #191d35;
-  --color-neutral-900: #0b0e1f;
-  --color-neutral-950: #010726; /* brand dark anchor */
+  /* Neutral — shared across all sites (cool gray) */
+  --color-neutral-50:  #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  --color-neutral-950: #0a0a0a;
 
   /* Status colors — shared across all sites */
-  --color-error-50: #fef2f2;
+  --color-error-50:  #fef2f2;
   --color-error-100: #fee2e2;
   --color-error-200: #fecaca;
   --color-error-300: #fca5a5;
@@ -179,7 +111,7 @@
   --color-error-900: #7f1d1d;
   --color-error-950: #450a0a;
 
-  --color-success-50: #f0fdf4;
+  --color-success-50:  #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-200: #bbf7d0;
   --color-success-300: #86efac;
@@ -191,7 +123,7 @@
   --color-success-900: #14532d;
   --color-success-950: #052e16;
 
-  --color-warning-50: #fffbeb;
+  --color-warning-50:  #fffbeb;
   --color-warning-100: #fef3c7;
   --color-warning-200: #fde68a;
   --color-warning-300: #fcd34d;
@@ -204,72 +136,93 @@
   --color-warning-950: #451a03;
 
   /* Typography */
-  --font-heading: "Alegreya", Georgia, serif;
-  --font-body: "GT America", system-ui, sans-serif;
-  --font-mono: "GT America Mono", ui-monospace, monospace;
-  --font-hero: "Alegreya", Georgia, serif;
+  --font-heading: system-ui, sans-serif;
+  --font-body:    system-ui, sans-serif;
+  --font-mono:    ui-monospace, monospace;
 }
 
-/* Hero typography */
-.wtr-hero h1 {
-    font-family: var(--font-hero);
-    font-size: clamp(3rem, 8vw, 5rem);
-  font-weight: 800;
-  line-height: 100%;
-  color: var(--color-cloud);
-  text-align: right;
+/* ------------------------------------------------------------
+ * Theme preset: "Grassroots" (green / amber / teal)
+ * Applied when <html data-theme="grassroots"> is set.
+ * Only tokens that differ from the base theme are listed.
+ * ------------------------------------------------------------ */
+[data-theme="grassroots"] {
+  --color-primary-50:  #f0fdf4;
+  --color-primary-100: #dcfce7;
+  --color-primary-200: #bbf7d0;
+  --color-primary-300: #86efac;
+  --color-primary-400: #4ade80;
+  --color-primary-500: #22c55e;
+  --color-primary-600: #16a34a;
+  --color-primary-700: #15803d;
+  --color-primary-800: #166534;
+  --color-primary-900: #14532d;
+  --color-primary-950: #052e16;
+
+  --color-secondary-50:  #fffbeb;
+  --color-secondary-100: #fef3c7;
+  --color-secondary-200: #fde68a;
+  --color-secondary-300: #fcd34d;
+  --color-secondary-400: #fbbf24;
+  --color-secondary-500: #f59e0b;
+  --color-secondary-600: #d97706;
+  --color-secondary-700: #b45309;
+  --color-secondary-800: #92400e;
+  --color-secondary-900: #78350f;
+  --color-secondary-950: #451a03;
+
+  --color-accent-50:  #f0fdfa;
+  --color-accent-100: #ccfbf1;
+  --color-accent-200: #99f6e4;
+  --color-accent-300: #5eead4;
+  --color-accent-400: #2dd4bf;
+  --color-accent-500: #14b8a6;
+  --color-accent-600: #0d9488;
+  --color-accent-700: #0f766e;
+  --color-accent-800: #115e59;
+  --color-accent-900: #134e4a;
+  --color-accent-950: #042f2e;
 }
 
-.wtr-hero-copy,
-.wtr-hero-copy p {
-  font-family: "GT America", system-ui, sans-serif;
-  font-size: 1.875rem;
-  font-weight: 700;
-  line-height: 142.9%;
-  color: var(--color-cloud);
-  text-align: right;
-}
+/* ------------------------------------------------------------
+ * Theme preset: "Solidarity" (red / slate / gold)
+ * Applied when <html data-theme="solidarity"> is set.
+ * Only tokens that differ from the base theme are listed.
+ * ------------------------------------------------------------ */
+[data-theme="solidarity"] {
+  --color-primary-50:  #fef2f2;
+  --color-primary-100: #fee2e2;
+  --color-primary-200: #fecaca;
+  --color-primary-300: #fca5a5;
+  --color-primary-400: #f87171;
+  --color-primary-500: #ef4444;
+  --color-primary-600: #dc2626;
+  --color-primary-700: #b91c1c;
+  --color-primary-800: #991b1b;
+  --color-primary-900: #7f1d1d;
+  --color-primary-950: #450a0a;
 
-/* ============================================================
- * wtr-btn — MPUniversity theme overrides
- * ============================================================
- *
- * A second @utility wtr-btn block merges with the base definition
- * in main.css (same @layer utilities, later in source = wins on conflict).
- * Applies the commissioned button style for this client:
- * flat corners, offset shadow, uppercase GT America Bold.
- * ============================================================ */
+  --color-secondary-50:  #f8fafc;
+  --color-secondary-100: #f1f5f9;
+  --color-secondary-200: #e2e8f0;
+  --color-secondary-300: #cbd5e1;
+  --color-secondary-400: #94a3b8;
+  --color-secondary-500: #64748b;
+  --color-secondary-600: #475569;
+  --color-secondary-700: #334155;
+  --color-secondary-800: #1e293b;
+  --color-secondary-900: #0f172a;
+  --color-secondary-950: #020617;
 
-@utility wtr-btn {
-    text-align: center;
-    font-family: var(--font-body);
-    font-size: 1.025rem;
-    font-weight: 700;
-    line-height: 140%;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    border-radius: 0;
-    border: 2px solid var(--color-dark);
-    box-shadow: 4px 4px 0 0 #000;
-    padding: 0.75rem 1rem;
-}
-
-/* ============================================================
- * Card grid — cycling brand background colours
- * ============================================================
- *
- * Cards inside a .wtr-card-grid cycle through 4 brand colours.
- * Applies only to direct .wtr-card children so standalone cards
- * (outside a grid) are unaffected.
- * ============================================================ */
-
-.wtr-card-grid > .wtr-card:nth-child(4n+1) { background-color: var(--color-brand-yellow); }
-.wtr-card-grid > .wtr-card:nth-child(4n+2) { background-color: var(--color-brand-grapefruit); }
-.wtr-card-grid > .wtr-card:nth-child(4n+3) { background-color: var(--color-brand-bright-blue); }
-.wtr-card-grid > .wtr-card:nth-child(4n+4) { background-color: var(--color-brand-light-green); }
-
-/* Remove the default border and shadow when a brand bg is applied */
-.wtr-card-grid > .wtr-card {
-  box-shadow: none;
-  border: 6px solid #000;
+  --color-accent-50:  #fffbeb;
+  --color-accent-100: #fef3c7;
+  --color-accent-200: #fde68a;
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+  --color-accent-700: #b45309;
+  --color-accent-800: #92400e;
+  --color-accent-900: #78350f;
+  --color-accent-950: #451a03;
 }
