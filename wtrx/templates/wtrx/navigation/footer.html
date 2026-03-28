@@ -40,7 +40,7 @@
                             {{ footer.copyright_text }}
                         {% else %}
                             {% now "Y" as current_year %}
-                            {% blocktrans with year=current_year name=current_site.site_name %}&copy; {{ year }} {{ name }}.{% endblocktrans %}
+                            {% blocktrans with year=current_year name=current_site.site_name %}&copy; {{ year }} {{ name }}{% endblocktrans %}
                         {% endif %}
                     </p>
                 </div>
