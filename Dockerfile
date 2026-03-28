@@ -18,6 +18,8 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# All python/gunicorn/manage.py invocations use the venv automatically.
+ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
@@ -27,10 +29,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* && \
     adduser --system --no-create-home --group app
 
-# Install Python dependencies before copying the full source so this layer is
-# cached independently of application code changes.
+# Install Python dependencies into an isolated venv before copying the full
+# source so this layer is cached independently of application code changes.
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
+RUN python -m venv /app/.venv && \
+    /app/.venv/bin/pip install --no-cache-dir .
 
 COPY . .
 # Overlay the frontend build output (CSS, JS, fonts) produced in Stage 1.

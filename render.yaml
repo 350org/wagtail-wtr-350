@@ -27,18 +27,12 @@ services:
         # tokens, and CSRF tokens are immediately invalidated.
       - key: DJANGO_SETTINGS_MODULE
         value: wagtail_wtr.settings.production
-      # Set ALLOWED_HOSTS to your Render hostname and any custom domains.
+      # Set to your Render hostname and any custom domains.
       # Example: mysite.onrender.com,mysite.org
       - key: ALLOWED_HOSTS
-        sync: false
       # Required: the full public URL used by the Wagtail admin (no trailing slash).
       # Example: https://mysite.onrender.com
       - key: WAGTAILADMIN_BASE_URL
-        sync: false
-      - key: WEB_CONCURRENCY
-        value: 4
-      - key: GUNICORN_TIMEOUT
-        sync: false
       # --- S3 media storage (optional but strongly recommended) ---
       # WARNING: Without S3, uploaded media (images, documents) is stored on
       # Render's ephemeral disk and will be lost on every new deploy.
