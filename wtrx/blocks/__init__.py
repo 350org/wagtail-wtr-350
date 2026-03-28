@@ -64,6 +64,7 @@ SECTION_BACKGROUND_CHOICES = [
     ("light", _("Light")),
     ("dark", _("Dark")),
     ("primary", _("Primary")),
+    ("secondary", _("Secondary")),
     ("muted", _("Muted")),
 ]
 
