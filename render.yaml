@@ -1,0 +1,77 @@
+databases:
+  - name: wagtail-wtr-db
+    plan: free
+    # WARNING: Free plan databases expire after 90 days and have no backups.
+    # Upgrade to a paid plan for production use.
+    databaseName: wagtail_wtr
+    user: wagtail_wtr
+
+services:
+  - type: web
+    name: wagtail-wtr
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /_health/
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wagtail-wtr-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+        # IMPORTANT: After first deploy, copy the generated value and pin it as
+        # a fixed env var in the Render dashboard. If this key is regenerated
+        # (e.g. by recreating the service), all existing sessions, password-reset
+        # tokens, and CSRF tokens are immediately invalidated.
+      - key: DJANGO_SETTINGS_MODULE
+        value: wagtail_wtr.settings.production
+      # Set ALLOWED_HOSTS to your Render hostname and any custom domains.
+      # Example: mysite.onrender.com,mysite.org
+      - key: ALLOWED_HOSTS
+        sync: false
+      # Required: the full public URL used by the Wagtail admin (no trailing slash).
+      # Example: https://mysite.onrender.com
+      - key: WAGTAILADMIN_BASE_URL
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: 4
+      - key: GUNICORN_TIMEOUT
+        sync: false
+      # --- S3 media storage (optional but strongly recommended) ---
+      # WARNING: Without S3, uploaded media (images, documents) is stored on
+      # Render's ephemeral disk and will be lost on every new deploy.
+      # Configure S3 for any deployment where editors upload content.
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_S3_CUSTOM_DOMAIN
+        sync: false
+      # --- SMTP email (optional) ---
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      # EMAIL_USE_TLS=true for STARTTLS (port 587, default).
+      # EMAIL_USE_SSL=true for implicit SSL (port 465). These are mutually exclusive.
+      - key: EMAIL_USE_TLS
+        sync: false
+      - key: EMAIL_USE_SSL
+        sync: false
+      # --- Cloudflare cache invalidation (optional) ---
+      - key: CLOUDFLARE_BEARER_TOKEN
+        sync: false
+      - key: CLOUDFLARE_ZONE_ID
+        sync: false

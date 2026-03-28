@@ -11,3 +11,8 @@ db.sqlite3
 .env
 .venv
 venv
+
+# Frontend build outputs are generated fresh in the Docker build stage.
+static_compiled/css/
+static_compiled/js/
+static_compiled/fonts/

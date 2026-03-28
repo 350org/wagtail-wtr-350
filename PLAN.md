@@ -105,13 +105,17 @@ wagtail-wtr/
 │   └── css/
 │       ├── main.css                # Tailwind entry point — imports theme.css + tailwindcss
 │       └── theme.css               # Client-editable: @theme {} tokens + [data-theme] presets
-├── static_compiled/                # Tailwind CLI output (committed)
+├── static_compiled/                # Tailwind CLI output (gitignored; built at deploy time)
 ├── fixtures/
 │   └── demo.json
 ├── package.json
 ├── pyproject.toml                  # Python dependencies and project metadata
 ├── manage.py
 ├── Dockerfile
+├── render.yaml                     # Render Blueprint (Docker runtime + PostgreSQL)
+├── bin/
+│   └── start.sh                    # Container entrypoint: migrate + gunicorn
+├── .env.example                    # All env vars documented with descriptions
 ├── Makefile
 ├── .gitignore
 ├── .dockerignore
@@ -730,8 +734,9 @@ Named `[data-theme]` presets override tokens at runtime — no rebuild needed.
 ```
 
 ### Output
-`static_src/css/main.css` → Tailwind CLI → `static_compiled/css/main.css` (committed to repo)
-`static_src/javascript/` → copied to `static_compiled/js/` via `make build-js` (committed to repo)
+`static_src/css/main.css` → Tailwind CLI → `static_compiled/css/main.css` (gitignored; built at deploy time)
+`static_src/javascript/` → copied to `static_compiled/js/` via `make build-js` (gitignored; built at deploy time)
+`static_src/fonts/` → copied to `static_compiled/fonts/fonts/` via `make build-fonts` (gitignored; built at deploy time)
 
 ---
 
@@ -1095,18 +1100,22 @@ is configured.
 
 ---
 
-### Phase 12: Hosting Strategy — NOT STARTED
+### Phase 12: Hosting Strategy — ✅ COMPLETE
 
-Plan and implement a pluggable hosting adapter pattern to support deploying
-wagtail-wtr sites on multiple cloud platforms.
+Deployed wagtail-wtr sites to Render via Docker runtime with PostgreSQL.
 
-- [ ] Evaluate Render, Railway, and AWS Lightsail as primary targets
-- [ ] Design pluggable host adapters: per-host `production_<host>.py` settings
-  overlay or env-var-driven selection
-- [ ] S3 (or compatible) media storage: `django-storages[s3]` + `wagtail-storages`
-  are already in `pyproject.toml`; document bucket naming, CORS, and IAM policy
-- [ ] Platform-specific `Procfile` / `render.yaml` / `railway.json` starter files
-- [ ] `make deploy-<host>` convenience targets in `Makefile`
+- [x] Render as primary hosting target (Docker runtime)
+- [x] AWS S3 media storage: `django-storages[s3]` + `wagtail-storages` wired up
+  in `production.py` (conditional on `AWS_STORAGE_BUCKET_NAME` env var)
+- [x] `render.yaml` Blueprint — auto-provisions PostgreSQL, generates `SECRET_KEY`,
+  declares all optional env vars (`sync: false`) for S3, SMTP, Cloudflare
+- [x] `bin/start.sh` container entrypoint: runs `migrate --noinput` then gunicorn
+- [x] `/_health/` endpoint for zero-downtime deploy health checks
+- [x] Dockerfile fixed: two-stage build (Node → CSS/JS/fonts, Python → app);
+  no `tailwind.config.js` reference; non-editable `pip install`
+- [x] `static_compiled/` removed from git — built fresh at deploy time in Docker
+  Stage 1; `static_src/fonts/` is now the canonical home for font source files
+- [x] `.env.example` documenting all required and optional env vars
 
 ### Phase 13: ADR Documentation — NOT STARTED
 
@@ -1121,16 +1130,15 @@ for future maintainers.
 - [ ] Document the "no custom User model" decision
 - [ ] Document the "no DB access at import time" constraint and how it's enforced
 
-### Phase 14: SMTP & Provisioning Automation — NOT STARTED
+### Phase 14: SMTP & Provisioning Automation — 🔄 IN PROGRESS
 
-Automate new-site provisioning to reduce the time from fork to running production site.
-
-- [ ] SMTP: document Mailgun, AWS SES, and Postmark options; add
-  `EMAIL_BACKEND` / `EMAIL_HOST` env-var-driven config to `production.py`
+- [x] SMTP: env-var-driven config in `production.py` — compatible with Mailgun,
+  AWS SES, Postmark, or any SMTP provider; falls back to console backend when
+  `EMAIL_HOST` is unset
+- [x] `.env.example` with all required and optional production env vars
 - [ ] Provisioning script: `make provision` that creates S3 bucket, IAM policy,
-  SES domain identity, and Cloudflare DNS entries for a new fork
-- [ ] `make env-template` that outputs a `.env.example` with all required and
-  optional production env vars and their descriptions
+  and SES domain identity for a new fork
+- [ ] `make env-template` target (superseded by `.env.example` — may remove)
 
 ---
 

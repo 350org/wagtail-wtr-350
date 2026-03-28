@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include, path
 
 from wagtail import urls as wagtail_urls
@@ -17,6 +18,12 @@ urlpatterns = [
     path("documents/", include(wagtaildocs_urls)),
     path("sitemap.xml", sitemap, name="sitemap"),
     path("i18n/", include("django.conf.urls.i18n")),
+    # Health check for zero-downtime deploys (Render, load balancers, etc.)
+    path(
+        "_health/",
+        lambda r: HttpResponse("ok", content_type="text/plain"),
+        name="health_check",
+    ),
 ]
 
 urlpatterns += i18n_patterns(
