@@ -9,7 +9,7 @@ Fork this repo and customize via Tailwind theme to build your own site, and merg
 Supports theming via semantic Tailwind design tokens, supports multiple languages,
 contains a StreamField library with common organizing blocks like Signup and Donate, has integrations with common organizing platforms like Action Network and Actblue, features custom page types ready to extend and more.
 
-The `wtrx/` sub-app contains core shared features and is designed for eventual extraction as a standalone pip package
+The `wtrx/` app (repo root, sibling to `wagtail_wtr/`) contains core shared features and is designed for eventual extraction as a standalone pip package
 (`wagtail-wtrx`), inspired by [CodeRed Extensions](https://github.com/coderedcorp/coderedcms), so that sites built on top of  `wagtail-wtr` can utilize future platform updates.
 
 ---
@@ -116,7 +116,7 @@ git fetch upstream
 git merge upstream/main
 ```
 
-Most upstream changes land in `wagtail_wtr/wtrx/`, `templates/`, and
+Most upstream changes land in `wtrx/`, `templates/`, and
 `static_src/css/main.css` — none of which you should be editing on your fork.
 The only file likely to produce a conflict is `static_src/css/theme.css` if you
 have customised your brand colors. Resolve by keeping your `@theme {}` block and
@@ -208,7 +208,7 @@ fork-specific configuration stay on your fork.
 
 | File / directory | Why |
 |---|---|
-| `wagtail_wtr/wtrx/` | Core reusable app — blocks, page models, settings models, views, hooks. Upstream changes land here. |
+| `wtrx/` | Core reusable app — blocks, page models, settings models, views, hooks. Upstream changes land here. |
 | `static_src/css/main.css` | Tailwind infrastructure — imports, plugins, base layer. Leaving it unedited ensures conflict-free upstream merges. |
 
 ### Extend, don't modify
@@ -232,7 +232,7 @@ Create a site-level blocks module (e.g. `wagtail_wtr/mysite/blocks.py`):
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import CharBlock, ListBlock
 
-from wagtail_wtr.wtrx.blocks import (
+from wtrx.blocks import (
     BodyStreamBlock,
     CardBlock,
     CardGridBlock,
@@ -271,8 +271,8 @@ class SiteBodyStreamBlock(BodyStreamBlock):
 Then update page models to use `SiteBodyStreamBlock` (in a new site-specific app):
 
 ```python
-# wagtail_wtr/mysite/models.py
-from wagtail_wtr.mysite.blocks import SiteBodyStreamBlock
+# mysite/models.py
+from mysite.blocks import SiteBodyStreamBlock
 
 class HomePage(BasePage, HeroMixin):
     body = StreamField(SiteBodyStreamBlock(), ...)
@@ -357,16 +357,16 @@ make load-data        Migrate + load demo fixtures + collectstatic
 
 ```
 wagtail-wtr/
-├── wagtail_wtr/
-│   ├── wtrx/               # Core reusable app (don't edit on client sites)
-│   │   ├── blocks/         # StreamField blocks (content, layout, composite, cards, actions)
-│   │   ├── models.py       # BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage
-│   │   ├── views.py        # search() view
-│   │   ├── site_settings.py
-│   │   ├── images.py       # CustomImage
-│   │   ├── templatetags/
-│   │   └── wagtail_hooks.py
- │   └── settings/
+├── wtrx/                   # Core reusable app (don't edit on client sites)
+│   ├── blocks/             # StreamField blocks (content, layout, composite, cards, actions)
+│   ├── models.py           # BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage
+│   ├── views.py            # search() view
+│   ├── site_settings.py
+│   ├── images.py           # CustomImage
+│   ├── templatetags/
+│   └── wagtail_hooks.py
+├── wagtail_wtr/            # Django project package (settings, urls, wsgi only)
+│   └── settings/
 │       ├── base.py
 │       ├── dev.py
 │       └── production.py
@@ -449,10 +449,10 @@ Override per-site in the Wagtail admin under **Settings > Integrations**.
 make watch
 
 # Run tests
-python manage.py test wagtail_wtr
+python manage.py test wtrx wagtail_wtr
 
 # Run a specific test module
-python manage.py test wagtail_wtr.wtrx.tests.test_images
+python manage.py test wtrx.tests.test_images
 
 # Generate migrations after model changes
 python manage.py makemigrations

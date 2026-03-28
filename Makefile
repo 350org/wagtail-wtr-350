@@ -53,7 +53,7 @@ setup:
 	python manage.py setup_site
 
 test:
-	python manage.py test wagtail_wtr
+	python manage.py test wtrx wagtail_wtr
 
 load-data:
 	python manage.py migrate

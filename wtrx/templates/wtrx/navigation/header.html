@@ -1,10 +1,4 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
-{% comment %}
-FORK SHADOW: overrides wtrx/templates/wtrx/navigation/header.html
-Changes vs upstream:
-  - Hamburger SVG replaced with MPU 3-rectangle brand-coloured mark (yellow/teal/grapefruit)
-Keep in sync with upstream on rebase.
-{% endcomment %}
 {% with nav=settings.wtrx.NavigationSettings social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings %}
 {% comment %}
 transparent_header is set in context by HomePage.get_context() when use_transparent_header is True.
@@ -154,10 +148,8 @@ and the dark_logo variant is used if available.
                                 data-mobile-menu-toggle>
                     {% endif %}
                 {% endif %}
-                    <svg width="38" height="32" viewBox="0 0 38 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <rect x="1" y="1" width="35.6" height="7.60001" fill="#E3FA6A" stroke="black" stroke-width="2"/>
-                        <rect x="1" y="12.2001" width="35.6" height="7.60001" fill="#00FFEC" stroke="black" stroke-width="2"/>
-                        <rect x="1" y="23.4" width="35.6" height="7.60001" fill="#FF7556" stroke="black" stroke-width="2"/>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
 

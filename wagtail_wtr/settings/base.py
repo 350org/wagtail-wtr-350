@@ -22,7 +22,7 @@ DEBUG = False
 ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
-    "wagtail_wtr.wtrx",
+    "wtrx",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",
@@ -135,7 +135,7 @@ MEDIA_URL = "/media/"
 # Wagtail settings
 WAGTAIL_SITE_NAME = "My Site"
 # WAGTAILADMIN_BASE_URL is set in dev.py and production.py
-WAGTAILIMAGES_IMAGE_MODEL = "wagtail_wtr_wtrx.CustomImage"
+WAGTAILIMAGES_IMAGE_MODEL = "wtrx.CustomImage"
 
 WAGTAILSEARCH_BACKENDS = {
     "default": {

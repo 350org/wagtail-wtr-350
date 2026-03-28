@@ -8,9 +8,9 @@ wagtail-wtr is the Wagtail CMS platform used at With the Ranks for campaign,
 nonprofit, and organizer websites. It is a working Django/Wagtail project —
 not a `wagtail start --template`. New client sites fork or clone this repo.
 
-The core reusable app lives at `wagtail_wtr/wtrx/` and is designed for eventual
-extraction to a standalone pip package (`wagtail-wtrx`), following a pattern
-similar to CodeRed CMS.
+The core reusable app lives at `wtrx/` (repo root, sibling to `wagtail_wtr/`) and
+is designed for eventual extraction to a standalone pip package (`wagtail-wtrx`),
+following a pattern similar to CodeRed CMS.
 
 See `PLAN.md` for the full specification and architectural decisions.
 
@@ -18,19 +18,19 @@ See `PLAN.md` for the full specification and architectural decisions.
 
 ```
 wagtail-wtr/
-├── wagtail_wtr/            # Main Django project package
-│   ├── wtrx/               # Core reusable app (future pip package)
-│   │   ├── blocks/         # StreamField blocks, one file per category
-│   │   ├── migrations/
-│   │   ├── templatetags/
-│   │   ├── templates/wtrx/ # All upstream templates live here (APP_DIRS)
-│   │   ├── tests/
-│   │   ├── apps.py
-│   │   ├── images.py       # CustomImage, CustomRendition
-│   │   ├── models.py       # BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage
-│   │   ├── views.py        # search() view
-│   │   └── site_settings.py
- │   ├── settings/
+├── wtrx/                   # Core reusable app (future pip package)
+│   ├── blocks/             # StreamField blocks, one file per category
+│   ├── migrations/
+│   ├── templatetags/
+│   ├── templates/wtrx/     # All upstream templates live here (APP_DIRS)
+│   ├── tests/
+│   ├── apps.py
+│   ├── images.py           # CustomImage, CustomRendition
+│   ├── models.py           # BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage
+│   ├── views.py            # search() view
+│   └── site_settings.py
+├── wagtail_wtr/            # Django project package (settings, urls, wsgi only)
+│   ├── settings/
 │   │   ├── base.py
 │   │   ├── dev.py
 │   │   └── production.py
@@ -46,12 +46,12 @@ wagtail-wtr/
 └── Dockerfile
 ```
 
-- `wagtail_wtr/wtrx/` -- Core reusable app. All page models live here.
-- `wagtail_wtr/wtrx/blocks/` -- StreamField blocks, one file per category.
-- `wagtail_wtr/wtrx/site_settings.py` -- All Wagtail site settings models.
-- `wagtail_wtr/wtrx/models.py` -- BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage.
-- `wagtail_wtr/wtrx/views.py` -- search() view.
-- `wagtail_wtr/wtrx/images.py` -- CustomImage model.
+- `wtrx/` -- Core reusable app. All page models live here.
+- `wtrx/blocks/` -- StreamField blocks, one file per category.
+- `wtrx/site_settings.py` -- All Wagtail site settings models.
+- `wtrx/models.py` -- BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage.
+- `wtrx/views.py` -- search() view.
+- `wtrx/images.py` -- CustomImage model.
 - `templates/` -- Fork override templates (empty in upstream). Forks place shadow templates here to override `wtrx/` defaults. Django's `DIRS` resolver checks this directory first.
 - `static_src/` -- Frontend source (Tailwind, JS).
 - `static_compiled/` -- Tailwind CLI output (committed to repo).
@@ -75,10 +75,10 @@ make setup                   # Interactive initial setup
 Granular test runs:
 
 ```bash
-python manage.py test wagtail_wtr                                    # all tests
-python manage.py test wagtail_wtr.wtrx                               # wtrx app only
-python manage.py test wagtail_wtr.wtrx.tests.test_images             # single module
-python manage.py test wagtail_wtr.wtrx.tests.test_images.TestObjectPositionStyle  # single class
+python manage.py test wtrx wagtail_wtr                               # all tests
+python manage.py test wtrx                                           # wtrx app only
+python manage.py test wtrx.tests.test_images                        # single module
+python manage.py test wtrx.tests.test_images.TestObjectPositionStyle # single class
 ```
 
 ### Generating Migrations
@@ -89,7 +89,7 @@ Migrations are generated directly in the repo:
 source .venv/bin/activate
 python manage.py makemigrations
 python manage.py migrate
-python manage.py test wagtail_wtr
+python manage.py test wtrx wagtail_wtr
 ```
 
 Never hand-write migrations. Always use `makemigrations`.
@@ -129,8 +129,8 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
   3. Wagtail
   4. Third-party packages
   5. Local app imports
-  Use absolute imports with `wagtail_wtr` prefix for cross-app imports
-  (e.g., `from wagtail_wtr.wtrx.blocks import BodyStreamBlock`).
+  Use absolute imports with `wtrx` prefix for cross-app imports
+  (e.g., `from wtrx.blocks import BodyStreamBlock`).
 - **Strings**: Use double quotes for human-readable strings (help_text, verbose_name).
   Use single quotes for identifiers and keys (dict keys, field names, choice values).
 - **Models**: One model per logical concern. Use abstract models for shared behavior.
@@ -176,8 +176,8 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
   - `wtr-social-links` — social icons container (in header menu panel and footer)
   Always add the `wtr-*` class in addition to any Tailwind utility classes — never
   replace utilities with it.
-- **Components**: Reusable UI lives in `wagtail_wtr/wtrx/templates/wtrx/components/`. Block templates
-  live in `wagtail_wtr/wtrx/templates/wtrx/components/streamfield/blocks/`.
+- **Components**: Reusable UI lives in `wtrx/templates/wtrx/components/`. Block templates
+  live in `wtrx/templates/wtrx/components/streamfield/blocks/`.
   Fork override templates live in `templates/` (project root, checked first by Django's DIRS resolver).
 - **Indentation**: 4 spaces for HTML. Use Wagtail template tags
   (`wagtailcore_tags`, `wagtailimages_tags`, etc.) as needed.
@@ -294,7 +294,7 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
 ## Testing
 
 - Tests live in each app's `tests/` directory (e.g., `wtrx/tests/`).
-- Test paths use the `wagtail_wtr` prefix: `wagtail_wtr.wtrx.tests.test_blocks`.
+- Test paths use the `wtrx` prefix: `wtrx.tests.test_blocks`.
 - Test blocks in isolation: instantiate, call `clean()`, verify validation.
 - Test page models: use `WagtailPageTestCase`.
 - Test settings: verify defaults, verify admin override behavior.
@@ -390,14 +390,13 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     ```bash
     python manage.py makemigrations
     python manage.py migrate
-    python manage.py test wagtail_wtr
+    python manage.py test wtrx wagtail_wtr
     ```
 
 13. **Page models need explicit `template`**: Wagtail derives the default template
-    path as `<app_label>/<model_snake_case>.html`. Because app labels use the
-    `wagtail_wtr_` prefix (e.g. `wagtail_wtr_home`), Wagtail would look for
-    `wagtail_wtr_home/home_page.html`. All page templates live in the `wtrx` app
-    under `wagtail_wtr/wtrx/templates/wtrx/pages/`. Every concrete page model
+    path as `<app_label>/<model_snake_case>.html`. Because the app label is `wtrx`,
+    Wagtail would look for `wtrx/home_page.html`. All page templates live in
+    `wtrx/templates/wtrx/pages/`. Every concrete page model
     **must** declare:
     ```python
     template = "wtrx/pages/<model_name>.html"

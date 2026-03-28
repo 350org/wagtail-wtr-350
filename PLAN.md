@@ -16,39 +16,41 @@ provide thin concrete subclasses.
 
 ## Architecture
 
-This is a standard Django project. `wagtail_wtr/` is the main project package.
-`wtrx/` is the core reusable app — client sites don't edit it, they extend/override.
-New sites fork this repo; the `wagtail_wtr` package name and app labels stay as-is.
+This is a standard Django project. `wagtail_wtr/` is the project config package
+(settings, urls, wsgi only). `wtrx/` is the core reusable app — client sites don't
+edit it, they extend/override. New sites fork this repo; the `wagtail_wtr` package
+name stays as-is but `wtrx/` is a top-level sibling, not nested inside it.
 
 ```
 wagtail-wtr/
-├── wagtail_wtr/
-│   ├── wtrx/                       # Core reusable app (DON'T EDIT on client sites)
+├── wtrx/                               # Core reusable app (DON'T EDIT on client sites)
+│   ├── __init__.py
+│   ├── apps.py
+│   ├── blocks/
+│   │   ├── __init__.py                 # Exports BodyStreamBlock, SectionContentBlock
+│   │   ├── content.py                  # TextBlock, ImageBlock, VideoBlock, ButtonBlock,
+│   │   │                               #   QuoteBlock, RawHTMLBlock, TableBlock
+│   │   ├── layout.py                   # SectionBlock, CardGridBlock, AccordionBlock
+│   │   ├── composite.py                # CalloutBlock, HeroBlock
+│   │   ├── cards.py                    # CardBlock, PersonCardBlock
+│   │   └── actions.py                  # DonateBlock, SignupBlock variants
+│   ├── models.py                       # BasePage, HeroMixin, HomePage, ContentPage,
+│   │                                   #   IndexPage, FormField, FormPage
+│   ├── views.py                        # search() view
+│   ├── site_settings.py                # BrandingSEOSettings, NavigationSettings,
+│   │                                   #   FooterSettings, SocialSettings, IntegrationSettings
+│   ├── images.py                       # CustomImage, Rendition
+│   ├── templatetags/
 │   │   ├── __init__.py
-│   │   ├── apps.py
-│   │   ├── blocks/
-│   │   │   ├── __init__.py         # Exports BodyStreamBlock, SectionContentBlock
-│   │   │   ├── content.py          # TextBlock, ImageBlock, VideoBlock, ButtonBlock,
-│   │   │   │                       #   QuoteBlock, RawHTMLBlock, TableBlock
-│   │   │   ├── layout.py           # SectionBlock, CardGridBlock, AccordionBlock
-│   │   │   ├── composite.py        # CalloutBlock, HeroBlock
-│   │   │   ├── cards.py            # CardBlock, PersonCardBlock
-│   │   │   └── actions.py          # DonateBlock, SignupBlock variants
-│   │   ├── models.py               # BasePage, HeroMixin, HomePage, ContentPage,
-│   │   │                           #   IndexPage, FormField, FormPage
-│   │   ├── views.py                # search() view
-│   │   ├── site_settings.py        # BrandingSEOSettings, NavigationSettings,
-│   │   │                           #   FooterSettings, SocialSettings, IntegrationSettings
-│   │   ├── images.py               # CustomImage, Rendition
-│   │   ├── templatetags/
-│   │   │   ├── __init__.py
-│   │   │   └── wtrx_tags.py
-│   │   ├── wagtail_hooks.py
- │   │   └── management/
- │   │       └── commands/
- │   │           └── setup_site.py   # Interactive setup command
- │   ├── settings/
- │   │   ├── __init__.py
+│   │   └── wtrx_tags.py
+│   ├── wagtail_hooks.py
+│   ├── migrations/
+│   └── management/
+│       └── commands/
+│           └── setup_site.py           # Interactive setup command
+├── wagtail_wtr/                        # Django project package (settings, urls, wsgi only)
+│   ├── settings/
+│   │   ├── __init__.py
 │   │   ├── base.py
 │   │   ├── dev.py
 │   │   └── production.py
@@ -127,7 +129,7 @@ wagtail-wtr/
 |---|---|---|
 | Project structure | Working Django project, not a `wagtail start --template` | Developers can run `manage.py` directly; no token round-tripping for migrations |
 | New client sites | Fork/clone this repo | Sites keep `wagtail_wtr` package name; site-specific code lives in new apps outside `wtrx/` |
-| Reusable app | `wtrx/` sub-app inside `wagtail_wtr/` | Visible boundary prevents mixing core + site-specific code. Designed for eventual pip extraction. |
+| Reusable app | `wtrx/` at repo root (sibling to `wagtail_wtr/`) | Clean separation: `wagtail_wtr/` is project config only; `wtrx/` is the pip-extractable app |
 | Concrete page models | All page models (`HomePage`, `ContentPage`, `IndexPage`, `FormPage`) live in `wtrx/` | Simplifies the fork model — no thin proxy apps needed. Forks add new page types in new apps. |
 | Future pip package | `wagtail-wtrx` (CodeRed pattern) | Package ships concrete models; forks extend with new page types in separate apps. Extraction happens when wtrx is stable. |
 | CSS framework | Tailwind CSS v4 with semantic design tokens | `bg-primary`, `font-heading`, etc. Sites customize via `@theme {}` block in `static_src/css/theme.css`. No raw color values in templates. |
@@ -994,12 +996,12 @@ rebase forks and eventually extract `wtrx/` to a pip package.
 
 - [x] `wtrx/models.py` -- added `HomePage`, `ContentPage`, `IndexPage`, `FormField`,
   `FormPage`, `ITEMS_PER_PAGE` constant; updated all `parent_page_types`/`subpage_types`
-  strings to `"wagtail_wtr_wtrx.*"`
+  strings to `"wagtail_wtr_wtrx.*"` (later updated to `"wtrx.*"` in Phase 10)
 - [x] `wtrx/views.py` -- new file; `search()` view moved from `search/views.py`
 - [x] `wtrx/blocks/__init__.py` -- updated `page_type` reference to `"wagtail_wtr_wtrx.FormPage"`
 - [x] `urls.py` -- search view imported from `wtrx` instead of `search`
 - [x] `settings/base.py` -- removed `wagtail_wtr.home`, `.pages`, `.forms`, `.search`
-  from `INSTALLED_APPS`; only `wagtail_wtr.wtrx` remains
+  from `INSTALLED_APPS`; only `wagtail_wtr.wtrx` remains (later updated to `wtrx` in Phase 10)
 - [x] Management commands updated: deferred `HomePage`/`ContentPage` imports now point to `wtrx.models`
 - [x] Test files: `test_pages.py`, `test_forms.py`, `test_search.py` consolidated into
   `wtrx/tests/`; stale imports in `test_create_test_page.py` and `test_setup_site.py` fixed
@@ -1014,6 +1016,31 @@ rebase forks and eventually extract `wtrx/` to a pip package.
 - [x] `PLAN.md` updated: directory tree, Key Design Decisions table, Phase 3 note, this entry
 - [x] Agent code review
 - [x] Human review + commit
+
+### ✅ Phase 10: Move wtrx/ to Repo Root — COMPLETE
+
+Moved `wagtail_wtr/wtrx/` to `wtrx/` at the repo root (sibling to `wagtail_wtr/`),
+matching the CodeRed CMS pattern where the reusable app is a top-level package
+separate from the project config package.
+
+- [x] `git mv wagtail_wtr/wtrx wtrx` — move the directory
+- [x] `wtrx/apps.py` -- `name = "wtrx"`, `label = "wtrx"` (was `wagtail_wtr.wtrx` / `wagtail_wtr_wtrx`)
+- [x] `wagtail_wtr/settings/base.py` -- `INSTALLED_APPS`: `"wtrx"` (was `"wagtail_wtr.wtrx"`)
+- [x] `wagtail_wtr/settings/base.py` -- `WAGTAILIMAGES_IMAGE_MODEL`: `"wtrx.CustomImage"`
+- [x] `wagtail_wtr/urls.py` -- import from `wtrx` (was `wagtail_wtr.wtrx`)
+- [x] `wtrx/blocks/__init__.py` -- absolute import from `wtrx.constants`
+- [x] `wtrx/blocks/__init__.py` -- `page_type="wtrx.FormPage"` (was `"wagtail_wtr_wtrx.FormPage"`)
+- [x] `wtrx/wagtail_hooks.py` -- deferred import from `wtrx.site_settings`
+- [x] `wtrx/templatetags/wtrx_tags.py` -- import from `wtrx.site_settings`
+- [x] `wtrx/management/commands/setup_site.py` -- deferred imports from `wtrx.models` / `wtrx.site_settings`
+- [x] `wtrx/management/commands/create_test_page.py` -- deferred imports from `wtrx.images` / `wtrx.models`
+- [x] `wtrx/models.py` -- all `parent_page_types`/`subpage_types` strings updated to `"wtrx.*"`
+- [x] Templates (5 files) -- `settings.wagtail_wtr_wtrx.X` → `settings.wtrx.X`
+- [x] Test files (10 files) -- imports updated from `wagtail_wtr.wtrx.*` → `wtrx.*`
+- [x] Migrations reset: deleted `0001_initial.py`, regenerated fresh `0001_initial.py`
+- [x] `Makefile` -- `test` target: `python manage.py test wtrx wagtail_wtr`
+- [x] `AGENTS.md`, `README.md`, `PLAN.md` updated
+- [x] 235 tests pass
 
 ---
 
