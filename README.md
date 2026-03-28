@@ -486,7 +486,31 @@ Required environment variables in production:
 SECRET_KEY=...
 DATABASE_URL=postgres://...
 ALLOWED_HOSTS=mysite.com,www.mysite.com
+WAGTAILADMIN_BASE_URL=https://mysite.com
 ```
+
+### Cloudflare cache invalidation (optional)
+
+When Cloudflare is in front of your site, set these two environment variables and
+the platform will automatically purge cached pages on publish and flush the entire
+cache whenever site settings (branding, navigation, footer, social, integrations)
+are saved.
+
+```
+CLOUDFLARE_BEARER_TOKEN=your-api-token
+CLOUDFLARE_ZONE_ID=your-zone-id
+```
+
+**To get these values:**
+
+1. **Zone ID** — in the Cloudflare dashboard, select your domain. The Zone ID
+   appears in the right-hand panel under *API* on the Overview page.
+
+2. **Bearer token** — go to **My Profile → API Tokens → Create Token**. Use the
+   **Edit zone resources** template (or create a custom token) with these
+   permissions:
+   - Zone → Cache Purge → Purge
+   - Zone Resources → Include → your specific zone (or all zones)
 
 ---
 

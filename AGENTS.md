@@ -507,6 +507,33 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
       `{% if action_type and slug %}` to prevent broken markup.
     - **`<noscript>` fallback**: links to the original AN form URL.
 
+22. **`WAGTAILFRONTENDCACHE` is configured in `production.py`, not `base.py`**:
+    The `WAGTAILFRONTENDCACHE` dict is set conditionally in `production.py` based
+    on the `CLOUDFLARE_BEARER_TOKEN` and `CLOUDFLARE_ZONE_ID` environment variables.
+    It is intentionally absent from `base.py` and `dev.py`. All cache functions in
+    `wtrx/cache.py` check `getattr(settings, "WAGTAILFRONTENDCACHE", None)` and
+    are silent no-ops when it is unset. Never read `WAGTAILFRONTENDCACHE` at module
+    import time — always read it inside the function body.
+
+23. **`Page.specific` is a `cached_property`, not a method**: In Wagtail,
+    `page.specific` is a `cached_property` that returns the concrete subclass
+    instance. It must be accessed as `page.get_parent().specific` (no parentheses).
+    Calling `page.get_parent().specific()` raises `TypeError: '<ModelClass>' object
+    is not callable` at runtime — this is silently swallowed if you have a bare
+    `except Exception: pass` block, making it a particularly sneaky bug.
+    Always write `.specific` without parentheses.
+
+24. **Cache signal patch target**: When testing that a settings model save triggers
+    `purge_all()`, patch `wtrx.signals.purge_all` (the imported name in the signals
+    module), not `wtrx.cache.purge_all`. The signal handler holds the reference it
+    imported at module load time; patching the original module has no effect on
+    already-imported names.
+
+    Similarly, when testing `PURGE_ALL_HANDLERS` dispatch, patch the dict itself
+    using `patch.dict(PURGE_ALL_HANDLERS, {...})` rather than patching the handler
+    function by name — the dict was built at import time with direct function
+    references, so patching the module-level name does not update the dict entry.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive branch names: `feature/signup-block`,

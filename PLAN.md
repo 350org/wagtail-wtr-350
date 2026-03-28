@@ -577,6 +577,7 @@ INSTALLED_APPS = [
     "wagtail.contrib.table_block",  # Required for TableBlock
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",     # Required for site settings models
+    "wagtail.contrib.frontend_cache",  # Required for CDN cache invalidation
     "wagtail.locales",              # Required for locale management UI (wagtail-localize)
     "wagtail_localize",             # Required for i18n support
     "wagtailmedia",                 # Required for VideoBlock (VideoChooserBlock)
@@ -1042,9 +1043,96 @@ separate from the project config package.
 - [x] `AGENTS.md`, `README.md`, `PLAN.md` updated
 - [x] 235 tests pass
 
+### ✅ Phase 11: CDN Cache Invalidation — COMPLETE
+
+Provider-agnostic cache invalidation built into `wtrx/`. Designed around the
+"support but don't depend on" principle — everything works normally when no CDN
+is configured.
+
+- [x] `wagtail.contrib.frontend_cache` added to `INSTALLED_APPS` in `base.py`
+  (handles per-URL purge on page publish/unpublish automatically)
+- [x] `production.py` — conditional `WAGTAILFRONTENDCACHE` block: if
+  `CLOUDFLARE_BEARER_TOKEN` and `CLOUDFLARE_ZONE_ID` env vars are both present,
+  configures the Cloudflare backend; otherwise leaves `WAGTAILFRONTENDCACHE` unset
+  (no-op for all cache code)
+- [x] `wtrx/cache.py` — provider-agnostic `purge_all()` and `purge_page_with_related()`:
+  - `PURGE_ALL_HANDLERS` dict maps backend class paths to handler functions (adding a
+    new CDN = add one entry)
+  - `_purge_all_cloudflare()` calls `POST /zones/{zone_id}/purge_cache` with
+    `{"purge_everything": true}`; supports both Bearer-token and legacy Email+API-key auth
+  - `_purge_all_fallback()` purges all live page URLs via `PurgeBatch` for backends
+    that have no single-call purge-all API
+  - `purge_all()` reads `WAGTAILFRONTENDCACHE`, dispatches per backend, silent no-op
+    when unconfigured
+  - `purge_page_with_related(page)` purges a page and its parent if the parent is an
+    `IndexPage`; silent no-op when unconfigured
+- [x] `wtrx/signals.py` — signal handlers and `connect_signals()`:
+  - `on_settings_saved` connected to `post_save` for all 5 settings models
+    (`BrandingSEOSettings`, `NavigationSettings`, `FooterSettings`, `SocialSettings`,
+    `IntegrationSettings`); calls `purge_all()` because header/footer affects every page
+  - `on_page_published` connected to Wagtail's `page_published` signal; calls
+    `purge_page_with_related()` to also refresh parent index listings
+  - Signal connection deferred inside `connect_signals()` to avoid
+    `AppRegistryNotReady` errors
+- [x] `wtrx/apps.py` — `WtrxConfig.ready()` calls `connect_signals()` from
+  `wtrx.signals`
+- [x] `wtrx/tests/test_cache.py` — 21 tests:
+  - `purge_all()` no-ops silently when not configured
+  - Cloudflare API called with correct payload + auth when configured
+  - Bearer-token and legacy Email+API-key auth paths tested
+  - Graceful handling of missing ZONEID, missing credentials, HTTP errors, network exceptions
+  - Registry dispatch routes correctly to CF handler and fallback handler
+  - `on_settings_saved` fires `purge_all` for each of the 5 settings models
+  - `purge_page_with_related` purges parent IndexPage when applicable
+  - `purge_page_with_related` is a no-op when not configured
+  - Does not raise when page has no parent
+- [x] `README.md` — Cloudflare configuration section under Deployment: zone ID
+  location, how to create an API token, how the two purge modes work, rate limits,
+  silent no-op behavior
+- [x] `AGENTS.md` — pitfall added for `WAGTAILFRONTENDCACHE` env vars and
+  `cached_property` vs method call (`.specific` not `.specific()`)
+- [x] 256 tests pass
+
 ---
 
-### Phase 8: Automated Visual Testing — NOT STARTED
+### Phase 12: Hosting Strategy — NOT STARTED
+
+Plan and implement a pluggable hosting adapter pattern to support deploying
+wagtail-wtr sites on multiple cloud platforms.
+
+- [ ] Evaluate Render, Railway, and AWS Lightsail as primary targets
+- [ ] Design pluggable host adapters: per-host `production_<host>.py` settings
+  overlay or env-var-driven selection
+- [ ] S3 (or compatible) media storage: `django-storages[s3]` + `wagtail-storages`
+  are already in `pyproject.toml`; document bucket naming, CORS, and IAM policy
+- [ ] Platform-specific `Procfile` / `render.yaml` / `railway.json` starter files
+- [ ] `make deploy-<host>` convenience targets in `Makefile`
+
+### Phase 13: ADR Documentation — NOT STARTED
+
+Create an Architecture Decision Record (ADR) log documenting the key decisions
+made in the platform. This helps onboard new developers and provides rationale
+for future maintainers.
+
+- [ ] Choose ADR format (Nygard-style `docs/adr/NNNN-title.md` is conventional)
+- [ ] Document the upstream/fork strategy (why fork over subpackage)
+- [ ] Document the `wtrx/` extraction roadmap (CodeRed CMS pattern)
+- [ ] Document the Tailwind v4 token system and why no `tailwind.config.js`
+- [ ] Document the "no custom User model" decision
+- [ ] Document the "no DB access at import time" constraint and how it's enforced
+
+### Phase 14: SMTP & Provisioning Automation — NOT STARTED
+
+Automate new-site provisioning to reduce the time from fork to running production site.
+
+- [ ] SMTP: document Mailgun, AWS SES, and Postmark options; add
+  `EMAIL_BACKEND` / `EMAIL_HOST` env-var-driven config to `production.py`
+- [ ] Provisioning script: `make provision` that creates S3 bucket, IAM policy,
+  SES domain identity, and Cloudflare DNS entries for a new fork
+- [ ] `make env-template` that outputs a `.env.example` with all required and
+  optional production env vars and their descriptions
+
+---
 
 The goal is to catch regressions in block rendering automatically — both at the
 HTML level (existing) and at the pixel level (visual regression).
@@ -1096,6 +1184,57 @@ Implementation steps (when ready):
 - [ ] `tests/visual/baselines/` -- initial baseline PNGs (generated by `make visual-baseline`)
 - [ ] `Makefile` targets: `visual-baseline`, `visual-test`, `visual-update`
 - [ ] CI step (GitHub Actions): run `make visual-test` after `make test`
+
+---
+
+### Phase 15: CI, Automated Testing & Linting — NOT STARTED
+
+Ensure contributors (and forks) cannot silently break conventions, upstream
+compatibility, or code quality. The goal is a green-CI gate on every PR.
+
+#### 15a: GitHub Actions workflow
+
+- [ ] `.github/workflows/ci.yml` — triggered on `push` and `pull_request` to
+  `main`. Jobs:
+  - **lint** — `ruff check .` + `ruff format --check .` (or `flake8` + `black`)
+  - **test** — `python manage.py test wtrx wagtail_wtr` against a matrix of
+    supported Python versions (3.11, 3.12)
+  - **migrations check** — `python manage.py migrate --check` + `python manage.py
+    makemigrations --check --dry-run` to catch missing or unapplied migrations
+  - **build** — `make build-prod` to verify CSS/JS compiles cleanly
+- [ ] Add `pyproject.toml` config for `ruff` (line-length 119, import ordering
+  matching AGENTS.md conventions, Django/Wagtail-aware rules)
+- [ ] Add `pyproject.toml` config for `mypy` or skip for now (models/blocks don't
+  require type hints per AGENTS.md; revisit when extracting `wtrx/` as a package)
+
+#### 15b: Pre-commit hooks
+
+- [ ] `.pre-commit-config.yaml` with:
+  - `ruff` (lint + format)
+  - `check-merge-conflict`, `end-of-file-fixer`, `trailing-whitespace`
+  - `python manage.py makemigrations --check` (fail if model changes have no migration)
+- [ ] Document `pre-commit install` in `README.md` and `Makefile` (`make install-hooks`)
+
+#### 15c: Fork compatibility test
+
+A lightweight smoke test to verify that a fork that subclasses `wtrx/` models
+does not break silently when upstream changes are merged.
+
+- [ ] `wtrx/tests/test_fork_compat.py` — asserts that all concrete page models
+  have a `template` attribute, all `BodyStreamBlock` children have `icon` and
+  `template` in their `Meta`, and all settings models are registered with
+  `@register_setting`
+- [ ] Run as part of the normal `make test` suite (no separate step needed)
+
+#### 15d: Linting conventions enforcement
+
+- [ ] Add `ruff` rules to enforce AGENTS.md conventions automatically:
+  - `I` (isort) — import ordering (stdlib → django → wagtail → third-party → local)
+  - `UP` (pyupgrade) — modern Python syntax
+  - `DJ` (flake8-django) — Django-specific gotchas
+  - `TID252` — ban relative imports from `wtrx/` (enforce `from wtrx.x import y`)
+- [ ] `make lint` target in `Makefile` that runs `ruff check . && ruff format --check .`
+- [ ] `make lint-fix` target that runs `ruff check --fix . && ruff format .`
 
 ---
 

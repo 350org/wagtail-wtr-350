@@ -42,6 +42,20 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+# ---------------------------------------------------------------------------
+# Cloudflare cache invalidation (optional — omit env vars to disable)
+# ---------------------------------------------------------------------------
+_cf_token = os.environ.get("CLOUDFLARE_BEARER_TOKEN")
+_cf_zone = os.environ.get("CLOUDFLARE_ZONE_ID")
+if _cf_token and _cf_zone:
+    WAGTAILFRONTENDCACHE = {
+        "cloudflare": {
+            "BACKEND": "wagtail.contrib.frontend_cache.backends.CloudflareBackend",
+            "BEARER_TOKEN": _cf_token,
+            "ZONEID": _cf_zone,
+        },
+    }
+
 try:
     from .local import *  # noqa: F401, F403
 except ImportError:
