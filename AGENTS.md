@@ -27,14 +27,10 @@ wagtail-wtr/
 │   │   ├── tests/
 │   │   ├── apps.py
 │   │   ├── images.py       # CustomImage, CustomRendition
-│   │   ├── models.py       # BasePage, HeroMixin
+│   │   ├── models.py       # BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage
+│   │   ├── views.py        # search() view
 │   │   └── site_settings.py
-│   ├── home/               # HomePage (site-specific layer)
-│   ├── pages/              # ContentPage, IndexPage
-│   ├── forms/              # FormPage
-│   ├── users/              # Custom User model
-│   ├── search/             # Search view
-│   ├── settings/
+ │   ├── settings/
 │   │   ├── base.py
 │   │   ├── dev.py
 │   │   └── production.py
@@ -50,12 +46,12 @@ wagtail-wtr/
 └── Dockerfile
 ```
 
-- `wagtail_wtr/wtrx/` -- Core reusable app. DO NOT put site-specific code here.
+- `wagtail_wtr/wtrx/` -- Core reusable app. All page models live here.
 - `wagtail_wtr/wtrx/blocks/` -- StreamField blocks, one file per category.
 - `wagtail_wtr/wtrx/site_settings.py` -- All Wagtail site settings models.
-- `wagtail_wtr/wtrx/models.py` -- BasePage, HeroMixin, core abstract models.
+- `wagtail_wtr/wtrx/models.py` -- BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage.
+- `wagtail_wtr/wtrx/views.py` -- search() view.
 - `wagtail_wtr/wtrx/images.py` -- CustomImage model.
-- `wagtail_wtr/home/`, `pages/`, `forms/` -- Page type apps (site-specific layer).
 - `templates/` -- Fork override templates (empty in upstream). Forks place shadow templates here to override `wtrx/` defaults. Django's `DIRS` resolver checks this directory first.
 - `static_src/` -- Frontend source (Tailwind, JS).
 - `static_compiled/` -- Tailwind CLI output (committed to repo).
@@ -212,10 +208,14 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
 
 ## Architecture Rules
 
-1. **wtrx/ is self-contained**: It MUST NOT import from `home/`, `pages/`,
-   `forms/`, or any other site-specific app. Those apps import FROM `wtrx/`.
-   This boundary is the future pip extraction point.
-2. **No circular imports**: Page-type apps depend on `wtrx/`, never the reverse.
+1. **wtrx/ is self-contained**: All page models (`HomePage`, `ContentPage`, `IndexPage`,
+   `FormField`, `FormPage`) and the `search()` view live inside `wtrx/`. `wtrx/` is the
+   only project app — no separate `users/` app. Django's built-in `auth.User` is used
+   directly; no `AUTH_USER_MODEL` override. No code outside `wtrx/` should exist in the
+   project unless a fork needs site-specific customisation.
+2. **No custom user model**: Use `django.contrib.auth.models.User` directly. Forks that
+   need custom user fields should add their own app with a `AbstractUser` subclass and
+   set `AUTH_USER_MODEL` in their fork's settings — not in upstream.
 3. **Settings over hardcoding**: Platform-specific behavior (ActBlue, Action Network)
    is driven by `IntegrationSettings`, not hardcoded in blocks or templates.
 4. **Block visibility via hooks, not import-time DB reads**: All SignupBlock
@@ -265,10 +265,12 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
    when a video is present. Poster fallback chain: wagtailmedia thumbnail →
    `hero.image` rendered at `fill-1280x720` → no poster.
 8. **wtrx/ extraction readiness**: Keep `wtrx/` structured as if it will become
-   a standalone pip package. Concrete models (CustomImage, settings models) will
-   ship with their own migrations when extracted. Abstract models (BasePage,
-   HeroMixin) will be provided for site apps to subclass. Follow the CodeRed CMS
-   pattern: package provides base classes, site apps provide thin concrete subclasses.
+   a standalone pip package. All concrete page models (`HomePage`, `ContentPage`,
+   `IndexPage`, `FormField`, `FormPage`) ship with their own migrations in `wtrx/`.
+   Forks that need custom page types add new apps with new page types rather than
+   modifying `wtrx/` models. Follow the CodeRed CMS pattern for the eventual pip
+   extraction; `wtrx/` will provide the concrete models and forks will override by
+   adding new page types in separate apps.
 9. **SectionContentBlock for fork extensibility**: `SectionBlock.content` uses a
    named declarative `StreamBlock` subclass (`SectionContentBlock`) instead of an
    inline tuple-list. This allows fork sites to subclass `SectionContentBlock` and

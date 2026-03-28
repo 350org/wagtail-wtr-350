@@ -501,7 +501,7 @@ class Command(BaseCommand):
         # Deferred imports to avoid import-time DB access (architecture rule #4).
         from wagtail.models import Page, Site
 
-        from wagtail_wtr.pages.models import ContentPage
+        from wagtail_wtr.wtrx.models import ContentPage
 
         slug = options["slug"]
         force = options["force"]

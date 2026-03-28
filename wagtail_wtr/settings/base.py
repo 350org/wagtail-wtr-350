@@ -22,11 +22,6 @@ DEBUG = False
 ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
-    "wagtail_wtr.home",
-    "wagtail_wtr.pages",
-    "wagtail_wtr.forms",
-    "wagtail_wtr.users",
-    "wagtail_wtr.search",
     "wagtail_wtr.wtrx",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -106,9 +101,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
-
-# Custom user model
-AUTH_USER_MODEL = "wagtail_wtr_users.User"
 
 # Internationalization
 USE_I18N = True

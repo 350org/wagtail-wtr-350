@@ -30,7 +30,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Deferred imports to avoid import-time DB access (architecture rule #4).
-        from wagtail_wtr.home.models import HomePage
+        from wagtail_wtr.wtrx.models import HomePage
         from wagtail_wtr.wtrx.site_settings import IntegrationSettings
 
         self.stdout.write(self.style.MIGRATE_HEADING("wagtail-wtr site setup"))

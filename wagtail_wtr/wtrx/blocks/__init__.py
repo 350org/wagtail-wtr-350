@@ -714,7 +714,7 @@ class SignupWagtailFormsBlock(StructBlock):
         help_text=_("Leave blank to use the site default button label."),
     )
     form_page = PageChooserBlock(
-        page_type="wagtail_wtr_forms.FormPage",
+        page_type="wagtail_wtr_wtrx.FormPage",
         label=_("Form page"),
         help_text=_("The FormPage whose form will be rendered inline."),
     )

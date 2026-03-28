@@ -6,12 +6,16 @@ TestCase with RequestFactory covers get_context() behaviour.
 """
 
 from django.test import RequestFactory, TestCase
-from wagtail.models import Page
+from wagtail.models import Page, Site
 from wagtail.test.utils import WagtailPageTests
 
-from wagtail_wtr.home.models import HomePage
-from wagtail_wtr.pages.models import ContentPage, IndexPage
-from wagtail_wtr.forms.models import FormField, FormPage
+from wagtail_wtr.wtrx.models import (
+    ContentPage,
+    FormField,
+    FormPage,
+    HomePage,
+    IndexPage,
+)
 
 
 class TestFormPageParentSubpageTypes(WagtailPageTests):
@@ -150,3 +154,61 @@ class TestFormPageContentPanels(TestCase):
         self.assertIn("subject", all_fields)
         self.assertIn("intro", all_fields)
         self.assertIn("thank_you_text", all_fields)
+
+
+class TestFormPageServeAjax(TestCase):
+    """FormPage.serve() must return JSON for AJAX requests."""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Remove any pre-existing default site so we control the tree.
+        Site.objects.filter(is_default_site=True).delete()
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-ajax")
+        root.add_child(instance=cls.home)
+        # Create a default site rooted at home so page.url works correctly.
+        Site.objects.create(
+            hostname="localhost",
+            port=80,
+            root_page=cls.home,
+            is_default_site=True,
+        )
+        cls.form_page = FormPage(
+            title="Contact",
+            slug="contact-ajax",
+            to_address="test@example.com",
+            from_address="noreply@example.com",
+            subject="New submission",
+        )
+        cls.home.add_child(instance=cls.form_page)
+        # Add a required text field so the form has something to validate.
+        FormField.objects.create(
+            page=cls.form_page,
+            sort_order=0,
+            label="Your name",
+            field_type="singleline",
+            required=True,
+        )
+
+    def test_ajax_invalid_post_returns_json_400(self):
+        """POSTing an incomplete AJAX form returns 400 with errors JSON."""
+        response = self.client.post(
+            self.form_page.url,
+            {},  # missing required "your_name" field
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data["success"])
+        self.assertIn("errors", data)
+
+    def test_ajax_valid_post_returns_json_success(self):
+        """POSTing a complete AJAX form returns 200 with success JSON."""
+        response = self.client.post(
+            self.form_page.url,
+            {"your_name": "Alice"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])

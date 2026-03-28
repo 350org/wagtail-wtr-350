@@ -9,7 +9,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from wagtail.models import Page, Site
 
-from wagtail_wtr.home.models import HomePage
+from wagtail_wtr.wtrx.models import HomePage
 from wagtail_wtr.wtrx.site_settings import IntegrationSettings
 
 

@@ -9,19 +9,19 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.contrib.sitemaps.views import sitemap
 from wagtail.documents import urls as wagtaildocs_urls
 
-from wagtail_wtr.search import views as search_views
+from wagtail_wtr.wtrx import views as search_views
 
 urlpatterns = [
-    path('django-admin/', admin.site.urls),
-    path('admin/', include(wagtailadmin_urls)),
-    path('documents/', include(wagtaildocs_urls)),
-    path('sitemap.xml', sitemap, name='sitemap'),
-    path('i18n/', include('django.conf.urls.i18n')),
+    path("django-admin/", admin.site.urls),
+    path("admin/", include(wagtailadmin_urls)),
+    path("documents/", include(wagtaildocs_urls)),
+    path("sitemap.xml", sitemap, name="sitemap"),
+    path("i18n/", include("django.conf.urls.i18n")),
 ]
 
 urlpatterns += i18n_patterns(
-    path('search/', search_views.search, name='search'),
-    path('', include(wagtail_urls)),
+    path("search/", search_views.search, name="search"),
+    path("", include(wagtail_urls)),
 )
 
 if settings.DEBUG:

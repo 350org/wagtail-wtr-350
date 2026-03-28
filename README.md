@@ -200,10 +200,7 @@ fork-specific configuration stay on your fork.
 |---|---|
 | `static_src/css/theme.css` | Brand colors (`--color-primary-*`, etc.), fonts, theme presets |
 | `wagtail_wtr/settings/base.py` | `WAGTAIL_SITE_NAME`, `WTRX_DONATION_PLATFORM`, `WTRX_SIGNUP_PLATFORM`, `LANGUAGES` |
-| `wagtail_wtr/home/` | `HomePage` model and template |
-| `wagtail_wtr/pages/` | Add or modify page types (`ContentPage`, `IndexPage`, new types) |
-| `wagtail_wtr/forms/` | Customise form page behavior |
-| `templates/` | Override or extend any template |
+| `templates/` | Override or extend any template (shadow `templates/wtrx/<path>`) |
 | `static_src/javascript/` | Add site-specific JS components |
 | Wagtail admin | Settings > Branding, Navigation, Footer, Social, Integrations |
 
@@ -211,14 +208,14 @@ fork-specific configuration stay on your fork.
 
 | File / directory | Why |
 |---|---|
-| `wagtail_wtr/wtrx/` | Core reusable app — blocks, base models, settings models, hooks. Upstream changes land here. |
+| `wagtail_wtr/wtrx/` | Core reusable app — blocks, page models, settings models, views, hooks. Upstream changes land here. |
 | `static_src/css/main.css` | Tailwind infrastructure — imports, plugins, base layer. Leaving it unedited ensures conflict-free upstream merges. |
 
 ### Extend, don't modify
 
-- **Page models**: subclass `BasePage` and `HeroMixin` from `wtrx/` in your own apps (`home/`, `pages/`, etc.)
+- **Page models**: all built-in page types (`HomePage`, `ContentPage`, `IndexPage`, `FormPage`) live in `wtrx/` — use them as-is. To add site-specific page types, create a new app and subclass `BasePage` and `HeroMixin` from `wtrx/`.
 - **StreamField blocks**: use `BodyStreamBlock` as-is, or subclass it to add site-specific blocks (see [Customizing blocks](#customizing-blocks))
-- **Settings models**: create new `BaseSiteSetting` subclasses (from `wagtail.contrib.settings`) in your own apps if you need additional settings panels beyond what `wtrx/` already provides.
+- **Settings models**: create new `BaseSiteSetting` subclasses (from `wagtail.contrib.settings`) in your own app if you need additional settings panels beyond what `wtrx/` already provides.
 
 ### Customizing blocks
 
@@ -229,7 +226,7 @@ via the MRO, so a subclass only needs to redeclare the blocks it wants to change
 
 **Example: adding a subtitle to CardBlock**
 
-Create a site-level blocks module (e.g. `wagtail_wtr/pages/blocks.py`):
+Create a site-level blocks module (e.g. `wagtail_wtr/mysite/blocks.py`):
 
 ```python
 from django.utils.translation import gettext_lazy as _
@@ -271,11 +268,11 @@ class SiteBodyStreamBlock(BodyStreamBlock):
     section = SiteSectionBlock()
 ```
 
-Then update page models to use `SiteBodyStreamBlock`:
+Then update page models to use `SiteBodyStreamBlock` (in a new site-specific app):
 
 ```python
-# wagtail_wtr/home/models.py (and pages/models.py)
-from wagtail_wtr.pages.blocks import SiteBodyStreamBlock
+# wagtail_wtr/mysite/models.py
+from wagtail_wtr.mysite.blocks import SiteBodyStreamBlock
 
 class HomePage(BasePage, HeroMixin):
     body = StreamField(SiteBodyStreamBlock(), ...)
@@ -289,8 +286,7 @@ class HomePage(BasePage, HeroMixin):
 - `SectionContentBlock` exists specifically to support this pattern — it's a named
   `StreamBlock` subclass so you can override individual child blocks without
   duplicating the full 17-entry block list.
-- The only merge friction is the import-line changes in `home/models.py` and
-  `pages/models.py` — trivial one-line conflicts.
+- The only merge friction is the import-line changes in `mysite/models.py` — trivial one-line conflicts.
 - **Template overrides**: block templates live in `templates/components/streamfield/blocks/`.
   You can modify them directly on your fork. When `wtrx` is extracted to a pip
   package, Django's template resolution will prefer your project-level templates
@@ -364,17 +360,13 @@ wagtail-wtr/
 ├── wagtail_wtr/
 │   ├── wtrx/               # Core reusable app (don't edit on client sites)
 │   │   ├── blocks/         # StreamField blocks (content, layout, composite, cards, actions)
-│   │   ├── models.py       # BasePage, HeroMixin
+│   │   ├── models.py       # BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage
+│   │   ├── views.py        # search() view
 │   │   ├── site_settings.py
 │   │   ├── images.py       # CustomImage
 │   │   ├── templatetags/
 │   │   └── wagtail_hooks.py
-│   ├── home/               # HomePage
-│   ├── pages/              # ContentPage, IndexPage
-│   ├── forms/              # FormPage
-│   ├── users/              # Custom user model
-│   ├── search/             # Search view
-│   └── settings/
+ │   └── settings/
 │       ├── base.py
 │       ├── dev.py
 │       └── production.py
@@ -386,8 +378,8 @@ wagtail-wtr/
 └── package.json
 ```
 
-`wtrx/` is the stable core. Site-specific code goes in `home/`, `pages/`, `forms/`,
-or new apps. Extend or override `wtrx/` models and blocks; don't edit them directly.
+`wtrx/` is the stable core. All page models and the search view live there. To add
+site-specific page types, create a new app and subclass `BasePage`; don't edit `wtrx/` directly.
 
 ---
 

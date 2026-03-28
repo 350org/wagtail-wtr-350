@@ -20,8 +20,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from wagtail.models import Page, Site
 
-from wagtail_wtr.home.models import HomePage
-from wagtail_wtr.pages.models import ContentPage
+from wagtail_wtr.wtrx.models import ContentPage, HomePage
 
 # Isolated media root so uploaded test images don't accumulate in the real
 # MEDIA_ROOT across test runs. Each test class gets its own temp directory

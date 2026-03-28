@@ -34,7 +34,9 @@ wagtail-wtr/
 │   │   │   ├── composite.py        # CalloutBlock, HeroBlock
 │   │   │   ├── cards.py            # CardBlock, PersonCardBlock
 │   │   │   └── actions.py          # DonateBlock, SignupBlock variants
-│   │   ├── models.py               # BasePage, HeroMixin
+│   │   ├── models.py               # BasePage, HeroMixin, HomePage, ContentPage,
+│   │   │                           #   IndexPage, FormField, FormPage
+│   │   ├── views.py                # search() view
 │   │   ├── site_settings.py        # BrandingSEOSettings, NavigationSettings,
 │   │   │                           #   FooterSettings, SocialSettings, IntegrationSettings
 │   │   ├── images.py               # CustomImage, Rendition
@@ -42,34 +44,11 @@ wagtail-wtr/
 │   │   │   ├── __init__.py
 │   │   │   └── wtrx_tags.py
 │   │   ├── wagtail_hooks.py
-│   │   └── management/
-│   │       └── commands/
-│   │           └── setup_site.py   # Interactive setup command
-│   ├── home/                       # HomePage model
-│   │   ├── __init__.py
-│   │   ├── apps.py
-│   │   ├── models.py
-│   │   └── migrations/
-│   ├── pages/                      # ContentPage, IndexPage models
-│   │   ├── __init__.py
-│   │   ├── apps.py
-│   │   ├── models.py
-│   │   └── migrations/
-│   ├── forms/                      # FormPage model
-│   │   ├── __init__.py
-│   │   ├── apps.py
-│   │   ├── models.py
-│   │   └── migrations/
-│   ├── users/                      # Custom user model
-│   │   ├── __init__.py
-│   │   ├── apps.py
-│   │   ├── models.py
-│   │   └── migrations/
-│   ├── search/                     # Search view
-│   │   ├── __init__.py
-│   │   └── views.py
-│   ├── settings/
-│   │   ├── __init__.py
+ │   │   └── management/
+ │   │       └── commands/
+ │   │           └── setup_site.py   # Interactive setup command
+ │   ├── settings/
+ │   │   ├── __init__.py
 │   │   ├── base.py
 │   │   ├── dev.py
 │   │   └── production.py
@@ -147,9 +126,10 @@ wagtail-wtr/
 | Decision | Choice | Rationale |
 |---|---|---|
 | Project structure | Working Django project, not a `wagtail start --template` | Developers can run `manage.py` directly; no token round-tripping for migrations |
-| New client sites | Fork/clone this repo | Sites keep `wagtail_wtr` package name; site-specific work goes in `home/`, `pages/`, `forms/` |
+| New client sites | Fork/clone this repo | Sites keep `wagtail_wtr` package name; site-specific code lives in new apps outside `wtrx/` |
 | Reusable app | `wtrx/` sub-app inside `wagtail_wtr/` | Visible boundary prevents mixing core + site-specific code. Designed for eventual pip extraction. |
-| Future pip package | `wagtail-wtrx` (CodeRed pattern) | Package provides base classes; site apps provide thin concrete subclasses. Extraction happens when wtrx is stable. |
+| Concrete page models | All page models (`HomePage`, `ContentPage`, `IndexPage`, `FormPage`) live in `wtrx/` | Simplifies the fork model — no thin proxy apps needed. Forks add new page types in new apps. |
+| Future pip package | `wagtail-wtrx` (CodeRed pattern) | Package ships concrete models; forks extend with new page types in separate apps. Extraction happens when wtrx is stable. |
 | CSS framework | Tailwind CSS v4 with semantic design tokens | `bg-primary`, `font-heading`, etc. Sites customize via `@theme {}` block in `static_src/css/theme.css`. No raw color values in templates. |
 | Dark mode | No (post-MVP) | Reduces CSS complexity |
 | Multi-lingual | Yes, via `wagtail-localize` | i18n infrastructure from day one. Sites default to English, add languages as needed. |
@@ -820,7 +800,7 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 - Directory structure, `manage.py`, `settings/`, `urls.py`, `wsgi.py`
 - `pyproject.toml` (Python 3.13, Django 5.2 LTS, Wagtail 7.0 LTS)
 - `package.json`, `tailwind.config.js`, `Dockerfile`, `Makefile`, `.gitignore`
-- `wtrx/` app skeleton, `users/` app with custom User model + migration
+- `wtrx/` app skeleton, `users/` app with custom User model + migration (later removed — see Phase 9)
 - `search/` app with search view (Query/add_hit removed — dropped in Wagtail 7.0)
 - Base templates (`base.html`, `base_page.html`, `404.html`, `500.html`)
 - `WAGTAILADMIN_BASE_URL` in `dev.py`/`production.py` (not `base.py`)
@@ -869,6 +849,8 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 - [x] Tests for all 4 page types (home, pages, forms)
 - [x] Agent code review
 - [x] Human review + commit
+
+Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
 
 ### ✅ Phase 4: Navigation & Footer — COMPLETE
 
@@ -1003,6 +985,37 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 - [x] `npm run build` succeeds: `≈ tailwindcss v4.2.2 / Done in 132ms`
 - [x] 189 Django tests pass
 - [x] PLAN.md, AGENTS.md, README.md updated for TW4
+
+### ✅ Phase 9: App Consolidation — COMPLETE (branch feature/consolidate-apps)
+
+Consolidated the four thin Django apps (`home`, `pages`, `forms`, `search`) into `wtrx/`
+so the entire reusable platform lives in one self-contained app, making it easier to
+rebase forks and eventually extract `wtrx/` to a pip package.
+
+- [x] `wtrx/models.py` -- added `HomePage`, `ContentPage`, `IndexPage`, `FormField`,
+  `FormPage`, `ITEMS_PER_PAGE` constant; updated all `parent_page_types`/`subpage_types`
+  strings to `"wagtail_wtr_wtrx.*"`
+- [x] `wtrx/views.py` -- new file; `search()` view moved from `search/views.py`
+- [x] `wtrx/blocks/__init__.py` -- updated `page_type` reference to `"wagtail_wtr_wtrx.FormPage"`
+- [x] `urls.py` -- search view imported from `wtrx` instead of `search`
+- [x] `settings/base.py` -- removed `wagtail_wtr.home`, `.pages`, `.forms`, `.search`
+  from `INSTALLED_APPS`; only `wagtail_wtr.wtrx` remains
+- [x] Management commands updated: deferred `HomePage`/`ContentPage` imports now point to `wtrx.models`
+- [x] Test files: `test_pages.py`, `test_forms.py`, `test_search.py` consolidated into
+  `wtrx/tests/`; stale imports in `test_create_test_page.py` and `test_setup_site.py` fixed
+- [x] Deleted `wagtail_wtr/home/`, `wagtail_wtr/pages/`, `wagtail_wtr/forms/`, `wagtail_wtr/search/`
+- [x] Deleted `wagtail_wtr/users/`; removed `AUTH_USER_MODEL` override; Django's built-in
+  `auth.User` is now used directly (same approach as CodeRed CMS)
+- [x] Migrations reset: deleted old `0001`–`0003`, regenerated fresh `0001_initial.py`
+  covering all 12 models (including page models previously split across 3 migration lineages)
+- [x] 234 tests pass on fresh DB
+- [x] `AGENTS.md` updated: repo structure tree, Architecture Rules 1 and 8
+- [x] `README.md` updated: what-to-customize table, don't-edit table
+- [x] `PLAN.md` updated: directory tree, Key Design Decisions table, Phase 3 note, this entry
+- [x] Agent code review
+- [x] Human review + commit
+
+---
 
 ### Phase 8: Automated Visual Testing — NOT STARTED
 
