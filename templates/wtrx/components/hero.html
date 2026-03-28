@@ -1,0 +1,161 @@
+{% load i18n wagtailimages_tags wagtailcore_tags %}
+{% comment %}
+FORK SHADOW: overrides wtrx/templates/wtrx/components/hero.html
+Changes vs upstream:
+  - Text alignment: text-center → text-right (both layout branches)
+  - H1 inline classes removed (typography controlled via theme.css .wtr-hero h1)
+  - .wtr-hero-copy inline classes removed (styles in theme.css)
+Keep in sync with upstream on rebase.
+{% endcomment %}
+{% comment %}
+  Shared hero component used by both HeroMixin (page-level) and HeroBlock (StreamField).
+
+  Expects a `hero` dict (or object) with these keys/attributes:
+    headline      — the heading text (str)
+    copy          — optional richtext value (rendered via |richtext or include_block)
+    copy_is_block — True if copy should be rendered via include_block, False for |richtext
+    image         — optional CustomImage instance
+    video         — optional wagtailmedia Media instance (type="video")
+    link_text     — optional CTA button label (str)
+    link_page     — optional internal Page
+    link_url      — optional external URL (str)
+
+  Layout behaviour:
+    - No video: centered text over optional background image (original layout).
+    - With video: two-column grid — text left (right-aligned on md+), video right.
+      On mobile both columns go full-width; video appears below text (DOM order).
+      Background image overlay is not shown when a video is present.
+
+  Poster fallback chain (video only):
+    1. wagtailmedia thumbnail (editor-uploaded on the Media item)
+    2. hero_image rendered at 1280×720 via Wagtail renditions
+    3. No poster (browser shows first frame or black)
+
+  Page templates pass `hero` via the template context (set in get_context()).
+  HeroBlock.get_context() builds this dict automatically (video is always None there).
+{% endcomment %}
+{% if hero.video %}
+
+    {# ------------------------------------------------------------------ #}
+    {# VIDEO LAYOUT — two-column: text left, video right                  #}
+    {# ------------------------------------------------------------------ #}
+    <div class="wtr-hero bg-dark text-light">
+        <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+            <div class="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
+
+                {# Left column — text content #}
+                <div class="text-right">
+                    <h1>{{ hero.headline }}</h1>
+
+                    {% if hero.copy %}
+                        <div class="wtr-hero-copy mt-4">
+                            {% if hero.copy_is_block %}
+                                {% include_block hero.copy %}
+                            {% else %}
+                                {{ hero.copy|richtext }}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    {# CTA guard: identical in both layout branches — update both if changed. #}
+                    {% if hero.link_text %}
+                        {% if hero.link_page or hero.link_url %}
+                            <div class="mt-8">
+                                {% include "wtrx/components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                {# Right column — video #}
+                <div>
+                    {% if hero.video.thumbnail %}
+                        {% comment %}wagtailmedia thumbnail — editor-uploaded poster frame{% endcomment %}
+                        <video
+                            controls
+                            preload="metadata"
+                            class="w-full h-auto rounded-lg"
+                            aria-label="{{ hero.video.title }}"
+                            poster="{{ hero.video.thumbnail.url }}"
+                        >
+                            {% for source in hero.video.sources %}
+                                <source src="{{ source.src }}" type="{{ source.type }}">
+                            {% endfor %}
+                            {% trans "Your browser does not support the video tag." %}
+                        </video>
+                    {% elif hero.image %}
+                        {% comment %}Fallback poster: hero_image rendered at 1280x720{% endcomment %}
+                        {% image hero.image fill-1280x720 as poster_img %}
+                        <video
+                            controls
+                            preload="metadata"
+                            class="w-full h-auto rounded-lg"
+                            aria-label="{{ hero.video.title }}"
+                            poster="{{ poster_img.url }}"
+                        >
+                            {% for source in hero.video.sources %}
+                                <source src="{{ source.src }}" type="{{ source.type }}">
+                            {% endfor %}
+                            {% trans "Your browser does not support the video tag." %}
+                        </video>
+                    {% else %}
+                        {% comment %}No poster available{% endcomment %}
+                        <video
+                            controls
+                            preload="metadata"
+                            class="w-full h-auto rounded-lg"
+                            aria-label="{{ hero.video.title }}"
+                        >
+                            {% for source in hero.video.sources %}
+                                <source src="{{ source.src }}" type="{{ source.type }}">
+                            {% endfor %}
+                            {% trans "Your browser does not support the video tag." %}
+                        </video>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+{% else %}
+
+    {# ------------------------------------------------------------------ #}
+    {# STANDARD LAYOUT — centered text over optional background image     #}
+    {# ------------------------------------------------------------------ #}
+    <div class="wtr-hero relative overflow-hidden bg-dark">
+
+        {% if hero.image %}
+            {% image hero.image fill-1600x700 as bg %}
+            <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}" alt="" role="presentation"
+                 class="absolute inset-0 h-full w-full object-cover opacity-40"
+                 style="{{ hero.image.object_position_style }}" loading="lazy">
+        {% endif %}
+
+        <div class="relative mx-auto max-w-4xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-right text-light">
+
+            <h1>{{ hero.headline }}</h1>
+
+            {% if hero.copy %}
+                <div class="wtr-hero-copy mt-4">
+                    {% if hero.copy_is_block %}
+                        {% include_block hero.copy %}
+                    {% else %}
+                        {{ hero.copy|richtext }}
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {# CTA guard: identical in both layout branches — update both if changed. #}
+            {% if hero.link_text %}
+                {% if hero.link_page or hero.link_url %}
+                    <div class="mt-8">
+                        {% include "wtrx/components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
+                    </div>
+                {% endif %}
+            {% endif %}
+
+        </div>
+    </div>
+
+{% endif %}

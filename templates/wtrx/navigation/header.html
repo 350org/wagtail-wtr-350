@@ -1,0 +1,275 @@
+{% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
+{% comment %}
+FORK SHADOW: overrides wtrx/templates/wtrx/navigation/header.html
+Changes vs upstream:
+  - Hamburger SVG replaced with MPU 3-rectangle brand-coloured mark (yellow/teal/grapefruit)
+Keep in sync with upstream on rebase.
+{% endcomment %}
+{% with nav=settings.wtrx.NavigationSettings social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings %}
+{% comment %}
+transparent_header is set in context by HomePage.get_context() when use_transparent_header is True.
+When transparent: header is position:absolute over the hero, bg is transparent, text switches to light,
+and the dark_logo variant is used if available.
+{% endcomment %}
+<header class="wtr-header {% if transparent_header %}absolute inset-x-0 top-0 z-30 bg-transparent border-b-0{% else %}relative bg-light border-b border-neutral-200{% endif %}">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+
+            {% comment %}
+            Logo — uses dark_logo when transparent header is active (dark hero bg),
+            falls back to primary logo, then site name text.
+            {% endcomment %}
+            <a href="/" class="flex items-center shrink-0">
+                {% if transparent_header and branding.dark_logo %}
+                    {% image branding.dark_logo max-160x60 as logo_img %}
+                    <img src="{{ logo_img.url }}"
+                         width="{{ logo_img.width }}"
+                         height="{{ logo_img.height }}"
+                         alt="{{ current_site.site_name }}"
+                         class="h-10 w-auto object-contain">
+                {% elif branding.logo %}
+                    {% image branding.logo max-160x60 as logo_img %}
+                    <img src="{{ logo_img.url }}"
+                         width="{{ logo_img.width }}"
+                         height="{{ logo_img.height }}"
+                         alt="{{ current_site.site_name }}"
+                         class="h-10 w-auto object-contain">
+                {% else %}
+                    <span class="font-heading font-bold text-xl {% if transparent_header %}text-light{% else %}text-dark{% endif %}">{{ current_site.site_name }}</span>
+                {% endif %}
+            </a>
+
+            {% comment %}
+            Desktop nav — hidden entirely when collapse_desktop_menu is True.
+            Each item is an InternalLinkBlock, ExternalLinkBlock, or AnchorLinkBlock.
+            {% endcomment %}
+            {% if not nav.collapse_desktop_menu %}
+                <nav class="hidden md:flex items-center space-x-6 ml-auto" aria-label="{% trans 'Primary navigation' %}">
+                    {% for item in nav.primary_navigation %}
+                        {% if item.block_type == "internal" %}
+                            <a href="{% pageurl item.value.page %}"
+                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "external" %}
+                            <a href="{{ item.value.url }}"
+                               rel="noopener noreferrer"
+                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "anchor" %}
+                            <a href="#{{ item.value.anchor }}"
+                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                </nav>
+            {% endif %}
+
+            {% comment %}
+            Right side: social icons (desktop always) + CTA button (always) + hamburger toggle.
+            {% endcomment %}
+            {% comment %}
+            relative here is the containing block for the collapsed desktop dropdown (md:absolute md:right-0 md:top-full).
+            Without it the dropdown would be positioned relative to the full-width <header> and overhang the right viewport edge.
+            {% endcomment %}
+            <div class="relative flex items-center gap-4 {% if not nav.collapse_desktop_menu %}ml-6{% else %}ml-auto{% endif %}">
+
+                {% comment %}
+                Social icons — always shown on desktop when show_in_header is enabled,
+                regardless of collapse_desktop_menu. On mobile they appear in the menu panel.
+                {% endcomment %}
+                {% if social.show_in_header and social.social_links %}
+                    <div class="wtr-social-links hidden md:flex items-center gap-3">
+                        {% for item in social.social_links %}
+                            <a href="{{ item.value.url }}"
+                               rel="noopener noreferrer"
+                               aria-label="{{ item.value.platform|social_platform_label }}"
+                               class="{% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
+                                {% social_icon item.value.platform %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% comment %}CTA button — always shown at all breakpoints regardless of collapse_desktop_menu.{% endcomment %}
+                {% if nav.cta_text %}
+                    {% if nav.cta_page %}
+                        <a href="{% pageurl nav.cta_page %}"
+                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                            {{ nav.cta_text }}
+                        </a>
+                    {% elif nav.cta_url %}
+                        <a href="{{ nav.cta_url }}"
+                           rel="noopener noreferrer"
+                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                            {{ nav.cta_text }}
+                        </a>
+                    {% elif nav.cta_anchor %}
+                        <a href="#{{ nav.cta_anchor }}"
+                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                            {{ nav.cta_text }}
+                        </a>
+                    {% endif %}
+                {% endif %}
+
+                {% comment %}
+                Hamburger toggle.
+                When collapse_desktop_menu is False: shown on mobile only (md:hidden).
+                When collapse_desktop_menu is True: shown at all breakpoints.
+                Four fully-spelled-out branches (collapse × transparent) so Tailwind's JIT scanner
+                can detect every class statically — never construct class names dynamically.
+                {% endcomment %}
+                {% if nav.collapse_desktop_menu %}
+                    {% if transparent_header %}
+                        <button type="button"
+                                class="p-2 text-neutral-200 hover:text-light"
+                                aria-label="{% trans 'Open menu' %}"
+                                aria-expanded="false"
+                                aria-controls="mobile-menu"
+                                data-mobile-menu-toggle>
+                    {% else %}
+                        <button type="button"
+                                class="p-2 text-neutral-600 hover:text-dark"
+                                aria-label="{% trans 'Open menu' %}"
+                                aria-expanded="false"
+                                aria-controls="mobile-menu"
+                                data-mobile-menu-toggle>
+                    {% endif %}
+                {% else %}
+                    {% if transparent_header %}
+                        <button type="button"
+                                class="md:hidden p-2 text-neutral-200 hover:text-light"
+                                aria-label="{% trans 'Open menu' %}"
+                                aria-expanded="false"
+                                aria-controls="mobile-menu"
+                                data-mobile-menu-toggle>
+                    {% else %}
+                        <button type="button"
+                                class="md:hidden p-2 text-neutral-600 hover:text-dark"
+                                aria-label="{% trans 'Open menu' %}"
+                                aria-expanded="false"
+                                aria-controls="mobile-menu"
+                                data-mobile-menu-toggle>
+                    {% endif %}
+                {% endif %}
+                    <svg width="38" height="32" viewBox="0 0 38 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <rect x="1" y="1" width="35.6" height="7.60001" fill="#E3FA6A" stroke="black" stroke-width="2"/>
+                        <rect x="1" y="12.2001" width="35.6" height="7.60001" fill="#00FFEC" stroke="black" stroke-width="2"/>
+                        <rect x="1" y="23.4" width="35.6" height="7.60001" fill="#FF7556" stroke="black" stroke-width="2"/>
+                    </svg>
+                </button>
+
+                {% comment %}
+                Collapsed desktop dropdown — only rendered when collapse_desktop_menu is True.
+                Lives inside the "relative" flex container so "absolute right-0 top-full" is
+                positioned relative to this group (not the full-width <header>), keeping the
+                right edge flush with the hamburger/CTA/social group.
+                Four fully-spelled-out class branches (collapse × transparent) for Tailwind JIT.
+                {% endcomment %}
+                {% if nav.collapse_desktop_menu %}
+                    {% if transparent_header %}
+                        <div id="mobile-menu"
+                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-700 bg-dark rounded-lg shadow-lg"
+                             aria-label="{% trans 'Mobile navigation' %}">
+                    {% else %}
+                        <div id="mobile-menu"
+                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-200 bg-light rounded-lg shadow-lg"
+                             aria-label="{% trans 'Mobile navigation' %}">
+                    {% endif %}
+                        <div class="px-4 py-4 space-y-2 text-right">
+                            {% for item in nav.primary_navigation %}
+                                {% if item.block_type == "internal" %}
+                                    <a href="{% pageurl item.value.page %}"
+                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                        {{ item.value.text }}
+                                    </a>
+                                {% elif item.block_type == "external" %}
+                                    <a href="{{ item.value.url }}"
+                                       rel="noopener noreferrer"
+                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                        {{ item.value.text }}
+                                    </a>
+                                {% elif item.block_type == "anchor" %}
+                                    <a href="#{{ item.value.anchor }}"
+                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                        {{ item.value.text }}
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                            {% if social.show_in_header and social.social_links %}
+                                 <div class="wtr-social-links md:hidden pt-2 border-t {% if transparent_header %}border-neutral-700{% else %}border-neutral-200{% endif %} flex items-center justify-end gap-4">
+                                    {% for item in social.social_links %}
+                                        <a href="{{ item.value.url }}"
+                                           rel="noopener noreferrer"
+                                           aria-label="{{ item.value.platform|social_platform_label }}"
+                                           class="{% if transparent_header %}text-neutral-400 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
+                                            {% social_icon item.value.platform %}
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% include "wtrx/components/language_switcher.html" %}
+                            {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>{# end right-side flex container #}
+        </div>
+    </div>
+
+    {% comment %}
+    Standard mobile-only panel — only rendered when collapse_desktop_menu is False.
+    Lives outside max-w-7xl as a direct child of <header> so it spans the full header
+    width at mobile breakpoints. md:hidden keeps it off desktop.
+    {% endcomment %}
+    {% if not nav.collapse_desktop_menu %}
+        {% if transparent_header %}
+            <div id="mobile-menu"
+                 class="hidden md:hidden border-t border-neutral-700 bg-dark"
+                 aria-label="{% trans 'Mobile navigation' %}">
+        {% else %}
+            <div id="mobile-menu"
+                 class="hidden md:hidden border-t border-neutral-200 bg-light"
+                 aria-label="{% trans 'Mobile navigation' %}">
+        {% endif %}
+            <div class="px-4 py-4 space-y-2 text-right">
+                {% for item in nav.primary_navigation %}
+                    {% if item.block_type == "internal" %}
+                        <a href="{% pageurl item.value.page %}"
+                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                            {{ item.value.text }}
+                        </a>
+                    {% elif item.block_type == "external" %}
+                        <a href="{{ item.value.url }}"
+                           rel="noopener noreferrer"
+                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                            {{ item.value.text }}
+                        </a>
+                    {% elif item.block_type == "anchor" %}
+                        <a href="#{{ item.value.anchor }}"
+                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                            {{ item.value.text }}
+                        </a>
+                    {% endif %}
+                {% endfor %}
+                {% if social.show_in_header and social.social_links %}
+                    <div class="wtr-social-links md:hidden pt-2 border-t {% if transparent_header %}border-neutral-700{% else %}border-neutral-200{% endif %} flex items-center justify-end gap-4">
+                        {% for item in social.social_links %}
+                            <a href="{{ item.value.url }}"
+                               rel="noopener noreferrer"
+                               aria-label="{{ item.value.platform|social_platform_label }}"
+                               class="{% if transparent_header %}text-neutral-400 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
+                                {% social_icon item.value.platform %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% include "wtrx/components/language_switcher.html" %}
+                {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+            </div>
+        </div>
+    {% endif %}
+</header>
+{% endwith %}

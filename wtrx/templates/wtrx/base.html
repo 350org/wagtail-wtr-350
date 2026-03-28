@@ -1,0 +1,29 @@
+{% load i18n wagtailcore_tags wagtailimages_tags static %}{% wagtail_site as current_site %}<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}{% if page.seo_title %}{{ page.seo_title }}{% else %}{{ page.title }}{% endif %}{% endblock %} — {% block site_name %}{{ current_site.site_name }}{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}{% if page.search_description %}{{ page.search_description }}{% else %}{{ settings.wtrx.BrandingSEOSettings.site_description }}{% endif %}{% endblock %}" />
+    {% with favicon=settings.wtrx.BrandingSEOSettings.favicon %}
+        {% if favicon %}
+            {% image favicon original as fav_img %}
+            <link rel="icon" href="{{ fav_img.url }}" />
+        {% endif %}
+    {% endwith %}
+    {% block fonts %}{% endblock %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_stylesheets %}{% endblock %}
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="font-body text-dark bg-light">
+    {% block header %}{% endblock %}
+    {% block hero %}{% endblock %}
+    <main id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    {% block footer %}{% endblock %}
+    <script type="module" src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
