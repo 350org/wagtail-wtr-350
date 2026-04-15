@@ -22,10 +22,10 @@ WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
 
 DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
 
-# Whitenoise static file serving — SecurityMiddleware must be first, WhiteNoise second
-MIDDLEWARE = [
+_s3_bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME")
+
+_MIDDLEWARE_BASE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -35,6 +35,18 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 ]
+
+if _s3_bucket:
+    # Static files served from S3 — WhiteNoise not needed.
+    MIDDLEWARE = list(_MIDDLEWARE_BASE)  # copy — never alias the base list
+else:
+    # No S3 — WhiteNoise serves static files from the container.
+    # Must be second, immediately after SecurityMiddleware.
+    MIDDLEWARE = [
+        _MIDDLEWARE_BASE[0],
+        "whitenoise.middleware.WhiteNoiseMiddleware",
+        *_MIDDLEWARE_BASE[1:],
+    ]
 
 STORAGES = {
     "default": {
@@ -53,40 +65,87 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # ---------------------------------------------------------------------------
-# AWS S3 media storage (optional — omit AWS_STORAGE_BUCKET_NAME to disable)
-# When configured, user-uploaded media (images, documents) is stored in S3.
-# Static files continue to be served by WhiteNoise from the container.
+# AWS S3 storage (optional — omit AWS_STORAGE_BUCKET_NAME to disable)
+# When configured, both user-uploaded media AND collected static files are
+# stored in S3 under separate prefixes (media/ and static/).
+#
+# Bucket layout:
+#   {bucket}/static/  — collected static assets (CSS, JS, fonts)
+#   {bucket}/media/   — user-uploaded content (images, documents)
+#
+# When S3 is configured, collectstatic runs in Render's preDeployCommand
+# (render.yaml) before the container starts so gunicorn binds immediately
+# and the health check responds without delay.
+# When S3 is not configured (WhiteNoise path), collectstatic runs in
+# start.sh instead so the manifest lands in the correct container filesystem.
 #
 # WARNING: Without S3, media is stored on the local filesystem. Render's
 # Docker containers have ephemeral disks — media will be lost on every deploy.
 # Always configure S3 (or another persistent storage backend) for production
 # deployments where editors upload images or documents.
 # ---------------------------------------------------------------------------
-_s3_bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 if _s3_bucket:
     _s3_custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN")
     _aws_expiry = 60 * 60 * 24 * 7  # 7 days
 
+    # Shared S3 options for both storage backends.
+    # NOTE: django-storages 1.14+ reads all S3 config from the OPTIONS dict only.
+    # Only pass explicit credentials when set — omitting them lets boto3 use its
+    # full credential chain (env vars, ~/.aws/credentials, IAM instance role).
+    _s3_region = os.environ.get("AWS_S3_REGION_NAME", "us-east-1")
+    _s3_opts_base = {
+        "bucket_name": _s3_bucket,
+        "region_name": _s3_region,
+        "custom_domain": _s3_custom_domain,
+        "querystring_auth": False,  # public read; all objects in this bucket are publicly accessible via direct URL
+    }
+    if os.environ.get("AWS_ACCESS_KEY_ID"):
+        _secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
+        if not _secret:
+            raise ImproperlyConfigured(
+                "AWS_ACCESS_KEY_ID is set but AWS_SECRET_ACCESS_KEY is missing. "
+                "Either set both, or omit AWS_ACCESS_KEY_ID to use IAM role credentials."
+            )
+        _s3_opts_base["access_key"] = os.environ["AWS_ACCESS_KEY_ID"]
+        _s3_opts_base["secret_key"] = _secret
+
+    # Media storage — user uploads, file_overwrite=False required by Wagtail.
     STORAGES["default"] = {
         "BACKEND": "storages.backends.s3.S3Storage",
         "OPTIONS": {
-            "bucket_name": _s3_bucket,
-            "region_name": os.environ.get("AWS_S3_REGION_NAME", "us-east-1"),
-            "access_key": os.environ.get("AWS_ACCESS_KEY_ID"),
-            "secret_key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
-            "custom_domain": _s3_custom_domain,
-            "querystring_auth": False,  # public bucket; wagtail-storages handles signed URLs for private docs
-            "file_overwrite": False,  # prevent overwriting existing files (Wagtail requirement)
+            **_s3_opts_base,
+            "location": "media",
+            "file_overwrite": False,
             "object_parameters": {
                 "CacheControl": f"max-age={_aws_expiry}, s-maxage={_aws_expiry}, must-revalidate",
             },
         },
     }
 
-    if _s3_custom_domain:
-        MEDIA_URL = f"https://{_s3_custom_domain}/"  # noqa: F405
-    else:
-        MEDIA_URL = f"https://{_s3_bucket}.s3.amazonaws.com/"  # noqa: F405
+    # Static files storage — S3ManifestStaticStorage layers ManifestFilesMixin
+    # on top of S3Storage, rewriting asset URLs with content-hash suffixes
+    # (e.g. main.abc123de.css) for safe far-future Cache-Control headers.
+    # file_overwrite=True is correct here: collectstatic regenerates files
+    # deterministically on each deploy and filenames change with content.
+    STORAGES["staticfiles"] = {
+        "BACKEND": "wtrx.storage_backends.S3ManifestStaticStorage",
+        "OPTIONS": {
+            **_s3_opts_base,
+            "location": "static",
+            "file_overwrite": True,
+            "object_parameters": {
+                "CacheControl": f"max-age={_aws_expiry}, s-maxage={_aws_expiry}, must-revalidate",
+            },
+        },
+    }
+
+    _s3_base_url = (
+        f"https://{_s3_custom_domain}"
+        if _s3_custom_domain
+        else f"https://{_s3_bucket}.s3.{_s3_region}.amazonaws.com"
+    )
+    MEDIA_URL = f"{_s3_base_url}/media/"  # noqa: F405
+    STATIC_URL = f"{_s3_base_url}/static/"  # noqa: F405
 
 # ---------------------------------------------------------------------------
 # Email / SMTP (optional — omit EMAIL_HOST to fall back to console backend)
@@ -134,6 +193,8 @@ if _cf_token and _cf_zone:
         },
     }
 
+# local.py overrides are applied last — any STORAGES, MIDDLEWARE, or URL
+# settings defined there will supersede the S3 configuration above.
 try:
     from .local import *  # noqa: F401, F403
 except ImportError:

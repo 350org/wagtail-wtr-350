@@ -339,15 +339,18 @@ class HomePage(BasePage, HeroMixin):
 ```
 make venv             Create .venv and install all dependencies
 make dev              Run development server (localhost:8000)
-make build            Build CSS + JS — development (Tailwind CLI + JS copy)
-make build-prod       Build CSS + JS — production (minified CSS + JS copy)
+make build            Build CSS + JS — development (Tailwind CLI + JS + fonts + images copy)
+make build-prod       Build CSS + JS — production (minified CSS + JS + fonts + images copy)
 make build-js         Copy JS source to static_compiled/js/
+make build-fonts      Copy font files to static_compiled/fonts/
+make build-images     Copy static images to static_compiled/images/
 make watch            Watch and rebuild CSS on file changes
 make migrate          Run database migrations
 make createsuperuser  Create admin user
 make setup            Interactive initial site setup
 make test             Run test suite
 make load-data        Migrate + load demo fixtures + collectstatic
+make provision        Provision AWS S3 bucket + IAM user (see make help)
 ```
 
 ---
@@ -481,8 +484,9 @@ A `render.yaml` Blueprint is included. To deploy:
 4. Set the required env vars in the Render dashboard (or in `render.yaml` before importing):
    - `ALLOWED_HOSTS` — your Render hostname, e.g. `mysite.onrender.com`
    - `WAGTAILADMIN_BASE_URL` — full public URL, e.g. `https://mysite.onrender.com`
-5. Deploy. The Docker build compiles CSS/JS, installs Python deps, and runs `collectstatic`.
-   On startup, `bin/start.sh` runs `migrate` then starts gunicorn.
+5. Deploy. The Docker build compiles CSS/JS and installs Python deps.
+   The `preDeployCommand` in `render.yaml` runs `collectstatic` before the container
+   takes traffic. On startup, `bin/start.sh` runs `migrate` then starts gunicorn.
 
 Copy `.env.example` to `.env` (gitignored) for local production-settings overrides.
 
@@ -491,12 +495,13 @@ Copy `.env.example` to `.env` (gitignored) for local production-settings overrid
 Ships with:
 
 - Two-stage `Dockerfile`: Node 20 (Tailwind CLI build) → Python 3.13-slim (app)
-- `bin/start.sh` entrypoint: runs `migrate --noinput` then starts gunicorn
+- `bin/start.sh` entrypoint: runs `migrate --noinput`, conditionally `collectstatic`, then starts gunicorn
 - `/_health/` endpoint for zero-downtime deploy health checks
-- `whitenoise` for static file serving from the container
-- `gunicorn` as WSGI server
+- `render.yaml` `preDeployCommand` runs `collectstatic` before the container takes traffic
+- `whitenoise` for static file serving when S3 is not configured
+- `gunicorn` as WSGI server with `$PORT` binding for Render compatibility
 - `dj-database-url` for `DATABASE_URL` env var
-- `django-storages[s3]` + `wagtail-storages` for S3 media (optional — see below)
+- `django-storages[s3]` + `wagtail-storages` for S3 media and static (optional — see below)
 
 ### Required environment variables
 
@@ -508,18 +513,33 @@ WAGTAILADMIN_BASE_URL=https://mysite.com
 DJANGO_SETTINGS_MODULE=wagtail_wtr.settings.production
 ```
 
-### AWS S3 media storage (optional)
+### AWS S3 storage (optional)
 
-When `AWS_STORAGE_BUCKET_NAME` is set, user-uploaded media (images, documents) is
-stored in S3. Omit the variable to use local filesystem storage instead.
+When `AWS_STORAGE_BUCKET_NAME` is set, **both** user-uploaded media (images, documents)
+**and** collected static files (CSS, JS, fonts) are stored in S3 under separate prefixes:
+
+- `{bucket}/media/` — user uploads
+- `{bucket}/static/` — compiled static assets
+
+Omit the variable to use WhiteNoise for static files and local filesystem for media.
 
 ```
-AWS_STORAGE_BUCKET_NAME=mysite-media
+AWS_STORAGE_BUCKET_NAME=mysite-assets
 AWS_S3_REGION_NAME=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
-AWS_S3_CUSTOM_DOMAIN=media.mysite.com   # optional: CloudFront or custom domain
+AWS_S3_CUSTOM_DOMAIN=assets.mysite.com   # optional: CloudFront or custom domain
 ```
+
+To provision a new S3 bucket and scoped IAM user automatically:
+
+```bash
+make provision SITE=mysite ENV=production
+# optional: make provision SITE=mysite ENV=staging PROFILE=my-aws-profile
+```
+
+This creates the bucket, sets the public-read policy, and outputs the `AWS_ACCESS_KEY_ID`
+and `AWS_SECRET_ACCESS_KEY` for a dedicated IAM user scoped to that bucket.
 
 ### SMTP email (optional)
 

@@ -46,7 +46,8 @@ wagtail-wtr/
 ├── Dockerfile
 ├── render.yaml             # Render Blueprint (Docker runtime + PostgreSQL)
 ├── bin/
-│   └── start.sh            # Container entrypoint: migrate + gunicorn
+│   ├── start.sh            # Container entrypoint: migrate + collectstatic + gunicorn
+│   └── provision.sh        # AWS S3 + IAM provisioning script
 └── .env.example            # All env vars documented
 ```
 
@@ -102,10 +103,11 @@ Never hand-write migrations. Always use `makemigrations`.
 
 ```bash
 npm install                  # Install Node dependencies (once only)
-make build                   # Dev build (CSS via Tailwind CLI + JS copy)
-make build-prod              # Production build (CSS minified + JS copy)
+make build                   # Dev build (CSS via Tailwind CLI + JS + fonts + images copy)
+make build-prod              # Production build (CSS minified + JS + fonts + images copy)
 make build-js                # Copy JS source to static_compiled/js/
-make build-fonts             # Copy font files to static_compiled/fonts/fonts/
+make build-fonts             # Copy font files to static_compiled/fonts/
+make build-images            # Copy static images to static_compiled/images/
 make watch                   # Watch mode (rebuilds CSS on change)
 ```
 
@@ -113,6 +115,9 @@ make watch                   # Watch mode (rebuilds CSS on change)
 `make build` after cloning to generate it locally. In production, the Docker
 Stage 1 build generates it automatically. Font source files live in
 `static_src/fonts/` (upstream has none; forks add their own).
+Static UI images (textures, illustrations, icons) live in `static_src/images/`
+and are copied verbatim to `static_compiled/images/` by `make build-images`
+(called automatically by `make build`).
 
 JavaScript source lives in `static_src/javascript/` and is copied verbatim to
 `static_compiled/js/` during `make build`. JS uses ES module syntax and is loaded
@@ -349,9 +354,14 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
 5. **`static_compiled/` is gitignored — always run `make build` after cloning**:
    The Tailwind CLI output directory `static_compiled/` is **not** committed to
    the repo. After cloning, run `npm install && make build` before starting the
-   dev server. In production, the Docker Stage 1 build generates it automatically.
+   dev server. In production, the Docker Stage 1 build generates `static_compiled/`
+   (Tailwind CSS, JS, fonts). `collectstatic` runs via Render's `preDeployCommand`
+   (defined in `render.yaml`) before the new container starts, uploading files to
+   S3 when `AWS_STORAGE_BUCKET_NAME` is set, or copying them to `STATIC_ROOT` for
+   WhiteNoise when S3 is not configured. This ensures gunicorn starts immediately
+   when the container launches so the health check responds without delay.
    Font source files for forks live in `static_src/fonts/` and are copied to
-   `static_compiled/fonts/fonts/` by `make build-fonts` (called by `make build`).
+   `static_compiled/fonts/` by `make build-fonts` (called by `make build`).
 
 6. **`SocialLinkBlock` must be a named class**: Do not use an anonymous
    StructBlock inline in `SocialSettings.social_links`. Define

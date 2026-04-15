@@ -14,6 +14,14 @@ services:
     dockerContext: .
     plan: free
     healthCheckPath: /_health/
+    port: 8000
+    # Run collectstatic before the new container takes traffic so gunicorn
+    # starts immediately and the health check responds without delay.
+    # S3 path: uploads static assets to S3 before the container launches.
+    # WhiteNoise path: this runs collectstatic in the pre-deploy runner
+    # (output is discarded), then start.sh re-runs it inside the real
+    # container where the manifest is needed. The duplication is harmless.
+    preDeployCommand: "python manage.py collectstatic --noinput"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -27,16 +35,24 @@ services:
         # tokens, and CSRF tokens are immediately invalidated.
       - key: DJANGO_SETTINGS_MODULE
         value: wagtail_wtr.settings.production
+      # Render injects PORT and forwards inbound traffic to this port.
+      # Must match the port: field above and what gunicorn binds to.
+      - key: PORT
+        value: "8000"
       # Set to your Render hostname and any custom domains.
       # Example: mysite.onrender.com,mysite.org
       - key: ALLOWED_HOSTS
+        sync: false
       # Required: the full public URL used by the Wagtail admin (no trailing slash).
       # Example: https://mysite.onrender.com
       - key: WAGTAILADMIN_BASE_URL
-      # --- S3 media storage (optional but strongly recommended) ---
-      # WARNING: Without S3, uploaded media (images, documents) is stored on
-      # Render's ephemeral disk and will be lost on every new deploy.
-      # Configure S3 for any deployment where editors upload content.
+        sync: false
+      # --- S3 storage (optional but strongly recommended) ---
+      # When set, both static files (CSS/JS/fonts) and uploaded media (images,
+      # documents) are stored in S3 under static/ and media/ prefixes.
+      # WARNING: Without S3, uploaded media is stored on Render's ephemeral disk
+      # and will be lost on every new deploy. Configure S3 for any deployment
+      # where editors upload content.
       - key: AWS_STORAGE_BUCKET_NAME
         sync: false
       - key: AWS_S3_REGION_NAME
@@ -69,3 +85,8 @@ services:
         sync: false
       - key: CLOUDFLARE_ZONE_ID
         sync: false
+      # --- Gunicorn ---
+      # Default is 4. Tune based on your Render plan's RAM (each worker ~50-80 MB).
+      # Free plan (512 MB): 2 workers. Starter plan (2 GB): 4 workers.
+      - key: WEB_CONCURRENCY
+        value: "2"

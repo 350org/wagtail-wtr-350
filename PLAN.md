@@ -102,9 +102,11 @@ wagtail-wtr/
 │   │       ├── mobile-menu.js
 │   │       ├── accordion.js         # Accordion toggle with aria-expanded
 │   │       └── form-ajax.js        # AJAX form submission for FormPage/SignupBlock
-│   └── css/
-│       ├── main.css                # Tailwind entry point — imports theme.css + tailwindcss
-│       └── theme.css               # Client-editable: @theme {} tokens + [data-theme] presets
+│   ├── css/
+│   │   ├── main.css                # Tailwind entry point — imports theme.css + tailwindcss
+│   │   └── theme.css               # Client-editable: @theme {} tokens + [data-theme] presets
+│   ├── fonts/                      # Font source files (forks add their own; upstream has none)
+│   └── images/                     # Static UI images (textures, icons; copied to static_compiled/)
 ├── static_compiled/                # Tailwind CLI output (gitignored; built at deploy time)
 ├── fixtures/
 │   └── demo.json
@@ -114,7 +116,8 @@ wagtail-wtr/
 ├── Dockerfile
 ├── render.yaml                     # Render Blueprint (Docker runtime + PostgreSQL)
 ├── bin/
-│   └── start.sh                    # Container entrypoint: migrate + gunicorn
+│   ├── start.sh                    # Container entrypoint: migrate + collectstatic + gunicorn
+│   └── provision.sh                # AWS S3 + IAM provisioning script
 ├── .env.example                    # All env vars documented with descriptions
 ├── Makefile
 ├── .gitignore
@@ -736,7 +739,8 @@ Named `[data-theme]` presets override tokens at runtime — no rebuild needed.
 ### Output
 `static_src/css/main.css` → Tailwind CLI → `static_compiled/css/main.css` (gitignored; built at deploy time)
 `static_src/javascript/` → copied to `static_compiled/js/` via `make build-js` (gitignored; built at deploy time)
-`static_src/fonts/` → copied to `static_compiled/fonts/fonts/` via `make build-fonts` (gitignored; built at deploy time)
+`static_src/fonts/` → copied to `static_compiled/fonts/` via `make build-fonts` (gitignored; built at deploy time)
+`static_src/images/` → copied to `static_compiled/images/` via `make build-images` (gitignored; built at deploy time)
 
 ---
 
@@ -1105,16 +1109,34 @@ is configured.
 Deployed wagtail-wtr sites to Render via Docker runtime with PostgreSQL.
 
 - [x] Render as primary hosting target (Docker runtime)
-- [x] AWS S3 media storage: `django-storages[s3]` + `wagtail-storages` wired up
-  in `production.py` (conditional on `AWS_STORAGE_BUCKET_NAME` env var)
+- [x] AWS S3 storage: `django-storages[s3]` + `wagtail-storages` wired up in
+  `production.py` — both media (`media/` prefix) and static files (`static/`
+  prefix) served from S3 when `AWS_STORAGE_BUCKET_NAME` is set;
+  `wtrx.storage_backends.S3ManifestStaticStorage` provides content-hash
+  cache-busting for static assets
+- [x] WhiteNoise fallback: when S3 is not configured, static files served from
+  the container via WhiteNoise (middleware inserted conditionally in production.py)
 - [x] `render.yaml` Blueprint — auto-provisions PostgreSQL, generates `SECRET_KEY`,
-  declares all optional env vars (`sync: false`) for S3, SMTP, Cloudflare
-- [x] `bin/start.sh` container entrypoint: runs `migrate --noinput` then gunicorn
+  declares all optional env vars (`sync: false`) for S3, SMTP, Cloudflare;
+  `preDeployCommand` runs `collectstatic` before the container takes traffic;
+  `port: 8000` and `PORT` env var align Render's router with gunicorn
+- [x] `bin/start.sh` container entrypoint: runs `migrate --noinput`; runs
+  `collectstatic` on WhiteNoise path (skips on S3 path, already done by
+  preDeployCommand); starts gunicorn bound to `$PORT`
 - [x] `/_health/` endpoint for zero-downtime deploy health checks
-- [x] Dockerfile fixed: two-stage build (Node → CSS/JS/fonts, Python → app);
-  no `tailwind.config.js` reference; non-editable `pip install`
+- [x] Dockerfile: two-stage build (Node → CSS/JS/fonts/images, Python → app);
+  `--chown=app:app` on COPY layers; gunicorn user gets `--home /tmp` to avoid
+  permission errors; collectstatic removed from build time (runs at deploy/startup
+  instead so real AWS credentials are available)
 - [x] `static_compiled/` removed from git — built fresh at deploy time in Docker
-  Stage 1; `static_src/fonts/` is now the canonical home for font source files
+  Stage 1; `static_src/fonts/` is the canonical home for font source files;
+  `static_src/images/` is the canonical home for static UI images
+- [x] `make build-images` target — copies `static_src/images/` to
+  `static_compiled/images/`; called automatically by `make build` and `make build-prod`
+- [x] `make build-fonts` fixed — now uses `cp -r fonts/*` (not `fonts/`) to
+  prevent double-nesting (`static_compiled/fonts/fonts/`)
+- [x] `bin/provision.sh` + `make provision` — creates S3 bucket and scoped IAM
+  user for a new environment; outputs credentials ready to paste into Render
 - [x] `.env.example` documenting all required and optional env vars
 
 ### Phase 13: ADR Documentation — NOT STARTED
@@ -1130,15 +1152,15 @@ for future maintainers.
 - [ ] Document the "no custom User model" decision
 - [ ] Document the "no DB access at import time" constraint and how it's enforced
 
-### Phase 14: SMTP & Provisioning Automation — 🔄 IN PROGRESS
+### Phase 14: SMTP & Provisioning Automation — ✅ COMPLETE
 
 - [x] SMTP: env-var-driven config in `production.py` — compatible with Mailgun,
   AWS SES, Postmark, or any SMTP provider; falls back to console backend when
   `EMAIL_HOST` is unset
 - [x] `.env.example` with all required and optional production env vars
-- [ ] Provisioning script: `make provision` that creates S3 bucket, IAM policy,
-  and SES domain identity for a new fork
-- [ ] `make env-template` target (superseded by `.env.example` — may remove)
+- [x] `bin/provision.sh` + `make provision SITE=x ENV=y [PROFILE=p]` — creates
+  S3 bucket, public-read policy, and scoped IAM user; outputs `AWS_ACCESS_KEY_ID`
+  and `AWS_SECRET_ACCESS_KEY` for pasting into Render
 
 ---
 
