@@ -14,9 +14,6 @@ services:
     dockerContext: .
     plan: free
     healthCheckPath: /_health/
-    # Run collectstatic before the new container takes traffic so gunicorn
-    # starts immediately and the health check responds without delay.
-    preDeployCommand: "python manage.py collectstatic --noinput"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
