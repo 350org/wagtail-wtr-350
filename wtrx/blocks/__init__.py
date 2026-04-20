@@ -515,18 +515,31 @@ class AccordionBlock(StructBlock):
 
 class CalloutBlock(StructBlock):
     """
-    An image + rich text side-by-side callout section.
+    An image or video + rich text side-by-side callout section.
 
     Stacks on mobile. Alignment (image-left / image-right) controls which
-    side the image appears on desktop. Optional CTA button link. At most one
-    of link_page or link_url may be set; clean() enforces this.
+    side the media appears on desktop. Optional CTA button link.
+
+    Exactly one of image or media_file must be set; clean() enforces this.
+    At most one of link_page or link_url may be set; clean() enforces this.
     """
 
     content = RichTextBlock(
         features=RICHTEXT_FEATURES_FULL,
         label=_("Content"),
     )
-    image = ImageChooserBlock(label=_("Image"))
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+        help_text=_("Set either this or Media file, not both."),
+    )
+    media_file = VideoChooserBlock(
+        required=False,
+        label=_("Media file"),
+        help_text=_(
+            "An uploaded video file from the media library. Set either this or Image, not both."
+        ),
+    )
     link_text = CharBlock(
         required=False,
         label=_("Link text"),
@@ -545,12 +558,25 @@ class CalloutBlock(StructBlock):
     alignment = ChoiceBlock(
         choices=CALLOUT_ALIGNMENT_CHOICES,
         default="image-left",
-        label=_("Image alignment"),
+        label=_("Media alignment"),
     )
 
     def clean(self, value):
         cleaned = super().clean(value)
-        errors = _validate_at_most_one_link(cleaned, {})
+        errors = {}
+        has_image = bool(cleaned.get("image"))
+        has_video = bool(cleaned.get("media_file"))
+        if not has_image and not has_video:
+            msg = ValidationError(_("Provide either an image or a media file."))
+            errors["image"] = msg
+            errors["media_file"] = msg
+        elif has_image and has_video:
+            msg = ValidationError(
+                _("Provide either an image or a media file, not both.")
+            )
+            errors["image"] = msg
+            errors["media_file"] = msg
+        errors = _validate_at_most_one_link(cleaned, errors)
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned

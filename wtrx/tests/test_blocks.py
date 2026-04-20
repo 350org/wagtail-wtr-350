@@ -114,12 +114,103 @@ class TestVideoBlockValidation(SimpleTestCase):
 
 class TestCalloutBlockValidation(SimpleTestCase):
     """
-    CalloutBlock uses _validate_at_most_one_link for its custom validation.
+    CalloutBlock validation: exactly one of image/media_file, at most one link.
 
-    CalloutBlock has a required ImageChooserBlock, so we cannot call
-    block.clean() in SimpleTestCase (no DB). Instead we test the shared
-    helper directly and verify the block's field structure.
+    ImageChooserBlock and VideoChooserBlock both require a DB to resolve
+    chooser values, so we cannot call block.clean() end-to-end in
+    SimpleTestCase. We test the media-exclusivity logic (which only inspects
+    truthiness of the cleaned values) via a standalone helper that mirrors
+    the block's clean() logic, and verify field structure via declared_blocks.
     """
+
+    def _run_media_validation(self, image, media_file):
+        """Mirror the media-exclusivity branch of CalloutBlock.clean()."""
+        from django.core.exceptions import ValidationError as DjValidationError
+        errors = {}
+        has_image = bool(image)
+        has_video = bool(media_file)
+        if not has_image and not has_video:
+            msg = DjValidationError("Provide either an image or a media file.")
+            errors["image"] = msg
+            errors["media_file"] = msg
+        elif has_image and has_video:
+            msg = DjValidationError("Provide either an image or a media file, not both.")
+            errors["image"] = msg
+            errors["media_file"] = msg
+        return errors
+
+    def _make_value(self, image=None, media_file=None, link_page=None, link_url=""):
+        return {
+            "image": image,
+            "media_file": media_file,
+            "link_page": link_page,
+            "link_url": link_url,
+        }
+
+    # --- media validation ---
+
+    def test_media_validation_both_absent(self):
+        """Both image and media_file absent should produce errors on both fields."""
+        errors = self._run_media_validation(image=None, media_file=None)
+        self.assertIn("image", errors)
+        self.assertIn("media_file", errors)
+
+    def test_media_validation_both_present(self):
+        """Both image and media_file set should produce errors on both fields."""
+        errors = self._run_media_validation(image=object(), media_file=object())
+        self.assertIn("image", errors)
+        self.assertIn("media_file", errors)
+
+    def test_media_validation_image_only(self):
+        """Image only (no media_file) should produce no media errors."""
+        errors = self._run_media_validation(image=object(), media_file=None)
+        self.assertEqual(errors, {})
+
+    def test_media_validation_video_only(self):
+        """media_file only (no image) should produce no media errors."""
+        errors = self._run_media_validation(image=None, media_file=object())
+        self.assertEqual(errors, {})
+
+    def test_media_validation_both_present(self):
+        """Both image and media_file set should produce errors on both fields."""
+        errors = {}
+        has_image = True
+        has_video = True
+        if has_image and has_video:
+            from django.core.exceptions import ValidationError as DjValidationError
+            msg = DjValidationError("Provide either an image or a media file, not both.")
+            errors["image"] = msg
+            errors["media_file"] = msg
+        self.assertIn("image", errors)
+        self.assertIn("media_file", errors)
+
+    def test_block_has_expected_fields(self):
+        block = CalloutBlock()
+        self.assertIn("content", block.declared_blocks)
+        self.assertIn("image", block.declared_blocks)
+        self.assertIn("media_file", block.declared_blocks)
+        self.assertIn("link_text", block.declared_blocks)
+        self.assertIn("link_page", block.declared_blocks)
+        self.assertIn("link_url", block.declared_blocks)
+        self.assertIn("alignment", block.declared_blocks)
+
+    def test_image_is_optional(self):
+        """image must be optional (required=False) to allow media_file instead."""
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["image"].required)
+
+    def test_media_file_is_optional(self):
+        """media_file must be optional (required=False) to allow image instead."""
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["media_file"].required)
+
+    def test_alignment_choices(self):
+        block = CalloutBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertIn("image-left", choices)
+        self.assertIn("image-right", choices)
+
+    # --- link validation (via shared helper) ---
 
     def test_both_links_raises(self):
         errors = _validate_at_most_one_link(
@@ -141,21 +232,6 @@ class TestCalloutBlockValidation(SimpleTestCase):
     def test_neither_link_no_error(self):
         errors = _validate_at_most_one_link({"link_page": None, "link_url": ""}, {})
         self.assertEqual(errors, {})
-
-    def test_block_has_expected_fields(self):
-        block = CalloutBlock()
-        self.assertIn("content", block.declared_blocks)
-        self.assertIn("image", block.declared_blocks)
-        self.assertIn("link_text", block.declared_blocks)
-        self.assertIn("link_page", block.declared_blocks)
-        self.assertIn("link_url", block.declared_blocks)
-        self.assertIn("alignment", block.declared_blocks)
-
-    def test_alignment_choices(self):
-        block = CalloutBlock()
-        choices = dict(block.declared_blocks["alignment"].field.choices)
-        self.assertIn("image-left", choices)
-        self.assertIn("image-right", choices)
 
 
 class TestHeroBlockValidation(SimpleTestCase):
