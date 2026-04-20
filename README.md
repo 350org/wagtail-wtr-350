@@ -481,8 +481,10 @@ A `render.yaml` Blueprint is included. To deploy:
 4. Set the required env vars in the Render dashboard (or in `render.yaml` before importing):
    - `ALLOWED_HOSTS` — your Render hostname, e.g. `mysite.onrender.com`
    - `WAGTAILADMIN_BASE_URL` — full public URL, e.g. `https://mysite.onrender.com`
-5. Deploy. The Docker build compiles CSS/JS, installs Python deps, and runs `collectstatic`.
-   On startup, `bin/start.sh` runs `migrate` then starts gunicorn.
+5. Deploy. The Docker build compiles CSS/JS and installs Python deps.
+   Render's `preDeployCommand` runs `collectstatic` (with S3 credentials available).
+   On startup, `bin/start.sh` runs `migrate` then starts gunicorn — the health
+   check responds immediately because collectstatic has already completed.
 
 Copy `.env.example` to `.env` (gitignored) for local production-settings overrides.
 
@@ -491,12 +493,30 @@ Copy `.env.example` to `.env` (gitignored) for local production-settings overrid
 Ships with:
 
 - Two-stage `Dockerfile`: Node 20 (Tailwind CLI build) → Python 3.13-slim (app)
-- `bin/start.sh` entrypoint: runs `migrate --noinput` then starts gunicorn
+- `preDeployCommand` (render.yaml): intended to run `collectstatic --noinput` with S3 credentials before the container starts — **see note below**
+- `bin/start.sh` entrypoint: runs `migrate --noinput` then starts gunicorn immediately
 - `/_health/` endpoint for zero-downtime deploy health checks
 - `whitenoise` for static file serving from the container
 - `gunicorn` as WSGI server
 - `dj-database-url` for `DATABASE_URL` env var
 - `django-storages[s3]` + `wagtail-storages` for S3 media (optional — see below)
+
+> **Known issue — manual collectstatic after CSS-changing deploys (S3 path)**
+>
+> When `AWS_STORAGE_BUCKET_NAME` is set, `bin/start.sh` skips `collectstatic`
+> because `render.yaml`'s `preDeployCommand` is supposed to run it before the
+> container starts. However, `preDeployCommand` has not been confirmed to run
+> reliably — its output does not appear in Render's runtime deploy logs.
+>
+> Until this is investigated and fixed, after any deploy that changes CSS, JS,
+> or other static assets you must manually run collectstatic via the Render
+> dashboard:
+>
+> 1. In the Render dashboard, open your service.
+> 2. Click the **Shell** tab.
+> 3. Run: `python manage.py collectstatic --noinput`
+>
+> This is tracked in PLAN.md Phase 17.
 
 ### Required environment variables
 
@@ -513,8 +533,85 @@ DJANGO_SETTINGS_MODULE=wagtail_wtr.settings.production
 When `AWS_STORAGE_BUCKET_NAME` is set, user-uploaded media (images, documents) is
 stored in S3. Omit the variable to use local filesystem storage instead.
 
+#### Automated provisioning
+
+Run `make provision` to create the S3 bucket and a scoped IAM user in one step.
+The script uses your local AWS CLI profile — no credentials are typed into the script.
+
+**1. Configure an AWS CLI profile** (if you haven't already):
+
+```bash
+aws configure --profile wagtail-wtr-provisioner
+# Prompts for: Access Key ID, Secret Access Key, region, output format
 ```
-AWS_STORAGE_BUCKET_NAME=mysite-media
+
+**2. Run the provisioning script:**
+
+```bash
+make provision SITE=mysite ENV=production PROFILE=wagtail-wtr-provisioner
+make provision SITE=mysite ENV=staging PROFILE=wagtail-wtr-provisioner
+```
+
+Omit `PROFILE` to use the default AWS CLI profile. `ENV` defaults to `production`.
+
+The script will display the AWS account ID and authenticated identity before
+making any changes, so you can confirm you're targeting the right account.
+
+This creates:
+- S3 bucket: `mysite-wagtail-wtr-production` (or `-staging`)
+- IAM user: `mysite-wagtail-wtr-production` with an inline policy scoped to that bucket only
+
+It then prints the four env vars to paste into the Render dashboard.
+
+**Required IAM permissions for the profile you use:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3Provisioning",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:HeadBucket",
+        "s3:PutBucketPolicy",
+        "s3:PutBucketCORS",
+        "s3:PutPublicAccessBlock"
+      ],
+      "Resource": "arn:aws:s3:::*"
+    },
+    {
+      "Sid": "IAMProvisioning",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateUser",
+        "iam:GetUser",
+        "iam:PutUserPolicy",
+        "iam:CreateAccessKey"
+      ],
+      "Resource": "arn:aws:iam::*:user/*"
+    },
+    {
+      "Sid": "STSGetCallerIdentity",
+      "Effect": "Allow",
+      "Action": "sts:GetCallerIdentity",
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Create this as a policy named `wagtail-wtr-provisioner` in **IAM → Policies → Create policy**
+and attach it to your admin user. If your admin user already has `AdministratorAccess`,
+no extra policy is needed.
+
+#### Manual setup
+
+If you prefer to create resources manually, set these env vars in the Render dashboard:
+
+```
+AWS_STORAGE_BUCKET_NAME=mysite-wagtail-wtr-production
 AWS_S3_REGION_NAME=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...

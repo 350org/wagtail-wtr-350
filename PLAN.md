@@ -1130,15 +1130,26 @@ for future maintainers.
 - [ ] Document the "no custom User model" decision
 - [ ] Document the "no DB access at import time" constraint and how it's enforced
 
-### Phase 14: SMTP & Provisioning Automation — 🔄 IN PROGRESS
+### Phase 14: SMTP & Provisioning Automation — ✅ COMPLETE
 
 - [x] SMTP: env-var-driven config in `production.py` — compatible with Mailgun,
   AWS SES, Postmark, or any SMTP provider; falls back to console backend when
   `EMAIL_HOST` is unset
 - [x] `.env.example` with all required and optional production env vars
-- [ ] Provisioning script: `make provision` that creates S3 bucket, IAM policy,
-  and SES domain identity for a new fork
-- [ ] `make env-template` target (superseded by `.env.example` — may remove)
+- [x] `bin/provision.sh` — profile-based script: uses a configured AWS CLI profile
+  (`--profile` flag, defaults to `default`), verifies the profile exists and
+  credentials are valid before proceeding, displays the AWS account ID and
+  authenticated identity in the confirmation prompt so the user can verify the
+  right account is targeted. Creates S3 bucket (`<site>-wagtail-wtr-<env>`), IAM
+  user (`<site>-wagtail-wtr-<env>`) with an inline policy scoped to that bucket
+  only, and prints the four env vars to paste into the Render dashboard. Idempotent
+  (skips already-created resources). Validates bucket name ≤ 63 chars and SITE
+  against S3 naming rules. Handles the `us-east-1` `create-bucket` quirk. Required
+  admin IAM permissions documented in script header and README.
+- [x] `make provision SITE=mysite ENV=production` target in `Makefile`
+- [x] README.md updated: automated provisioning instructions, required IAM policy
+  JSON, manual setup fallback
+- [ ] `make env-template` target (superseded by `.env.example` — removed from plan)
 
 ---
 
@@ -1273,3 +1284,85 @@ These were analyzed during planning:
    Wagtail site with Tailwind, poetry, Docker.
 - **websites-for-all** (With the Ranks' previous project, cloned in `websites-for-all/`
   for reference) -- Carried forward feature set, redesigned architecture.
+
+---
+
+### Phase 16: Static Image Optimization — NOT STARTED
+
+Static UI images (textures, icons, illustrations) live in `static_src/images/` and are
+copied verbatim to `static_compiled/images/` by `make build-images` (called by `make build`
+and Docker Stage 1). Currently there is no optimization step — files are copied as-is.
+
+#### Goal
+
+Automatically compress and convert static images at build time so that browsers receive
+the smallest possible file without manual effort.
+
+#### Implementation plan
+
+- [ ] **Add `sharp-cli` (or similar) as a dev dependency** — Node-based, runs in the same
+  environment as the Tailwind build. Alternatives: `imagemin-cli`, `squoosh-cli`.
+  Prefer `sharp` because it is actively maintained and handles PNG → WebP/AVIF conversion.
+
+- [ ] **Update `build-images` Make target** to run optimization after the copy:
+  ```makefile
+  build-images:
+      mkdir -p static_compiled/images
+      rm -rf static_compiled/images/*
+      cp -r static_src/images/* static_compiled/images/
+      npx sharp-cli --input "static_compiled/images/**/*.png" \
+          --output static_compiled/images/ \
+          --format webp --quality 80
+  ```
+  Keep the original PNGs as fallbacks. Emit companion `.webp` files alongside them.
+
+- [ ] **Template usage** — where `noise.png` is referenced in CSS via
+  `url("../images/noise.png")`, the PNG remains the reference (universal browser support
+  for PNG is guaranteed). The `.webp` output is intended for `<picture>` / `<img>`
+  elements in templates, not CSS `background-image`.
+
+- [ ] **Dockerfile Stage 1** — no change needed; `cp -r static_src/images/. static_compiled/images`
+  already runs before collectstatic. The optimization step runs as part of `npm run build:prod`,
+  or add a separate `RUN npx sharp-cli ...` step in Stage 1 after the copy.
+
+- [ ] **`.gitignore`** — `static_compiled/images/` is already gitignored. No change needed.
+
+- [ ] **AGENTS.md** — update build commands section to document the optimization step
+  and note that `.webp` outputs are generated automatically at build time.
+
+#### Notes
+
+- `noise.png` is a small tiled texture (~a few KB) — optimization saves little here, but
+  the infrastructure is worth having for larger illustrations added in future.
+- PNG → WebP conversion at quality 80 typically saves 25-40% on photographic images and
+  50%+ on large PNGs without perceptible quality loss.
+- AVIF offers better compression but browser support is slightly lower; add as a future
+  enhancement once `sharp-cli` WebP output is proven out.
+
+---
+
+### Phase 17: Fix collectstatic Pipeline (S3 path) — NOT STARTED
+
+When `AWS_STORAGE_BUCKET_NAME` is set, `bin/start.sh` intentionally skips
+`collectstatic`, relying entirely on `render.yaml`'s `preDeployCommand`. However,
+`preDeployCommand` output does not appear in Render's runtime deploy logs and has
+not been confirmed to run reliably. As a result, CSS and other static asset changes
+do not reach S3 on deploy, and the old files continue to be served.
+
+**Current workaround**: manually run `python manage.py collectstatic --noinput`
+via Render's Shell tab after any deploy that changes static assets.
+
+**Investigation / fix tasks**:
+
+- [ ] Confirm whether `preDeployCommand` is running: check Render's event/audit
+  logs (separate from the runtime log stream) or add a sentinel file to S3 to
+  verify the command executed
+- [ ] Evaluate whether to always run `collectstatic` in `bin/start.sh` regardless
+  of `AWS_STORAGE_BUCKET_NAME` — this was attempted in a previous commit and
+  reverted; assess the health-check timing impact (does gunicorn start before
+  collectstatic finishes? does Render's health check fail?)
+- [ ] If `preDeployCommand` is confirmed working but slow, evaluate running
+  `collectstatic` in both places (idempotent, harmless duplicate)
+- [ ] Update `bin/start.sh`, `render.yaml`, `README.md`, and `AGENTS.md` once
+  the correct approach is determined; remove the TODO comment and workaround note
+- [ ] Document the resolution in this phase entry

@@ -36,10 +36,20 @@
     white-space: nowrap;
 }
 
-@utility wtr-btn-outline {
-    background-color: transparent;
-    border-color: var(--color-primary);
-    color: var(--color-primary-700);
+/* Smooth scroll — respects prefers-reduced-motion.
+ * Placed outside @layer base because TW4 strips nested @media
+ * queries inside its owned layers during compilation. */
+@media (prefers-reduced-motion: no-preference) {
+    html {
+        scroll-behavior: smooth;
+    }
+}
+
+/* Offset anchor scroll targets so they don't land flush against
+ * the top of the viewport. If the header becomes sticky in the
+ * future, increase this to at least the header height. */
+html {
+    scroll-padding-top: 2rem;
 }
 
 @utility wtr-btn-secondary {
