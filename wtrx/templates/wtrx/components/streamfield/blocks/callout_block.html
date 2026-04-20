@@ -1,8 +1,15 @@
 {% load i18n wagtailimages_tags wagtailcore_tags %}
 <div class="wtr-callout flex flex-col gap-8 {% if value.alignment == 'image-right' %}md:flex-row-reverse{% else %}md:flex-row{% endif %} items-center">
     <div class="w-full md:w-1/2 overflow-hidden rounded-lg">
-        {% image value.image fill-800x600 as img %}
-        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}" class="h-full w-full object-cover" loading="lazy">
+        {% if value.media_file %}
+            <video src="{{ value.media_file.url }}" controls preload="metadata"
+                   class="h-full w-full object-cover"
+                   {% if value.image %}{% image value.image fill-800x600 as poster_img %}poster="{{ poster_img.url }}"{% endif %}>
+            </video>
+        {% elif value.image %}
+            {% image value.image fill-800x600 as img %}
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}" class="h-full w-full object-cover" loading="lazy">
+        {% endif %}
     </div>
     <div class="w-full md:w-1/2">
         <div class="prose prose-neutral max-w-none in-data-[bg=dark]:prose-invert in-data-[bg=primary]:prose-invert in-data-[bg=secondary]:prose-invert">
