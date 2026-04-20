@@ -14,7 +14,6 @@ services:
     dockerContext: .
     plan: free
     healthCheckPath: /_health/
-    port: 8000
     # Run collectstatic before the new container takes traffic so gunicorn
     # starts immediately and the health check responds without delay.
     preDeployCommand: "python manage.py collectstatic --noinput"
@@ -31,8 +30,7 @@ services:
         # tokens, and CSRF tokens are immediately invalidated.
       - key: DJANGO_SETTINGS_MODULE
         value: wagtail_wtr.settings.production
-      # Render injects PORT and forwards inbound traffic to this port.
-      # Must match the port: field above and what gunicorn binds to.
+      # Render injects PORT; set it explicitly so gunicorn binds to the right port.
       - key: PORT
         value: "8000"
       # Set to your Render hostname and any custom domains.
@@ -43,10 +41,6 @@ services:
       # Example: https://mysite.onrender.com
       - key: WAGTAILADMIN_BASE_URL
         sync: false
-      # Render injects PORT and forwards inbound traffic to this port.
-      # Must match the port: field above and what gunicorn binds to.
-      - key: PORT
-        value: "8000"
       # --- S3 storage (optional but strongly recommended) ---
       # When set, both static files (CSS/JS/fonts) and uploaded media (images,
       # documents) are stored in S3 under static/ and media/ prefixes.
