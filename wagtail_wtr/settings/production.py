@@ -18,6 +18,12 @@ if not ALLOWED_HOSTS:
         "Set it to a comma-separated list of hostnames (e.g. mysite.onrender.com)."
     )
 
+# Docker / PaaS probes often use Host: 127.0.0.1:<port> or localhost. Without these,
+# Django returns 400 and reverse proxies mark the container unhealthy.
+for _loopback in ("127.0.0.1", "localhost"):
+    if _loopback not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_loopback)
+
 WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
 
 DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
