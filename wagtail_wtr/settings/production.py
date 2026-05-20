@@ -18,14 +18,25 @@ if not ALLOWED_HOSTS:
         "Set it to a comma-separated list of hostnames (e.g. mysite.onrender.com)."
     )
 
+# Docker / PaaS probes often use Host: 127.0.0.1:<port> or localhost. Without these,
+# Django returns 400 and reverse proxies mark the container unhealthy.
+for _loopback in ("127.0.0.1", "localhost"):
+    if _loopback not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_loopback)
+
 WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
 
 DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
 
 _s3_bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 
-_MIDDLEWARE_BASE = [
+# AssumeTlsFromEdgeMiddleware runs before SecurityMiddleware so SECURE_PROXY_SSL_HEADER
+# sees https when TRUST_EDGE_TLS is set. WhiteNoise must follow SecurityMiddleware.
+_MIDDLEWARE_SECURITY_PREFIX = [
+    "wagtail_wtr.middleware.AssumeTlsFromEdgeMiddleware",
     "django.middleware.security.SecurityMiddleware",
+]
+_MIDDLEWARE_TAIL = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -37,15 +48,11 @@ _MIDDLEWARE_BASE = [
 ]
 
 if _s3_bucket:
-    # Static files served from S3 — WhiteNoise not needed.
-    MIDDLEWARE = list(_MIDDLEWARE_BASE)  # copy — never alias the base list
+    MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + _MIDDLEWARE_TAIL
 else:
-    # No S3 — WhiteNoise serves static files from the container.
-    # Must be second, immediately after SecurityMiddleware.
-    MIDDLEWARE = [
-        _MIDDLEWARE_BASE[0],
+    MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + [
         "whitenoise.middleware.WhiteNoiseMiddleware",
-        *_MIDDLEWARE_BASE[1:],
+        *_MIDDLEWARE_TAIL,
     ]
 
 STORAGES = {

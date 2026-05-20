@@ -25,6 +25,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
     libpq-dev \
     gcc \
     && rm -rf /var/lib/apt/lists/* && \
@@ -42,6 +44,10 @@ COPY --chown=app:app --from=frontend /app/static_compiled/ ./static_compiled/
 
 # Ensure the entrypoint is executable (git does not reliably preserve +x bits).
 RUN chmod +x bin/start.sh
+
+# STATIC_ROOT is /app/static (see wagtail_wtr/settings/base.py). collectstatic in
+# bin/start.sh runs as user app — directory must exist and be writable.
+RUN mkdir -p /app/static && chown app:app /app/static
 
 # collectstatic runs at deploy time via render.yaml's preDeployCommand (S3 path)
 # or at container startup via bin/start.sh (WhiteNoise path). It is intentionally
