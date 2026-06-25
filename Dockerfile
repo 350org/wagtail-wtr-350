@@ -10,7 +10,7 @@ COPY static_src/ ./static_src/
 COPY templates/ ./templates/
 COPY wtrx/templates/ ./wtrx/templates/
 RUN npm run build:prod && \
-    cp -r static_src/javascript/. static_compiled/js && \
+    cp -r static_src/js/. static_compiled/js && \
     cp -r static_src/fonts/. static_compiled/fonts && \
     cp -r static_src/images/. static_compiled/images
 
