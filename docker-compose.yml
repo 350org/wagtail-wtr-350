@@ -1,0 +1,50 @@
+# Local development stack for `divio app up`.
+#
+# - web: the Django/Wagtail app, built from the project Dockerfile but run with
+#   `runserver` and the dev settings (DEBUG=True, HTTP-friendly, working admin).
+# - database_default: Postgres, matching Divio Cloud's managed database. The
+#   `database_default` name and the DATABASE_URL below are the Divio convention.
+#
+# The source tree is bind-mounted into /app for live reload. Anonymous volumes
+# mask /app/.venv and the build-output dirs so the dependencies and compiled
+# assets baked into the image are not hidden by the (empty) host directories.
+services:
+  web:
+    build: "."
+    # The image runs as the non-root `app` user; root is needed to bind port 80
+    # (Divio expects the web container on port 80) and to write to the bind mount.
+    user: "root"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:80"
+    ports:
+      - "8000:80"
+    volumes:
+      - ".:/app:rw"
+      - "/app/.venv"
+      - "/app/static_compiled"
+      - "/app/static"
+    environment:
+      DJANGO_SETTINGS_MODULE: "wagtail_wtr.settings.dev"
+      DATABASE_URL: "postgres://postgres:postgres@database_default:5432/db"
+      WAGTAILADMIN_BASE_URL: "http://localhost:8000"
+    depends_on:
+      database_default:
+        condition: service_healthy
+
+  database_default:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "db"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    volumes:
+      - "db_data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
