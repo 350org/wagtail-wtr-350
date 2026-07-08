@@ -60,6 +60,24 @@ class AnchorLinkBlock(StructBlock):
         label = _("Anchor link")
 
 
+class SubmenuBlock(StructBlock):
+    """A top-level navigation item that expands into a dropdown of child links."""
+
+    text = CharBlock(label=_("Menu label"))
+    links = StreamBlock(
+        [
+            ("internal", InternalLinkBlock()),
+            ("external", ExternalLinkBlock()),
+            ("anchor", AnchorLinkBlock()),
+        ],
+        label=_("Dropdown links"),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Dropdown menu")
+
+
 class FooterColumnBlock(StructBlock):
     """A column of links in the footer."""
 
@@ -213,6 +231,7 @@ class NavigationSettings(BaseSiteSetting):
             ("internal", InternalLinkBlock()),
             ("external", ExternalLinkBlock()),
             ("anchor", AnchorLinkBlock()),
+            ("submenu", SubmenuBlock()),
         ],
         blank=True,
         verbose_name=_("primary navigation"),
