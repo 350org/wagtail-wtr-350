@@ -18,6 +18,7 @@ dependencies = [
     "gunicorn",
     "django-storages[s3]",
     "wagtail-storages",
+    "requests",
 ]
 
 [project.optional-dependencies]

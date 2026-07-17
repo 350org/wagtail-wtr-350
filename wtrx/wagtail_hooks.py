@@ -44,9 +44,12 @@ from wagtail import hooks
 BLOCK_PLATFORM_REQUIREMENTS = {
     # Donation blocks — visible when donation_platform != "none"
     "donate": ("donation", None),
-    # Signup blocks — visible when signup_platform matches
-    "signup_wagtail_forms": ("signup", "wagtail_forms"),
-    "signup_action_network": ("signup", "action_network"),
+    # Signup blocks — visible when signup_platform is one of the listed values.
+    # The Wagtail-forms block also renders the form for the ActionKit platform
+    # (ActionKit forwarding happens server-side in FormPage.process_form_submission),
+    # so it must be available under both.
+    "signup_wagtail_forms": ("signup", ("wagtail_forms", "actionkit")),
+    "signup_action_network": ("signup", ("action_network",)),
     # signup_link is always visible (it's a simple CTA link, platform-agnostic)
 }
 
@@ -82,7 +85,7 @@ def _block_visibility_js(request):
             if donation_platform == "none":
                 hidden_blocks.append(block_name)
         elif category == "signup":
-            if signup_platform != required_value:
+            if signup_platform not in required_value:
                 hidden_blocks.append(block_name)
 
     if not hidden_blocks:
@@ -128,35 +131,48 @@ def insert_block_visibility_js():
 
 
 # ---------------------------------------------------------------------------
-# Action Network API key field visibility
+# Signup-platform credential field visibility
 # ---------------------------------------------------------------------------
 #
-# Hides the action_network_api_key field in IntegrationSettings unless
-# signup_platform is set to "action_network". Uses a MutationObserver so
-# it works with Wagtail's dynamic form rendering.
+# Shows each platform's credential fields in IntegrationSettings only when that
+# platform is the selected signup_platform: the Action Network API key for
+# "action_network", and the ActionKit host/username/password for "actionkit".
+# Uses a MutationObserver so it works with Wagtail's dynamic form rendering.
 # ---------------------------------------------------------------------------
 
-_AN_API_KEY_JS = """
+_SIGNUP_PLATFORM_FIELD_JS = """
 (function () {
-    function updateApiKeyVisibility() {
+    var PLATFORM_FIELDS = {
+        action_network: ["action_network_api_key"],
+        actionkit: ["actionkit_hostname", "actionkit_api_username", "actionkit_api_password"]
+    };
+
+    function fieldWrapper(name) {
+        var input = document.querySelector('[data-field-input-name="' + name + '"]');
+        if (!input) { return null; }
+        return input.closest('[data-field]') || input.closest('.w-field__wrapper') || input.parentElement;
+    }
+
+    function updateVisibility() {
         var platformField = document.querySelector('[name="signup_platform"]');
-        var apiKeyRow = document.querySelector('[data-field-input-name="action_network_api_key"]');
-        if (!platformField || !apiKeyRow) {
-            return;
-        }
-        var wrapper = apiKeyRow.closest('[data-field]') || apiKeyRow.closest('.w-field__wrapper') || apiKeyRow.parentElement;
-        if (wrapper) {
-            wrapper.style.display = platformField.value === 'action_network' ? '' : 'none';
-        }
+        if (!platformField) { return; }
+        var selected = platformField.value;
+        Object.keys(PLATFORM_FIELDS).forEach(function (platform) {
+            var show = platform === selected;
+            PLATFORM_FIELDS[platform].forEach(function (name) {
+                var wrapper = fieldWrapper(name);
+                if (wrapper) { wrapper.style.display = show ? '' : 'none'; }
+            });
+        });
     }
 
     function init() {
-        updateApiKeyVisibility();
+        updateVisibility();
         var form = document.querySelector('form[data-edit-form], form.w-settings-form, form');
         if (form) {
             form.addEventListener('change', function (e) {
                 if (e.target && e.target.name === 'signup_platform') {
-                    updateApiKeyVisibility();
+                    updateVisibility();
                 }
             });
         }
@@ -164,7 +180,7 @@ _AN_API_KEY_JS = """
         var observer = new MutationObserver(function (mutations) {
             for (var i = 0; i < mutations.length; i++) {
                 if (mutations[i].addedNodes.length) {
-                    updateApiKeyVisibility();
+                    updateVisibility();
                     break;
                 }
             }
@@ -182,5 +198,5 @@ _AN_API_KEY_JS = """
 
 
 @hooks.register("insert_global_admin_js")
-def insert_an_api_key_visibility_js():
-    return format_html("<script>{}</script>", _AN_API_KEY_JS)
+def insert_signup_platform_field_visibility_js():
+    return format_html("<script>{}</script>", _SIGNUP_PLATFORM_FIELD_JS)

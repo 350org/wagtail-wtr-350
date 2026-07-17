@@ -1,3 +1,5 @@
+import logging
+
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
 from django.http import JsonResponse
@@ -18,6 +20,7 @@ from wagtailmedia.edit_handlers import MediaChooserPanel
 from .blocks import BodyStreamBlock
 from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
+from .integrations import actionkit
 from .site_settings import (  # noqa: F401 — register with Django ORM
     BrandingSEOSettings,
     FooterSettings,
@@ -25,6 +28,8 @@ from .site_settings import (  # noqa: F401 — register with Django ORM
     NavigationSettings,
     SocialSettings,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class BasePage(Page):
@@ -488,6 +493,16 @@ class FormPage(BasePage, AbstractEmailForm):
         verbose_name=_("thank you text"),
         help_text=_("Text displayed after a successful form submission."),
     )
+    actionkit_page = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("ActionKit page name"),
+        help_text=_(
+            "The ActionKit page short name this form submits to. Only used when "
+            "the signup platform (Settings → Integrations) is set to ActionKit. "
+            "Leave blank to disable ActionKit forwarding for this form."
+        ),
+    )
 
     # Explicitly start from AbstractEmailForm.content_panels, which extends
     # Page.content_panels with the email notification fields (to_address, from_address,
@@ -504,6 +519,10 @@ class FormPage(BasePage, AbstractEmailForm):
                 FieldPanel("subject"),
             ],
             heading=_("Email notifications"),
+        ),
+        MultiFieldPanel(
+            [FieldPanel("actionkit_page")],
+            heading=_("ActionKit"),
         ),
     ]
 
@@ -544,6 +563,40 @@ class FormPage(BasePage, AbstractEmailForm):
             "link_url": None,
         }
         return ctx
+
+    def process_form_submission(self, form):
+        """
+        Store the submission normally (Wagtail DB + email), then forward it to
+        ActionKit when the signup platform is set to ActionKit and this form has
+        an ActionKit page configured.
+
+        Forwarding is best-effort: any failure (misconfiguration, API error, or
+        network error) is logged and swallowed so it never blocks the user's
+        signup. The local submission is always saved first and returned.
+        """
+        submission = super().process_form_submission(form)
+
+        try:
+            integration = IntegrationSettings.for_site(self.get_site())
+            if integration.get_signup_platform() == "actionkit" and self.actionkit_page:
+                fields = actionkit.map_form_fields(form.cleaned_data)
+                if fields.get("email"):
+                    actionkit.submit_action(
+                        integration.actionkit_hostname,
+                        integration.actionkit_api_username,
+                        integration.get_actionkit_api_password(),
+                        self.actionkit_page,
+                        fields,
+                    )
+                else:
+                    logger.warning(
+                        "ActionKit forwarding skipped for FormPage %s: no email in submission.",
+                        self.pk,
+                    )
+        except Exception:
+            logger.exception("ActionKit forwarding failed for FormPage %s.", self.pk)
+
+        return submission
 
     def serve(self, request, *args, **kwargs):
         if request.method == "POST":
