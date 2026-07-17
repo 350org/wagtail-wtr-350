@@ -436,6 +436,7 @@ DONATION_PLATFORM_CHOICES = [
 SIGNUP_PLATFORM_CHOICES = [
     ("wagtail_forms", _("Wagtail Forms (built-in)")),
     ("action_network", "Action Network"),
+    ("actionkit", "ActionKit"),
     ("none", _("None")),
 ]
 
@@ -487,6 +488,31 @@ class IntegrationSettings(BaseSiteSetting):
             "Leave blank if using the embed widget approach."
         ),
     )
+    actionkit_hostname = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("ActionKit hostname"),
+        help_text=_(
+            "Your ActionKit instance hostname, e.g. 'myorg.actionkit.com' "
+            "(no scheme or trailing slash needed)."
+        ),
+    )
+    actionkit_api_username = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("ActionKit API username"),
+        help_text=_("The ActionKit REST API username used for HTTP Basic auth."),
+    )
+    actionkit_api_password = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("ActionKit API password"),
+        help_text=_(
+            "The ActionKit REST API password. In production, prefer the "
+            "WTRX_ACTIONKIT_API_PASSWORD environment variable, which overrides "
+            "this value so the secret is not stored in the database."
+        ),
+    )
 
     panels = [
         MultiFieldPanel(
@@ -502,6 +528,9 @@ class IntegrationSettings(BaseSiteSetting):
             [
                 FieldPanel("signup_platform"),
                 FieldPanel("action_network_api_key"),
+                FieldPanel("actionkit_hostname"),
+                FieldPanel("actionkit_api_username"),
+                FieldPanel("actionkit_api_password"),
             ],
             heading=_("Signups"),
         ),
@@ -561,6 +590,17 @@ class IntegrationSettings(BaseSiteSetting):
         """
         env_key = getattr(settings, "WTRX_ACTION_NETWORK_API_KEY", "")
         return env_key or self.action_network_api_key
+
+    def get_actionkit_api_password(self):
+        """
+        Return the effective ActionKit API password.
+
+        Like get_action_network_api_key, the env/Django setting wins over the DB
+        value because API secrets should not live in the database in production.
+        Set WTRX_ACTIONKIT_API_PASSWORD as an environment variable to override.
+        """
+        env_password = getattr(settings, "WTRX_ACTIONKIT_API_PASSWORD", "")
+        return env_password or self.actionkit_api_password
 
     class Meta:
         verbose_name = _("Integrations")
