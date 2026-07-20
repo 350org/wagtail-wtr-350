@@ -152,13 +152,18 @@ WAGTAIL_ENABLE_UPDATE_CHECK = False
 WTRX_DONATION_PLATFORM = "none"  # none, actblue
 WTRX_SIGNUP_PLATFORM = "wagtail_forms"  # wagtail_forms, action_network, none
 
-# Usercentrics consent management (shared 350 config; see the integration doc).
+# Usercentrics consent management:
 # The consent snippet renders only when WTRX_USERCENTRICS_SETTINGS_ID is non-empty;
 # dev.py blanks it so the external CDN script does not load in local development.
-# Requires a Cloudflare Worker to inject the visitor country (see cloudflare/).
+# Requires a Cloudflare Worker to inject the visitor country.
 WTRX_USERCENTRICS_SETTINGS_ID = os.environ.get(
     "WTRX_USERCENTRICS_SETTINGS_ID", "AcMHYQUX2Y80Au"
 )
 WTRX_USERCENTRICS_VERSION = os.environ.get("WTRX_USERCENTRICS_VERSION", "1.1.4")
+# Visitor country used to decide whether to show the consent banner. Defaults to
+# an EU/GDPR country so the banner shows for everyone — correct when the site is
+# NOT behind Cloudflare (e.g. plain Divio). Set to "" to instead emit the
+# {{COUNTRY}} placeholder for the Cloudflare Worker to fill per-visitor.
+WTRX_USERCENTRICS_COUNTRY = os.environ.get("WTRX_USERCENTRICS_COUNTRY", "DE")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

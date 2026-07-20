@@ -9,7 +9,7 @@ def usercentrics(request):
 
     ``usercentrics_settings_id`` empty → the consent snippet is not rendered
     (used to disable it in local development). See wtrx/templates/wtrx/includes/
-    usercentrics_head.html and the Usercentrics integration doc.
+    usercentrics_head.html.
     """
     return {
         "usercentrics_settings_id": getattr(
@@ -18,4 +18,5 @@ def usercentrics(request):
         "usercentrics_version": getattr(
             settings, "WTRX_USERCENTRICS_VERSION", "1.1.4"
         ),
+        "usercentrics_country": getattr(settings, "WTRX_USERCENTRICS_COUNTRY", ""),
     }
