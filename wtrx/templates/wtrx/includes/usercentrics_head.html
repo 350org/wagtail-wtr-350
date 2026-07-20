@@ -1,0 +1,38 @@
+{% comment %}
+Usercentrics consent management — must be the first scripts in <head>.
+
+Rendered only when usercentrics_settings_id is set (see wtrx.context_processors
+.usercentrics; blank in dev). The literal {{COUNTRY}} placeholder is emitted via
+{% templatetag openvariable %}/{% templatetag closevariable %} so Django does not
+interpret it — the Cloudflare Worker (see cloudflare/usercentrics-country-worker.js)
+replaces it with the visitor's CF-IPCountry on every request.
+{% endcomment %}
+{% if usercentrics_settings_id %}
+{% comment %}1. Consent Mode v2 defaults — must be first.{% endcomment %}
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('consent', 'default', {
+    ad_storage: 'denied',
+    analytics_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+    wait_for_update: 2000
+  });
+</script>
+{% comment %}2. Visitor country — replaced by the Cloudflare Worker.{% endcomment %}
+<script>
+  window.__USERCENTRICS_COUNTRY = '{% templatetag openvariable %}COUNTRY{% templatetag closevariable %}';
+</script>
+{% comment %}3. Load the consent module and initialise it.{% endcomment %}
+<script src="https://cdn.350.org/usercentrics-consent/{{ usercentrics_version }}/usercentrics-consent.js"></script>
+<script>
+  UsercentricsConsent.initConsent({
+    settingsId: '{{ usercentrics_settings_id }}',
+    serviceIds: {
+      reloadOnOptIn: ['BJz7qNsdj-7', 'SyUQ54odobQ', 'Hko_qNsui-Q', 'n1jiXg1v'],
+      deactivateBlocking: ['BJ59EidsWQ', 'gIwEsybsHImyP9'],
+    },
+  });
+</script>
+{% endif %}

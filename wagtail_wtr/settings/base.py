@@ -80,6 +80,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "wagtail.contrib.settings.context_processors.settings",
+                "wtrx.context_processors.usercentrics",
             ],
         },
     },
@@ -150,5 +151,14 @@ WAGTAIL_ENABLE_UPDATE_CHECK = False
 # wtrx platform settings
 WTRX_DONATION_PLATFORM = "none"  # none, actblue
 WTRX_SIGNUP_PLATFORM = "wagtail_forms"  # wagtail_forms, action_network, none
+
+# Usercentrics consent management (shared 350 config; see the integration doc).
+# The consent snippet renders only when WTRX_USERCENTRICS_SETTINGS_ID is non-empty;
+# dev.py blanks it so the external CDN script does not load in local development.
+# Requires a Cloudflare Worker to inject the visitor country (see cloudflare/).
+WTRX_USERCENTRICS_SETTINGS_ID = os.environ.get(
+    "WTRX_USERCENTRICS_SETTINGS_ID", "AcMHYQUX2Y80Au"
+)
+WTRX_USERCENTRICS_VERSION = os.environ.get("WTRX_USERCENTRICS_VERSION", "1.1.4")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
