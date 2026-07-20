@@ -160,5 +160,10 @@ WTRX_USERCENTRICS_SETTINGS_ID = os.environ.get(
     "WTRX_USERCENTRICS_SETTINGS_ID", "AcMHYQUX2Y80Au"
 )
 WTRX_USERCENTRICS_VERSION = os.environ.get("WTRX_USERCENTRICS_VERSION", "1.1.4")
+# Visitor country used to decide whether to show the consent banner. Defaults to
+# an EU/GDPR country so the banner shows for everyone — correct when the site is
+# NOT behind Cloudflare (e.g. plain Divio). Set to "" to instead emit the
+# {{COUNTRY}} placeholder for the Cloudflare Worker to fill per-visitor.
+WTRX_USERCENTRICS_COUNTRY = os.environ.get("WTRX_USERCENTRICS_COUNTRY", "DE")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

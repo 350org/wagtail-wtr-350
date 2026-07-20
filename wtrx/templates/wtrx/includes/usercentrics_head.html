@@ -20,9 +20,14 @@ replaces it with the visitor's CF-IPCountry on every request.
     wait_for_update: 2000
   });
 </script>
-{% comment %}2. Visitor country — replaced by the Cloudflare Worker.{% endcomment %}
+{% comment %}
+2. Visitor country. When usercentrics_country is set (WTRX_USERCENTRICS_COUNTRY),
+   emit it directly — used when the site is not behind Cloudflare (defaults to an
+   EU country so the banner always shows). Otherwise emit the literal {{COUNTRY}}
+   placeholder for the Cloudflare Worker to replace per-visitor.
+{% endcomment %}
 <script>
-  window.__USERCENTRICS_COUNTRY = '{% templatetag openvariable %}COUNTRY{% templatetag closevariable %}';
+  window.__USERCENTRICS_COUNTRY = '{% if usercentrics_country %}{{ usercentrics_country }}{% else %}{% templatetag openvariable %}COUNTRY{% templatetag closevariable %}{% endif %}';
 </script>
 {% comment %}3. Load the consent module and initialise it.{% endcomment %}
 <script src="https://cdn.350.org/usercentrics-consent/{{ usercentrics_version }}/usercentrics-consent.js"></script>

@@ -18,4 +18,5 @@ def usercentrics(request):
         "usercentrics_version": getattr(
             settings, "WTRX_USERCENTRICS_VERSION", "1.1.4"
         ),
+        "usercentrics_country": getattr(settings, "WTRX_USERCENTRICS_COUNTRY", ""),
     }
