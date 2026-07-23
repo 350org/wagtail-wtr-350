@@ -9,7 +9,7 @@ description = "Wagtail CMS platform for campaign, nonprofit, and organizer websi
 requires-python = ">=3.13"
 dependencies = [
     "django>=5.2,<5.3",
-    "wagtail>=7.0,<7.1",
+    "wagtail>=7.1,<7.3",
     "wagtail-localize>=1.9,<2.0",
     "wagtailmedia",
     "dj-database-url",
@@ -19,6 +19,8 @@ dependencies = [
     "django-storages[s3]",
     "wagtail-storages",
     "requests",
+    "wagtail-ai>=3.1,<4.0",
+    "llm-anthropic>=0.25,<0.26",
 ]
 
 [project.optional-dependencies]

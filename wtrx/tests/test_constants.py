@@ -30,13 +30,15 @@ class TestRichtextFeatureConstants(SimpleTestCase):
     def test_full_includes_blockquote(self):
         self.assertIn("blockquote", RICHTEXT_FEATURES_FULL)
 
-    def test_inline_has_only_bold_italic_link(self):
-        self.assertEqual(set(RICHTEXT_FEATURES_INLINE), {"bold", "italic", "link"})
+    def test_inline_has_bold_italic_link_ai(self):
+        self.assertEqual(
+            set(RICHTEXT_FEATURES_INLINE), {"bold", "italic", "link", "ai"}
+        )
 
     def test_hero_has_inline_plus_lists(self):
         self.assertEqual(
             set(RICHTEXT_FEATURES_HERO),
-            {"bold", "italic", "link", "ol", "ul"},
+            {"bold", "italic", "link", "ol", "ul", "ai"},
         )
 
     def test_hero_has_no_headings(self):

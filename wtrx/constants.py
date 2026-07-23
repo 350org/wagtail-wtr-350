@@ -23,6 +23,11 @@ CHARFIELD_MAX_LENGTH = 255
 # RICHTEXT_FEATURES_HERO:   inline formatting + lists (no headings, no blockquote).
 #                           Used for HeroMixin.hero_copy where lists are useful
 #                           but headings would conflict with the hero headline.
+#
+# "ai" is included in all three: it's a Draftail toolbar control (wagtail-ai)
+# that doesn't add any markup/content-state of its own, so it's safe to offer
+# everywhere rich text is edited. wagtail-ai only adds it to fields whose
+# `features` list is explicit — like all of these — if it's listed here.
 # ---------------------------------------------------------------------------
 
 RICHTEXT_FEATURES_FULL = [
@@ -35,8 +40,9 @@ RICHTEXT_FEATURES_FULL = [
     "ol",
     "ul",
     "blockquote",
+    "ai",
 ]
 
-RICHTEXT_FEATURES_INLINE = ["bold", "italic", "link"]
+RICHTEXT_FEATURES_INLINE = ["bold", "italic", "link", "ai"]
 
-RICHTEXT_FEATURES_HERO = ["bold", "italic", "link", "ol", "ul"]
+RICHTEXT_FEATURES_HERO = ["bold", "italic", "link", "ol", "ul", "ai"]

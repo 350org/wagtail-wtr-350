@@ -1,7 +1,8 @@
 """
 Django settings for wagtail_wtr project.
 
-Requires Python 3.13+, Django 5.2 LTS, Wagtail 7.0 LTS.
+Requires Python 3.13+, Django 5.2 LTS, Wagtail 7.1+ (moved off the 7.0 LTS
+line to satisfy wagtail-ai's Wagtail>=7.1 requirement).
 """
 
 import os
@@ -23,6 +24,7 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     "wtrx",
+    "wagtail_ai",
     "wagtail_storages",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -147,6 +149,26 @@ WAGTAILSEARCH_BACKENDS = {
 }
 
 WAGTAIL_ENABLE_UPDATE_CHECK = False
+
+# Wagtail AI — content-assist tools (title/description suggestions, rich text
+# actions, etc.) backed by Claude via the `llm` library's Anthropic plugin
+# (llm-anthropic). Requires ANTHROPIC_API_KEY to be set in the environment;
+# the anthropic SDK reads it directly, so no key is stored here or in the DB.
+# TOKEN_LIMIT is required explicitly: wagtail-ai only ships default token
+# limits for a handful of OpenAI models (see wagtail_ai.tokens), so Claude
+# models raise ImproperlyConfigured without one. This limits how much text
+# gets sent per completion/correction chunk, well under Claude's 200k context.
+WAGTAIL_AI = {
+    "BACKENDS": {
+        "default": {
+            "CLASS": "wagtail_ai.ai.llm.LLMBackend",
+            "CONFIG": {
+                "MODEL_ID": "anthropic/claude-sonnet-4-5",
+                "TOKEN_LIMIT": 100000,
+            },
+        },
+    },
+}
 
 # wtrx platform settings
 WTRX_DONATION_PLATFORM = "none"  # none, actblue
