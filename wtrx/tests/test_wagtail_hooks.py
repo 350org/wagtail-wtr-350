@@ -25,13 +25,16 @@ class TestBlockPlatformRequirements(TestCase):
         self.assertIn("signup_wagtail_forms", BLOCK_PLATFORM_REQUIREMENTS)
         category, value = BLOCK_PLATFORM_REQUIREMENTS["signup_wagtail_forms"]
         self.assertEqual(category, "signup")
-        self.assertEqual(value, "wagtail_forms")
+        # The Wagtail-forms block is available for both the wagtail_forms and
+        # actionkit platforms (ActionKit reuses the FormPage form server-side).
+        self.assertIn("wagtail_forms", value)
+        self.assertIn("actionkit", value)
 
     def test_signup_action_network_requires_matching_platform(self):
         self.assertIn("signup_action_network", BLOCK_PLATFORM_REQUIREMENTS)
         category, value = BLOCK_PLATFORM_REQUIREMENTS["signup_action_network"]
         self.assertEqual(category, "signup")
-        self.assertEqual(value, "action_network")
+        self.assertEqual(value, ("action_network",))
 
     def test_signup_link_not_in_requirements(self):
         """signup_link is platform-agnostic and should not be in the mapping."""
@@ -97,6 +100,17 @@ class TestBlockVisibilityJS(TestCase):
         content = response.content.decode()
         self.assertIn("signup_wagtail_forms", content)
         self.assertNotIn("signup_action_network", content)
+
+    def test_actionkit_keeps_wagtail_forms_and_hides_action_network(self):
+        """ActionKit reuses the FormPage form, so the wagtail_forms block stays
+        available while the action_network block is hidden."""
+        self.integration.donation_platform = "actblue"
+        self.integration.signup_platform = "actionkit"
+        self.integration.save()
+        response = _block_visibility_js(self._make_request())
+        content = response.content.decode()
+        self.assertNotIn('[data-contentpath="signup_wagtail_forms"]', content)
+        self.assertIn("signup_action_network", content)
 
     def test_active_platforms_not_hidden(self):
         """Active platform blocks should not be hidden in the CSS."""

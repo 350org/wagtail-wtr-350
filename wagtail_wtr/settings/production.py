@@ -47,13 +47,12 @@ _MIDDLEWARE_TAIL = [
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 ]
 
-if _s3_bucket:
-    MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + _MIDDLEWARE_TAIL
-else:
-    MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + [
-        "whitenoise.middleware.WhiteNoiseMiddleware",
-        *_MIDDLEWARE_TAIL,
-    ]
+# WhiteNoise always serves static files (even when media is on S3), so its
+# middleware is always present, immediately after SecurityMiddleware.
+MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + [
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    *_MIDDLEWARE_TAIL,
+]
 
 STORAGES = {
     "default": {
@@ -72,24 +71,17 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # ---------------------------------------------------------------------------
-# AWS S3 storage (optional — omit AWS_STORAGE_BUCKET_NAME to disable)
-# When configured, both user-uploaded media AND collected static files are
-# stored in S3 under separate prefixes (media/ and static/).
+# AWS S3 storage for MEDIA ONLY (optional — omit AWS_STORAGE_BUCKET_NAME to disable)
+# When configured, user-uploaded media (images, documents) is stored in S3 under
+# the media/ prefix. Static files (CSS, JS, fonts) are NOT put on S3 — they are
+# always served by WhiteNoise from the container's STATIC_ROOT, with collectstatic
+# run at container startup by bin/start.sh in every environment. This decoupling
+# keeps static serving reliable on platforms without a pre-deploy hook (e.g. Divio),
+# while still giving media persistent, shared storage.
 #
-# Bucket layout:
-#   {bucket}/static/  — collected static assets (CSS, JS, fonts)
-#   {bucket}/media/   — user-uploaded content (images, documents)
-#
-# When S3 is configured, collectstatic runs in Render's preDeployCommand
-# (render.yaml) before the container starts so gunicorn binds immediately
-# and the health check responds without delay.
-# When S3 is not configured (WhiteNoise path), collectstatic runs in
-# start.sh instead so the manifest lands in the correct container filesystem.
-#
-# WARNING: Without S3, media is stored on the local filesystem. Render's
-# Docker containers have ephemeral disks — media will be lost on every deploy.
-# Always configure S3 (or another persistent storage backend) for production
-# deployments where editors upload images or documents.
+# WARNING: Without S3, media is stored on the local filesystem, which is ephemeral
+# on Divio/Render — uploads are lost on every deploy. Configure S3 for any
+# deployment where editors upload images or documents.
 # ---------------------------------------------------------------------------
 if _s3_bucket:
     _s3_custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN")
@@ -129,22 +121,9 @@ if _s3_bucket:
         },
     }
 
-    # Static files storage — S3ManifestStaticStorage layers ManifestFilesMixin
-    # on top of S3Storage, rewriting asset URLs with content-hash suffixes
-    # (e.g. main.abc123de.css) for safe far-future Cache-Control headers.
-    # file_overwrite=True is correct here: collectstatic regenerates files
-    # deterministically on each deploy and filenames change with content.
-    STORAGES["staticfiles"] = {
-        "BACKEND": "wtrx.storage_backends.S3ManifestStaticStorage",
-        "OPTIONS": {
-            **_s3_opts_base,
-            "location": "static",
-            "file_overwrite": True,
-            "object_parameters": {
-                "CacheControl": f"max-age={_aws_expiry}, s-maxage={_aws_expiry}, must-revalidate",
-            },
-        },
-    }
+    # NOTE: static files are intentionally NOT placed on S3. STORAGES["staticfiles"]
+    # keeps its WhiteNoise default (set above), and STATIC_URL keeps its local
+    # default from base.py. Only media (STORAGES["default"]) uses S3.
 
     _s3_base_url = (
         f"https://{_s3_custom_domain}"
@@ -152,7 +131,6 @@ if _s3_bucket:
         else f"https://{_s3_bucket}.s3.{_s3_region}.amazonaws.com"
     )
     MEDIA_URL = f"{_s3_base_url}/media/"  # noqa: F405
-    STATIC_URL = f"{_s3_base_url}/static/"  # noqa: F405
 
 # ---------------------------------------------------------------------------
 # Email / SMTP (optional — omit EMAIL_HOST to fall back to console backend)
