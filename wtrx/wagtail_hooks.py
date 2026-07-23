@@ -12,8 +12,11 @@ import json
 from django.http import HttpResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 
 from wagtail import hooks
+from wagtail.admin.menu import MenuItem
+from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
 
 
 # ---------------------------------------------------------------------------
@@ -200,3 +203,62 @@ _SIGNUP_PLATFORM_FIELD_JS = """
 @hooks.register("insert_global_admin_js")
 def insert_signup_platform_field_visibility_js():
     return format_html("<script>{}</script>", _SIGNUP_PLATFORM_FIELD_JS)
+
+
+# ---------------------------------------------------------------------------
+# Blog admin-menu shortcut
+# ---------------------------------------------------------------------------
+#
+# Adds a "Blog" item to the admin sidebar linking to the page explorer for
+# the blog index page configured in Settings > Admin menu
+# (AdminMenuSettings.blog_index_page). Hidden entirely when no blog index
+# page is configured, or the configured page isn't live.
+# ---------------------------------------------------------------------------
+
+
+def _get_blog_index_page(request):
+    # Import here to avoid import-time DB access
+    from wagtail.models import Site
+
+    from wtrx.site_settings import AdminMenuSettings
+
+    try:
+        admin_settings = AdminMenuSettings.for_request(request)
+    except (AdminMenuSettings.DoesNotExist, Site.DoesNotExist):
+        return None
+
+    page = admin_settings.blog_index_page
+    if page is None or not page.live:
+        return None
+    return page
+
+
+class BlogMenuItem(MenuItem):
+    def is_shown(self, request):
+        return _get_blog_index_page(request) is not None
+
+    def render_component(self, request):
+        # Recompute rather than reuse a cached URL: menu item instances are
+        # shared across requests, so the target page must be resolved fresh
+        # each time rather than stashed on self.
+        page = _get_blog_index_page(request)
+        url = reverse("wagtailadmin_explore", args=[page.id])
+        return LinkMenuItemComponent(
+            self.name,
+            self.label,
+            url,
+            icon_name=self.icon_name,
+            classname=self.classname,
+            attrs=self.attrs,
+        )
+
+
+@hooks.register("register_admin_menu_item")
+def register_blog_menu_item():
+    return BlogMenuItem(
+        _("Blog"),
+        "#",
+        name="blog",
+        icon_name="doc-empty",
+        order=150,
+    )

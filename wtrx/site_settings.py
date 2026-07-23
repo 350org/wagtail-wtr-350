@@ -604,3 +604,29 @@ class IntegrationSettings(BaseSiteSetting):
 
     class Meta:
         verbose_name = _("Integrations")
+
+
+@register_setting(icon="link", order=60)
+class AdminMenuSettings(BaseSiteSetting):
+    """Settings > Admin menu — configures shortcut links in the Wagtail admin sidebar."""
+
+    blog_index_page = models.ForeignKey(
+        "wagtailcore.Page",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("blog index page"),
+        help_text=_(
+            "The page that lists your blog posts. When set, a 'Blog' shortcut "
+            "appears in the admin sidebar linking to it. Leave blank to hide "
+            "the shortcut."
+        ),
+    )
+
+    panels = [
+        FieldPanel("blog_index_page"),
+    ]
+
+    class Meta:
+        verbose_name = _("Admin menu")
