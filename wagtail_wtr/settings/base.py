@@ -25,6 +25,9 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     "wtrx",
     "wagtail_ai",
+    "wagtail_2fa",
+    "django_otp",
+    "django_otp.plugins.otp_totp",
     "wagtail_storages",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -61,6 +64,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "wagtail_2fa.middleware.VerifyUserMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
@@ -149,6 +153,10 @@ WAGTAILSEARCH_BACKENDS = {
 }
 
 WAGTAIL_ENABLE_UPDATE_CHECK = False
+
+# Wagtail 2FA — required for all staff/superusers accessing the admin.
+# Disabled in dev.py so local development doesn't require TOTP enrollment.
+WAGTAIL_2FA_REQUIRED = True
 
 # Wagtail AI — content-assist tools (title/description suggestions, rich text
 # actions, etc.) backed by Claude via the `llm` library's Anthropic plugin

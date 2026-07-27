@@ -26,6 +26,10 @@ WAGTAILADMIN_BASE_URL = "http://localhost:8000"
 # CDN script loading during local development.
 WTRX_USERCENTRICS_SETTINGS_ID = ""
 
+# Disable 2FA enforcement locally so developers aren't forced into TOTP
+# enrollment just to run the admin. Still fully enforced in production.
+WAGTAIL_2FA_REQUIRED = False
+
 try:
     from .local import *  # noqa: F401, F403
 except ImportError:
