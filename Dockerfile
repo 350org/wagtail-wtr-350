@@ -54,8 +54,12 @@ RUN mkdir -p /app/static && chown app:app /app/static
 # omitted from the Docker build so gunicorn starts immediately when the container
 # launches and the health check responds without delay.
 
-USER app
+# The container starts as root so gunicorn's master can bind privileged port 80
+# (Divio's load balancer connects on port 80; it does not inject a PORT env var).
+# gunicorn immediately drops worker processes to the unprivileged `app` user
+# (see --user/--group in bin/start.sh), so request handling never runs as root.
+# On Render, PORT=8000 (render.yaml) overrides the bind port.
 
-EXPOSE 8000
+EXPOSE 80
 
 CMD ["bin/start.sh"]

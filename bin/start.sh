@@ -31,9 +31,11 @@ fi
 # See PLAN.md Phase 17 for the tracked fix.
 
 exec gunicorn wagtail_wtr.wsgi:application \
-    --bind "0.0.0.0:${PORT:-8000}" \
+    --bind "0.0.0.0:${PORT:-80}" \
     --workers "${WEB_CONCURRENCY:-4}" \
     --timeout "${GUNICORN_TIMEOUT:-120}" \
     --worker-tmp-dir /dev/shm \
+    --user app \
+    --group app \
     --access-logfile - \
     --error-logfile -
