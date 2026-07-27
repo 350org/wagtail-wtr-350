@@ -21,6 +21,11 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 WAGTAILADMIN_BASE_URL = "http://localhost:8000"
 
+# Disable Usercentrics locally — the country injection relies on a Cloudflare
+# Worker that isn't in front of the dev server, and we don't want the external
+# CDN script loading during local development.
+WTRX_USERCENTRICS_SETTINGS_ID = ""
+
 try:
     from .local import *  # noqa: F401, F403
 except ImportError:
