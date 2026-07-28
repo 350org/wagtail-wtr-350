@@ -28,6 +28,11 @@ INSTALLED_APPS = [
     "wagtail_2fa",
     "django_otp",
     "django_otp.plugins.otp_totp",
+    "django.contrib.sites",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
     "wagtail_storages",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -64,7 +69,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "wagtail_2fa.middleware.VerifyUserMiddleware",
+    "wagtail_wtr.middleware.ScopedVerifyUserMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
@@ -87,6 +93,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "wagtail.contrib.settings.context_processors.settings",
                 "wtrx.context_processors.usercentrics",
+                "wtrx.context_processors.google_sso",
             ],
         },
     },
@@ -176,6 +183,50 @@ WAGTAIL_AI = {
             },
         },
     },
+}
+
+# Google SSO (django-allauth) — "Sign in with Google" alongside the regular
+# username/password form on the Wagtail admin login page (see the
+# templates/wagtailadmin/login.html override). Client credentials come from
+# GOOGLE_OAUTH_CLIENT_ID/SECRET env vars (no SocialApp DB row needed).
+# WTRX_GOOGLE_SSO_DOMAIN restricts sign-in to a single Google Workspace
+# domain, enforced server-side in wtrx.allauth_adapter — leaving it unset
+# disables the domain check (any Google account could sign in), so it should
+# always be set outside of local dev.
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+ACCOUNT_ADAPTER = "wtrx.allauth_adapter.NoSignupAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "wtrx.allauth_adapter.DomainRestrictedSocialAccountAdapter"
+
+# New Google-authenticated users are created with is_staff=False — an
+# existing superuser must still grant Wagtail admin access via the Users
+# section before they can do anything.
+SOCIALACCOUNT_AUTO_SIGNUP = True
+ACCOUNT_EMAIL_VERIFICATION = "none"  # Google has already verified the email
+# Skip allauth's unstyled intermediate "Continue" confirmation page — the
+# login template's button already is the deliberate click that starts SSO.
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+WTRX_GOOGLE_SSO_DOMAIN = os.environ.get("WTRX_GOOGLE_SSO_DOMAIN", "")
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": (
+            {"hd": WTRX_GOOGLE_SSO_DOMAIN} if WTRX_GOOGLE_SSO_DOMAIN else {}
+        ),
+        "OAUTH_PKCE_ENABLED": True,
+        "APP": {
+            "client_id": os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""),
+            "secret": os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""),
+            "key": "",
+        },
+    }
 }
 
 # wtrx platform settings

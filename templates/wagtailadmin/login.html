@@ -1,0 +1,16 @@
+{% extends "wagtailadmin/login.html" %}
+{% load i18n socialaccount %}
+
+{% block above_login %}
+    {{ block.super }}
+    {% if google_sso_enabled %}
+        <a
+            href="{% provider_login_url 'google' %}"
+            class="button button-secondary button-longrunning"
+            style="width: 100%; justify-content: center; margin-bottom: 1em;"
+        >
+            {% trans "Sign in with Google" %}
+        </a>
+        <p style="text-align: center; margin-bottom: 1em;">{% trans "or sign in with a password" %}</p>
+    {% endif %}
+{% endblock %}

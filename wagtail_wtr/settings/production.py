@@ -32,27 +32,17 @@ _s3_bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 
 # AssumeTlsFromEdgeMiddleware runs before SecurityMiddleware so SECURE_PROXY_SSL_HEADER
 # sees https when TRUST_EDGE_TLS is set. WhiteNoise must follow SecurityMiddleware.
-_MIDDLEWARE_SECURITY_PREFIX = [
+#
+# Builds on base.py's MIDDLEWARE (imported via `from .base import *` above)
+# rather than re-declaring the whole list here — a hand-duplicated copy
+# silently drifted out of sync in the past (missing a middleware entry added
+# to base.py caused a 500 on every admin page in production; see git log).
+assert MIDDLEWARE[0] == "django.middleware.security.SecurityMiddleware"  # noqa: F405
+MIDDLEWARE = [  # noqa: F405
     "wagtail_wtr.middleware.AssumeTlsFromEdgeMiddleware",
-    "django.middleware.security.SecurityMiddleware",
-]
-_MIDDLEWARE_TAIL = [
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "wagtail_2fa.middleware.VerifyUserMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
-]
-
-# WhiteNoise always serves static files (even when media is on S3), so its
-# middleware is always present, immediately after SecurityMiddleware.
-MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + [
+    MIDDLEWARE[0],  # noqa: F405
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    *_MIDDLEWARE_TAIL,
+    *MIDDLEWARE[1:],  # noqa: F405
 ]
 
 STORAGES = {

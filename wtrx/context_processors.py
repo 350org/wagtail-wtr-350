@@ -20,3 +20,14 @@ def usercentrics(request):
         ),
         "usercentrics_country": getattr(settings, "WTRX_USERCENTRICS_COUNTRY", ""),
     }
+
+
+def google_sso(request):
+    """
+    Whether Google SSO is fully configured (client ID present), used by the
+    wagtailadmin/login.html override to show/hide the "Sign in with Google"
+    button — clicking it with no client ID configured would just fail against
+    Google with an invalid_client error.
+    """
+    google_app = settings.SOCIALACCOUNT_PROVIDERS.get("google", {}).get("APP", {})
+    return {"google_sso_enabled": bool(google_app.get("client_id"))}
