@@ -13,6 +13,14 @@ ActionKit's "action" endpoint records a user taking an action on a named page:
 Standard user fields (first_name, last_name, zip, phone, city, state, address1)
 are passed at the top level; anything unrecognised is sent as an ActionKit
 custom user field using the ``user_<name>`` convention.
+
+ActionKit's public page endpoint also serves an embeddable HTML fragment of a
+page's own form (see ``fetch_embed_form_html``), used by SignupActionKitBlock
+to auto-render whatever fields an ActionKit page is configured with, given
+just its short name:
+    GET https://<hostname>/act/<page short name>?form_only=1&abs_urls=1
+No auth required — this is the same markup ActionKit serves to anonymous
+visitors of the hosted page, just without the surrounding site chrome.
 """
 
 import requests
@@ -81,7 +89,7 @@ def map_form_fields(cleaned_data):
     return result
 
 
-def _base_url(hostname):
+def base_url(hostname):
     """Normalise a hostname or full URL to a scheme-qualified base with no trailing slash."""
     host = (hostname or "").strip().rstrip("/")
     if host.startswith(("http://", "https://")):
@@ -103,7 +111,7 @@ def submit_action(hostname, username, password, page, fields, timeout=5):
             "ActionKit hostname, API username, and page name are all required."
         )
 
-    url = f"{_base_url(hostname)}/rest/v1/action/"
+    url = f"{base_url(hostname)}/rest/v1/action/"
     payload = {"page": page, **fields}
 
     response = requests.post(
@@ -118,3 +126,38 @@ def submit_action(hostname, username, password, page, fields, timeout=5):
         raise ActionKitError(
             f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
         )
+
+
+def fetch_embed_form_html(hostname, short_form_id, timeout=5):
+    """
+    Fetch the auto-rendered HTML fragment for an ActionKit page's form.
+
+    Uses ActionKit's ``form_only=1&abs_urls=1`` query params, which return just
+    the page's title/description/form markup with no site chrome (header, nav,
+    footer, or ActionKit's own stylesheet) — safe to splice into another page's
+    HTML and restyle with our own CSS. Whatever fields that ActionKit page is
+    actually configured with come along automatically; nothing here needs to
+    know what they are.
+
+    Returns the raw HTML fragment (str) on success. Raises :class:`ActionKitError`
+    on missing configuration or any non-2xx response. Network errors from
+    ``requests`` propagate to the caller. Callers are expected to cache the
+    result — this hits ActionKit's live server on every call.
+    """
+    if not (hostname and short_form_id):
+        raise ActionKitError("ActionKit hostname and short form ID are required.")
+
+    url = f"{base_url(hostname)}/act/{short_form_id}"
+
+    response = requests.get(
+        url,
+        params={"form_only": 1, "abs_urls": 1},
+        timeout=timeout,
+    )
+
+    if not 200 <= response.status_code < 300:
+        raise ActionKitError(
+            f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
+        )
+
+    return response.text

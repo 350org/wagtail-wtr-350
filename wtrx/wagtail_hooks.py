@@ -53,6 +53,7 @@ BLOCK_PLATFORM_REQUIREMENTS = {
     # so it must be available under both.
     "signup_wagtail_forms": ("signup", ("wagtail_forms", "actionkit")),
     "signup_action_network": ("signup", ("action_network",)),
+    "signup_actionkit": ("signup", ("actionkit",)),
     # signup_link is always visible (it's a simple CTA link, platform-agnostic)
 }
 

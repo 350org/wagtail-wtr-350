@@ -1,0 +1,93 @@
+{% load i18n wagtailcore_tags %}
+<div class="wtr-signup wtr-signup-actionkit rounded-lg bg-neutral-50 px-6 py-10"{% if value.anchor_id %} id="{{ value.anchor_id }}"{% endif %}>
+    <div class="mx-auto max-w-2xl">
+        {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-dark md:text-3xl">{{ value.heading }}</h2>{% endif %}
+        {% if value.description %}
+            <div class="prose prose-neutral mt-4 max-w-none">
+                {{ value.description|richtext }}
+            </div>
+        {% endif %}
+        {% if form_html %}
+            {% comment %}
+            The fragment itself contains inline <script> blocks (ActionKit's
+            own, e.g. for oneclick/privacy-field behavior) that call jQuery(...)
+            directly and unguarded, assuming it's already a page global — true
+            on ActionKit's hosted page, which loads jQuery in <head> before this
+            markup. Those scripts run synchronously as the browser parses this
+            HTML, so jQuery has to be loaded synchronously too, before the
+            fragment is reached — an async-appended <script> (loadScript below)
+            resolves too late and the fragment's own scripts throw
+            "jQuery is not defined". document.write, called from a script
+            that's itself still being parsed, is the standard way to inject a
+            blocking script tag mid-parse.
+            {% endcomment %}
+            <script>
+                if (typeof jQuery === "undefined") {
+                    document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
+                }
+            </script>
+            <div class="wtr-actionkit-embed mt-8">
+                {{ form_html|safe }}
+            </div>
+            {% comment %}
+            Load the ActionKit client library (AJAX submission, validation,
+            country/privacy logic) once per page. Guarded so multiple
+            ActionKit signup blocks on the same page don't double-init (they'd
+            also collide on ActionKit's own hardcoded #action-form id — a
+            known limit of embedding more than one ActionKit form per page).
+            {% endcomment %}
+            <script>
+                (function () {
+                    if (window.__wtrAkInit) { return; }
+                    window.__wtrAkInit = true;
+
+                    {% comment %}
+                    ActionKit's real submit is a plain full-page form POST
+                    (actionkit.js calls form.submit() directly, which bypasses
+                    the submit event entirely — there's no AJAX step). Our
+                    site's default Referrer-Policy (same-origin) means the
+                    browser sends no Referer at all on that cross-origin POST,
+                    unlike ActionKit's own hosted page or a typical WordPress
+                    site with no such restriction. Override it just for this
+                    one navigation so ActionKit sees where the submission came
+                    from.
+                    {% endcomment %}
+                    var actionForm = document.getElementById("action-form");
+                    if (actionForm) {
+                        actionForm.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+                    }
+
+                    function loadScript(src, onload) {
+                        var s = document.createElement("script");
+                        s.src = src;
+                        if (onload) { s.onload = onload; }
+                        document.body.appendChild(s);
+                    }
+
+                    var baseUrl = "{{ actionkit_base_url|escapejs }}";
+                    if (!baseUrl) { return; }
+
+                    function initForm() {
+                        actionkit.forms.contextRoot = baseUrl + "/context/";
+                        {% comment %}
+                        initPage() sets ak.args (parsed from the querystring) and
+                        other page-level state that a full ActionKit page sets up
+                        via its own inline script — one our form_only=1 fragment
+                        doesn't include. Without it, beforeContextLoad() throws on
+                        ak.args being undefined and loadContext() never completes,
+                        leaving the form unable to submit.
+                        {% endcomment %}
+                        actionkit.forms.initPage();
+                        actionkit.forms.initForm("act");
+                    }
+
+                    loadScript(baseUrl + "/resources/actionkit.js", initForm);
+                })();
+            </script>
+        {% else %}
+            <div class="mt-8 rounded-lg bg-white p-6 text-sm text-neutral-500">
+                {% trans "This signup form is temporarily unavailable. Please try again shortly." %}
+            </div>
+        {% endif %}
+    </div>
+</div>

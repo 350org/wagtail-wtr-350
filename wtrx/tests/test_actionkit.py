@@ -9,14 +9,20 @@ Covers:
 - FormPage.process_form_submission: forwards to ActionKit when the platform is
   "actionkit" and a page is set; a forwarding failure is swallowed/logged and
   the local submission is still saved.
+- fetch_embed_form_html: URL/query-param construction, success, and error cases.
+- SignupActionKitBlock.get_context: fetches and caches the embed fragment,
+  caches (and rate-limits retrying) failures, and degrades gracefully when
+  unconfigured.
 """
 
 from unittest.mock import MagicMock, patch
 
 import requests
-from django.test import SimpleTestCase, TestCase
+from django.core.cache import cache
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from wagtail.models import Page, Site
 
+from wtrx.blocks import SignupActionKitBlock
 from wtrx.integrations import actionkit
 from wtrx.integrations.actionkit import ActionKitError
 from wtrx.models import FormField, FormPage, HomePage
@@ -209,3 +215,121 @@ class TestFormPageActionKitForwarding(TestCase):
         self.assertTrue(response.json()["success"])
         # The local submission was still stored.
         self.assertEqual(self.form_page.get_submission_class().objects.count(), 1)
+
+
+class TestFetchEmbedFormHTML(SimpleTestCase):
+    def _mock_response(self, status_code=200, text="<form>...</form>"):
+        resp = MagicMock()
+        resp.status_code = status_code
+        resp.text = text
+        return resp
+
+    @patch("wtrx.integrations.actionkit.requests.get")
+    def test_requests_form_only_fragment_with_abs_urls(self, mock_get):
+        mock_get.return_value = self._mock_response()
+        html = actionkit.fetch_embed_form_html("myorg.actionkit.com", "join")
+        self.assertEqual(html, "<form>...</form>")
+        args, kwargs = mock_get.call_args
+        self.assertEqual(args[0], "https://myorg.actionkit.com/act/join")
+        self.assertEqual(kwargs["params"], {"form_only": 1, "abs_urls": 1})
+
+    @patch("wtrx.integrations.actionkit.requests.get")
+    def test_accepts_full_url_hostname(self, mock_get):
+        mock_get.return_value = self._mock_response()
+        actionkit.fetch_embed_form_html("https://myorg.actionkit.com/", "join")
+        self.assertEqual(
+            mock_get.call_args[0][0], "https://myorg.actionkit.com/act/join"
+        )
+
+    @patch("wtrx.integrations.actionkit.requests.get")
+    def test_non_2xx_raises_actionkit_error(self, mock_get):
+        mock_get.return_value = self._mock_response(404, text="not found")
+        with self.assertRaises(ActionKitError):
+            actionkit.fetch_embed_form_html("myorg.actionkit.com", "nope")
+
+    def test_missing_config_raises_actionkit_error(self):
+        with self.assertRaises(ActionKitError):
+            actionkit.fetch_embed_form_html("", "join")
+        with self.assertRaises(ActionKitError):
+            actionkit.fetch_embed_form_html("myorg.actionkit.com", "")
+
+
+class TestSignupActionKitBlockContext(TestCase):
+    """SignupActionKitBlock.get_context() fetches, caches, and degrades gracefully."""
+
+    @classmethod
+    def setUpTestData(cls):
+        Site.objects.filter(is_default_site=True).delete()
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-ak-embed")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="localhost",
+            port=80,
+            root_page=cls.home,
+            is_default_site=True,
+        )
+        IntegrationSettings.objects.update_or_create(
+            site=cls.site,
+            defaults={
+                "signup_platform": "actionkit",
+                "actionkit_hostname": "myorg.actionkit.com",
+            },
+        )
+
+    def setUp(self):
+        cache.clear()
+        self.factory = RequestFactory()
+
+    def _value(self, short_form_id="join"):
+        block = SignupActionKitBlock()
+        return block.to_python(
+            {
+                "heading": "Sign up",
+                "description": "",
+                "short_form_id": short_form_id,
+                "anchor_id": "",
+            }
+        )
+
+    @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
+    def test_fetches_and_caches_on_success(self, mock_fetch):
+        mock_fetch.return_value = "<form>hello</form>"
+        block = SignupActionKitBlock()
+        request = self.factory.get("/")
+        ctx = block.get_context(self._value(), parent_context={"request": request})
+
+        self.assertEqual(ctx["form_html"], "<form>hello</form>")
+        self.assertEqual(ctx["actionkit_base_url"], "https://myorg.actionkit.com")
+        mock_fetch.assert_called_once_with("myorg.actionkit.com", "join")
+
+        # Second render within the cache window does not hit ActionKit again.
+        block.get_context(self._value(), parent_context={"request": request})
+        mock_fetch.assert_called_once()
+
+    @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
+    def test_fetch_failure_degrades_to_none_and_is_cached(self, mock_fetch):
+        mock_fetch.side_effect = ActionKitError("boom")
+        block = SignupActionKitBlock()
+        request = self.factory.get("/")
+
+        ctx = block.get_context(self._value(), parent_context={"request": request})
+        self.assertIsNone(ctx["form_html"])
+
+        # A second attempt within the failure-cache window doesn't retry.
+        ctx2 = block.get_context(self._value(), parent_context={"request": request})
+        self.assertIsNone(ctx2["form_html"])
+        mock_fetch.assert_called_once()
+
+    def test_no_request_in_context_yields_no_form_html(self):
+        block = SignupActionKitBlock()
+        ctx = block.get_context(self._value(), parent_context=None)
+        self.assertIsNone(ctx["form_html"])
+
+    def test_blank_short_form_id_yields_no_form_html(self):
+        block = SignupActionKitBlock()
+        request = self.factory.get("/")
+        ctx = block.get_context(
+            self._value(short_form_id=""), parent_context={"request": request}
+        )
+        self.assertIsNone(ctx["form_html"])

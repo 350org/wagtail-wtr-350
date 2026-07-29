@@ -342,6 +342,7 @@ class TestSectionBlockStructure(SimpleTestCase):
         "donate",
         "signup_wagtail_forms",
         "signup_action_network",
+        "signup_actionkit",
         "signup_link",
     }
 

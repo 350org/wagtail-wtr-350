@@ -8,7 +8,7 @@ Block categories (in definition order):
   Layout:   AccordionItemBlock, CardGridBlock, AccordionBlock,
             CalloutBlock, HeroBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
-            SignupLinkBlock
+            SignupActionKitBlock, SignupLinkBlock
   Layout²:  SectionBlock  (defined after action blocks so its nested
             StreamBlock can instantiate the action block classes)
 
@@ -19,6 +19,8 @@ from decimal import Decimal
 import re
 from urllib.parse import urlparse
 
+import requests
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import (
@@ -38,12 +40,16 @@ from wagtail.blocks import (
 from wagtail.blocks import RawHTMLBlock as WagtailRawHTMLBlock
 from wagtail.contrib.table_block.blocks import TableBlock as WagtailTableBlock
 from wagtail.images.blocks import ImageChooserBlock
+from wagtail.models import Site
 from wagtailmedia.blocks import VideoChooserBlock
 
 from wtrx.constants import (
     RICHTEXT_FEATURES_FULL,
     RICHTEXT_FEATURES_INLINE,
 )
+from wtrx.integrations import actionkit
+from wtrx.integrations.actionkit import ActionKitError
+from wtrx.site_settings import IntegrationSettings
 
 # ---------------------------------------------------------------------------
 # Choice constants
@@ -885,6 +891,100 @@ class SignupActionNetworkBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/signup_action_network_block.html"
 
 
+class SignupActionKitBlock(StructBlock):
+    """
+    Auto-renders an ActionKit page's own signup form.
+
+    Editors provide only the ActionKit page's short name. The block fetches
+    that page's form via ActionKit's ``form_only=1&abs_urls=1`` embed
+    mechanism (see wtrx.integrations.actionkit.fetch_embed_form_html) and
+    renders the returned HTML fragment directly — whatever fields that page
+    is actually configured with (name, email, custom survey questions, etc.)
+    show up automatically; nothing here enumerates them. The fragment has no
+    ActionKit page chrome or stylesheet, so styling is entirely ours, via CSS
+    targeting ActionKit's own semantic classes (ak-fieldbox-*, input-text, etc).
+
+    The fetched HTML — and fetch failures — are cached, since a fetch hits
+    ActionKit's live server on every call. A failed fetch renders a fallback
+    message instead of breaking the page.
+    """
+
+    SUCCESS_CACHE_TIMEOUT = 60 * 15  # 15 minutes
+    FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
+    _FAILURE_SENTINEL = "__actionkit_embed_fetch_failed__"
+
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Signup section heading, shown above the ActionKit form."),
+    )
+    description = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        required=False,
+        label=_("Description"),
+        help_text=_("Optional supporting text below the heading."),
+    )
+    short_form_id = CharBlock(
+        label=_("ActionKit Page Shortname"),
+        help_text=_(
+            "The ActionKit page's short name (e.g. 'join'). Its signup form "
+            "is fetched from ActionKit and rendered automatically — whatever "
+            "fields that page is configured with will appear, with no further "
+            "setup needed here."
+        ),
+    )
+    anchor_id = CharBlock(
+        required=False,
+        label=_("Anchor ID"),
+        help_text=_(
+            "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
+        ),
+    )
+
+    def _fetch_form_html(self, hostname, short_form_id):
+        """Return the cached (or freshly fetched) form fragment, or None on failure."""
+        cache_key = f"wtrx:actionkit_embed:{hostname}:{short_form_id}"
+        cached = cache.get(cache_key)
+        if cached == self._FAILURE_SENTINEL:
+            return None
+        if cached is not None:
+            return cached
+
+        try:
+            html = actionkit.fetch_embed_form_html(hostname, short_form_id)
+        except (ActionKitError, requests.RequestException):
+            cache.set(cache_key, self._FAILURE_SENTINEL, self.FAILURE_CACHE_TIMEOUT)
+            return None
+
+        cache.set(cache_key, html, self.SUCCESS_CACHE_TIMEOUT)
+        return html
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        short_form_id = value.get("short_form_id", "")
+
+        request = (parent_context or {}).get("request")
+        hostname = ""
+        if request is not None:
+            try:
+                hostname = IntegrationSettings.for_request(request).actionkit_hostname
+            except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+                hostname = ""
+
+        form_html = None
+        if hostname and short_form_id:
+            form_html = self._fetch_form_html(hostname, short_form_id)
+
+        ctx["form_html"] = form_html
+        ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
+        return ctx
+
+    class Meta:
+        icon = "form"
+        label = _("Sign Up (ActionKit)")
+        template = "wtrx/components/streamfield/blocks/signup_actionkit_block.html"
+
+
 class SignupLinkBlock(StructBlock):
     """
     A simple link-out signup CTA.
@@ -965,6 +1065,7 @@ class SectionContentBlock(StreamBlock):
     donate = DonateBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
+    signup_actionkit = SignupActionKitBlock()
     signup_link = SignupLinkBlock()
 
     class Meta:
@@ -1042,6 +1143,7 @@ class BodyStreamBlock(StreamBlock):
     donate = DonateBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
+    signup_actionkit = SignupActionKitBlock()
     signup_link = SignupLinkBlock()
 
     class Meta:
