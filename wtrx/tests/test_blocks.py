@@ -340,6 +340,7 @@ class TestSectionBlockStructure(SimpleTestCase):
         "callout",
         "hero",
         "donate",
+        "donate_fundraiseup",
         "signup_wagtail_forms",
         "signup_action_network",
         "signup_actionkit",

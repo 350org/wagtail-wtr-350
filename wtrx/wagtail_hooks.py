@@ -45,8 +45,9 @@ from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
 # platform setting that must be active for the block to be visible.
 # Blocks not listed here are always visible.
 BLOCK_PLATFORM_REQUIREMENTS = {
-    # Donation blocks — visible when donation_platform != "none"
-    "donate": ("donation", None),
+    # Donation blocks — visible when donation_platform matches.
+    "donate": ("donation", ("actblue",)),
+    "donate_fundraiseup": ("donation", ("fundraiseup",)),
     # Signup blocks — visible when signup_platform is one of the listed values.
     # The Wagtail-forms block also renders the form for the ActionKit platform
     # (ActionKit forwarding happens server-side in FormPage.process_form_submission),
@@ -82,15 +83,13 @@ def _block_visibility_js(request):
         donation_platform = "none"
         signup_platform = "wagtail_forms"
 
-    hidden_blocks = []
+    active_platform = {"donation": donation_platform, "signup": signup_platform}
 
-    for block_name, (category, required_value) in BLOCK_PLATFORM_REQUIREMENTS.items():
-        if category == "donation":
-            if donation_platform == "none":
-                hidden_blocks.append(block_name)
-        elif category == "signup":
-            if signup_platform not in required_value:
-                hidden_blocks.append(block_name)
+    hidden_blocks = [
+        block_name
+        for block_name, (category, required_value) in BLOCK_PLATFORM_REQUIREMENTS.items()
+        if active_platform[category] not in required_value
+    ]
 
     if not hidden_blocks:
         # Nothing to hide — return a no-op script

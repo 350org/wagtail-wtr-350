@@ -431,6 +431,7 @@ class SocialSettings(BaseSiteSetting):
 DONATION_PLATFORM_CHOICES = [
     ("none", _("None")),
     ("actblue", "ActBlue"),
+    ("fundraiseup", "Fundraise Up"),
 ]
 
 SIGNUP_PLATFORM_CHOICES = [
@@ -472,6 +473,15 @@ class IntegrationSettings(BaseSiteSetting):
     donation_default_recurring = models.BooleanField(
         default=False,
         verbose_name=_("default to recurring donation"),
+    )
+    fundraiseup_installation_code = models.TextField(
+        blank=True,
+        verbose_name=_("Fundraise Up installation code"),
+        help_text=_(
+            "The full <script> snippet from your Fundraise Up dashboard "
+            "(Settings → Installation). Rendered once in the site's <head> "
+            "when Fundraise Up is the active donation platform."
+        ),
     )
     signup_platform = models.CharField(
         max_length=50,
@@ -521,6 +531,7 @@ class IntegrationSettings(BaseSiteSetting):
                 FieldPanel("donation_base_url"),
                 FieldPanel("donation_suggested_amounts"),
                 FieldPanel("donation_default_recurring"),
+                FieldPanel("fundraiseup_installation_code"),
             ],
             heading=_("Donations"),
         ),

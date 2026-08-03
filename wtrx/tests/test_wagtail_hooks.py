@@ -15,11 +15,17 @@ from wtrx.wagtail_hooks import (
 class TestBlockPlatformRequirements(TestCase):
     """Verify the BLOCK_PLATFORM_REQUIREMENTS mapping."""
 
-    def test_donate_requires_donation_platform(self):
+    def test_donate_requires_actblue_platform(self):
         self.assertIn("donate", BLOCK_PLATFORM_REQUIREMENTS)
         category, value = BLOCK_PLATFORM_REQUIREMENTS["donate"]
         self.assertEqual(category, "donation")
-        self.assertIsNone(value)
+        self.assertEqual(value, ("actblue",))
+
+    def test_donate_fundraiseup_requires_fundraiseup_platform(self):
+        self.assertIn("donate_fundraiseup", BLOCK_PLATFORM_REQUIREMENTS)
+        category, value = BLOCK_PLATFORM_REQUIREMENTS["donate_fundraiseup"]
+        self.assertEqual(category, "donation")
+        self.assertEqual(value, ("fundraiseup",))
 
     def test_signup_wagtail_forms_requires_matching_platform(self):
         self.assertIn("signup_wagtail_forms", BLOCK_PLATFORM_REQUIREMENTS)
@@ -72,14 +78,28 @@ class TestBlockVisibilityJS(TestCase):
         self.assertIn("display: none", content)
 
     def test_actblue_does_not_hide_donate_block(self):
-        """When donation_platform is 'actblue', the donate block should NOT be hidden."""
+        """When donation_platform is 'actblue', the donate block should NOT be
+        hidden, but donate_fundraiseup should be."""
         self.integration.donation_platform = "actblue"
         self.integration.signup_platform = "wagtail_forms"
         self.integration.save()
         response = _block_visibility_js(self._make_request())
         content = response.content.decode()
-        # donate should not appear in CSS selectors
-        self.assertNotIn('[data-contentpath="donate"]', content)
+        # The visibility script is JSON-encoded into a JS string literal, so
+        # selectors appear with escaped quotes (\") in the raw response body.
+        self.assertNotIn('data-contentpath=\\"donate\\"', content)
+        self.assertIn('data-contentpath=\\"donate_fundraiseup\\"', content)
+
+    def test_fundraiseup_does_not_hide_fundraiseup_block(self):
+        """When donation_platform is 'fundraiseup', donate_fundraiseup should
+        NOT be hidden, but the ActBlue donate block should be."""
+        self.integration.donation_platform = "fundraiseup"
+        self.integration.signup_platform = "wagtail_forms"
+        self.integration.save()
+        response = _block_visibility_js(self._make_request())
+        content = response.content.decode()
+        self.assertNotIn('data-contentpath=\\"donate_fundraiseup\\"', content)
+        self.assertIn('data-contentpath=\\"donate\\"', content)
 
     def test_wagtail_forms_hides_action_network(self):
         """When signup_platform is 'wagtail_forms', action_network block should be hidden."""

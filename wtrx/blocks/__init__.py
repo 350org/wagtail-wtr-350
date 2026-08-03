@@ -722,6 +722,53 @@ class DonateBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/donate_block.html"
 
 
+class DonateFundraiseUpBlock(StructBlock):
+    """
+    A Fundraise Up donate button.
+
+    Fundraise Up elements (buttons, forms, overlays) are created in Fundraise
+    Up's own dashboard, each yielding an opaque Element ID. Embedding one is
+    just a hidden anchor tag that Fundraise Up's installation script (loaded
+    site-wide from IntegrationSettings.fundraiseup_installation_code when it's
+    the active donation platform) scans for and hydrates into a styled
+    checkout-modal trigger. The button's appearance and label are configured
+    in the Fundraise Up dashboard for that element, not here — unlike
+    DonateBlock, there is no button_text field.
+    """
+
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Donation section heading."),
+    )
+    description = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        required=False,
+        label=_("Description"),
+        help_text=_("Optional supporting text below the heading."),
+    )
+    element_id = CharBlock(
+        label=_("Fundraise Up element ID"),
+        help_text=_(
+            "The element ID from your Fundraise Up dashboard, e.g. "
+            "'XJKPQPZV' (without the #)."
+        ),
+    )
+    designation_id = CharBlock(
+        required=False,
+        label=_("Designation ID"),
+        help_text=_(
+            "Optional Fundraise Up designation ID to route this donation to "
+            "a specific fund."
+        ),
+    )
+
+    class Meta:
+        icon = "pick"
+        label = _("Donate (Fundraise Up)")
+        template = "wtrx/components/streamfield/blocks/donate_fundraiseup_block.html"
+
+
 class SignupWagtailFormsBlock(StructBlock):
     """
     Renders a Wagtail FormPage's form inline.
@@ -1063,6 +1110,7 @@ class SectionContentBlock(StreamBlock):
     callout = CalloutBlock()
     hero = HeroBlock()
     donate = DonateBlock()
+    donate_fundraiseup = DonateFundraiseUpBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
     signup_actionkit = SignupActionKitBlock()
@@ -1141,6 +1189,7 @@ class BodyStreamBlock(StreamBlock):
     hero = HeroBlock()
     section = SectionBlock()
     donate = DonateBlock()
+    donate_fundraiseup = DonateFundraiseUpBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
     signup_actionkit = SignupActionKitBlock()

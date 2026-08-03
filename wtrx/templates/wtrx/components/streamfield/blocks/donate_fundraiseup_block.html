@@ -1,0 +1,20 @@
+{% load i18n wagtailcore_tags %}
+<div class="wtr-donate rounded-lg bg-primary-50 px-6 py-10 text-center">
+    {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-primary-900 md:text-3xl">{{ value.heading }}</h2>{% endif %}
+    {% if value.description %}
+        <div class="prose prose-neutral mx-auto mt-4 max-w-2xl">
+            {{ value.description|richtext }}
+        </div>
+    {% endif %}
+    {% comment %}
+    Fundraise Up's installation script (rendered site-wide in <head> when it's
+    the active donation platform — see IntegrationSettings.fundraiseup_installation_code)
+    scans the page for anchors like this and hydrates them into a styled
+    button that opens its Checkout Modal. Appearance and label are configured
+    in the Fundraise Up dashboard for this element, not here — the anchor
+    stays hidden until Fundraise Up's script replaces it.
+    {% endcomment %}
+    <div class="mt-8">
+        <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+    </div>
+</div>

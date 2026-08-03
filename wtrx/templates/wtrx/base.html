@@ -39,6 +39,15 @@
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
     {% block extra_stylesheets %}{% endblock %}
     {% block extra_head %}{% endblock %}
+    {% comment %}
+    Fundraise Up's own docs require its installation snippet to be the last
+    script in <head>, so it comes after extra_head. The snippet is an opaque,
+    versioned bit of vendor JS pasted by an admin into Settings → Integrations,
+    same trust level as form_html in the ActionKit block.
+    {% endcomment %}
+    {% if settings.wtrx.IntegrationSettings.donation_platform == "fundraiseup" and settings.wtrx.IntegrationSettings.fundraiseup_installation_code %}
+        {{ settings.wtrx.IntegrationSettings.fundraiseup_installation_code|safe }}
+    {% endif %}
 </head>
 <body class="font-body text-dark bg-light">
     {% block header %}{% endblock %}

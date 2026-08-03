@@ -41,22 +41,6 @@
                     if (window.__wtrAkInit) { return; }
                     window.__wtrAkInit = true;
 
-                    {% comment %}
-                    ActionKit's real submit is a plain full-page form POST
-                    (actionkit.js calls form.submit() directly, which bypasses
-                    the submit event entirely — there's no AJAX step). Our
-                    site's default Referrer-Policy (same-origin) means the
-                    browser sends no Referer at all on that cross-origin POST,
-                    unlike ActionKit's own hosted page or a typical WordPress
-                    site with no such restriction. Override it just for this
-                    one navigation so ActionKit sees where the submission came
-                    from.
-                    {% endcomment %}
-                    var actionForm = document.getElementById("action-form");
-                    if (actionForm) {
-                        actionForm.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-                    }
-
                     function loadScript(src, onload) {
                         var s = document.createElement("script");
                         s.src = src;
