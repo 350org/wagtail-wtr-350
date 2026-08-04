@@ -30,6 +30,19 @@ class ActionKitError(Exception):
     """Raised when ActionKit is misconfigured or returns a non-success response."""
 
 
+# Field names ActionKit's own hosted forms already post under the
+# ``action_<name>`` convention — passed through verbatim (not re-prefixed
+# with ``user_``) so they land on the actual Action-model fields ActionKit
+# uses for campaign-attribution reporting, not as meaningless custom fields.
+ACTIONKIT_NATIVE_FIELDS = {
+    "action_utm_source",
+    "action_utm_medium",
+    "action_utm_campaign",
+    "action_utm_term",
+    "action_utm_content",
+}
+
+
 # Wagtail form fields arrive keyed by their ``clean_name`` (a slug of the field
 # label, e.g. "Email address" -> "email_address"). These heuristics map the
 # common signup fields onto ActionKit's field names.
@@ -38,9 +51,10 @@ def map_form_fields(cleaned_data):
     Map a Wagtail form's ``cleaned_data`` to ActionKit action fields.
 
     Returns a dict suitable for merging into the ActionKit request body. Blank
-    values are dropped. Unrecognised fields become ``user_<clean_name>`` custom
-    fields. If no email is present the caller should skip forwarding — ActionKit
-    requires an email to identify the user.
+    values are dropped. ACTIONKIT_NATIVE_FIELDS pass through as-is; other
+    unrecognised fields become ``user_<clean_name>`` custom fields. If no email
+    is present the caller should skip forwarding — ActionKit requires an email
+    to identify the user.
     """
     result = {}
     name_split = None
@@ -53,7 +67,9 @@ def map_form_fields(cleaned_data):
             continue
         key = raw_key.lower()
 
-        if "email" in key:
+        if key in ACTIONKIT_NATIVE_FIELDS:
+            result[key] = value
+        elif "email" in key:
             result.setdefault("email", value)
         elif ("first" in key and "name" in key) or key in ("firstname", "first_name"):
             result["first_name"] = value

@@ -10,7 +10,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.contrib.sitemaps.views import sitemap
 from wagtail.documents import urls as wagtaildocs_urls
 
-from wtrx import views as search_views
+from wtrx import views
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
@@ -25,10 +25,15 @@ urlpatterns = [
         lambda r: HttpResponse("ok", content_type="text/plain"),
         name="health_check",
     ),
+    path(
+        "actionkit-signup/",
+        views.actionkit_inline_signup,
+        name="actionkit_inline_signup",
+    ),
 ]
 
 urlpatterns += i18n_patterns(
-    path("search/", search_views.search, name="search"),
+    path("search/", views.search, name="search"),
     path("", include(wagtail_urls)),
     # English (the default language) is served at / without a language prefix.
     # Non-default languages added by forks are still prefixed (e.g. /es/).

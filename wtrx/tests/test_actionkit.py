@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, patch
 import requests
 from django.core.cache import cache
 from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.urls import reverse
 from wagtail.models import Page, Site
 
 from wtrx.blocks import SignupActionKitBlock
@@ -77,6 +78,29 @@ class TestMapFormFields(SimpleTestCase):
     def test_missing_email_yields_no_email_key(self):
         result = actionkit.map_form_fields({"name": "Alice"})
         self.assertNotIn("email", result)
+
+    def test_actionkit_native_utm_fields_pass_through_unprefixed(self):
+        result = actionkit.map_form_fields(
+            {
+                "email": "a@b.com",
+                "action_utm_source": "newsletter",
+                "action_utm_medium": "email",
+                "action_utm_campaign": "spring-drive",
+                "action_utm_term": "climate",
+                "action_utm_content": "header-link",
+            }
+        )
+        self.assertEqual(result["action_utm_source"], "newsletter")
+        self.assertEqual(result["action_utm_medium"], "email")
+        self.assertEqual(result["action_utm_campaign"], "spring-drive")
+        self.assertEqual(result["action_utm_term"], "climate")
+        self.assertEqual(result["action_utm_content"], "header-link")
+        # Must not also land under a user_ prefix.
+        self.assertNotIn("user_action_utm_source", result)
+
+    def test_blank_utm_fields_are_dropped_not_forwarded_empty(self):
+        result = actionkit.map_form_fields({"email": "a@b.com", "action_utm_source": ""})
+        self.assertNotIn("action_utm_source", result)
 
 
 class TestSubmitAction(SimpleTestCase):
@@ -333,3 +357,106 @@ class TestSignupActionKitBlockContext(TestCase):
             self._value(short_form_id=""), parent_context={"request": request}
         )
         self.assertIsNone(ctx["form_html"])
+
+
+class TestActionKitInlineSignupView(TestCase):
+    """
+    views.actionkit_inline_signup — the endpoint SignupActionKitBlock's
+    success_message mode posts to instead of letting ActionKit's own
+    onsubmit chain do a full-page POST straight to ActionKit.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        Site.objects.filter(is_default_site=True).delete()
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-ak-inline")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="localhost",
+            port=80,
+            root_page=cls.home,
+            is_default_site=True,
+        )
+
+    def _configure_platform(self, platform="actionkit"):
+        IntegrationSettings.objects.update_or_create(
+            site=self.site,
+            defaults={
+                "signup_platform": platform,
+                "actionkit_hostname": "myorg.actionkit.com",
+                "actionkit_api_username": "apiuser",
+                "actionkit_api_password": "secret",
+            },
+        )
+
+    def _post(self, data):
+        return self.client.post(reverse("actionkit_inline_signup"), data)
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_forwards_via_submit_action_and_strips_bookkeeping_fields(
+        self, mock_submit
+    ):
+        self._configure_platform()
+        response = self._post(
+            {
+                "page": "web_join",
+                "email": "a@b.com",
+                "name": "Alice Smith",
+                # ActionKit's own hidden bookkeeping fields — must not leak
+                # into ActionKit as bogus user_<name> custom fields.
+                "utf8": "✔",
+                "form_name": "act",
+                "url": "http://localhost:8000/",
+                "js": "1",
+                "auto_country": "1",
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["success"])
+        mock_submit.assert_called_once()
+        args, _ = mock_submit.call_args
+        # (hostname, username, password, page, fields)
+        self.assertEqual(args[3], "web_join")
+        fields = args[4]
+        self.assertEqual(fields["email"], "a@b.com")
+        self.assertEqual(fields["first_name"], "Alice")
+        for bookkeeping_field in ("page", "utf8", "form_name", "url", "js", "auto_country"):
+            self.assertNotIn(f"user_{bookkeeping_field}", fields)
+
+    def test_missing_page_returns_400_without_calling_submit_action(self):
+        self._configure_platform()
+        with patch("wtrx.views.actionkit.submit_action") as mock_submit:
+            response = self._post({"email": "a@b.com"})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["success"])
+        mock_submit.assert_not_called()
+
+    def test_missing_email_returns_400_without_calling_submit_action(self):
+        self._configure_platform()
+        with patch("wtrx.views.actionkit.submit_action") as mock_submit:
+            response = self._post({"page": "web_join", "name": "Alice"})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["success"])
+        mock_submit.assert_not_called()
+
+    def test_wrong_platform_returns_503_without_calling_submit_action(self):
+        self._configure_platform(platform="wagtail_forms")
+        with patch("wtrx.views.actionkit.submit_action") as mock_submit:
+            response = self._post({"page": "web_join", "email": "a@b.com"})
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()["success"])
+        mock_submit.assert_not_called()
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_submit_action_error_returns_502(self, mock_submit):
+        mock_submit.side_effect = ActionKitError("boom")
+        self._configure_platform()
+        response = self._post({"page": "web_join", "email": "a@b.com"})
+        self.assertEqual(response.status_code, 502)
+        self.assertFalse(response.json()["success"])
+
+    def test_get_request_not_allowed(self):
+        self._configure_platform()
+        response = self.client.get(reverse("actionkit_inline_signup"))
+        self.assertEqual(response.status_code, 405)

@@ -987,6 +987,21 @@ class SignupActionKitBlock(StructBlock):
             "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
         ),
     )
+    success_message = SuccessMessageBlock(
+        required=False,
+        label=_("Success message"),
+        help_text=_(
+            "Optional. When set, a successful signup shows this message in "
+            "place of the form instead of redirecting to ActionKit's own "
+            "thank-you page. ActionKit's normal submission is a full-page "
+            "POST directly to ActionKit, so this works by forwarding the "
+            "signup through our own server (the same "
+            "integrations.actionkit.submit_action REST call FormPage signups "
+            "already use) instead — which does not go through ActionKit's own "
+            "recaptcha check, the same trade-off that forwarding already "
+            "accepts elsewhere."
+        ),
+    )
 
     def _fetch_form_html(self, hostname, short_form_id):
         """Return the cached (or freshly fetched) form fragment, or None on failure."""
@@ -1024,6 +1039,7 @@ class SignupActionKitBlock(StructBlock):
 
         ctx["form_html"] = form_html
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
+        ctx["success_message"] = value.get("success_message")
         return ctx
 
     class Meta:

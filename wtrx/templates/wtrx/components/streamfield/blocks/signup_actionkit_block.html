@@ -8,38 +8,37 @@
             </div>
         {% endif %}
         {% if form_html %}
-            {% comment %}
-            The fragment itself contains inline <script> blocks (ActionKit's
-            own, e.g. for oneclick/privacy-field behavior) that call jQuery(...)
-            directly and unguarded, assuming it's already a page global — true
-            on ActionKit's hosted page, which loads jQuery in <head> before this
-            markup. Those scripts run synchronously as the browser parses this
-            HTML, so jQuery has to be loaded synchronously too, before the
-            fragment is reached — an async-appended <script> (loadScript below)
-            resolves too late and the fragment's own scripts throw
-            "jQuery is not defined". document.write, called from a script
-            that's itself still being parsed, is the standard way to inject a
-            blocking script tag mid-parse.
-            {% endcomment %}
             <script>
                 if (typeof jQuery === "undefined") {
                     document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
                 }
             </script>
-            <div class="wtr-actionkit-embed mt-8">
+            <div class="wtr-actionkit-embed mt-8" data-form-container>
                 {{ form_html|safe }}
             </div>
-            {% comment %}
-            Load the ActionKit client library (AJAX submission, validation,
-            country/privacy logic) once per page. Guarded so multiple
-            ActionKit signup blocks on the same page don't double-init (they'd
-            also collide on ActionKit's own hardcoded #action-form id — a
-            known limit of embedding more than one ActionKit form per page).
-            {% endcomment %}
+            {% if success_message %}
+                <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
+                <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
+                     data-thank-you>
+                    {% include_block success_message %}
+                </div>
+            {% endif %}
             <script>
                 (function () {
                     if (window.__wtrAkInit) { return; }
                     window.__wtrAkInit = true;
+                    function populateUtmFields() {
+                        var form = document.getElementById("action-form");
+                        if (!form) { return; }
+                        var params = new URLSearchParams(window.location.search);
+                        ["source", "medium", "campaign", "term", "content"].forEach(function (name) {
+                            var value = params.get("utm_" + name);
+                            if (!value) { return; }
+                            var field = form.querySelector('[name="action_utm_' + name + '"]');
+                            if (field) { field.value = value; }
+                        });
+                    }
+                    populateUtmFields();
 
                     function loadScript(src, onload) {
                         var s = document.createElement("script");
@@ -50,6 +49,52 @@
 
                     var baseUrl = "{{ actionkit_base_url|escapejs }}";
                     if (!baseUrl) { return; }
+
+                    {% if success_message %}
+                    function wireInlineSubmit() {
+                        var form = document.getElementById("action-form");
+                        if (!form) { return; }
+                        var wrapper = form.closest(".wtr-signup-actionkit");
+                        if (!wrapper) { return; }
+                        var formContainer = wrapper.querySelector("[data-form-container]");
+                        var thankYou = wrapper.querySelector("[data-thank-you]");
+                        var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
+
+                        form.onsubmit = null;
+                        form.addEventListener("submit", function (event) {
+                            event.preventDefault();
+
+                            var emailField = form.querySelector('[name="email"]');
+                            if (emailField && !emailField.value.trim()) {
+                                emailField.focus();
+                                return;
+                            }
+
+                            var submitButton = form.querySelector('[type="submit"]');
+                            if (submitButton) { submitButton.disabled = true; }
+
+                            fetch("{% url 'actionkit_inline_signup' %}", {
+                                method: "POST",
+                                body: new FormData(form),
+                                headers: {
+                                    "X-CSRFToken": csrfInput ? csrfInput.value : "",
+                                    "X-Requested-With": "XMLHttpRequest"
+                                }
+                            }).then(function (response) {
+                                return response.json();
+                            }).then(function (data) {
+                                if (data.success) {
+                                    if (formContainer) { formContainer.classList.add("hidden"); }
+                                    if (thankYou) { thankYou.classList.remove("hidden"); }
+                                } else if (submitButton) {
+                                    submitButton.disabled = false;
+                                }
+                            }).catch(function () {
+                                if (submitButton) { submitButton.disabled = false; }
+                            });
+                        });
+                    }
+                    {% endif %}
 
                     function initForm() {
                         actionkit.forms.contextRoot = baseUrl + "/context/";
@@ -63,6 +108,9 @@
                         {% endcomment %}
                         actionkit.forms.initPage();
                         actionkit.forms.initForm("act");
+                        {% if success_message %}
+                        wireInlineSubmit();
+                        {% endif %}
                     }
 
                     loadScript(baseUrl + "/resources/actionkit.js", initForm);
