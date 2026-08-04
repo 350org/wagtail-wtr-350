@@ -233,6 +233,9 @@ SOCIALACCOUNT_PROVIDERS = {
 WTRX_DONATION_PLATFORM = "none"  # none, actblue
 WTRX_SIGNUP_PLATFORM = "wagtail_forms"  # wagtail_forms, action_network, none
 
+WTRX_ACTION_NETWORK_API_KEY = os.environ.get("WTRX_ACTION_NETWORK_API_KEY", "")
+WTRX_ACTIONKIT_API_PASSWORD = os.environ.get("WTRX_ACTIONKIT_API_PASSWORD", "")
+
 # Usercentrics consent management:
 # The consent snippet renders only when WTRX_USERCENTRICS_SETTINGS_ID is non-empty;
 # dev.py blanks it so the external CDN script does not load in local development.
