@@ -30,6 +30,18 @@ class DomainRestrictedSocialAccountAdapter(DefaultSocialAccountAdapter):
             )
             raise ImmediateHttpResponse(redirect("wagtailadmin_login"))
 
+    def is_open_for_signup(self, request, sociallogin):
+        # DefaultSocialAccountAdapter's own is_open_for_signup delegates to
+        # the *regular* account adapter (get_account_adapter(request)
+        # .is_open_for_signup(request)) — NoSignupAccountAdapter, which is
+        # always False since it exists to close the username/password signup
+        # form. Left un-overridden, that same False also blocks Google
+        # sign-in for any not-yet-existing account, even though Google SSO is
+        # the intended account-creation path (SOCIALACCOUNT_AUTO_SIGNUP).
+        # The domain restriction above still runs first and can reject the
+        # login before this is ever reached.
+        return True
+
 
 class NoSignupAccountAdapter(DefaultAccountAdapter):
     """Disable allauth's own username/password signup form — accounts are

@@ -1,0 +1,63 @@
+"""
+Tests for allauth_adapter.py.
+"""
+
+from unittest.mock import MagicMock
+
+from django.test import RequestFactory, SimpleTestCase, override_settings
+
+from wtrx.allauth_adapter import DomainRestrictedSocialAccountAdapter
+
+
+class TestIsOpenForSignup(SimpleTestCase):
+    """
+    DomainRestrictedSocialAccountAdapter.is_open_for_signup must return True
+    unconditionally — allauth's own default implementation delegates to the
+    regular account adapter (NoSignupAccountAdapter, always False, since it
+    exists only to close the username/password signup form), which without
+    this override also blocks Google sign-in for any new account even though
+    Google SSO is the intended account-creation path.
+    """
+
+    def test_returns_true(self):
+        adapter = DomainRestrictedSocialAccountAdapter()
+        request = RequestFactory().get("/accounts/google/login/callback/")
+        self.assertTrue(adapter.is_open_for_signup(request, MagicMock()))
+
+
+class TestPreSocialLogin(SimpleTestCase):
+    def _adapter_and_sociallogin(self, email):
+        adapter = DomainRestrictedSocialAccountAdapter()
+        sociallogin = MagicMock()
+        sociallogin.account.extra_data = {"email": email}
+        return adapter, sociallogin
+
+    @override_settings(WTRX_GOOGLE_SSO_DOMAIN="")
+    def test_no_domain_configured_allows_any_email(self):
+        adapter, sociallogin = self._adapter_and_sociallogin("anyone@example.com")
+        request = RequestFactory().get("/")
+        # Should not raise.
+        adapter.pre_social_login(request, sociallogin)
+
+    @override_settings(WTRX_GOOGLE_SSO_DOMAIN="withtheranks.com")
+    def test_matching_domain_allowed(self):
+        adapter, sociallogin = self._adapter_and_sociallogin("sukhada@withtheranks.com")
+        request = RequestFactory().get("/")
+        # Should not raise.
+        adapter.pre_social_login(request, sociallogin)
+
+    @override_settings(WTRX_GOOGLE_SSO_DOMAIN="withtheranks.com")
+    def test_non_matching_domain_rejected(self):
+        from allauth.core.exceptions import ImmediateHttpResponse
+
+        adapter, sociallogin = self._adapter_and_sociallogin("someone@gmail.com")
+        request = RequestFactory().get("/")
+        request.session = {}
+
+        # RequestFactory requests need message storage for messages.error to work.
+        from django.contrib.messages.storage.fallback import FallbackStorage
+
+        setattr(request, "_messages", FallbackStorage(request))
+
+        with self.assertRaises(ImmediateHttpResponse):
+            adapter.pre_social_login(request, sociallogin)
