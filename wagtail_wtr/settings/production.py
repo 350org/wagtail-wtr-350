@@ -26,7 +26,12 @@ for _loopback in ("127.0.0.1", "localhost"):
 
 WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
 
-DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
+# ssl_require=True: some managed Postgres instances (e.g. certain RDS parameter
+# groups) enforce SSL and refuse plaintext connections outright. Connecting
+# over SSL works whether or not the server actually requires it, so forcing it
+# here is safe regardless — and avoids depending on knowing (or being able to
+# check) the target instance's specific enforcement setting.
+DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
 
 _s3_bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 
