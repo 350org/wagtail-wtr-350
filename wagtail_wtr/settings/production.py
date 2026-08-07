@@ -161,6 +161,47 @@ else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # ---------------------------------------------------------------------------
+# Logging — with DEBUG=False, Django's own default LOGGING config only prints
+# exceptions to console when DEBUG=True; otherwise it tries to email ADMINS
+# (unset here) and the traceback goes nowhere. Every 500 was previously
+# invisible in container logs because of this. Route django (request errors,
+# security warnings, etc.) and our own app loggers (logging.getLogger(__name__)
+# in views.py/models.py) to stderr, which gunicorn's --error-logfile - and
+# Divio both already capture.
+# ---------------------------------------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Cloudflare cache invalidation (optional — omit env vars to disable)
 # ---------------------------------------------------------------------------
 _cf_token = os.environ.get("CLOUDFLARE_BEARER_TOKEN")
