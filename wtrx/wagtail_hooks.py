@@ -3,8 +3,7 @@ Wagtail hooks for the wtrx app.
 
 Hooks registered here:
 - register_admin_urls: adds the block-visibility JS endpoint
-- insert_global_admin_js: loads the block-visibility script and AN API key
-  field visibility script in the admin
+- insert_global_admin_js: loads the block-visibility script in the admin
 """
 
 import json
@@ -25,8 +24,14 @@ from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
 #
 # All SignupBlock and DonateBlock variants are always registered in
 # BodyStreamBlock (see blocks/__init__.py). This hook hides the block-type
-# picker buttons for variants that are irrelevant based on the site's
-# IntegrationSettings.
+# picker buttons for integrations that aren't enabled in the site's
+# IntegrationSettings. Which content block(s) each integration gates is
+# metadata on its IntegrationType (wtrx/integrations/registry.py) —
+# adding a new integration type never requires touching this file.
+#
+# signup_wagtail_forms and signup_link are not gated by any integration —
+# they're always visible (the built-in form and a plain CTA link work
+# regardless of which integrations are enabled).
 #
 # How it works:
 #   1. register_admin_urls adds a lightweight JS endpoint at
@@ -41,28 +46,11 @@ from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
 # actually loaded.
 # ---------------------------------------------------------------------------
 
-# Mapping of block type names (as registered in BodyStreamBlock) to the
-# platform setting that must be active for the block to be visible.
-# Blocks not listed here are always visible.
-BLOCK_PLATFORM_REQUIREMENTS = {
-    # Donation blocks — visible when donation_platform matches.
-    "donate": ("donation", ("actblue",)),
-    "donate_fundraiseup": ("donation", ("fundraiseup",)),
-    # Signup blocks — visible when signup_platform is one of the listed values.
-    # The Wagtail-forms block also renders the form for the ActionKit platform
-    # (ActionKit forwarding happens server-side in FormPage.process_form_submission),
-    # so it must be available under both.
-    "signup_wagtail_forms": ("signup", ("wagtail_forms", "actionkit")),
-    "signup_action_network": ("signup", ("action_network",)),
-    "signup_actionkit": ("signup", ("actionkit",)),
-    # signup_link is always visible (it's a simple CTA link, platform-agnostic)
-}
-
 
 def _block_visibility_js(request):
     """
     Return a JS snippet that hides block-type buttons in the StreamField
-    block chooser for irrelevant platform variants.
+    block chooser for disabled integrations.
 
     The script injects a <style> element with CSS rules that hide the
     block-chooser buttons for disabled block types. CSS injection works
@@ -72,24 +60,20 @@ def _block_visibility_js(request):
     # Import here to avoid import-time DB access
     from wagtail.models import Site
 
+    from wtrx.integrations.registry import all_integrations
     from wtrx.site_settings import IntegrationSettings
 
     try:
         integration = IntegrationSettings.for_request(request)
-        donation_platform = integration.get_donation_platform()
-        signup_platform = integration.get_signup_platform()
+        hidden_blocks = [
+            block_name
+            for integration_type in all_integrations()
+            if not integration.is_integration_enabled(integration_type.slug)
+            for block_name in integration_type.content_block_names
+        ]
     except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
         # If settings aren't configured yet (fresh install), show all blocks
-        donation_platform = "none"
-        signup_platform = "wagtail_forms"
-
-    active_platform = {"donation": donation_platform, "signup": signup_platform}
-
-    hidden_blocks = [
-        block_name
-        for block_name, (category, required_value) in BLOCK_PLATFORM_REQUIREMENTS.items()
-        if active_platform[category] not in required_value
-    ]
+        hidden_blocks = []
 
     if not hidden_blocks:
         # Nothing to hide — return a no-op script
@@ -133,76 +117,10 @@ def insert_block_visibility_js():
     return format_html('<script src="{}"></script>', url)
 
 
-# ---------------------------------------------------------------------------
-# Signup-platform credential field visibility
-# ---------------------------------------------------------------------------
-#
-# Shows each platform's credential fields in IntegrationSettings only when that
-# platform is the selected signup_platform: the Action Network API key for
-# "action_network", and the ActionKit host/username/password for "actionkit".
-# Uses a MutationObserver so it works with Wagtail's dynamic form rendering.
-# ---------------------------------------------------------------------------
-
-_SIGNUP_PLATFORM_FIELD_JS = """
-(function () {
-    var PLATFORM_FIELDS = {
-        action_network: ["action_network_api_key"],
-        actionkit: ["actionkit_hostname", "actionkit_api_username", "actionkit_api_password"]
-    };
-
-    function fieldWrapper(name) {
-        var input = document.querySelector('[data-field-input-name="' + name + '"]');
-        if (!input) { return null; }
-        return input.closest('[data-field]') || input.closest('.w-field__wrapper') || input.parentElement;
-    }
-
-    function updateVisibility() {
-        var platformField = document.querySelector('[name="signup_platform"]');
-        if (!platformField) { return; }
-        var selected = platformField.value;
-        Object.keys(PLATFORM_FIELDS).forEach(function (platform) {
-            var show = platform === selected;
-            PLATFORM_FIELDS[platform].forEach(function (name) {
-                var wrapper = fieldWrapper(name);
-                if (wrapper) { wrapper.style.display = show ? '' : 'none'; }
-            });
-        });
-    }
-
-    function init() {
-        updateVisibility();
-        var form = document.querySelector('form[data-edit-form], form.w-settings-form, form');
-        if (form) {
-            form.addEventListener('change', function (e) {
-                if (e.target && e.target.name === 'signup_platform') {
-                    updateVisibility();
-                }
-            });
-        }
-        // MutationObserver handles dynamic form injection (Wagtail admin SPA navigation)
-        var observer = new MutationObserver(function (mutations) {
-            for (var i = 0; i < mutations.length; i++) {
-                if (mutations[i].addedNodes.length) {
-                    updateVisibility();
-                    break;
-                }
-            }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-})();
-"""
-
-
-@hooks.register("insert_global_admin_js")
-def insert_signup_platform_field_visibility_js():
-    return format_html("<script>{}</script>", _SIGNUP_PLATFORM_FIELD_JS)
+# Credential-field show/hide is no longer needed: each integration's fields
+# now live inside its own StreamField block instance in IntegrationSettings,
+# so Wagtail's editor already only shows the fields for integrations an
+# admin has actually added.
 
 
 # ---------------------------------------------------------------------------

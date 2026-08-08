@@ -1,10 +1,11 @@
 {% load i18n wagtailcore_tags %}
 {% comment %}
-    settings context variable injected by wagtail.contrib.settings.context_processors.settings.
-    If rendered outside a request context (e.g. management commands) settings may be unavailable.
+    donation_base_url / donation_suggested_amounts_list are injected by
+    DonateBlock.get_context() from the enabled ActBlue integration config
+    (wtrx/site_settings.py IntegrationSettings), not read directly here.
 {% endcomment %}
 {% trans "Donate" as default_donate_text %}
-{% with donate_url=value.override_url|default:settings.wtrx.IntegrationSettings.donation_base_url %}
+{% with donate_url=value.override_url|default:donation_base_url %}
 <div class="wtr-donate rounded-lg bg-primary-50 px-6 py-10 text-center">
     {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-primary-900 md:text-3xl">{{ value.heading }}</h2>{% endif %}
     {% if value.description %}
@@ -32,9 +33,9 @@
                 {% endif %}
             {% endfor %}
         </div>
-    {% elif settings.wtrx.IntegrationSettings.donation_suggested_amounts %}
+    {% elif donation_suggested_amounts_list %}
         <div class="mt-6 flex flex-wrap justify-center gap-3">
-            {% for amount in settings.wtrx.IntegrationSettings.donation_suggested_amounts_list %}
+            {% for amount in donation_suggested_amounts_list %}
                 {% if donate_url %}
                     <a href="{{ donate_url }}?amount={{ amount }}"
                        class="rounded-full border border-primary-300 bg-light px-4 py-1.5 font-heading text-sm font-medium text-primary-700 transition hover:bg-primary-100">

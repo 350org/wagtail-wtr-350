@@ -229,10 +229,9 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# wtrx platform settings
-WTRX_DONATION_PLATFORM = "none"  # none, actblue
-WTRX_SIGNUP_PLATFORM = "wagtail_forms"  # wagtail_forms, action_network, none
-
+# wtrx integration secret overrides — take precedence over the DB-stored
+# value in the corresponding integration's config (Settings > Integrations)
+# so secrets aren't required to live in the database in production.
 WTRX_ACTION_NETWORK_API_KEY = os.environ.get("WTRX_ACTION_NETWORK_API_KEY", "")
 WTRX_ACTIONKIT_API_PASSWORD = os.environ.get("WTRX_ACTIONKIT_API_PASSWORD", "")
 

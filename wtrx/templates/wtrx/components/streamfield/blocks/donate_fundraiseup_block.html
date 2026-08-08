@@ -7,8 +7,8 @@
         </div>
     {% endif %}
     {% comment %}
-    Fundraise Up's installation script (rendered site-wide in <head> when it's
-    the active donation platform — see IntegrationSettings.fundraiseup_installation_code)
+    Fundraise Up's installation script (rendered site-wide in <head> via
+    IntegrationSettings.head_html() while this integration is enabled)
     scans the page for anchors like this and hydrates them into a styled
     button that opens its Checkout Modal. Appearance and label are configured
     in the Fundraise Up dashboard for this element, not here — the anchor

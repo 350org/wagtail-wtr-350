@@ -146,8 +146,8 @@ wagtail-wtr/
 | Hero | HeroMixin on pages + HeroBlock in StreamField | Dedicated hero at top of page + mid-page hero sections |
 | Page title / h1 | Page title is the h1. `hero_headline` overrides if set. | Every page gets an h1 automatically |
 | Form submission | AJAX | Form stays on page, thank-you text replaces form on success |
-| Platform integrations | Site-wide settings, defaults from `settings.py`, overridable in admin | One configuration point, not per-block |
-| Block field visibility | All SignupBlock variants always registered; irrelevant ones hidden via `wagtail_hooks.py` based on `IntegrationSettings` | Avoids DB access at import time |
+| Platform integrations | Pluggable registry (`wtrx/integrations/`); any number independently enabled via `IntegrationSettings.integrations` | Add a new integration without touching a shared god-object |
+| Block field visibility | All SignupBlock/DonateBlock variants always registered; ones for disabled integrations hidden via `wagtail_hooks.py`, driven by the registry | Avoids DB access at import time |
 | Frontend build | Tailwind CLI (no webpack, no PostCSS config, no Sass) | Simpler pipeline, fewer deps, same semantic token output |
 | Settings panels | 5 clear panels under Settings | Each panel has a clear purpose, no grab-bags |
 | Python deps | `pyproject.toml` | Modern Python packaging standard |
@@ -306,7 +306,7 @@ Optional icon image displayed beside the heading. Rendered at 24x24px with
 
 ### Action Blocks (dynamically registered)
 
-**15a. DonateBlock** (StructBlock) — single variant, behavior from IntegrationSettings
+**15a. DonateBlock** (StructBlock) — ActBlue variant, behavior from the "actblue" integration config (`IntegrationSettings.get_integration_config("actblue")`)
 
 | Field | Type | Required |
 |---|---|---|
@@ -361,10 +361,12 @@ by extending the `ACTION_NETWORK_URL_TYPES` dict.
 
 Simple link-out CTA.
 
-The correct SignupBlock variant is shown to editors via `wagtail_hooks.py`, which
-reads `IntegrationSettings` at request time (not at import/class-definition time)
-and hides irrelevant block types in the Wagtail editor interface. All variants are
-always registered in `BodyStreamBlock` — hiding is purely a UI concern.
+The SignupBlock variants shown to editors are controlled via `wagtail_hooks.py`,
+which reads `IntegrationSettings` at request time (not at import/class-definition
+time) and hides block types whose integration isn't enabled. All variants are
+always registered in `BodyStreamBlock` — hiding is purely a UI concern. Since
+integrations are independently enabled (see "Settings > Integrations" below),
+more than one signup variant can be available to editors at once.
 
 ---
 
@@ -433,16 +435,15 @@ always registered in `BodyStreamBlock` — hiding is purely a UI concern.
 - **Parent**: Any page
 - **Notes**: AJAX submission. Form replaced with thank_you_text on success. Also
   used by SignupBlock (wagtail_forms variant) for inline form rendering.
-- **Future: platform forwarding** — `process_form_submission()` is the correct
-  override point for forwarding submissions to Action Network (or other platforms).
-  When `IntegrationSettings.signup_platform == "action_network"`, override this
-  method to POST cleaned form data to the Action Network API using
-  `IntegrationSettings.action_network_api_key`. Field mapping (email → email,
-  first_name, last_name, zip, etc.) and an optional `action_network_action_id`
-  field on `FormPage` will be needed. A `FormMixin` in `wtrx/` is the clean
-  abstraction for this — keeps the AN forwarding logic in the extractable package.
-  Error handling: log API failures and continue (don't block the user's submission).
-  Not implemented in Phase 3 — no architectural changes to Phase 3 required.
+- **Platform forwarding** — `process_form_submission()` already forwards to
+  ActionKit when that integration is enabled (`IntegrationSettings.is_integration_enabled("actionkit")`)
+  and the page has `actionkit_page` set (see `wtrx/models.py`). Forwarding to
+  Action Network the same way (when that integration is enabled, using
+  `IntegrationSettings.get_action_network_api_key()`) is the same pattern,
+  not yet implemented. Field mapping (email → email, first_name, last_name,
+  zip, etc.) and an optional `action_network_action_id` field on `FormPage`
+  would be needed. Error handling: log API failures and continue (don't block
+  the user's submission) — same as the existing ActionKit forwarding.
 
 ---
 
@@ -535,20 +536,42 @@ not a `ListBlock`, so each item is independently typed and editable in the admin
 Platform choices: Facebook, Twitter/X, Instagram, TikTok, LinkedIn, YouTube, Threads,
 Bluesky, Mastodon
 
-### Settings > Integrations (`IntegrationSettings`)
+### Settings > Integrations (`IntegrationSettings`) — pluggable framework
 
-| Field | Type | Required |
-|---|---|---|
-| donation_platform | CharField (choices: none, actblue) | No, default from `WTRX_DONATION_PLATFORM` |
-| donation_base_url | URLField | No |
-| donation_suggested_amounts | CharField | No, comma-separated integers (e.g., "10,25,50,100"). Parse in templates/views with `[int(x) for x in amounts.split(",") if x.strip()]`. |
-| donation_default_recurring | BooleanField | No, default: False |
-| signup_platform | CharField (choices: wagtail_forms, action_network, none) | No, default from `WTRX_SIGNUP_PLATFORM` |
-| action_network_api_key | CharField | No |
+`IntegrationSettings` has a single field, `integrations` (a `StreamField`),
+instead of the flat `donation_platform`/`signup_platform` choice fields this
+section originally specified. Editors click "Add" and pick a pre-set
+integration type (ActionKit, Fundraise Up, ActBlue, Action Network today; more
+can be added later); each entry is independently enabled/disabled and
+configured — there is no single "active platform" per category, so e.g.
+ActionKit and Action Network can both be enabled for signups at once.
 
-Note: `DonateBlock.override_amounts` uses `ListBlock(IntegerBlock)` (already a Python list).
-`IntegrationSettings.donation_suggested_amounts` uses a `CharField` (comma-separated string)
-for simpler admin UI. The template/view layer must parse the CharField when using it.
+Architecture (see `wtrx/integrations/`):
+- `registry.py` — an `IntegrationType` dataclass (slug, label, category,
+  `content_block_names`, optional `head_html_field`) registered by each
+  integration module at import time. Pure metadata, no DB access.
+- One module per integration (`actionkit.py`, `fundraiseup.py`, `actblue.py`,
+  `action_network.py`) defines that integration's config `StructBlock` and
+  calls `register_integration(...)`.
+- `IntegrationsStreamBlock` in `site_settings.py` is the named `StreamBlock`
+  that assembles the "Add integration" UI (one attribute per integration —
+  same fork-override pattern as `SectionContentBlock`).
+- `IntegrationSettings.get_integration_config(slug)` returns the enabled
+  entry's config (a `StructValue`) or `None`. `is_integration_enabled(slug)`
+  and `enabled_slugs_by_category(category)` build on top of it.
+- `IntegrationSettings.head_html()` concatenates markup for every enabled
+  integration with a `head_html_field` (currently only Fundraise Up's
+  installation script), rendered in `base.html`'s `<head>`.
+
+Block-chooser visibility (`wagtail_hooks.py`) now derives hidden blocks
+directly from the registry's `content_block_names` and which integrations are
+enabled, rather than a hand-maintained mapping — adding a new integration type
+never requires editing `wagtail_hooks.py`.
+
+Note: `DonateBlock.override_amounts` uses `ListBlock(DecimalBlock)` (already a
+Python list). The ActBlue integration's `suggested_amounts` field is a
+`CharBlock` (comma-separated string) for simpler admin UI; `DonateBlock.get_context()`
+parses it into `donation_suggested_amounts_list` for the template.
 
 ---
 
@@ -556,9 +579,6 @@ for simpler admin UI. The template/view layer must parse the CharField when usin
 
 ```python
 # settings/base.py
-WTRX_DONATION_PLATFORM = "none"           # none, actblue
-WTRX_SIGNUP_PLATFORM = "wagtail_forms"    # wagtail_forms, action_network, none
-
 # Internationalization
 USE_I18N = True
 WAGTAIL_I18N_ENABLED = True
@@ -571,7 +591,13 @@ WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
 ]
 ```
 
-`WTRX_*` defaults are overridable in Wagtail admin via IntegrationSettings.
+Per-integration secrets (ActionKit API password, Action Network API key) can
+be overridden via `WTRX_ACTIONKIT_API_PASSWORD` / `WTRX_ACTION_NETWORK_API_KEY`
+environment variables, which take precedence over the DB-stored value in
+`IntegrationSettings.integrations` so secrets aren't required to live in the
+database in production. There is no longer a `WTRX_DONATION_PLATFORM` /
+`WTRX_SIGNUP_PLATFORM` env-var fallback — each integration's enabled state
+lives only in `IntegrationSettings.integrations`.
 Language configuration is in `settings/base.py` — sites uncomment or add
 languages to `WAGTAIL_CONTENT_LANGUAGES`.
 

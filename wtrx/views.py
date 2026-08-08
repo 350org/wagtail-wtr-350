@@ -57,7 +57,8 @@ def actionkit_inline_signup(request):
             {"success": False, "message": _("Signup is not configured.")}, status=503
         )
 
-    if integration.get_signup_platform() != "actionkit":
+    actionkit_config = integration.get_integration_config("actionkit")
+    if not actionkit_config:
         return JsonResponse(
             {"success": False, "message": _("Signup is not configured.")}, status=503
         )
@@ -75,8 +76,8 @@ def actionkit_inline_signup(request):
 
     try:
         actionkit.submit_action(
-            integration.actionkit_hostname,
-            integration.actionkit_api_username,
+            actionkit_config.get("hostname"),
+            actionkit_config.get("api_username"),
             integration.get_actionkit_api_password(),
             short_form_id,
             fields,

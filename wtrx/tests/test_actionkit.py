@@ -192,14 +192,21 @@ class TestFormPageActionKitForwarding(TestCase):
             required=True,
         )
 
-    def _configure_platform(self, platform):
+    def _configure_actionkit(self, enabled=True):
         IntegrationSettings.objects.update_or_create(
             site=self.site,
             defaults={
-                "signup_platform": platform,
-                "actionkit_hostname": "myorg.actionkit.com",
-                "actionkit_api_username": "apiuser",
-                "actionkit_api_password": "secret",
+                "integrations": [
+                    (
+                        "actionkit",
+                        {
+                            "enabled": enabled,
+                            "hostname": "myorg.actionkit.com",
+                            "api_username": "apiuser",
+                            "api_password": "secret",
+                        },
+                    )
+                ],
             },
         )
 
@@ -211,8 +218,8 @@ class TestFormPageActionKitForwarding(TestCase):
         )
 
     @patch("wtrx.integrations.actionkit.submit_action")
-    def test_forwards_when_platform_is_actionkit(self, mock_submit):
-        self._configure_platform("actionkit")
+    def test_forwards_when_actionkit_enabled(self, mock_submit):
+        self._configure_actionkit()
         response = self._submit()
         self.assertEqual(response.status_code, 200)
         mock_submit.assert_called_once()
@@ -223,8 +230,8 @@ class TestFormPageActionKitForwarding(TestCase):
         self.assertEqual(args[4]["first_name"], "Alice")
 
     @patch("wtrx.integrations.actionkit.submit_action")
-    def test_does_not_forward_when_platform_is_wagtail_forms(self, mock_submit):
-        self._configure_platform("wagtail_forms")
+    def test_does_not_forward_when_actionkit_not_enabled(self, mock_submit):
+        self._configure_actionkit(enabled=False)
         response = self._submit()
         self.assertEqual(response.status_code, 200)
         mock_submit.assert_not_called()
@@ -232,7 +239,7 @@ class TestFormPageActionKitForwarding(TestCase):
     @patch("wtrx.integrations.actionkit.submit_action")
     def test_forwarding_failure_is_swallowed_and_submission_saved(self, mock_submit):
         mock_submit.side_effect = requests.RequestException("boom")
-        self._configure_platform("actionkit")
+        self._configure_actionkit()
         response = self._submit()
         # User still sees success despite the ActionKit failure.
         self.assertEqual(response.status_code, 200)
@@ -296,8 +303,17 @@ class TestSignupActionKitBlockContext(TestCase):
         IntegrationSettings.objects.update_or_create(
             site=cls.site,
             defaults={
-                "signup_platform": "actionkit",
-                "actionkit_hostname": "myorg.actionkit.com",
+                "integrations": [
+                    (
+                        "actionkit",
+                        {
+                            "enabled": True,
+                            "hostname": "myorg.actionkit.com",
+                            "api_username": "",
+                            "api_password": "",
+                        },
+                    )
+                ],
             },
         )
 
@@ -379,14 +395,21 @@ class TestActionKitInlineSignupView(TestCase):
             is_default_site=True,
         )
 
-    def _configure_platform(self, platform="actionkit"):
+    def _configure_actionkit(self, enabled=True):
         IntegrationSettings.objects.update_or_create(
             site=self.site,
             defaults={
-                "signup_platform": platform,
-                "actionkit_hostname": "myorg.actionkit.com",
-                "actionkit_api_username": "apiuser",
-                "actionkit_api_password": "secret",
+                "integrations": [
+                    (
+                        "actionkit",
+                        {
+                            "enabled": enabled,
+                            "hostname": "myorg.actionkit.com",
+                            "api_username": "apiuser",
+                            "api_password": "secret",
+                        },
+                    )
+                ],
             },
         )
 
@@ -397,7 +420,7 @@ class TestActionKitInlineSignupView(TestCase):
     def test_forwards_via_submit_action_and_strips_bookkeeping_fields(
         self, mock_submit
     ):
-        self._configure_platform()
+        self._configure_actionkit()
         response = self._post(
             {
                 "page": "web_join",
@@ -425,7 +448,7 @@ class TestActionKitInlineSignupView(TestCase):
             self.assertNotIn(f"user_{bookkeeping_field}", fields)
 
     def test_missing_page_returns_400_without_calling_submit_action(self):
-        self._configure_platform()
+        self._configure_actionkit()
         with patch("wtrx.views.actionkit.submit_action") as mock_submit:
             response = self._post({"email": "a@b.com"})
         self.assertEqual(response.status_code, 400)
@@ -433,15 +456,15 @@ class TestActionKitInlineSignupView(TestCase):
         mock_submit.assert_not_called()
 
     def test_missing_email_returns_400_without_calling_submit_action(self):
-        self._configure_platform()
+        self._configure_actionkit()
         with patch("wtrx.views.actionkit.submit_action") as mock_submit:
             response = self._post({"page": "web_join", "name": "Alice"})
         self.assertEqual(response.status_code, 400)
         self.assertFalse(response.json()["success"])
         mock_submit.assert_not_called()
 
-    def test_wrong_platform_returns_503_without_calling_submit_action(self):
-        self._configure_platform(platform="wagtail_forms")
+    def test_actionkit_not_enabled_returns_503_without_calling_submit_action(self):
+        self._configure_actionkit(enabled=False)
         with patch("wtrx.views.actionkit.submit_action") as mock_submit:
             response = self._post({"page": "web_join", "email": "a@b.com"})
         self.assertEqual(response.status_code, 503)
@@ -451,12 +474,12 @@ class TestActionKitInlineSignupView(TestCase):
     @patch("wtrx.views.actionkit.submit_action")
     def test_submit_action_error_returns_502(self, mock_submit):
         mock_submit.side_effect = ActionKitError("boom")
-        self._configure_platform()
+        self._configure_actionkit()
         response = self._post({"page": "web_join", "email": "a@b.com"})
         self.assertEqual(response.status_code, 502)
         self.assertFalse(response.json()["success"])
 
     def test_get_request_not_allowed(self):
-        self._configure_platform()
+        self._configure_actionkit()
         response = self.client.get(reverse("actionkit_inline_signup"))
         self.assertEqual(response.status_code, 405)

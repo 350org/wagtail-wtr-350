@@ -15,7 +15,7 @@ Block categories (in definition order):
 All blocks are assembled into BodyStreamBlock at the bottom of this file.
 """
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import re
 from urllib.parse import urlparse
 
@@ -716,6 +716,31 @@ class DonateBlock(StructBlock):
         ),
     )
 
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        request = (parent_context or {}).get("request")
+        actblue_config = None
+        if request is not None:
+            try:
+                actblue_config = IntegrationSettings.for_request(request).get_integration_config(
+                    "actblue"
+                )
+            except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+                actblue_config = None
+
+        ctx["donation_base_url"] = actblue_config.get("base_url") if actblue_config else ""
+        suggested_amounts = actblue_config.get("suggested_amounts") if actblue_config else ""
+        if suggested_amounts:
+            try:
+                ctx["donation_suggested_amounts_list"] = [
+                    Decimal(x.strip()) for x in suggested_amounts.split(",") if x.strip()
+                ]
+            except (InvalidOperation, AttributeError):
+                ctx["donation_suggested_amounts_list"] = []
+        else:
+            ctx["donation_suggested_amounts_list"] = []
+        return ctx
+
     class Meta:
         icon = "pick"
         label = _("Donate")
@@ -729,11 +754,11 @@ class DonateFundraiseUpBlock(StructBlock):
     Fundraise Up elements (buttons, forms, overlays) are created in Fundraise
     Up's own dashboard, each yielding an opaque Element ID. Embedding one is
     just a hidden anchor tag that Fundraise Up's installation script (loaded
-    site-wide from IntegrationSettings.fundraiseup_installation_code when it's
-    the active donation platform) scans for and hydrates into a styled
-    checkout-modal trigger. The button's appearance and label are configured
-    in the Fundraise Up dashboard for that element, not here — unlike
-    DonateBlock, there is no button_text field.
+    site-wide via IntegrationSettings.head_html() when the Fundraise Up
+    integration is enabled) scans for and hydrates into a styled checkout-modal
+    trigger. The button's appearance and label are configured in the Fundraise
+    Up dashboard for that element, not here — unlike DonateBlock, there is no
+    button_text field.
     """
 
     heading = CharBlock(
@@ -1029,7 +1054,10 @@ class SignupActionKitBlock(StructBlock):
         hostname = ""
         if request is not None:
             try:
-                hostname = IntegrationSettings.for_request(request).actionkit_hostname
+                config = IntegrationSettings.for_request(request).get_integration_config(
+                    "actionkit"
+                )
+                hostname = config.get("hostname", "") if config else ""
             except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
                 hostname = ""
 

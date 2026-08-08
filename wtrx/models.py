@@ -474,9 +474,9 @@ class FormPage(BasePage, AbstractEmailForm):
     AbstractEmailForm.content_panels (== Page.content_panels) to avoid the
     MRO resolving to BasePage.content_panels and dropping email fields.
 
-    Future: override process_form_submission() to forward submissions to
-    Action Network when IntegrationSettings.signup_platform == "action_network".
-    See PLAN.md FormPage notes for the full forwarding design.
+    Future: override process_form_submission() to also forward submissions to
+    Action Network when that integration is enabled. See PLAN.md FormPage
+    notes for the full forwarding design.
     """
 
     template = "wtrx/pages/form_page.html"
@@ -499,7 +499,7 @@ class FormPage(BasePage, AbstractEmailForm):
         verbose_name=_("ActionKit page name"),
         help_text=_(
             "The ActionKit page short name this form submits to. Only used when "
-            "the signup platform (Settings → Integrations) is set to ActionKit. "
+            "the ActionKit integration (Settings → Integrations) is enabled. "
             "Leave blank to disable ActionKit forwarding for this form."
         ),
     )
@@ -578,12 +578,13 @@ class FormPage(BasePage, AbstractEmailForm):
 
         try:
             integration = IntegrationSettings.for_site(self.get_site())
-            if integration.get_signup_platform() == "actionkit" and self.actionkit_page:
+            actionkit_config = integration.get_integration_config("actionkit")
+            if actionkit_config and self.actionkit_page:
                 fields = actionkit.map_form_fields(form.cleaned_data)
                 if fields.get("email"):
                     actionkit.submit_action(
-                        integration.actionkit_hostname,
-                        integration.actionkit_api_username,
+                        actionkit_config.get("hostname"),
+                        actionkit_config.get("api_username"),
                         integration.get_actionkit_api_password(),
                         self.actionkit_page,
                         fields,

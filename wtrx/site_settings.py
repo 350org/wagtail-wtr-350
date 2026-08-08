@@ -1,8 +1,7 @@
-from decimal import Decimal, InvalidOperation
-
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.blocks import (
@@ -17,6 +16,14 @@ from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
 from wagtail.fields import StreamField
 
 from .images import CustomImage
+from .integrations.actblue import (
+    ActBlueConfigBlock,
+    validate_comma_separated_amounts,  # noqa: F401 -- referenced by historical migration 0001_initial
+)
+from .integrations.action_network import ActionNetworkConfigBlock
+from .integrations.actionkit import ActionKitConfigBlock
+from .integrations.fundraiseup import FundraiseUpConfigBlock
+from .integrations.registry import all_integrations
 
 
 # ---------------------------------------------------------------------------
@@ -132,24 +139,6 @@ FOOTER_LAYOUT_CHOICES = [
     ("columns", _("Columns")),
     ("minimal", _("Minimal")),
 ]
-
-
-# ---------------------------------------------------------------------------
-# Field validators
-# ---------------------------------------------------------------------------
-
-
-def validate_comma_separated_amounts(value):
-    """Validate that value is a comma-separated list of positive numbers."""
-    if value:
-        try:
-            parsed = [Decimal(x.strip()) for x in value.split(",") if x.strip()]
-            if any(v <= 0 for v in parsed):
-                raise ValidationError(_("All amounts must be greater than zero."))
-        except InvalidOperation:
-            raise ValidationError(
-                _("Enter a comma-separated list of amounts, e.g. 10,25,50,100.")
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -428,190 +417,123 @@ class SocialSettings(BaseSiteSetting):
         verbose_name = _("Social")
 
 
-DONATION_PLATFORM_CHOICES = [
-    ("none", _("None")),
-    ("actblue", "ActBlue"),
-    ("fundraiseup", "Fundraise Up"),
-]
+class IntegrationsStreamBlock(StreamBlock):
+    """
+    The "Add new integration" list on Settings > Integrations.
 
-SIGNUP_PLATFORM_CHOICES = [
-    ("wagtail_forms", _("Wagtail Forms (built-in)")),
-    ("action_network", "Action Network"),
-    ("actionkit", "ActionKit"),
-    ("none", _("None")),
-]
+    Named declarative StreamBlock subclass (rather than an inline tuple list)
+    so fork sites can override individual integration config blocks the same
+    way SectionContentBlock/BodyStreamBlock allow overriding individual
+    content blocks (see AGENTS.md architecture rule #9). Each attribute name
+    here must match the corresponding IntegrationType.slug registered in
+    wtrx/integrations/registry.py.
+    """
+
+    actionkit = ActionKitConfigBlock()
+    fundraiseup = FundraiseUpConfigBlock()
+    actblue = ActBlueConfigBlock()
+    action_network = ActionNetworkConfigBlock()
+
+    class Meta:
+        label = _("Integrations")
 
 
 @register_setting(icon="cogs", order=50)
 class IntegrationSettings(BaseSiteSetting):
-    """Settings > Integrations — donation and signup platform configuration."""
+    """
+    Settings > Integrations — add and configure any number of pre-set integrations.
 
-    donation_platform = models.CharField(
-        max_length=50,
-        choices=DONATION_PLATFORM_CHOICES,
-        default="none",
-        verbose_name=_("donation platform"),
-    )
-    donation_base_url = models.URLField(
+    Each entry in `integrations` is one enabled-or-disabled instance of a
+    pre-set integration type (ActionKit, Fundraise Up, ActBlue, Action
+    Network, ...). Multiple integrations — even multiple in the same
+    category — can be enabled simultaneously; there is no single "active
+    platform" choice. Block visibility in the page editor is driven by which
+    integrations are enabled here (see wagtail_hooks.py).
+    """
+
+    integrations = StreamField(
+        IntegrationsStreamBlock,
         blank=True,
-        verbose_name=_("donation base URL"),
-        help_text=_(
-            "e.g. https://secure.actblue.com/donate/mycampaign. "
-            "Used by DonateBlock when no override URL is set."
-        ),
-    )
-    donation_suggested_amounts = models.CharField(
-        max_length=255,
-        blank=True,
-        verbose_name=_("suggested donation amounts"),
-        help_text=_(
-            "Comma-separated integers, e.g. 10,25,50,100. "
-            "Used by DonateBlock when no override amounts are set."
-        ),
-        validators=[validate_comma_separated_amounts],
-    )
-    donation_default_recurring = models.BooleanField(
-        default=False,
-        verbose_name=_("default to recurring donation"),
-    )
-    fundraiseup_installation_code = models.TextField(
-        blank=True,
-        verbose_name=_("Fundraise Up installation code"),
-        help_text=_(
-            "The full <script> snippet from your Fundraise Up dashboard "
-            "(Settings → Installation). Rendered once in the site's <head> "
-            "when Fundraise Up is the active donation platform."
-        ),
-    )
-    signup_platform = models.CharField(
-        max_length=50,
-        choices=SIGNUP_PLATFORM_CHOICES,
-        default="wagtail_forms",
-        verbose_name=_("signup platform"),
-    )
-    action_network_api_key = models.CharField(
-        max_length=255,
-        blank=True,
-        verbose_name=_("Action Network API key"),
-        help_text=_(
-            "Required for server-side Action Network integrations. "
-            "Leave blank if using the embed widget approach."
-        ),
-    )
-    actionkit_hostname = models.CharField(
-        max_length=255,
-        blank=True,
-        verbose_name=_("ActionKit hostname"),
-        help_text=_(
-            "Your ActionKit instance hostname, e.g. 'myorg.actionkit.com' "
-            "(no scheme or trailing slash needed)."
-        ),
-    )
-    actionkit_api_username = models.CharField(
-        max_length=255,
-        blank=True,
-        verbose_name=_("ActionKit API username"),
-        help_text=_("The ActionKit REST API username used for HTTP Basic auth."),
-    )
-    actionkit_api_password = models.CharField(
-        max_length=255,
-        blank=True,
-        verbose_name=_("ActionKit API password"),
-        help_text=_(
-            "The ActionKit REST API password. In production, prefer the "
-            "WTRX_ACTIONKIT_API_PASSWORD environment variable, which overrides "
-            "this value so the secret is not stored in the database."
-        ),
+        verbose_name=_("integrations"),
+        help_text=_("Add and configure the platforms this site integrates with."),
+        use_json_field=True,
     )
 
     panels = [
-        MultiFieldPanel(
-            [
-                FieldPanel("donation_platform"),
-                FieldPanel("donation_base_url"),
-                FieldPanel("donation_suggested_amounts"),
-                FieldPanel("donation_default_recurring"),
-                FieldPanel("fundraiseup_installation_code"),
-            ],
-            heading=_("Donations"),
-        ),
-        MultiFieldPanel(
-            [
-                FieldPanel("signup_platform"),
-                FieldPanel("action_network_api_key"),
-                FieldPanel("actionkit_hostname"),
-                FieldPanel("actionkit_api_username"),
-                FieldPanel("actionkit_api_password"),
-            ],
-            heading=_("Signups"),
-        ),
+        FieldPanel("integrations"),
     ]
 
-    def get_donation_platform(self):
+    def get_integration_config(self, slug):
         """
-        Return the effective donation platform.
+        Return the StructValue of the first *enabled* entry of this integration
+        type, or None if it isn't configured or is disabled.
+        """
+        for block in self.integrations:
+            if block.block_type == slug and block.value.get("enabled", True):
+                return block.value
+        return None
 
-        If the admin has set a value (including "none"), use it.
-        Falls back to WTRX_DONATION_PLATFORM Django setting.
-        """
-        if self.donation_platform:
-            return self.donation_platform
-        return getattr(settings, "WTRX_DONATION_PLATFORM", "none")
+    def is_integration_enabled(self, slug):
+        return self.get_integration_config(slug) is not None
 
-    def get_signup_platform(self):
-        """
-        Return the effective signup platform.
+    def enabled_slugs_by_category(self, category):
+        """Return the slugs of all enabled integrations in the given category."""
+        from .integrations.registry import get_integration
 
-        If the admin has set a value (including "none"), use it.
-        Falls back to WTRX_SIGNUP_PLATFORM Django setting.
-        """
-        if self.signup_platform:
-            return self.signup_platform
-        return getattr(settings, "WTRX_SIGNUP_PLATFORM", "wagtail_forms")
-
-    @property
-    def donation_suggested_amounts_list(self):
-        """
-        Return donation_suggested_amounts as a list of Decimals.
-
-        Used in templates to iterate over amounts when the block-level
-        override_amounts is empty and the site-wide default is set.
-        Returns an empty list if the field is blank or contains invalid data.
-        """
-        if not self.donation_suggested_amounts:
-            return []
-        try:
-            return [
-                Decimal(x.strip())
-                for x in self.donation_suggested_amounts.split(",")
-                if x.strip()
-            ]
-        except (InvalidOperation, AttributeError):
-            return []
+        slugs = []
+        for block in self.integrations:
+            if not block.value.get("enabled", True):
+                continue
+            integration_type = get_integration(block.block_type)
+            if integration_type and integration_type.category == category:
+                slugs.append(block.block_type)
+        return slugs
 
     def get_action_network_api_key(self):
         """
         Return the effective Action Network API key.
 
-        Intentionally reversed precedence compared to get_donation_platform /
-        get_signup_platform: the env/Django setting wins over the DB value here
-        because API keys should not be stored in the database in production.
-        Set WTRX_ACTION_NETWORK_API_KEY as an environment variable to override
-        the DB-stored value.
+        The env/Django setting wins over the DB value because API keys should
+        not be stored in the database in production. Set
+        WTRX_ACTION_NETWORK_API_KEY as an environment variable to override the
+        DB-stored value.
         """
         env_key = getattr(settings, "WTRX_ACTION_NETWORK_API_KEY", "")
-        return env_key or self.action_network_api_key
+        if env_key:
+            return env_key
+        config = self.get_integration_config("action_network")
+        return config.get("api_key", "") if config else ""
 
     def get_actionkit_api_password(self):
         """
         Return the effective ActionKit API password.
 
-        Like get_action_network_api_key, the env/Django setting wins over the DB
-        value because API secrets should not live in the database in production.
-        Set WTRX_ACTIONKIT_API_PASSWORD as an environment variable to override.
+        Like get_action_network_api_key, the env/Django setting wins over the
+        DB value because API secrets should not live in the database in
+        production. Set WTRX_ACTIONKIT_API_PASSWORD as an environment variable
+        to override.
         """
         env_password = getattr(settings, "WTRX_ACTIONKIT_API_PASSWORD", "")
-        return env_password or self.actionkit_api_password
+        if env_password:
+            return env_password
+        config = self.get_integration_config("actionkit")
+        return config.get("api_password", "") if config else ""
+
+    def head_html(self):
+        """
+        Concatenate the head-injection markup for every enabled integration
+        that declares a `head_html_field` (e.g. Fundraise Up's installation
+        script). Rendered as-is in base.html's <head> — same trust level as
+        editor-pasted vendor scripts elsewhere in this settings model.
+        """
+        fragments = []
+        for integration_type in all_integrations():
+            if not integration_type.head_html_field:
+                continue
+            config = self.get_integration_config(integration_type.slug)
+            if config:
+                fragments.append(config.get(integration_type.head_html_field, ""))
+        return mark_safe("".join(fragments))
 
     class Meta:
         verbose_name = _("Integrations")

@@ -20,6 +20,7 @@ See `PLAN.md` for the full specification and architectural decisions.
 wagtail-wtr/
 ├── wtrx/                   # Core reusable app (future pip package)
 │   ├── blocks/             # StreamField blocks, one file per category
+│   ├── integrations/       # One module per pre-set integration + the registry (see Integrations Framework below)
 │   ├── migrations/
 │   ├── templatetags/
 │   ├── templates/wtrx/     # All upstream templates live here (APP_DIRS)
@@ -53,6 +54,7 @@ wagtail-wtr/
 
 - `wtrx/` -- Core reusable app. All page models live here.
 - `wtrx/blocks/` -- StreamField blocks, one file per category.
+- `wtrx/integrations/` -- One module per pre-set integration (ActionKit, Fundraise Up, ActBlue, Action Network), plus `registry.py`. See "Integrations Framework" below.
 - `wtrx/site_settings.py` -- All Wagtail site settings models.
 - `wtrx/models.py` -- BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage.
 - `wtrx/views.py` -- search() view.
@@ -228,10 +230,12 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
 2. **No custom user model**: Use `django.contrib.auth.models.User` directly. Forks that
    need custom user fields should add their own app with a `AbstractUser` subclass and
    set `AUTH_USER_MODEL` in their fork's settings — not in upstream.
-3. **Settings over hardcoding**: Platform-specific behavior (ActBlue, Action Network)
-   is driven by `IntegrationSettings`, not hardcoded in blocks or templates.
+3. **Settings over hardcoding**: Platform-specific behavior (ActBlue, Action Network,
+   ActionKit, Fundraise Up) is driven by `IntegrationSettings.integrations`, not
+   hardcoded in blocks or templates. See "Integrations Framework" below.
 4. **Block visibility via hooks, not import-time DB reads**: All SignupBlock
-   variants are always registered in `BodyStreamBlock`. Irrelevant variants are
+   and DonateBlock variants are always registered in `BodyStreamBlock` /
+   `SectionContentBlock`. Variants for integrations that aren't enabled are
    hidden in the Wagtail editor via `wagtail_hooks.py`, which reads
    `IntegrationSettings` at request time. Never read the database at
    class-definition or import time — Django's ORM is not available then.
@@ -292,6 +296,30 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
    the MRO, so a subclass only needs to redeclare the block(s) it wants to change.
    The same metaclass pattern works for `BodyStreamBlock` (override individual
    block attributes) and `CardGridBlock` (override the `cards` ListBlock).
+10. **Integrations framework**: Settings > Integrations (`IntegrationSettings.integrations`,
+    a `StreamField`) lets an editor add any number of pre-set integrations
+    (ActionKit, Fundraise Up, ActBlue, Action Network today), each independently
+    enabled/disabled and configured — there is no single "active platform" choice.
+    - `wtrx/integrations/registry.py` holds `IntegrationType` metadata (slug,
+      category, `content_block_names`, optional `head_html_field`) — pure
+      Python, no DB access, safe to populate at import time.
+    - Each integration is one module under `wtrx/integrations/` defining its
+      config `StructBlock` and calling `register_integration(...)`.
+    - `IntegrationsStreamBlock` in `site_settings.py` is the named declarative
+      `StreamBlock` that actually builds the "Add integration" UI — one
+      attribute per integration, same subclass-override pattern as rule #9.
+    - To add a new integration: write its module (config block + registration),
+      add one line to `IntegrationsStreamBlock`, and if it contributes a
+      content block, add that block to `BodyStreamBlock`/`SectionContentBlock`
+      (always registered, gated by `content_block_names` — see rule #4). No
+      other shared file needs to change.
+    - Read a site's config for an integration via
+      `IntegrationSettings.get_integration_config(slug)` (returns the enabled
+      entry's `StructValue`, or `None`) — never reach into `.integrations`
+      directly from blocks/views/models.
+    - Hero-section and nav/footer contribution hooks are reserved for future
+      `IntegrationType` fields — not implemented yet, since no current
+      integration needs them.
 
 ## Error Handling
 
@@ -552,6 +580,18 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     using `patch.dict(PURGE_ALL_HANDLERS, {...})` rather than patching the handler
     function by name — the dict was built at import time with direct function
     references, so patching the module-level name does not update the dict entry.
+
+25. **Validator functions used in historical migrations can never move without a
+    re-export**: Django migrations serialize field `validators=[...]` as a dotted
+    import path frozen at `makemigrations` time (e.g.
+    `wtrx.site_settings.validate_comma_separated_amounts` in migration 0001).
+    Moving that function to a new module later (it now lives in
+    `wtrx/integrations/actblue.py`) breaks every migration that still imports the
+    old path, including on a fresh `migrate` from zero. Keep a
+    `# noqa: F401 -- referenced by historical migration <name>` re-export import
+    at the old location for as long as that migration exists — this is a
+    permanent Django migration contract, not a stale backwards-compat shim to
+    clean up later.
 
 ## Git Conventions
 

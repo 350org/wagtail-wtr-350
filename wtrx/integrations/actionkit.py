@@ -24,6 +24,10 @@ visitors of the hosted page, just without the surrounding site chrome.
 """
 
 import requests
+from django.utils.translation import gettext_lazy as _
+from wagtail.blocks import BooleanBlock, CharBlock, StructBlock
+
+from wtrx.integrations.registry import IntegrationType, register_integration
 
 
 class ActionKitError(Exception):
@@ -177,3 +181,53 @@ def fetch_embed_form_html(hostname, short_form_id, timeout=5):
         )
 
     return response.text
+
+
+# ---------------------------------------------------------------------------
+# Integration registration
+# ---------------------------------------------------------------------------
+
+
+class ActionKitConfigBlock(StructBlock):
+    """Per-site ActionKit configuration, added as an entry in Settings > Integrations."""
+
+    enabled = BooleanBlock(
+        required=False,
+        default=True,
+        label=_("Enabled"),
+        help_text=_("Uncheck to temporarily disable ActionKit without removing its configuration."),
+    )
+    hostname = CharBlock(
+        label=_("ActionKit hostname"),
+        help_text=_(
+            "Your ActionKit instance hostname, e.g. 'myorg.actionkit.com' "
+            "(no scheme or trailing slash needed)."
+        ),
+    )
+    api_username = CharBlock(
+        label=_("ActionKit API username"),
+        help_text=_("The ActionKit REST API username used for HTTP Basic auth."),
+    )
+    api_password = CharBlock(
+        required=False,
+        label=_("ActionKit API password"),
+        help_text=_(
+            "The ActionKit REST API password. In production, prefer the "
+            "WTRX_ACTIONKIT_API_PASSWORD environment variable, which overrides "
+            "this value so the secret is not stored in the database."
+        ),
+    )
+
+    class Meta:
+        icon = "cogs"
+        label = _("ActionKit")
+
+
+register_integration(
+    IntegrationType(
+        slug="actionkit",
+        label=_("ActionKit"),
+        category="signup",
+        content_block_names=("signup_actionkit",),
+    )
+)

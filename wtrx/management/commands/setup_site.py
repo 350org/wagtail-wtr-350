@@ -155,10 +155,22 @@ class Command(BaseCommand):
         integration, _created = IntegrationSettings.objects.get_or_create(
             site=site,
         )
-        integration.donation_platform = donation_platform
-        integration.donation_base_url = donation_base_url
-        integration.donation_suggested_amounts = donation_suggested_amounts
-        integration.signup_platform = signup_platform
+        integrations_data = []
+        if donation_platform == "actblue":
+            integrations_data.append(
+                (
+                    "actblue",
+                    {
+                        "enabled": True,
+                        "base_url": donation_base_url,
+                        "suggested_amounts": donation_suggested_amounts,
+                        "default_recurring": False,
+                    },
+                )
+            )
+        if signup_platform == "action_network":
+            integrations_data.append(("action_network", {"enabled": True, "api_key": ""}))
+        integration.integrations = integrations_data
         integration.save()
         self.stdout.write(self.style.SUCCESS("  Configured IntegrationSettings"))
 
