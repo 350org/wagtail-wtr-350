@@ -20,7 +20,18 @@ python manage.py migrate --noinput
 
 python manage.py collectstatic --noinput
 
-exec gunicorn wagtail_wtr.wsgi:application \
+# HOME=/tmp: gunicorn's --user/--group below only drops the worker processes'
+# UID/GID (setuid/setgid) — it does not reset HOME, which stays "/root"
+# (inherited from this root-run script). psycopg/libpq always checks for an
+# optional client certificate at $HOME/.postgresql/postgresql.crt when
+# negotiating SSL; root's home directory is 0700, so the unprivileged app
+# worker gets a hard permission error just checking whether that file exists,
+# instead of the normal "doesn't exist, skip it" outcome, and every DB
+# connection fails. /tmp is world-accessible, so the same "doesn't exist"
+# check succeeds there instead. Verified: passing sslcert="" in the DB OPTIONS
+# does NOT suppress this lookup (tried and confirmed ineffective) — HOME must
+# actually resolve to a directory the app user can read.
+exec env HOME=/tmp gunicorn wagtail_wtr.wsgi:application \
     --bind "0.0.0.0:${PORT:-80}" \
     --workers "${WEB_CONCURRENCY:-4}" \
     --timeout "${GUNICORN_TIMEOUT:-120}" \
