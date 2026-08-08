@@ -30,19 +30,10 @@ WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
 # groups) enforce SSL and refuse plaintext connections outright. Connecting
 # over SSL works whether or not the server actually requires it, so forcing it
 # here is safe regardless — and avoids depending on knowing (or being able to
-# check) the target instance's specific enforcement setting.
-#
-# sslcert="": this app never uses client-certificate auth, but psycopg/libpq
-# still defaults to looking for one at $HOME/.postgresql/postgresql.crt during
-# SSL negotiation. gunicorn's --user/--group (bin/start.sh) drops worker
-# processes to the unprivileged app user without resetting HOME, which stays
-# "/root" (inherited from the root-started master) — root's home directory is
-# 0700, so the unprivileged worker gets a hard permission error just checking
-# whether that file exists, instead of the normal "doesn't exist, skip it"
-# outcome, and every DB connection fails. Explicitly disabling the client-cert
-# lookup sidesteps this rather than depending on HOME being correct.
+# check) the target instance's specific enforcement setting. (The actual fix
+# for the $HOME/.postgresql/postgresql.crt permission error this surfaced
+# lives in bin/start.sh, not here — see the comment there.)
 DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
-DATABASES["default"]["OPTIONS"]["sslcert"] = ""
 
 _s3_bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 
