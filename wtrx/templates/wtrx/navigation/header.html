@@ -1,5 +1,6 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
-{% with nav=settings.wtrx.NavigationSettings social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings %}
+{% resolved_navigation as nav %}
+{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings %}
 {% comment %}
 transparent_header is set in context by HomePage.get_context() when use_transparent_header is True.
 When transparent: header is position:absolute over the hero, bg is transparent, text switches to light,

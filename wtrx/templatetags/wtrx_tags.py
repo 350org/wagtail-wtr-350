@@ -1,7 +1,7 @@
 from django import template
 from django.utils.html import format_html
 
-from wtrx.site_settings import SOCIAL_PLATFORM_CHOICES
+from wtrx.site_settings import SOCIAL_PLATFORM_CHOICES, NavigationSettings
 
 
 register = template.Library()
@@ -21,6 +21,31 @@ register = template.Library()
 #   settings.wtrx.BrandingSEOSettings.site_description
 #
 # Add project-specific template tags below.
+
+
+# ---------------------------------------------------------------------------
+# Navigation helpers
+# ---------------------------------------------------------------------------
+
+
+@register.simple_tag(takes_context=True)
+def resolved_navigation(context):
+    """
+    Return the NavigationSettings-shaped object to render for the current
+    page: the site's default NavigationSettings, or the most specific
+    matching entry from its navigation_overrides if the current page falls
+    under one of their root pages. See
+    NavigationSettings.resolved_for_page().
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% resolved_navigation as nav %}
+    """
+    request = context.get("request")
+    if request is None:
+        return None
+    nav_settings = NavigationSettings.for_request(request)
+    return nav_settings.resolved_for_page(context.get("page"))
 
 
 # ---------------------------------------------------------------------------

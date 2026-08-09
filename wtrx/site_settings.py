@@ -5,11 +5,13 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.blocks import (
+    BooleanBlock,
     CharBlock,
     ChoiceBlock,
     PageChooserBlock,
     StreamBlock,
     StructBlock,
+    StructBlockValidationError,
     URLBlock,
 )
 from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
@@ -83,6 +85,114 @@ class SubmenuBlock(StructBlock):
     class Meta:
         icon = "list-ul"
         label = _("Dropdown menu")
+
+
+def _primary_navigation_blocks():
+    """
+    Link block choices shared between the default primary navigation
+    (NavigationSettings.primary_navigation) and each per-root-page override's
+    own navigation (NavigationOverrideBlock.primary_navigation). Returns a
+    fresh list of block instances each call since block instances aren't
+    safe to reuse across separate parent block definitions.
+    """
+    return [
+        ("internal", InternalLinkBlock()),
+        ("external", ExternalLinkBlock()),
+        ("anchor", AnchorLinkBlock()),
+        ("submenu", SubmenuBlock()),
+    ]
+
+
+class NavigationOverrideBlock(StructBlock):
+    """
+    An alternate navigation (links, CTA button, layout) scoped to a root page
+    and everything beneath it. See NavigationSettings.resolved_for_page().
+    """
+
+    root_page = PageChooserBlock(
+        label=_("Root page"),
+        help_text=_(
+            "This page and every page beneath it will use this navigation "
+            "instead of the default. If a page falls under more than one "
+            "override, the override with the most specific (closest) root "
+            "page wins."
+        ),
+    )
+    primary_navigation = StreamBlock(
+        _primary_navigation_blocks(),
+        blank=True,
+        label=_("Primary navigation"),
+        help_text=_("Links shown in the main navigation bar for this section."),
+    )
+    cta_text = CharBlock(required=False, label=_("CTA button text"))
+    cta_page = PageChooserBlock(
+        required=False,
+        label=_("CTA page"),
+        help_text=_(
+            "Internal link for the CTA button. Set either this, CTA URL, or "
+            "CTA anchor, not more than one."
+        ),
+    )
+    cta_url = URLBlock(
+        required=False,
+        label=_("CTA URL"),
+        help_text=_(
+            "External link for the CTA button. Set either this, CTA page, or "
+            "CTA anchor, not more than one."
+        ),
+    )
+    cta_anchor = CharBlock(
+        required=False,
+        label=_("CTA anchor"),
+        help_text=_(
+            "Anchor link for the CTA button (without the # symbol, e.g. "
+            "'donate'). Set this instead of CTA page or CTA URL to link to an "
+            "anchor on the current page."
+        ),
+    )
+    collapse_desktop_menu = BooleanBlock(
+        required=False,
+        label=_("Collapse desktop menu"),
+        help_text=_(
+            "Always show the hamburger menu icon, even on desktop, for this "
+            "section."
+        ),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = {}
+        cta_page = cleaned.get("cta_page")
+        cta_url = cleaned.get("cta_url")
+        cta_anchor = cleaned.get("cta_anchor")
+        cta_targets_set = sum([bool(cta_page), bool(cta_url), bool(cta_anchor)])
+        if cleaned.get("cta_text") and cta_targets_set == 0:
+            msg = ValidationError(
+                _(
+                    "Set either a CTA page, CTA URL, or CTA anchor when CTA "
+                    "button text is provided."
+                )
+            )
+            errors["cta_page"] = msg
+            errors["cta_url"] = msg
+            errors["cta_anchor"] = msg
+        if cta_targets_set > 1:
+            msg = ValidationError(
+                _("Set only one of CTA page, CTA URL, or CTA anchor — not multiple.")
+            )
+            errors["cta_url"] = msg
+            errors["cta_anchor"] = msg
+        if cta_targets_set > 0 and not cleaned.get("cta_text"):
+            errors["cta_text"] = ValidationError(
+                _("CTA button text is required when a CTA page, URL, or anchor is set.")
+            )
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "site"
+        label = _("Navigation override")
 
 
 class FooterColumnBlock(StructBlock):
@@ -216,14 +326,9 @@ class NavigationSettings(BaseSiteSetting):
     """Settings > Navigation — primary nav links, CTA button, layout options."""
 
     primary_navigation = StreamField(
-        [
-            ("internal", InternalLinkBlock()),
-            ("external", ExternalLinkBlock()),
-            ("anchor", AnchorLinkBlock()),
-            ("submenu", SubmenuBlock()),
-        ],
+        _primary_navigation_blocks(),
         blank=True,
-        verbose_name=_("primary navigation"),
+        verbose_name=_("Primary navigation"),
         help_text=_("Links shown in the main navigation bar."),
         use_json_field=True,
     )
@@ -262,11 +367,23 @@ class NavigationSettings(BaseSiteSetting):
     )
     collapse_desktop_menu = models.BooleanField(
         default=False,
-        verbose_name=_("collapse desktop menu"),
+        verbose_name=_("Collapse desktop menu"),
         help_text=_(
             "Always show the hamburger menu icon, even on desktop. "
             "Navigation links are hidden behind the menu toggle at all screen sizes."
         ),
+    )
+    navigation_overrides = StreamField(
+        [("override", NavigationOverrideBlock())],
+        blank=True,
+        verbose_name=_("navigation overrides"),
+        help_text=_(
+            "Alternate navigations for specific sections of the site. Each "
+            "override applies to a chosen root page and every page beneath "
+            "it; pages outside any override use the default navigation "
+            "above."
+        ),
+        use_json_field=True,
     )
 
     panels = [
@@ -284,6 +401,7 @@ class NavigationSettings(BaseSiteSetting):
             [FieldPanel("collapse_desktop_menu")],
             heading=_("Layout"),
         ),
+        FieldPanel("navigation_overrides"),
     ]
 
     def clean(self):
@@ -317,6 +435,33 @@ class NavigationSettings(BaseSiteSetting):
             )
         if errors:
             raise ValidationError(errors)
+
+    def resolved_for_page(self, page):
+        """
+        Return the navigation to render for ``page``: either this settings
+        instance itself (the site default) or the value of the most specific
+        matching entry in ``navigation_overrides`` — whichever's ``root_page``
+        is an ancestor of (or is) ``page``, breaking ties by depth so a more
+        specific/nested override wins over a broader one.
+
+        The returned object exposes the same attribute names either way
+        (``primary_navigation``, ``cta_text``, ``cta_page``, ``cta_url``,
+        ``cta_anchor``, ``collapse_desktop_menu``), so templates don't need
+        to care which one they got.
+        """
+        if page is None:
+            return self
+        best_override = None
+        best_depth = -1
+        for stream_child in self.navigation_overrides:
+            override = stream_child.value
+            root_page = override.get("root_page")
+            if root_page is None:
+                continue
+            if page.path.startswith(root_page.path) and root_page.depth > best_depth:
+                best_override = override
+                best_depth = root_page.depth
+        return best_override if best_override is not None else self
 
     class Meta:
         verbose_name = _("Navigation")
