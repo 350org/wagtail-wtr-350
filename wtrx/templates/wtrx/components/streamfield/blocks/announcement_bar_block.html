@@ -1,0 +1,13 @@
+{% load i18n %}
+{% if value.link_page or value.link_url %}
+    <a href="{% if value.link_page %}{{ value.link_page.url }}{% else %}{{ value.link_url }}{% endif %}"
+       {% if value.link_url %}rel="noopener noreferrer"{% endif %}
+       class="wtr-announcement-bar inline-flex items-center gap-2 rounded-full bg-light/20 px-4 py-2 font-heading text-sm font-semibold text-light transition hover:bg-light/30">
+        {{ value.text }}
+        <span aria-hidden="true">&rarr;</span>
+    </a>
+{% else %}
+    <span class="wtr-announcement-bar inline-flex items-center gap-2 rounded-full bg-light/20 px-4 py-2 font-heading text-sm font-semibold text-light">
+        {{ value.text }}
+    </span>
+{% endif %}

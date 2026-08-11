@@ -26,10 +26,10 @@
     font-size: 1rem;
     font-weight: 600;
     line-height: 1.5;
-    color: var(--color-dark);
+    color: var(--color-light);
     background-color: var(--color-primary);
     border: 2px solid transparent;
-    border-radius: 0.375rem;
+    border-radius: 1rem;
     text-decoration: none;
     cursor: pointer;
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
@@ -55,6 +55,17 @@ html {
 @utility wtr-btn-secondary {
     background-color: var(--color-secondary-600);
     color: var(--color-light);
+}
+
+@utility wtr-btn-outline {
+    background-color: transparent;
+    color: var(--color-dark);
+    border-color: var(--color-dark);
+}
+
+@utility wtr-btn-sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
 }
 
 /*
@@ -92,6 +103,144 @@ html {
         outline: 2px solid var(--color-primary-500);
         outline-offset: 0px;
     }
+}
+
+/* Wrapper for a HeroBlock.cta="signup" choice — see components/hero.html
+ * and signup_actionkit_block.html's compact=True branch. No card chrome
+ * (unlike the standalone wtr-signup-actionkit default), since it sits
+ * directly inside the hero's own dark-overlay area. */
+.wtr-signup-inline {
+    width: 100%;
+}
+
+/* Spam honeypot fields — ActionKit's own site CSS normally hides these
+ * (we don't load that stylesheet, so they're visible here otherwise). A
+ * visible honeypot both looks broken and defeats its own purpose: a real
+ * visitor filling it in gets flagged as spam. Applies in both compact and
+ * default rendering, not just inline. */
+.wtr-actionkit-embed .honey,
+.wtr-actionkit-embed input[name='user_honey'] {
+    display: none !important;
+}
+
+/* ============================================================
+ * ActionKit inline embed override — .wtr-actionkit-embed-inline
+ * ============================================================
+ *
+ * Applied when signup_actionkit_block.html is rendered with compact=True
+ * (from a HeroBlock.cta choice — see components/hero.html). The fetched
+ * ActionKit form fragment normally stacks fields vertically and wraps a
+ * whole page section (intro copy, the form itself, and a "recent actions"
+ * list) together; these rules hide the intro/recent-actions content (the
+ * hero's own headline/copy already cover that) and lay the actual user
+ * fields + submit button out as a single inline row of pill inputs.
+ *
+ * Selectors verified against a real, live ActionKit page's fetched markup
+ * (not just documentation):
+ *   - #action-lead is the outer <section> for the whole thing — it directly
+ *     CONTAINS <form id="action-form">, not just precedes it. Don't hide
+ *     #action-lead itself (that hides the form too); instead hide its two
+ *     non-form siblings specifically: #action-header (intro copy) and
+ *     #recent-actions (sidebar list of recent signups).
+ *   - Inside the form, the real user fields (name/email/country/zip/...)
+ *     live two levels deep: #unknown_user > .user-form > .{name}_box.
+ *     .user-form itself is not a flex container by default, so the
+ *     top-level #action-form flex row alone doesn't reach them — .user-form
+ *     needs its own display:flex.
+ *   - The submit button (.input-wrapper.input-submit) is a *sibling* of
+ *     #unknown_user, not nested inside it, with ak-privacy (consent radios)
+ *     and other page-specific content in between them in DOM order. `order`
+ *     pulls the field group + submit button onto the same visual row
+ *     without touching consent/notice content (kept, not hidden — may be
+ *     legally required opt-in) or DOM/tab order.
+ *   - Each field wrapper carries `input-text` or `input-select`; the text
+ *     input itself carries `ak-userfield-input`.
+ *
+ * !important on display below is required: ActionKit's fetched fragment
+ * has a hard-coded `style="display: block;"` attribute directly on
+ * #action-form (a fallback for no-JS zip/state field visibility, unrelated
+ * to layout), and inline styles beat any stylesheet rule regardless of
+ * specificity.
+ * ============================================================ */
+.wtr-actionkit-embed-inline #action-header,
+.wtr-actionkit-embed-inline #recent-actions {
+    display: none;
+}
+
+.wtr-actionkit-embed-inline #action-form {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+/* Field group + submit button share the first line... */
+.wtr-actionkit-embed-inline #action-form > #unknown_user {
+    order: 0;
+    flex: 1 1 auto;
+}
+
+.wtr-actionkit-embed-inline #action-form > .input-wrapper.input-submit {
+    order: 1;
+    flex: 0 0 auto;
+}
+
+/* ...everything else (intro text fields, consent radios, privacy notice,
+ * error list) is pushed onto its own full-width line below, in whatever
+ * relative order it already had. */
+.wtr-actionkit-embed-inline #action-form > *:not(#unknown_user):not(.input-wrapper) {
+    order: 2;
+    flex-basis: 100%;
+}
+
+.wtr-actionkit-embed-inline .user-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.wtr-actionkit-embed-inline .input-text,
+.wtr-actionkit-embed-inline .input-select {
+    margin: 0;
+    flex: 1 1 12rem;
+}
+
+.wtr-actionkit-embed-inline .ak-userfield-input,
+.wtr-actionkit-embed-inline select {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    border: 1px solid var(--color-neutral-300);
+    border-radius: 1rem;
+    background-color: var(--color-light);
+    color: var(--color-dark);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+}
+
+.wtr-actionkit-embed-inline button[type='submit'],
+.wtr-actionkit-embed-inline input[type='submit'] {
+    flex: 0 0 auto;
+    padding: 0.625rem 1.25rem;
+    font-family: var(--font-heading);
+    font-weight: 800;
+    color: var(--color-light);
+    background-color: var(--color-primary);
+    border: 2px solid transparent;
+    border-radius: 1rem;
+    cursor: pointer;
+}
+
+.wtr-actionkit-embed-inline .input-text > label,
+.wtr-actionkit-embed-inline .input-select > label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-family: var(--font-heading);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-light);
 }
 
 

@@ -50,8 +50,6 @@ class TestHomePageGetContext(TestCase):
             slug="home-test-hpgc",
             hero_headline="Welcome",
             hero_copy="<p>Subtext</p>",
-            hero_link_text="Learn more",
-            hero_link_url="https://example.com",
         )
         root.add_child(instance=cls.home)
 
@@ -81,10 +79,6 @@ class TestHomePageGetContext(TestCase):
         ctx = self._get_context(self.home)
         self.assertFalse(ctx["hero"]["copy_is_block"])
 
-    def test_hero_link_url_is_passed(self):
-        ctx = self._get_context(self.home)
-        self.assertEqual(ctx["hero"]["link_url"], "https://example.com")
-
     def test_hero_image_defaults_none(self):
         ctx = self._get_context(self.home)
         self.assertIsNone(ctx["hero"]["image"])
@@ -93,9 +87,9 @@ class TestHomePageGetContext(TestCase):
         ctx = self._get_context(self.home)
         self.assertIsNone(ctx["hero"]["video"])
 
-    def test_hero_link_page_defaults_none(self):
+    def test_hero_layout_defaults_centered(self):
         ctx = self._get_context(self.home)
-        self.assertIsNone(ctx["hero"]["link_page"])
+        self.assertEqual(ctx["hero"]["layout"], "centered")
 
     def test_hero_dict_has_all_required_keys(self):
         ctx = self._get_context(self.home)
@@ -105,9 +99,8 @@ class TestHomePageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
-            "link_text",
-            "link_page",
-            "link_url",
+            "layout",
+            "cta",
         }
         self.assertEqual(set(ctx["hero"].keys()), required_keys)
 
@@ -158,8 +151,6 @@ class TestContentPageGetContext(TestCase):
             title="About Us",
             slug="about",
             hero_headline="Our Story",
-            hero_link_text="Contact",
-            hero_link_url="https://example.com/contact",
         )
         cls.home.add_child(instance=cls.page)
 
@@ -196,9 +187,8 @@ class TestContentPageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
-            "link_text",
-            "link_page",
-            "link_url",
+            "layout",
+            "cta",
         }
         self.assertEqual(set(ctx["hero"].keys()), expected)
 

@@ -17,7 +17,7 @@ from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
-from .blocks import BodyStreamBlock
+from .blocks import HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
 from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
@@ -99,11 +99,10 @@ class HeroMixin(models.Model):
     - hero_copy: optional subtext below the headline
     - hero_image: optional background/feature image (also used as video poster fallback)
     - hero_video: optional video; switches hero to two-column text-left / video-right layout
-    - hero_link_text + hero_link_page / hero_link_url: optional CTA button
+    - hero_layout: centered or left-aligned text
+    - hero_cta: optional signup/donate/announcement widget (HeroCTABlock, at most one)
 
     Use: include `components/hero.html` in the page template.
-    Exactly one of hero_link_page or hero_link_url should be set (not validated
-    at model level — validated in the admin panel via help text guidance).
     """
 
     hero_headline = models.CharField(
@@ -147,25 +146,22 @@ class HeroMixin(models.Model):
             "falls back to the hero image above if no thumbnail is set."
         ),
     )
-    hero_link_text = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name=_("hero link text"),
-        help_text=_("CTA button label. Required if a link is set."),
+    hero_layout = models.CharField(
+        max_length=20,
+        choices=HERO_LAYOUT_CHOICES,
+        default="centered",
+        verbose_name=_("hero layout"),
+        help_text=_("Centered text over the image, or left-aligned and anchored toward the bottom."),
     )
-    hero_link_page = models.ForeignKey(
-        "wagtailcore.Page",
-        null=True,
+    hero_cta = StreamField(
+        HeroCTABlock(),
         blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        verbose_name=_("hero link page"),
-        help_text=_("Internal CTA link. Set either this or Hero link URL, not both."),
-    )
-    hero_link_url = models.URLField(
-        blank=True,
-        verbose_name=_("hero link URL"),
-        help_text=_("External CTA link. Set either this or Hero link page, not both."),
+        verbose_name=_("hero call to action"),
+        help_text=_(
+            "Optional signup bar, donate block, or announcement bar shown "
+            "below the hero copy. At most one."
+        ),
+        use_json_field=True,
     )
 
     hero_panels = [
@@ -175,13 +171,31 @@ class HeroMixin(models.Model):
                 FieldPanel("hero_copy"),
                 FieldPanel("hero_image"),
                 MediaChooserPanel("hero_video", media_type="video"),
-                FieldPanel("hero_link_text"),
-                FieldPanel("hero_link_page"),
-                FieldPanel("hero_link_url"),
+                FieldPanel("hero_layout"),
+                FieldPanel("hero_cta"),
             ],
             heading=_("Hero"),
         ),
     ]
+
+    def get_hero_context(self):
+        """
+        Build the context dict consumed by components/hero.html. Same shape
+        as HeroBlock.get_context()'s "hero" key so the template works
+        identically for pages and StreamField hero blocks.
+
+        copy_is_block=False because hero_copy is a RichTextField (string),
+        not a StreamField block value — the template renders it with |richtext.
+        """
+        return {
+            "headline": self.hero_headline or self.title,
+            "copy": self.hero_copy,
+            "copy_is_block": False,
+            "image": self.hero_image,
+            "video": self.hero_video,
+            "layout": self.hero_layout,
+            "cta": self.hero_cta,
+        }
 
     class Meta:
         abstract = True
@@ -254,24 +268,7 @@ class HomePage(BasePage, HeroMixin):
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
-        # Build the hero context dict consumed by components/hero.html.
-        # The same template is used by HeroBlock (StreamField) and all page types,
-        # so every caller must provide this exact dict shape. Mapping is done here
-        # in Python rather than in the template so that:
-        #   - The headline fallback (hero_headline or page title) is in one place.
-        #   - hero.html stays logic-free and works identically for pages and blocks.
-        # copy_is_block=False because hero_copy is a RichTextField (string),
-        # not a StreamField block value — the template renders it with |richtext.
-        ctx["hero"] = {
-            "headline": self.hero_headline or self.title,
-            "copy": self.hero_copy,
-            "copy_is_block": False,
-            "image": self.hero_image,
-            "video": self.hero_video,
-            "link_text": self.hero_link_text,
-            "link_page": self.hero_link_page,
-            "link_url": self.hero_link_url,
-        }
+        ctx["hero"] = self.get_hero_context()
         ctx["transparent_header"] = self.use_transparent_header
         return ctx
 
@@ -329,18 +326,7 @@ class ContentPage(BasePage, HeroMixin):
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
-        # Build the hero context dict consumed by components/hero.html.
-        # See HomePage.get_context() for the full explanation of this pattern.
-        ctx["hero"] = {
-            "headline": self.hero_headline or self.title,
-            "copy": self.hero_copy,
-            "copy_is_block": False,
-            "image": self.hero_image,
-            "video": self.hero_video,
-            "link_text": self.hero_link_text,
-            "link_page": self.hero_link_page,
-            "link_url": self.hero_link_url,
-        }
+        ctx["hero"] = self.get_hero_context()
         return ctx
 
 
@@ -407,18 +393,7 @@ class IndexPage(BasePage, HeroMixin):
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
 
-        # Build the hero context dict consumed by components/hero.html.
-        # See HomePage.get_context() for the full explanation of this pattern.
-        ctx["hero"] = {
-            "headline": self.hero_headline or self.title,
-            "copy": self.hero_copy,
-            "copy_is_block": False,
-            "image": self.hero_image,
-            "video": self.hero_video,
-            "link_text": self.hero_link_text,
-            "link_page": self.hero_link_page,
-            "link_url": self.hero_link_url,
-        }
+        ctx["hero"] = self.get_hero_context()
 
         children_qs = (
             self.get_children()
@@ -558,9 +533,8 @@ class FormPage(BasePage, AbstractEmailForm):
             "copy_is_block": False,
             "image": None,
             "video": None,
-            "link_text": None,
-            "link_page": None,
-            "link_url": None,
+            "layout": "centered",
+            "cta": [],
         }
         return ctx
 

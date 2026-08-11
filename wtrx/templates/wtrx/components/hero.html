@@ -8,9 +8,8 @@
     copy_is_block — True if copy should be rendered via include_block, False for |richtext
     image         — optional CustomImage instance
     video         — optional wagtailmedia Media instance (type="video")
-    link_text     — optional CTA button label (str)
-    link_page     — optional internal Page
-    link_url      — optional external URL (str)
+    layout        — "centered" (default) or "left"
+    cta           — optional HeroCTABlock stream value (0 or 1 items: signup/donate/announcement)
 
   Layout behaviour:
     - No video: centered text over optional background image (original layout).
@@ -51,14 +50,12 @@
                         </div>
                     {% endif %}
 
-                    {# CTA guard: identical in both layout branches — update both if changed. #}
-                    {% if hero.link_text %}
-                        {% if hero.link_page or hero.link_url %}
-                            <div class="mt-8">
-                                {% include "wtrx/components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
-                            </div>
-                        {% endif %}
-                    {% endif %}
+                    {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
+                    {% for cta_block in hero.cta %}
+                        <div class="mt-8">
+                            {% include_block cta_block with compact=True %}
+                        </div>
+                    {% endfor %}
                 </div>
 
                 {# Right column — video #}
@@ -115,9 +112,11 @@
 {% else %}
 
     {# ------------------------------------------------------------------ #}
-    {# STANDARD LAYOUT — centered text over optional background image     #}
+    {# STANDARD LAYOUT — background image, text either centered (default) #}
+    {# or left-aligned and anchored toward the bottom (hero.layout="left")#}
     {# ------------------------------------------------------------------ #}
-    <div class="wtr-hero relative overflow-hidden bg-dark">
+    <div class="wtr-hero relative overflow-hidden bg-dark
+                {% if hero.layout == 'left' %}flex flex-col justify-end min-h-[28rem] md:min-h-[36rem]{% endif %}">
 
         {% if hero.image %}
             {% image hero.image fill-1600x700 as bg %}
@@ -126,14 +125,16 @@
                  style="{{ hero.image.object_position_style }}" loading="lazy">
         {% endif %}
 
-        <div class="relative mx-auto max-w-4xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-center text-light">
+        <div class="relative mx-auto w-full px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-light
+                    {% if hero.layout == 'left' %}max-w-7xl text-left{% else %}max-w-4xl text-center{% endif %}">
 
-            <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+            <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl
+                       {% if hero.layout == 'left' %}max-w-2xl{% endif %}">
                 {{ hero.headline }}
             </h1>
 
             {% if hero.copy %}
-                <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl mx-auto">
+                <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
                     {% if hero.copy_is_block %}
                         {% include_block hero.copy %}
                     {% else %}
@@ -142,14 +143,12 @@
                 </div>
             {% endif %}
 
-            {# CTA guard: identical in both layout branches — update both if changed. #}
-            {% if hero.link_text %}
-                {% if hero.link_page or hero.link_url %}
-                    <div class="mt-8">
-                        {% include "wtrx/components/button.html" with text=hero.link_text link_page=hero.link_page link_url=hero.link_url style="primary" %}
-                    </div>
-                {% endif %}
-            {% endif %}
+            {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
+            {% for cta_block in hero.cta %}
+                <div class="mt-8 max-w-xl">
+                    {% include_block cta_block with compact=True %}
+                </div>
+            {% endfor %}
 
         </div>
     </div>

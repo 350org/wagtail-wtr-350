@@ -19,9 +19,12 @@ from wtrx.blocks import (
     ButtonBlock,
     CalloutBlock,
     CardBlock,
+    DonateBlock,
     HeroBlock,
+    HeroCTABlock,
     SectionBlock,
     SectionContentBlock,
+    SignupActionKitBlock,
     SignupActionNetworkBlock,
     SignupLinkBlock,
     SuccessMessageBlock,
@@ -234,42 +237,47 @@ class TestCalloutBlockValidation(SimpleTestCase):
         self.assertEqual(errors, {})
 
 
-class TestHeroBlockValidation(SimpleTestCase):
+class TestHeroBlockFields(SimpleTestCase):
     """
-    HeroBlock uses the same _validate_at_most_one_link helper.
-
     HeroBlock has an optional ImageChooserBlock but a required RichTextBlock
-    whose content is hard to construct without a template context. We test
-    the link validation helper directly and verify field structure.
+    whose content is hard to construct without a template context. We just
+    verify field structure here.
     """
-
-    def test_both_links_raises(self):
-        errors = _validate_at_most_one_link(
-            {"link_page": object(), "link_url": "https://example.com"}, {}
-        )
-        self.assertIn("link_page", errors)
-        self.assertIn("link_url", errors)
-
-    def test_only_link_url_no_error(self):
-        errors = _validate_at_most_one_link(
-            {"link_page": None, "link_url": "https://example.com"}, {}
-        )
-        self.assertEqual(errors, {})
 
     def test_block_has_expected_fields(self):
         block = HeroBlock()
         self.assertIn("headline", block.declared_blocks)
         self.assertIn("content", block.declared_blocks)
         self.assertIn("image", block.declared_blocks)
-        self.assertIn("link_text", block.declared_blocks)
-        self.assertIn("link_page", block.declared_blocks)
-        self.assertIn("link_url", block.declared_blocks)
+        self.assertIn("layout", block.declared_blocks)
+        self.assertIn("cta", block.declared_blocks)
 
     def test_image_is_not_required(self):
         """The image field should be optional (required=False)."""
         block = HeroBlock()
         image_block = block.declared_blocks["image"]
         self.assertFalse(image_block.required)
+
+
+class TestHeroCTABlock(SimpleTestCase):
+    """
+    HeroCTABlock is HeroBlock.cta / HeroMixin.hero_cta's block type: at most
+    one of signup (ActionKit), donate, or announcement.
+    """
+
+    def test_signup_choice_is_actionkit(self):
+        block = HeroCTABlock()
+        self.assertIsInstance(block.declared_blocks["signup"], SignupActionKitBlock)
+
+    def test_donate_choice_is_donate_block(self):
+        block = HeroCTABlock()
+        self.assertIsInstance(block.declared_blocks["donate"], DonateBlock)
+
+    def test_at_most_one_item(self):
+        self.assertEqual(HeroCTABlock().meta.max_num, 1)
+
+    def test_zero_items_allowed(self):
+        self.assertEqual(HeroCTABlock().meta.min_num, 0)
 
 
 class TestSignupLinkBlockValidation(SimpleTestCase):
@@ -372,7 +380,16 @@ class TestCardBlockFields(SimpleTestCase):
 
     def test_has_expected_fields(self):
         block = CardBlock()
-        expected = {"icon", "heading", "description", "image", "link_page", "link_url"}
+        expected = {
+            "tag",
+            "icon",
+            "heading",
+            "description",
+            "image",
+            "link_page",
+            "link_url",
+            "link_text",
+        }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
     def test_heading_is_required(self):

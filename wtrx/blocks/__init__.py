@@ -5,12 +5,12 @@ Block categories (in definition order):
   Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock, QuoteBlock,
             RawHTMLBlock, TableBlock
   Cards:    CardBlock, PersonCardBlock
-  Layout:   AccordionItemBlock, CardGridBlock, AccordionBlock,
-            CalloutBlock, HeroBlock
+  Layout:   AccordionItemBlock, CardGridBlock, AccordionBlock, CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock, SignupLinkBlock
-  Layout²:  SectionBlock  (defined after action blocks so its nested
-            StreamBlock can instantiate the action block classes)
+  Layout²:  AnnouncementBarBlock, HeroCTABlock, HeroBlock, SectionBlock
+            (defined after action blocks so their nested/optional fields
+            can instantiate the action block classes)
 
 All blocks are assembled into BodyStreamBlock at the bottom of this file.
 """
@@ -78,6 +78,11 @@ SECTION_PADDING_CHOICES = [
     ("sm", _("Small")),
     ("md", _("Medium")),
     ("lg", _("Large")),
+]
+
+HERO_LAYOUT_CHOICES = [
+    ("centered", _("Centered")),
+    ("left", _("Left-aligned")),
 ]
 
 # Mapping of Action Network URL path segments (plural) to embed types (singular).
@@ -372,6 +377,11 @@ class CardBlock(StructBlock):
     link_page or link_url may be set. clean() enforces this.
     """
 
+    tag = CharBlock(
+        required=False,
+        label=_("Tag"),
+        help_text=_("Optional short label displayed as a pill above the heading (e.g. 'Global')."),
+    )
     icon = ImageChooserBlock(
         required=False,
         label=_("Icon"),
@@ -397,6 +407,12 @@ class CardBlock(StructBlock):
         required=False,
         label=_("Link URL"),
         help_text=_("External link. Set either this or Link page, not both."),
+    )
+    link_text = CharBlock(
+        required=False,
+        default=_("Learn more"),
+        label=_("Link text"),
+        help_text=_("Label for the card's CTA button."),
     )
 
     def clean(self, value):
@@ -593,81 +609,12 @@ class CalloutBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/callout_block.html"
 
 
-class HeroBlock(StructBlock):
-    """
-    A mid-page hero section within the StreamField body.
-
-    Distinct from HeroMixin (which provides a dedicated hero at the top of a
-    page). HeroBlock can appear anywhere in the body.
-
-    headline is a plain text field (mirroring HeroMixin). content is richtext
-    for the supporting copy below the headline. Uses the same component
-    template as the page-level hero (components/hero.html) via get_context(),
-    which normalises field names so the template needs no branch logic.
-
-    At most one of link_page or link_url may be set; clean() enforces this.
-    """
-
-    headline = CharBlock(
-        label=_("Headline"),
-        help_text=_("The hero heading text."),
-    )
-    content = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Content"),
-        help_text=_("Optional supporting copy below the headline."),
-    )
-    image = ImageChooserBlock(
-        required=False,
-        label=_("Image"),
-    )
-    link_text = CharBlock(
-        required=False,
-        label=_("Link text"),
-        help_text=_("CTA button label. Leave blank to omit the button."),
-    )
-    link_page = PageChooserBlock(
-        required=False,
-        label=_("Link page"),
-        help_text=_("Internal link. Set either this or Link URL, not both."),
-    )
-    link_url = URLBlock(
-        required=False,
-        label=_("Link URL"),
-        help_text=_("External link. Set either this or Link page, not both."),
-    )
-
-    def get_context(self, value, parent_context=None):
-        ctx = super().get_context(value, parent_context=parent_context)
-        # Normalise to the same shape expected by components/hero.html.
-        ctx["hero"] = {
-            "headline": value.get("headline"),
-            "copy": value.get("content"),
-            "copy_is_block": False,
-            "image": value.get("image"),
-            "video": None,  # HeroBlock does not support video; key kept for template contract
-            "link_text": value.get("link_text"),
-            "link_page": value.get("link_page"),
-            "link_url": value.get("link_url"),
-        }
-        return ctx
-
-    def clean(self, value):
-        cleaned = super().clean(value)
-        errors = _validate_at_most_one_link(cleaned, {})
-        if errors:
-            raise StructBlockValidationError(block_errors=errors)
-        return cleaned
-
-    class Meta:
-        icon = "image"
-        label = _("Hero")
-        template = "wtrx/components/streamfield/blocks/hero_block.html"
-
-
 # ---------------------------------------------------------------------------
 # Action blocks
+#
+# HeroBlock is defined further below (after these) since its optional `cta`
+# field needs to instantiate DonateBlock and SignupActionNetworkBlock — same
+# reason SectionBlock is defined after this section too.
 # ---------------------------------------------------------------------------
 
 
@@ -974,7 +921,10 @@ class SignupActionKitBlock(StructBlock):
     is actually configured with (name, email, custom survey questions, etc.)
     show up automatically; nothing here enumerates them. The fragment has no
     ActionKit page chrome or stylesheet, so styling is entirely ours, via CSS
-    targeting ActionKit's own semantic classes (ak-fieldbox-*, input-text, etc).
+    targeting ActionKit's own semantic classes (each field wraps in a
+    ``{name}_box`` div carrying ``input-text``/``input-select``; text inputs
+    carry ``ak-userfield-input``; see main.css's .wtr-actionkit-embed-inline
+    rules, verified against a real fetched form).
 
     The fetched HTML — and fetch failures — are cached, since a fetch hits
     ActionKit's live server on every call. A failed fetch renders a fallback
@@ -1120,9 +1070,121 @@ class SignupLinkBlock(StructBlock):
 
 
 # ---------------------------------------------------------------------------
-# Layout blocks continued — SectionBlock is defined here (after action blocks)
-# so its nested StreamBlock can instantiate DonateBlock and the signup classes.
+# Layout blocks continued — AnnouncementBarBlock, HeroCTABlock, HeroBlock, and
+# SectionBlock are defined here (after action blocks) so their nested/optional
+# fields can instantiate DonateBlock and the signup classes.
 # ---------------------------------------------------------------------------
+
+
+class AnnouncementBarBlock(StructBlock):
+    """
+    A small badge/pill CTA, e.g. "Help 350.org turn things around for our
+    climate." Used as one of the optional HeroBlock.cta choices.
+
+    At most one of link_page or link_url may be set; clean() enforces this.
+    """
+
+    text = CharBlock(label=_("Text"))
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "info-circle"
+        label = _("Announcement bar")
+        template = "wtrx/components/streamfield/blocks/announcement_bar_block.html"
+
+
+class HeroCTABlock(StreamBlock):
+    """
+    The hero's optional call-to-action widget: at most one of a signup bar,
+    a donate block, or an announcement bar. min_num=0/max_num=1 make "at most
+    one" a StreamField-level constraint — no clean() needed for it.
+    """
+
+    signup = SignupActionKitBlock()
+    donate = DonateBlock()
+    announcement = AnnouncementBarBlock()
+
+    class Meta:
+        min_num = 0
+        max_num = 1
+        label = _("Call to action")
+
+
+class HeroBlock(StructBlock):
+    """
+    A mid-page hero section within the StreamField body.
+
+    Distinct from HeroMixin (which provides a dedicated hero at the top of a
+    page). HeroBlock can appear anywhere in the body.
+
+    headline is a plain text field (mirroring HeroMixin). content is richtext
+    for the supporting copy below the headline. Uses the same component
+    template as the page-level hero (components/hero.html) via get_context(),
+    which normalises field names so the template needs no branch logic.
+    """
+
+    headline = CharBlock(
+        label=_("Headline"),
+        help_text=_("The hero heading text."),
+    )
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        required=False,
+        label=_("Content"),
+        help_text=_("Optional supporting copy below the headline."),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+    )
+    layout = ChoiceBlock(
+        choices=HERO_LAYOUT_CHOICES,
+        default="centered",
+        label=_("Layout"),
+    )
+    cta = HeroCTABlock(
+        label=_("Call to action"),
+        help_text=_(
+            "Optional signup bar, donate block, or announcement bar shown "
+            "below the headline. At most one — enforced by min_num=0/max_num=1 "
+            "on HeroCTABlock."
+        ),
+    )
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        # Normalise to the same shape expected by components/hero.html.
+        ctx["hero"] = {
+            "headline": value.get("headline"),
+            "copy": value.get("content"),
+            "copy_is_block": False,
+            "image": value.get("image"),
+            "video": None,  # HeroBlock does not support video; key kept for template contract
+            "layout": value.get("layout"),
+            "cta": value.get("cta"),
+        }
+        return ctx
+
+    class Meta:
+        icon = "image"
+        label = _("Hero")
+        template = "wtrx/components/streamfield/blocks/hero_block.html"
 
 
 class SectionContentBlock(StreamBlock):

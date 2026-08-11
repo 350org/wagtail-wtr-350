@@ -1,9 +1,22 @@
 {% load i18n wagtailcore_tags %}
-<div class="wtr-signup wtr-signup-actionkit rounded-lg bg-neutral-50 px-6 py-10"{% if value.anchor_id %} id="{{ value.anchor_id }}"{% endif %}>
-    <div class="mx-auto max-w-2xl">
-        {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-dark md:text-3xl">{{ value.heading }}</h2>{% endif %}
+{% comment %}
+    compact=True is passed when this block is rendered as a HeroBlock.cta
+    choice (see components/hero.html) — swaps the card-style wrapper for a
+    slim inline row and light-on-dark text, and adds wtr-actionkit-embed-inline
+    so the CSS overrides in main.css lay the fetched ActionKit form's fields
+    out horizontally instead of stacked.
+{% endcomment %}
+<div class="wtr-signup wtr-signup-actionkit
+            {% if compact %}wtr-signup-inline{% else %}rounded-lg bg-neutral-50 px-6 py-10{% endif %}"
+     {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+    <div class="{% if not compact %}mx-auto max-w-2xl{% endif %}">
+        {% if value.heading %}
+            <h2 class="font-heading font-bold {% if compact %}text-xl text-light{% else %}text-2xl text-dark md:text-3xl{% endif %}">
+                {{ value.heading }}
+            </h2>
+        {% endif %}
         {% if value.description %}
-            <div class="prose prose-neutral mt-4 max-w-none">
+            <div class="prose {% if compact %}prose-invert prose-sm{% else %}prose-neutral{% endif %} mt-4 max-w-none">
                 {{ value.description|richtext }}
             </div>
         {% endif %}
@@ -13,7 +26,7 @@
                     document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
                 }
             </script>
-            <div class="wtr-actionkit-embed mt-8" data-form-container>
+            <div class="wtr-actionkit-embed {% if compact %}wtr-actionkit-embed-inline{% endif %} mt-8" data-form-container>
                 {{ form_html|safe }}
             </div>
             {% if success_message %}
