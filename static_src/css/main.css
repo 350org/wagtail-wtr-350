@@ -174,10 +174,19 @@ html {
     gap: 0.75rem;
 }
 
-/* Field group + submit button share the first line... */
+/* Field group + submit button share the first line...
+ * flex-basis:0 (not auto) is required here: with `auto`, the browser
+ * computes this item's hypothetical size from its content's *max-content*
+ * width — and since .user-form (below) is itself a wrapping flex container,
+ * its max-content width is what it would need if NONE of its fields
+ * wrapped (all 4+ fields on one line), which is far wider than this
+ * container. That alone exceeds the line, so #unknown_user claims the
+ * whole row by itself and pushes the submit button to a new line. Starting
+ * from a 0 basis and growing avoids that runaway max-content computation. */
 .wtr-actionkit-embed-inline #action-form > #unknown_user {
     order: 0;
-    flex: 1 1 auto;
+    flex: 1 1 0%;
+    min-width: 0;
 }
 
 .wtr-actionkit-embed-inline #action-form > .input-wrapper.input-submit {
@@ -241,6 +250,19 @@ html {
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--color-light);
+}
+
+/* Disclaimer/fine-print text below the form (terms of service, privacy
+ * policy, unsubscribe notice). */
+.wtr-actionkit-embed-inline .general-privacy-notice {
+    font-size: 14px;
+    color: var(--color-light);
+    opacity: 0.8;
+}
+
+.wtr-actionkit-embed-inline .general-privacy-notice a {
+    color: inherit;
+    text-decoration: underline;
 }
 
 

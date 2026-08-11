@@ -114,15 +114,27 @@
     {# ------------------------------------------------------------------ #}
     {# STANDARD LAYOUT — background image, text either centered (default) #}
     {# or left-aligned and anchored toward the bottom (hero.layout="left")#}
+    {#                                                                     #}
+    {# Height: viewport height minus the site nav's height (h-16 = 4rem   #}
+    {# in header.html) when the nav is in normal flow; full viewport when #}
+    {# the nav is transparent/overlaid (see HomePage.use_transparent_header#}
+    {# — transparent_header is set on the page-level context and inherited#}
+    {# here since hero.html is {% include %}'d without `only`).           #}
     {# ------------------------------------------------------------------ #}
-    <div class="wtr-hero relative overflow-hidden bg-dark
-                {% if hero.layout == 'left' %}flex flex-col justify-end min-h-[28rem] md:min-h-[36rem]{% endif %}">
+    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col
+                {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}
+                {% if hero.layout == 'left' %}justify-end{% else %}justify-center{% endif %}">
 
         {% if hero.image %}
             {% image hero.image fill-1600x700 as bg %}
             <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}" alt="" role="presentation"
-                 class="absolute inset-0 h-full w-full object-cover opacity-40"
+                 class="absolute inset-0 h-full w-full object-cover"
                  style="{{ hero.image.object_position_style }}" loading="lazy">
+            {# Linear gradient scrim over the image (dark, fading from bottom to transparent
+               at top) at 80% opacity — matches the Figma hero fill stack: FFFFFF base,
+               Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
+               busy photos without flattening the whole image like a uniform opacity did. #}
+            <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
         {% endif %}
 
         <div class="relative mx-auto w-full px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-light
@@ -145,7 +157,7 @@
 
             {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
             {% for cta_block in hero.cta %}
-                <div class="mt-8 max-w-xl">
+                <div class="mt-8 max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
                     {% include_block cta_block with compact=True %}
                 </div>
             {% endfor %}
