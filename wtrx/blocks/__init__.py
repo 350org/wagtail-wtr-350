@@ -85,6 +85,11 @@ HERO_LAYOUT_CHOICES = [
     ("left", _("Left-aligned")),
 ]
 
+SIGNUP_ACTIONKIT_LAYOUT_CHOICES = [
+    ("default", _("Default")),
+    ("image_split", _("Image + split panel")),
+]
+
 # Mapping of Action Network URL path segments (plural) to embed types (singular).
 # Only 'forms' is supported initially; others will be added as needed.
 ACTION_NETWORK_URL_TYPES = {
@@ -935,6 +940,16 @@ class SignupActionKitBlock(StructBlock):
     FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
     _FAILURE_SENTINEL = "__actionkit_embed_fetch_failed__"
 
+    layout = ChoiceBlock(
+        choices=SIGNUP_ACTIONKIT_LAYOUT_CHOICES,
+        default="default",
+        label=_("Layout"),
+        help_text=_(
+            "Default: centered card above the form. Image + split panel: a "
+            "photo above a dark two-column section (heading left, inline "
+            "form right)."
+        ),
+    )
     heading = CharBlock(
         required=False,
         label=_("Heading"),
@@ -945,6 +960,19 @@ class SignupActionKitBlock(StructBlock):
         required=False,
         label=_("Description"),
         help_text=_("Optional supporting text below the heading."),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+        help_text=_("Only used by the 'Image + split panel' layout."),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_(
+            "Optional caption overlaid on the image, e.g. a photo credit. "
+            "Only used by the 'Image + split panel' layout."
+        ),
     )
     short_form_id = CharBlock(
         label=_("ActionKit Page Shortname"),

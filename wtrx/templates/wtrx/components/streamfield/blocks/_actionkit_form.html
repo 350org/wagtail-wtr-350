@@ -1,0 +1,128 @@
+{% load i18n wagtailcore_tags %}
+{% comment %}
+    Shared ActionKit form renderer, used by signup_actionkit_block.html's
+    "default" and "image_split" layouts, and by the hero's signup CTA choice
+    (components/hero.html, via signup_actionkit_block.html with compact=True).
+
+    Expects from context: form_html, success_message, actionkit_base_url
+    (all set by SignupActionKitBlock.get_context()), and a `compact` flag
+    passed explicitly by the including template.
+
+    compact=True swaps wtr-actionkit-embed-inline in, so the CSS overrides
+    in main.css lay the fetched ActionKit form's fields out horizontally
+    instead of stacked.
+{% endcomment %}
+{% if form_html %}
+    <script>
+        if (typeof jQuery === "undefined") {
+            document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
+        }
+    </script>
+    <div class="wtr-actionkit-embed {% if compact %}wtr-actionkit-embed-inline{% endif %} mt-8" data-form-container>
+        {{ form_html|safe }}
+    </div>
+    {% if success_message %}
+        <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
+        <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
+             data-thank-you>
+            {% include_block success_message %}
+        </div>
+    {% endif %}
+    <script>
+        (function () {
+            if (window.__wtrAkInit) { return; }
+            window.__wtrAkInit = true;
+            function populateUtmFields() {
+                var form = document.getElementById("action-form");
+                if (!form) { return; }
+                var params = new URLSearchParams(window.location.search);
+                ["source", "medium", "campaign", "term", "content"].forEach(function (name) {
+                    var value = params.get("utm_" + name);
+                    if (!value) { return; }
+                    var field = form.querySelector('[name="action_utm_' + name + '"]');
+                    if (field) { field.value = value; }
+                });
+            }
+            populateUtmFields();
+
+            function loadScript(src, onload) {
+                var s = document.createElement("script");
+                s.src = src;
+                if (onload) { s.onload = onload; }
+                document.body.appendChild(s);
+            }
+
+            var baseUrl = "{{ actionkit_base_url|escapejs }}";
+            if (!baseUrl) { return; }
+
+            {% if success_message %}
+            function wireInlineSubmit() {
+                var form = document.getElementById("action-form");
+                if (!form) { return; }
+                var wrapper = form.closest(".wtr-signup-actionkit");
+                if (!wrapper) { return; }
+                var formContainer = wrapper.querySelector("[data-form-container]");
+                var thankYou = wrapper.querySelector("[data-thank-you]");
+                var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
+
+                form.onsubmit = null;
+                form.addEventListener("submit", function (event) {
+                    event.preventDefault();
+
+                    var emailField = form.querySelector('[name="email"]');
+                    if (emailField && !emailField.value.trim()) {
+                        emailField.focus();
+                        return;
+                    }
+
+                    var submitButton = form.querySelector('[type="submit"]');
+                    if (submitButton) { submitButton.disabled = true; }
+
+                    fetch("{% url 'actionkit_inline_signup' %}", {
+                        method: "POST",
+                        body: new FormData(form),
+                        headers: {
+                            "X-CSRFToken": csrfInput ? csrfInput.value : "",
+                            "X-Requested-With": "XMLHttpRequest"
+                        }
+                    }).then(function (response) {
+                        return response.json();
+                    }).then(function (data) {
+                        if (data.success) {
+                            if (formContainer) { formContainer.classList.add("hidden"); }
+                            if (thankYou) { thankYou.classList.remove("hidden"); }
+                        } else if (submitButton) {
+                            submitButton.disabled = false;
+                        }
+                    }).catch(function () {
+                        if (submitButton) { submitButton.disabled = false; }
+                    });
+                });
+            }
+            {% endif %}
+
+            function initForm() {
+                actionkit.forms.contextRoot = baseUrl + "/context/";
+                {% comment %}
+                initPage() sets ak.args (parsed from the querystring) and
+                other page-level state that a full ActionKit page sets up
+                via its own inline script — one our form_only=1 fragment
+                doesn't include. Without it, beforeContextLoad() throws on
+                ak.args being undefined and loadContext() never completes,
+                leaving the form unable to submit.
+                {% endcomment %}
+                actionkit.forms.initPage();
+                actionkit.forms.initForm("act");
+                {% if success_message %}
+                wireInlineSubmit();
+                {% endif %}
+            }
+
+            loadScript(baseUrl + "/resources/actionkit.js", initForm);
+        })();
+    </script>
+{% else %}
+    <div class="mt-8 rounded-lg bg-white p-6 text-sm text-neutral-500">
+        {% trans "This signup form is temporarily unavailable. Please try again shortly." %}
+    </div>
+{% endif %}

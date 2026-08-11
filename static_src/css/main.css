@@ -163,7 +163,8 @@ html {
  * specificity.
  * ============================================================ */
 .wtr-actionkit-embed-inline #action-header,
-.wtr-actionkit-embed-inline #recent-actions {
+.wtr-actionkit-embed-inline #recent-actions,
+.wtr-actionkit-embed-inline #known_user {
     display: none;
 }
 

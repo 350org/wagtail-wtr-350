@@ -1,138 +1,58 @@
-{% load i18n wagtailcore_tags %}
+{% load i18n wagtailcore_tags wagtailimages_tags %}
 {% comment %}
     compact=True is passed when this block is rendered as a HeroBlock.cta
     choice (see components/hero.html) — swaps the card-style wrapper for a
-    slim inline row and light-on-dark text, and adds wtr-actionkit-embed-inline
-    so the CSS overrides in main.css lay the fetched ActionKit form's fields
-    out horizontally instead of stacked.
+    slim inline row and light-on-dark text. It's independent of value.layout
+    below (that's this block's own standalone layout choice, not the hero's).
 {% endcomment %}
-<div class="wtr-signup wtr-signup-actionkit
-            {% if compact %}wtr-signup-inline{% else %}rounded-lg bg-neutral-50 px-6 py-10{% endif %}"
-     {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
-    <div class="{% if not compact %}mx-auto max-w-2xl{% endif %}">
-        {% if value.heading %}
-            <h2 class="font-heading font-bold {% if compact %}text-xl text-light{% else %}text-2xl text-dark md:text-3xl{% endif %}">
-                {{ value.heading }}
-            </h2>
-        {% endif %}
-        {% if value.description %}
-            <div class="prose {% if compact %}prose-invert prose-sm{% else %}prose-neutral{% endif %} mt-4 max-w-none">
-                {{ value.description|richtext }}
+{% if value.layout == 'image_split' %}
+    <div class="wtr-signup wtr-signup-actionkit overflow-hidden rounded-lg" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+        {% if value.image %}
+            <div class="relative">
+                {% image value.image fill-1600x500 as img %}
+                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                     class="h-64 w-full object-cover sm:h-80" loading="lazy">
+                {% if value.image_caption %}
+                    <div class="absolute inset-x-0 bottom-0 bg-dark/70 px-4 py-2">
+                        <p class="text-xs text-light">{{ value.image_caption }}</p>
+                    </div>
+                {% endif %}
             </div>
         {% endif %}
-        {% if form_html %}
-            <script>
-                if (typeof jQuery === "undefined") {
-                    document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
-                }
-            </script>
-            <div class="wtr-actionkit-embed {% if compact %}wtr-actionkit-embed-inline{% endif %} mt-8" data-form-container>
-                {{ form_html|safe }}
+        <div class="bg-dark px-6 py-12 sm:px-10 sm:py-16">
+            <div class="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 md:grid-cols-2">
+                <div class="text-light">
+                    {% if value.heading %}
+                        <h2 class="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">{{ value.heading }}</h2>
+                    {% endif %}
+                    {% if value.description %}
+                        <div class="prose prose-invert mt-4 max-w-none">
+                            {{ value.description|richtext }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div>
+                    {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
+                </div>
             </div>
-            {% if success_message %}
-                <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
-                <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
-                     data-thank-you>
-                    {% include_block success_message %}
+        </div>
+    </div>
+{% else %}
+    <div class="wtr-signup wtr-signup-actionkit
+                {% if compact %}wtr-signup-inline{% else %}rounded-lg bg-neutral-50 px-6 py-10{% endif %}"
+         {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+        <div class="{% if not compact %}mx-auto max-w-2xl{% endif %}">
+            {% if value.heading %}
+                <h2 class="font-heading font-bold {% if compact %}text-xl text-light{% else %}text-2xl text-dark md:text-3xl{% endif %}">
+                    {{ value.heading }}
+                </h2>
+            {% endif %}
+            {% if value.description %}
+                <div class="prose {% if compact %}prose-invert prose-sm{% else %}prose-neutral{% endif %} mt-4 max-w-none">
+                    {{ value.description|richtext }}
                 </div>
             {% endif %}
-            <script>
-                (function () {
-                    if (window.__wtrAkInit) { return; }
-                    window.__wtrAkInit = true;
-                    function populateUtmFields() {
-                        var form = document.getElementById("action-form");
-                        if (!form) { return; }
-                        var params = new URLSearchParams(window.location.search);
-                        ["source", "medium", "campaign", "term", "content"].forEach(function (name) {
-                            var value = params.get("utm_" + name);
-                            if (!value) { return; }
-                            var field = form.querySelector('[name="action_utm_' + name + '"]');
-                            if (field) { field.value = value; }
-                        });
-                    }
-                    populateUtmFields();
-
-                    function loadScript(src, onload) {
-                        var s = document.createElement("script");
-                        s.src = src;
-                        if (onload) { s.onload = onload; }
-                        document.body.appendChild(s);
-                    }
-
-                    var baseUrl = "{{ actionkit_base_url|escapejs }}";
-                    if (!baseUrl) { return; }
-
-                    {% if success_message %}
-                    function wireInlineSubmit() {
-                        var form = document.getElementById("action-form");
-                        if (!form) { return; }
-                        var wrapper = form.closest(".wtr-signup-actionkit");
-                        if (!wrapper) { return; }
-                        var formContainer = wrapper.querySelector("[data-form-container]");
-                        var thankYou = wrapper.querySelector("[data-thank-you]");
-                        var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
-
-                        form.onsubmit = null;
-                        form.addEventListener("submit", function (event) {
-                            event.preventDefault();
-
-                            var emailField = form.querySelector('[name="email"]');
-                            if (emailField && !emailField.value.trim()) {
-                                emailField.focus();
-                                return;
-                            }
-
-                            var submitButton = form.querySelector('[type="submit"]');
-                            if (submitButton) { submitButton.disabled = true; }
-
-                            fetch("{% url 'actionkit_inline_signup' %}", {
-                                method: "POST",
-                                body: new FormData(form),
-                                headers: {
-                                    "X-CSRFToken": csrfInput ? csrfInput.value : "",
-                                    "X-Requested-With": "XMLHttpRequest"
-                                }
-                            }).then(function (response) {
-                                return response.json();
-                            }).then(function (data) {
-                                if (data.success) {
-                                    if (formContainer) { formContainer.classList.add("hidden"); }
-                                    if (thankYou) { thankYou.classList.remove("hidden"); }
-                                } else if (submitButton) {
-                                    submitButton.disabled = false;
-                                }
-                            }).catch(function () {
-                                if (submitButton) { submitButton.disabled = false; }
-                            });
-                        });
-                    }
-                    {% endif %}
-
-                    function initForm() {
-                        actionkit.forms.contextRoot = baseUrl + "/context/";
-                        {% comment %}
-                        initPage() sets ak.args (parsed from the querystring) and
-                        other page-level state that a full ActionKit page sets up
-                        via its own inline script — one our form_only=1 fragment
-                        doesn't include. Without it, beforeContextLoad() throws on
-                        ak.args being undefined and loadContext() never completes,
-                        leaving the form unable to submit.
-                        {% endcomment %}
-                        actionkit.forms.initPage();
-                        actionkit.forms.initForm("act");
-                        {% if success_message %}
-                        wireInlineSubmit();
-                        {% endif %}
-                    }
-
-                    loadScript(baseUrl + "/resources/actionkit.js", initForm);
-                })();
-            </script>
-        {% else %}
-            <div class="mt-8 rounded-lg bg-white p-6 text-sm text-neutral-500">
-                {% trans "This signup form is temporarily unavailable. Please try again shortly." %}
-            </div>
-        {% endif %}
+            {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=compact %}
+        </div>
     </div>
-</div>
+{% endif %}
