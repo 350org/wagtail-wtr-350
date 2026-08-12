@@ -340,6 +340,41 @@ html {
     scroll-snap-align: start;
 }
 
+/* Right-edge fade — see card_carousel_block.html's comment on
+ * [data-carousel-fade] for why this is a fixed overlay at the edge
+ * rather than styling baked into any specific card. Fades to
+ * --color-light (matches the page background this block sits on) so the
+ * cut-off card blends into it instead of ending in a hard vertical clip.
+ * transition+opacity (toggled by updateArrows() in the script below)
+ * fades it out once there's nothing left to scroll to. */
+.wtr-card-carousel-fade {
+    background: linear-gradient(to right, transparent 0%, var(--color-light) 100%);
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Card description/headline text size + line-height, scoped to carousel
+ * cards only — card.html (its .wtr-card p / h3) is shared with the
+ * standalone CardBlock and CardGridBlock, which keep their own default
+ * text-sm / text-lg (and default line-height); this doesn't touch that
+ * shared template. 1024px matches Tailwind's lg: breakpoint, used the
+ * same way elsewhere in this block (e.g. the section heading's
+ * lg:text-8xl). */
+.wtr-card-carousel-track .wtr-card p {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.wtr-card-carousel-track .wtr-card h3 {
+    font-size: 24px;
+    line-height: 1;
+}
+
+@media (min-width: 1024px) {
+    .wtr-card-carousel-track .wtr-card h3 {
+        font-size: 32px;
+    }
+}
+
 .wtr-carousel-arrow {
     display: flex;
     align-items: center;

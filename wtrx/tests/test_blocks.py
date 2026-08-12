@@ -344,6 +344,7 @@ class TestSectionBlockStructure(SimpleTestCase):
         "card",
         "person_card",
         "card_grid",
+        "card_carousel",
         "accordion",
         "callout",
         "hero",
