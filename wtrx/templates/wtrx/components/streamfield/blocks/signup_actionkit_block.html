@@ -1,10 +1,16 @@
 {% load i18n wagtailcore_tags wagtailimages_tags %}
 {% comment %}
-    compact=True is passed only when this block is rendered as a
-    HeroBlock.cta choice (see components/hero.html) — nothing else sets it.
-    That's the only case where the slim inline row (no image, no card,
-    light-on-dark text sitting directly in the hero's own dark overlay) is
-    used. Every other (standalone) use renders the image + dark split panel.
+    This block's own `compact` (below) is only ever True when rendered as a
+    HeroBlock.cta choice (see components/hero.html) — it picks the slim
+    inline CTA wrapper (no image, no card, light-on-dark text sitting
+    directly in the hero's own dark overlay) over the standalone image +
+    dark split panel card.
+
+    _actionkit_form.html's own compact=True, by contrast, is passed in
+    BOTH branches below — the fetched form's fields always render as a
+    single wrapping inline row (see main.css's .wtr-actionkit-embed-inline),
+    never ActionKit's normal vertical stack, regardless of which wrapper
+    chrome this block itself is using.
 {% endcomment %}
 {% if compact %}
     <div class="wtr-signup wtr-signup-actionkit wtr-signup-inline" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>

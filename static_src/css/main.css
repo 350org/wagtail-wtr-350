@@ -127,13 +127,12 @@ html {
  * ActionKit inline embed override — .wtr-actionkit-embed-inline
  * ============================================================
  *
- * Applied when signup_actionkit_block.html is rendered with compact=True
- * (from a HeroBlock.cta choice — see components/hero.html). The fetched
- * ActionKit form fragment normally stacks fields vertically and wraps a
- * whole page section (intro copy, the form itself, and a "recent actions"
- * list) together; these rules hide the intro/recent-actions content (the
- * hero's own headline/copy already cover that) and lay the actual user
- * fields + submit button out as a single inline row of pill inputs.
+ * Applied to both signup_actionkit_block.html renderings — the hero's slim
+ * CTA wrapper and the standalone image + dark split panel card both pass
+ * compact=True to _actionkit_form.html (see that file's top comment), so
+ * the fetched form's fields (and the submit button, on the same row) always
+ * render as a single wrapping inline row of pill inputs, never ActionKit's
+ * normal vertical stack.
  *
  * Selectors verified against a real, live ActionKit page's fetched markup
  * (not just documentation):
@@ -143,10 +142,18 @@ html {
  *     non-form siblings specifically: #action-header (intro copy) and
  *     #recent-actions (sidebar list of recent signups).
  *   - Inside the form, the real user fields (name/email/country/zip/...)
- *     live two levels deep: #unknown_user > .user-form > .{name}_box.
- *     .user-form itself is not a flex container by default, so the
- *     top-level #action-form flex row alone doesn't reach them — .user-form
- *     needs its own display:flex.
+ *     live two levels deep: #unknown_user > .user-form > .{name}_box. A real
+ *     page (act.350.org's "join" form) has 5 of these — far too many to fit
+ *     on one line at hero (or even the standalone panel's) width, so
+ *     wrapping is the normal case, not an edge case. #unknown_user and
+ *     .user-form are both `display: contents` (boxless): this promotes the
+ *     individual .{name}_box fields to be flex items of #action-form
+ *     directly, in the *same* wrapping flow as the submit button, so the
+ *     button flows onto whichever line the last field lands on — staying
+ *     inline with the fields whenever there's room — instead of being
+ *     pinned to the bottom of a multi-row field block (which — with
+ *     #unknown_user as one flex item — left it visually floating below
+ *     empty space whenever fields wrapped to 2+ rows).
  *   - The submit button (.input-wrapper.input-submit) is a *sibling* of
  *     #unknown_user, not nested inside it, with ak-privacy (consent radios)
  *     and other page-specific content in between them in DOM order. `order`
@@ -175,19 +182,9 @@ html {
     gap: 0.75rem;
 }
 
-/* Field group + submit button share the first line...
- * flex-basis:0 (not auto) is required here: with `auto`, the browser
- * computes this item's hypothetical size from its content's *max-content*
- * width — and since .user-form (below) is itself a wrapping flex container,
- * its max-content width is what it would need if NONE of its fields
- * wrapped (all 4+ fields on one line), which is far wider than this
- * container. That alone exceeds the line, so #unknown_user claims the
- * whole row by itself and pushes the submit button to a new line. Starting
- * from a 0 basis and growing avoids that runaway max-content computation. */
-.wtr-actionkit-embed-inline #action-form > #unknown_user {
-    order: 0;
-    flex: 1 1 0%;
-    min-width: 0;
+.wtr-actionkit-embed-inline #unknown_user,
+.wtr-actionkit-embed-inline .user-form {
+    display: contents;
 }
 
 .wtr-actionkit-embed-inline #action-form > .input-wrapper.input-submit {
@@ -197,23 +194,27 @@ html {
 
 /* ...everything else (intro text fields, consent radios, privacy notice,
  * error list) is pushed onto its own full-width line below, in whatever
- * relative order it already had. */
+ * relative order it already had. Fields themselves default to order:0, so
+ * they still lead the row ahead of the order:1 submit button. */
 .wtr-actionkit-embed-inline #action-form > *:not(#unknown_user):not(.input-wrapper) {
     order: 2;
     flex-basis: 100%;
 }
 
-.wtr-actionkit-embed-inline .user-form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.75rem;
-}
-
+/* flex-basis 8rem (not the more spacious 12rem it started at): the
+ * standalone split panel's form column is only ~460px wide (half of the
+ * card's inner width, split against the heading column) — with as few as
+ * 2 fields, 12rem-per-field left no room at all for the button on the same
+ * line (2*192px + gaps already exceeded 460px before the button's own
+ * hypothetical width was even added in), so it always wrapped to its own
+ * row regardless of the display:contents fix above (that fix only stops
+ * the button from floating *when* it wraps — it doesn't create room for it
+ * to avoid wrapping). 8rem keeps 2-3 short fields (email, zip, country)
+ * plus the button fitting on one line even in that narrower column. */
 .wtr-actionkit-embed-inline .input-text,
 .wtr-actionkit-embed-inline .input-select {
     margin: 0;
-    flex: 1 1 12rem;
+    flex: 1 1 8rem;
 }
 
 .wtr-actionkit-embed-inline .ak-userfield-input,
@@ -275,12 +276,33 @@ html {
  * box-decoration-break: clone repeats the background/padding per line
  * fragment instead of once for the whole wrapped element — the standard
  * technique for this effect (Tailwind has no utility for it).
+ *
+ * font-size is clamp()ed rather than fixed at the desktop 48px: the overlay
+ * stays absolutely positioned on top of the image at every breakpoint (see
+ * callout_block.html's comment — no stacked-below fallback for mobile, and
+ * the image itself goes full-width, not 80%, below sm: for extra height),
+ * so keeping it vertically contained depends on the text — plus the CTA
+ * button below it, when a callout has one, sharing the same vertical
+ * budget — not needing much more height than the image has.
+ *
+ * The image's own height (it's aspect-video, so height tracks its own
+ * width directly) only reaches enough room for 48px-tall overlaid text at
+ * a genuinely wide desktop viewport. At 320–375px widths, measured against
+ * a real long callout (a 2-3 sentence mission statement) WITH its CTA
+ * button — the button alone is ~48px plus a 16px gap, eating into the same
+ * budget as the text — the floor that reliably still fits is 14px at
+ * 320px's now-full-width (~162px-tall) image; 375px has enough width by
+ * then to comfortably clear it too. 4vw reaches the 3rem/48px cap at
+ * 1200px, so through the whole 640–1200px tablet range the font is still
+ * scaling down below 48px to leave the (there, still not very tall) image
+ * headroom too — verified against a real long callout + button at 320,
+ * 375, 700, 950, and 1200px.
  * ============================================================ */
 .wtr-callout-highlight,
 .wtr-callout-highlight p {
     margin: 0;
     font-family: var(--font-heading);
-    font-size: 48px;
+    font-size: clamp(0.875rem, 4vw, 3rem);
     font-weight: 400;
     line-height: 1.25;
 }
@@ -293,5 +315,4 @@ html {
     color: var(--color-dark);
     padding: 0.05em 0.3em;
 }
-
 

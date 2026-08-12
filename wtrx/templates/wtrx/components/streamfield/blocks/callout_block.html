@@ -1,19 +1,35 @@
 {% load i18n wagtailimages_tags wagtailcore_tags %}
 {% comment %}
-Image at ~80% width, aligned per value.alignment (image-left/image-right).
-Text sits directly on top (no card/box) on the OPPOSITE side from the
-image — each line gets a tight white "highlighter" background via
-.wtr-callout-highlight (box-decoration-break: clone, see main.css) rather
-than one padded rectangle behind the whole paragraph.
+Image at ~80% width from sm: up, aligned per value.alignment
+(image-left/image-right) with a ~20% gutter on the other side for the text
+to spill into. Below sm: the image is full-width instead — see the
+vertical-containment note below for why. Text sits directly on top (no
+card/box) on the OPPOSITE side from the image — each line gets a tight
+white "highlighter" background via .wtr-callout-highlight
+(box-decoration-break: clone, see main.css) rather than one padded
+rectangle behind the whole paragraph.
 
 Spill: the text overlay is a SIBLING of the image (positioned relative to
 the outer, full-width wrapper, not clipped by the image's own
 overflow-hidden), so it's meant to spill horizontally past the image's
-edge into the empty ~20% gutter on the side opposite the image. It must
-NOT spill vertically though — bottom-4/8 insets it up from the bottom edge
-(not translated past it), and since the image is the only normal-flow
-content, the outer wrapper's height equals the image's height, so
-"bottom" here is anchored to the image's own bottom edge.
+edge into the empty ~20% gutter on the side opposite the image, at every
+breakpoint — no separate stacked-below layout for mobile; the overlay
+effect itself stays on. It must NOT spill vertically though — bottom-4/8
+insets it up from the bottom edge (not translated past it), and since the
+image is the only normal-flow content, the outer wrapper's height equals
+the image's height, so "bottom" here is anchored to the image's own
+bottom edge.
+
+Staying vertically contained across every screen size, with a fixed
+aspect-video ratio and no layout fallback, rests on two things together:
+.wtr-callout-highlight's font-size clamp()ing down on narrow viewports
+(see main.css), and the image itself going full-width (not 80%) below
+sm:. Both matter — a long callout + CTA button easily needs more height
+than an 80%-width phone-screen image has, even at the font clamp's floor
+size, so trading the horizontal "spill into the gutter" effect (moot on a
+phone anyway — there's no gutter narrow screens can spare) for the ~25%
+taller image (1/0.8 wider = 1/0.8 taller, aspect ratio fixed) buys back
+real headroom rather than just shrinking text further.
 
 flex + items-end/items-start (not text-align + margin-left/right:auto) for
 the alignment — a max-width-only block's width stays "auto" under the
@@ -22,7 +38,7 @@ clamps it (CSS2.1 10.3.3's over-constrained-auto-margins rule). Flexbox's
 own alignment algorithm doesn't have that gotcha.
 {% endcomment %}
 <div class="wtr-callout relative">
-    <div class="w-4/5 overflow-hidden rounded-lg {% if value.alignment == 'image-right' %}ml-auto{% else %}mr-auto{% endif %}">
+    <div class="w-full overflow-hidden rounded-lg sm:w-4/5 {% if value.alignment == 'image-right' %}sm:ml-auto{% else %}sm:mr-auto{% endif %}">
         {% if value.media_file %}
             <video src="{{ value.media_file.url }}" controls preload="metadata"
                    class="aspect-video w-full object-cover"
