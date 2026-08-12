@@ -316,3 +316,50 @@ html {
     padding: 0.05em 0.3em;
 }
 
+/* ============================================================
+ * Card carousel — .wtr-card-carousel-track / .wtr-carousel-arrow
+ * ============================================================
+ * Used by card_carousel_block.html. scroll-snap-type + each card's
+ * scroll-snap-align: start gives free, JS-independent swipe/scroll
+ * behavior (touch trackpads, mobile swipe); the prev/next buttons in the
+ * template are a progressive-enhancement layer on top, not a replacement.
+ * Scrollbar is hidden since the arrow buttons are the intended control —
+ * native scroll/swipe still works, just without visible scrollbar chrome.
+ * ============================================================ */
+.wtr-card-carousel-track {
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.wtr-card-carousel-track::-webkit-scrollbar {
+    display: none;
+}
+
+.wtr-card-carousel-track [data-carousel-item] {
+    scroll-snap-align: start;
+}
+
+.wtr-carousel-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-neutral-300);
+    background-color: var(--color-light);
+    color: var(--color-dark);
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out, opacity 0.15s ease-in-out;
+}
+
+.wtr-carousel-arrow:hover:not(:disabled) {
+    background-color: var(--color-neutral-200);
+}
+
+.wtr-carousel-arrow:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+

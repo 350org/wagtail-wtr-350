@@ -4,8 +4,9 @@ StreamField blocks for the BodyStreamBlock.
 Block categories (in definition order):
   Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock, QuoteBlock,
             RawHTMLBlock, TableBlock
-  Cards:    CardBlock, PersonCardBlock
-  Layout:   AccordionItemBlock, CardGridBlock, AccordionBlock, CalloutBlock
+  Cards:    CardBlock, CarouselCardBlock, PersonCardBlock
+  Layout:   AccordionItemBlock, CardGridBlock, CardCarouselBlock,
+            AccordionBlock, CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock, SignupLinkBlock
   Layout²:  AnnouncementBarBlock, HeroCTABlock, HeroBlock, SectionBlock
@@ -428,6 +429,28 @@ class CardBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/card_block.html"
 
 
+class CarouselCardBlock(CardBlock):
+    """
+    CardBlock variant used by CardCarouselBlock's `cards` ListBlock.
+
+    Identical to CardBlock except image is required — every carousel card
+    needs one, unlike the general-purpose CardBlock (used standalone and by
+    CardGridBlock) where it's optional. Overriding just this one field, via
+    subclassing rather than editing CardBlock directly, keeps every other
+    use of CardBlock unchanged. No template of its own: rendered the same
+    way as any other card, via components/card.html (see
+    card_carousel_block.html).
+    """
+
+    image = ImageChooserBlock(
+        label=_("Image"),
+    )
+
+    class Meta:
+        icon = "doc-full"
+        label = _("Card")
+
+
 class PersonCardBlock(StructBlock):
     """
     A person or staff member card with name, role, photo, bio, and contact info.
@@ -513,6 +536,60 @@ class CardGridBlock(StructBlock):
         icon = "grip"
         label = _("Card Grid")
         template = "wtrx/components/streamfield/blocks/card_grid_block.html"
+
+
+class CardCarouselBlock(StructBlock):
+    """
+    A heading + supporting copy, an optional CTA button, and a horizontally
+    scrollable row of cards with prev/next arrow controls.
+
+    Cards are manually authored (a ListBlock of CarouselCardBlock, not
+    pulled from pages) — minimum 3, no maximum. At most one of link_page or
+    link_url may be set; clean() enforces this, same pattern as CardBlock
+    and CalloutBlock.
+    """
+
+    heading = CharBlock(
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        label=_("Text"),
+        help_text=_("Supporting copy shown below the heading."),
+    )
+    link_text = CharBlock(
+        required=False,
+        label=_("Button text"),
+        help_text=_("Optional CTA button label. Leave blank to omit the button."),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+    cards = ListBlock(
+        CarouselCardBlock(),
+        min_num=3,
+        label=_("Cards"),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "grip"
+        label = _("Card Carousel")
+        template = "wtrx/components/streamfield/blocks/card_carousel_block.html"
 
 
 class AccordionBlock(StructBlock):
@@ -1240,6 +1317,7 @@ class SectionContentBlock(StreamBlock):
     card = CardBlock()
     person_card = PersonCardBlock()
     card_grid = CardGridBlock()
+    card_carousel = CardCarouselBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
     hero = HeroBlock()
@@ -1318,6 +1396,7 @@ class BodyStreamBlock(StreamBlock):
     card = CardBlock()
     person_card = PersonCardBlock()
     card_grid = CardGridBlock()
+    card_carousel = CardCarouselBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
     hero = HeroBlock()
