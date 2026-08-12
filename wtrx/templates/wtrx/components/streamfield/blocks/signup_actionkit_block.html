@@ -1,11 +1,24 @@
 {% load i18n wagtailcore_tags wagtailimages_tags %}
 {% comment %}
-    compact=True is passed when this block is rendered as a HeroBlock.cta
-    choice (see components/hero.html) — swaps the card-style wrapper for a
-    slim inline row and light-on-dark text. It's independent of value.layout
-    below (that's this block's own standalone layout choice, not the hero's).
+    compact=True is passed only when this block is rendered as a
+    HeroBlock.cta choice (see components/hero.html) — nothing else sets it.
+    That's the only case where the slim inline row (no image, no card,
+    light-on-dark text sitting directly in the hero's own dark overlay) is
+    used. Every other (standalone) use renders the image + dark split panel.
 {% endcomment %}
-{% if value.layout == 'image_split' %}
+{% if compact %}
+    <div class="wtr-signup wtr-signup-actionkit wtr-signup-inline" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+        {% if value.heading %}
+            <h2 class="font-heading text-xl font-bold text-light">{{ value.heading }}</h2>
+        {% endif %}
+        {% if value.description %}
+            <div class="prose prose-invert prose-sm mt-4 max-w-none">
+                {{ value.description|richtext }}
+            </div>
+        {% endif %}
+        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
+    </div>
+{% else %}
     <div class="wtr-signup wtr-signup-actionkit overflow-hidden rounded-lg" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
         {% if value.image %}
             <div class="relative">
@@ -35,24 +48,6 @@
                     {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
                 </div>
             </div>
-        </div>
-    </div>
-{% else %}
-    <div class="wtr-signup wtr-signup-actionkit
-                {% if compact %}wtr-signup-inline{% else %}rounded-lg bg-neutral-50 px-6 py-10{% endif %}"
-         {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
-        <div class="{% if not compact %}mx-auto max-w-2xl{% endif %}">
-            {% if value.heading %}
-                <h2 class="font-heading font-bold {% if compact %}text-xl text-light{% else %}text-2xl text-dark md:text-3xl{% endif %}">
-                    {{ value.heading }}
-                </h2>
-            {% endif %}
-            {% if value.description %}
-                <div class="prose {% if compact %}prose-invert prose-sm{% else %}prose-neutral{% endif %} mt-4 max-w-none">
-                    {{ value.description|richtext }}
-                </div>
-            {% endif %}
-            {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=compact %}
         </div>
     </div>
 {% endif %}

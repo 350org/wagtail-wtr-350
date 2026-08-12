@@ -66,11 +66,6 @@ CALLOUT_ALIGNMENT_CHOICES = [
     ("image-right", _("Image right")),
 ]
 
-CALLOUT_LAYOUT_CHOICES = [
-    ("side_by_side", _("Side by side")),
-    ("image_overlay", _("Image with overlay text")),
-]
-
 SECTION_BACKGROUND_CHOICES = [
     ("light", _("Light")),
     ("dark", _("Dark")),
@@ -88,14 +83,6 @@ SECTION_PADDING_CHOICES = [
 HERO_LAYOUT_CHOICES = [
     ("centered", _("Centered")),
     ("left", _("Left-aligned")),
-]
-
-# Shared `layout` choice set for action blocks that support an optional
-# photo-above-a-dark-two-column-panel layout (see SignupActionKitBlock,
-# DonateFundraiseUpBlock).
-IMAGE_SPLIT_LAYOUT_CHOICES = [
-    ("default", _("Default")),
-    ("image_split", _("Image + split panel")),
 ]
 
 # Mapping of Action Network URL path segments (plural) to embed types (singular).
@@ -550,10 +537,11 @@ class AccordionBlock(StructBlock):
 
 class CalloutBlock(StructBlock):
     """
-    An image or video + rich text side-by-side callout section.
+    An image or video with highlighted text overlaid on it.
 
-    Stacks on mobile. Alignment (image-left / image-right) controls which
-    side the media appears on desktop. Optional CTA button link.
+    The media renders at ~80% width; alignment (image-left / image-right)
+    controls which side it sits on, with the text on the opposite side.
+    Optional CTA button link.
 
     Exactly one of image or media_file must be set; clean() enforces this.
     At most one of link_page or link_url may be set; clean() enforces this.
@@ -595,19 +583,8 @@ class CalloutBlock(StructBlock):
         default="image-left",
         label=_("Media alignment"),
         help_text=_(
-            "Side by side: which column the media appears in. Image with "
-            "overlay text: which side the (~80%-width) image sits on — the "
-            "text sits on the opposite side."
-        ),
-    )
-    layout = ChoiceBlock(
-        choices=CALLOUT_LAYOUT_CHOICES,
-        default="side_by_side",
-        label=_("Layout"),
-        help_text=_(
-            "Side by side: image and text as equal columns. Image with "
-            "overlay text: a ~80%-width image with highlighted text over "
-            "it, no card."
+            "Which side the (~80%-width) image sits on — the text sits on "
+            "the opposite side."
         ),
     )
 
@@ -734,20 +711,13 @@ class DonateFundraiseUpBlock(StructBlock):
     trigger. The button's appearance and label are configured in the Fundraise
     Up dashboard for that element, not here — unlike DonateBlock, there is no
     button_text field.
+
+    Renders as a photo beside a dark panel (heading, description, the
+    Fundraise Up element) — use a Fundraise Up element configured as an
+    inline/embedded form in your dashboard, not a modal-trigger button, so
+    it actually renders inline in the panel rather than as a small button.
     """
 
-    layout = ChoiceBlock(
-        choices=IMAGE_SPLIT_LAYOUT_CHOICES,
-        default="default",
-        label=_("Layout"),
-        help_text=_(
-            "Default: centered card. Image + split panel: a photo above a "
-            "dark two-column section (heading left, Fundraise Up element "
-            "right) — use this with a Fundraise Up element configured as an "
-            "inline/embedded form in your dashboard, not a modal-trigger "
-            "button, so it actually renders inline in the right column."
-        ),
-    )
     heading = CharBlock(
         required=False,
         label=_("Heading"),
@@ -762,15 +732,11 @@ class DonateFundraiseUpBlock(StructBlock):
     image = ImageChooserBlock(
         required=False,
         label=_("Image"),
-        help_text=_("Only used by the 'Image + split panel' layout."),
     )
     image_caption = CharBlock(
         required=False,
         label=_("Image caption"),
-        help_text=_(
-            "Optional caption overlaid on the image, e.g. a photo credit. "
-            "Only used by the 'Image + split panel' layout."
-        ),
+        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
     )
     element_id = CharBlock(
         label=_("Fundraise Up element ID"),
@@ -988,16 +954,6 @@ class SignupActionKitBlock(StructBlock):
     FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
     _FAILURE_SENTINEL = "__actionkit_embed_fetch_failed__"
 
-    layout = ChoiceBlock(
-        choices=IMAGE_SPLIT_LAYOUT_CHOICES,
-        default="default",
-        label=_("Layout"),
-        help_text=_(
-            "Default: centered card above the form. Image + split panel: a "
-            "photo above a dark two-column section (heading left, inline "
-            "form right)."
-        ),
-    )
     heading = CharBlock(
         required=False,
         label=_("Heading"),
@@ -1012,15 +968,11 @@ class SignupActionKitBlock(StructBlock):
     image = ImageChooserBlock(
         required=False,
         label=_("Image"),
-        help_text=_("Only used by the 'Image + split panel' layout."),
     )
     image_caption = CharBlock(
         required=False,
         label=_("Image caption"),
-        help_text=_(
-            "Optional caption overlaid on the image, e.g. a photo credit. "
-            "Only used by the 'Image + split panel' layout."
-        ),
+        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
     )
     short_form_id = CharBlock(
         label=_("ActionKit Page Shortname"),
