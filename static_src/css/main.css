@@ -266,4 +266,32 @@ html {
     text-decoration: underline;
 }
 
+/* ============================================================
+ * Callout image-overlay "highlighter" text — .wtr-callout-highlight
+ * ============================================================
+ * Used by callout_block.html's image_overlay layout: text sits directly on
+ * the photo with a tight white background clinging to each line (like a
+ * highlighter pen), not one padded box behind the whole paragraph.
+ * box-decoration-break: clone repeats the background/padding per line
+ * fragment instead of once for the whole wrapped element — the standard
+ * technique for this effect (Tailwind has no utility for it).
+ * ============================================================ */
+.wtr-callout-highlight,
+.wtr-callout-highlight p {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 1.25;
+}
+
+.wtr-callout-highlight p {
+    display: inline;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    background-color: var(--color-light);
+    color: var(--color-dark);
+    padding: 0.05em 0.3em;
+}
+
 

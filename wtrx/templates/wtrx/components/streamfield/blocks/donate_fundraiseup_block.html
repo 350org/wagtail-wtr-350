@@ -1,20 +1,61 @@
-{% load i18n wagtailcore_tags %}
-<div class="wtr-donate rounded-lg bg-primary-50 px-6 py-10 text-center">
-    {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-primary-900 md:text-3xl">{{ value.heading }}</h2>{% endif %}
-    {% if value.description %}
-        <div class="prose prose-neutral mx-auto mt-4 max-w-2xl">
-            {{ value.description|richtext }}
-        </div>
-    {% endif %}
-    {% comment %}
+{% load i18n wagtailcore_tags wagtailimages_tags %}
+{% comment %}
     Fundraise Up's installation script (rendered site-wide in <head> via
     IntegrationSettings.head_html() while this integration is enabled)
-    scans the page for anchors like this and hydrates them into a styled
-    button that opens its Checkout Modal. Appearance and label are configured
-    in the Fundraise Up dashboard for this element, not here — the anchor
-    stays hidden until Fundraise Up's script replaces it.
+    scans the page for anchors like the one below and hydrates them based
+    on how that element is configured in the Fundraise Up dashboard —
+    a modal-trigger button, or an inline/embedded form (amount grid,
+    give-once/monthly toggle, payment icons, all rendered by Fundraise Up
+    itself). The anchor stays hidden until Fundraise Up's script replaces
+    it — appearance and behavior are configured in their dashboard, not here.
+{% endcomment %}
+{% if value.layout == 'image_split' %}
+    {% comment %}
+    Side-by-side split: image as the left column (stretches to match the
+    right column's height via CSS Grid's default row-stretch), dark panel
+    as the right column with heading/description/action stacked in one
+    column — distinct from signup_actionkit_block.html's image_split,
+    which stacks image-on-top-of-a-2-column-panel instead. Not a shared
+    component: the two are genuinely different layouts, not the same
+    shell with different content.
     {% endcomment %}
-    <div class="mt-8">
-        <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+    <div class="wtr-donate grid grid-cols-1 overflow-hidden rounded-lg md:grid-cols-2">
+        {% if value.image %}
+            <div class="relative">
+                {% image value.image fill-1200x1200 as img %}
+                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                     class="h-64 w-full object-cover md:h-full" loading="lazy">
+                {% if value.image_caption %}
+                    <div class="absolute inset-x-0 bottom-0 bg-dark/70 px-4 py-2">
+                        <p class="text-xs text-light">{{ value.image_caption }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+        <div class="bg-dark px-6 py-12 text-light sm:px-10 sm:py-16">
+            {% if value.heading %}
+                <h2 class="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">{{ value.heading }}</h2>
+            {% endif %}
+            {% if value.description %}
+                <div class="prose prose-invert mt-4 max-w-none">
+                    {{ value.description|richtext }}
+                </div>
+            {% endif %}
+            <div class="mt-8">
+                <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+            </div>
+        </div>
     </div>
-</div>
+{% else %}
+    <div class="wtr-donate rounded-lg bg-primary-50 px-6 py-10 text-center">
+        {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-primary-900 md:text-3xl">{{ value.heading }}</h2>{% endif %}
+        {% if value.description %}
+            <div class="prose prose-neutral mx-auto mt-4 max-w-2xl">
+                {{ value.description|richtext }}
+            </div>
+        {% endif %}
+        <div class="mt-8">
+            <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+        </div>
+    </div>
+{% endif %}

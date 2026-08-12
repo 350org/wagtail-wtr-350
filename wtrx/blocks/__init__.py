@@ -66,6 +66,11 @@ CALLOUT_ALIGNMENT_CHOICES = [
     ("image-right", _("Image right")),
 ]
 
+CALLOUT_LAYOUT_CHOICES = [
+    ("side_by_side", _("Side by side")),
+    ("image_overlay", _("Image with overlay text")),
+]
+
 SECTION_BACKGROUND_CHOICES = [
     ("light", _("Light")),
     ("dark", _("Dark")),
@@ -85,7 +90,10 @@ HERO_LAYOUT_CHOICES = [
     ("left", _("Left-aligned")),
 ]
 
-SIGNUP_ACTIONKIT_LAYOUT_CHOICES = [
+# Shared `layout` choice set for action blocks that support an optional
+# photo-above-a-dark-two-column-panel layout (see SignupActionKitBlock,
+# DonateFundraiseUpBlock).
+IMAGE_SPLIT_LAYOUT_CHOICES = [
     ("default", _("Default")),
     ("image_split", _("Image + split panel")),
 ]
@@ -586,6 +594,21 @@ class CalloutBlock(StructBlock):
         choices=CALLOUT_ALIGNMENT_CHOICES,
         default="image-left",
         label=_("Media alignment"),
+        help_text=_(
+            "Side by side: which column the media appears in. Image with "
+            "overlay text: which side the (~80%-width) image sits on — the "
+            "text sits on the opposite side."
+        ),
+    )
+    layout = ChoiceBlock(
+        choices=CALLOUT_LAYOUT_CHOICES,
+        default="side_by_side",
+        label=_("Layout"),
+        help_text=_(
+            "Side by side: image and text as equal columns. Image with "
+            "overlay text: a ~80%-width image with highlighted text over "
+            "it, no card."
+        ),
     )
 
     def clean(self, value):
@@ -713,6 +736,18 @@ class DonateFundraiseUpBlock(StructBlock):
     button_text field.
     """
 
+    layout = ChoiceBlock(
+        choices=IMAGE_SPLIT_LAYOUT_CHOICES,
+        default="default",
+        label=_("Layout"),
+        help_text=_(
+            "Default: centered card. Image + split panel: a photo above a "
+            "dark two-column section (heading left, Fundraise Up element "
+            "right) — use this with a Fundraise Up element configured as an "
+            "inline/embedded form in your dashboard, not a modal-trigger "
+            "button, so it actually renders inline in the right column."
+        ),
+    )
     heading = CharBlock(
         required=False,
         label=_("Heading"),
@@ -723,6 +758,19 @@ class DonateFundraiseUpBlock(StructBlock):
         required=False,
         label=_("Description"),
         help_text=_("Optional supporting text below the heading."),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+        help_text=_("Only used by the 'Image + split panel' layout."),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_(
+            "Optional caption overlaid on the image, e.g. a photo credit. "
+            "Only used by the 'Image + split panel' layout."
+        ),
     )
     element_id = CharBlock(
         label=_("Fundraise Up element ID"),
@@ -941,7 +989,7 @@ class SignupActionKitBlock(StructBlock):
     _FAILURE_SENTINEL = "__actionkit_embed_fetch_failed__"
 
     layout = ChoiceBlock(
-        choices=SIGNUP_ACTIONKIT_LAYOUT_CHOICES,
+        choices=IMAGE_SPLIT_LAYOUT_CHOICES,
         default="default",
         label=_("Layout"),
         help_text=_(
