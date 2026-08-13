@@ -63,6 +63,15 @@ html {
     border-color: var(--color-dark);
 }
 
+/* Same as wtr-btn-outline but light-colored, for dark backgrounds
+ * (e.g. CalloutBlock's navy/red/dark-grey/blue-gradient colors) where the
+ * dark-text-on-transparent default would be unreadable. */
+@utility wtr-btn-outline-light {
+    background-color: transparent;
+    color: var(--color-light);
+    border-color: var(--color-light);
+}
+
 @utility wtr-btn-sm {
     padding: 0.375rem 0.875rem;
     font-size: 0.875rem;
@@ -268,38 +277,38 @@ html {
 }
 
 /* ============================================================
- * Callout image-overlay "highlighter" text — .wtr-callout-highlight
+ * Quote image-overlay "highlighter" text — .wtr-quote-highlight
  * ============================================================
- * Used by callout_block.html's image_overlay layout: text sits directly on
- * the photo with a tight white background clinging to each line (like a
- * highlighter pen), not one padded box behind the whole paragraph.
- * box-decoration-break: clone repeats the background/padding per line
- * fragment instead of once for the whole wrapped element — the standard
- * technique for this effect (Tailwind has no utility for it).
+ * Used by quote_block.html: text sits directly on the photo with a tight
+ * white background clinging to each line (like a highlighter pen), not
+ * one padded box behind the whole paragraph. box-decoration-break: clone
+ * repeats the background/padding per line fragment instead of once for
+ * the whole wrapped element — the standard technique for this effect
+ * (Tailwind has no utility for it).
  *
  * font-size is clamp()ed rather than fixed at the desktop 48px: the overlay
  * stays absolutely positioned on top of the image at every breakpoint (see
- * callout_block.html's comment — no stacked-below fallback for mobile, and
+ * quote_block.html's comment — no stacked-below fallback for mobile, and
  * the image itself goes full-width, not 80%, below sm: for extra height),
  * so keeping it vertically contained depends on the text — plus the CTA
- * button below it, when a callout has one, sharing the same vertical
+ * button below it, when a quote has one, sharing the same vertical
  * budget — not needing much more height than the image has.
  *
  * The image's own height (it's aspect-video, so height tracks its own
  * width directly) only reaches enough room for 48px-tall overlaid text at
  * a genuinely wide desktop viewport. At 320–375px widths, measured against
- * a real long callout (a 2-3 sentence mission statement) WITH its CTA
+ * a real long quote (a 2-3 sentence mission statement) WITH its CTA
  * button — the button alone is ~48px plus a 16px gap, eating into the same
  * budget as the text — the floor that reliably still fits is 14px at
  * 320px's now-full-width (~162px-tall) image; 375px has enough width by
  * then to comfortably clear it too. 4vw reaches the 3rem/48px cap at
  * 1200px, so through the whole 640–1200px tablet range the font is still
  * scaling down below 48px to leave the (there, still not very tall) image
- * headroom too — verified against a real long callout + button at 320,
+ * headroom too — verified against a real long quote + button at 320,
  * 375, 700, 950, and 1200px.
  * ============================================================ */
-.wtr-callout-highlight,
-.wtr-callout-highlight p {
+.wtr-quote-highlight,
+.wtr-quote-highlight p {
     margin: 0;
     font-family: var(--font-heading);
     font-size: clamp(0.875rem, 4vw, 3rem);
@@ -307,13 +316,59 @@ html {
     line-height: 1.25;
 }
 
-.wtr-callout-highlight p {
+.wtr-quote-highlight p {
     display: inline;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
     background-color: var(--color-light);
     color: var(--color-dark);
     padding: 0.05em 0.3em;
+}
+
+/* ============================================================
+ * Callout color variants — .wtr-callout-{color}
+ * ============================================================
+ * Used by callout_block.html. Five choices from CalloutBlock.color;
+ * light-grey is the only light background (matching text/button color
+ * handled in the template, not here — see its comment). navy/red reuse
+ * the two CalloutBlock-only tokens from theme.css (Figma hex values, not
+ * part of the general brand ramp); dark-grey reuses --color-dark exactly
+ * (not a separate token — this *is* 350's existing dark color, just also
+ * offered as a callout background); light-grey reuses --color-neutral-200
+ * (already labeled "Figma: gray callout" in theme.css, predating this
+ * block). blue-gradient is the only one without a direct Figma hex — a
+ * diagonal gradient across the existing primary blue ramp, light-to-dark,
+ * approximating the reference design's gradient + faint "350" watermark
+ * (the watermark itself is CalloutBlock's own optional `image` field, not
+ * baked into this gradient).
+ * ============================================================ */
+.wtr-callout-navy {
+    background-color: var(--color-callout-navy);
+}
+
+.wtr-callout-red {
+    background-color: var(--color-callout-red);
+}
+
+.wtr-callout-dark-grey {
+    background-color: var(--color-dark);
+}
+
+.wtr-callout-light-grey {
+    background-color: var(--color-neutral-200);
+}
+
+.wtr-callout-blue-gradient {
+    background: linear-gradient(135deg, var(--color-primary-400), var(--color-primary-800));
+}
+
+/* Background image: a subtle texture/watermark behind the text, not a
+ * full photo — see callout_block.html's comment. Sits behind the
+ * `relative` text block purely via DOM order (it's the first child), so
+ * no z-index is needed on either side. */
+.wtr-callout-bg-image {
+    opacity: 0.2;
+    pointer-events: none;
 }
 
 /* ============================================================

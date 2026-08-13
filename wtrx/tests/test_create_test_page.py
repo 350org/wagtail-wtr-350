@@ -202,10 +202,6 @@ class TestCreateTestPageRendering(TestCase):
         response = self._get()
         self.assertContains(response, "Primary Button")
 
-    def test_quote_block_renders(self):
-        response = self._get()
-        self.assertContains(response, "The change we need starts with each of us")
-
     def test_raw_html_block_renders(self):
         response = self._get()
         self.assertContains(response, "Raw HTML block")
@@ -288,12 +284,6 @@ class TestCreateTestPageRendering(TestCase):
         response = self._get()
         self.assertContains(response, "Outline Button")
 
-    # --- quote without attribution ---
-
-    def test_quote_without_attribution_renders(self):
-        response = self._get()
-        self.assertContains(response, "Unattributed quote")
-
     # --- standalone card block ---
 
     def test_card_block_with_image_renders(self):
@@ -320,14 +310,14 @@ class TestCreateTestPageRendering(TestCase):
         response = self._get()
         self.assertContains(response, "Bob Minimal")
 
-    # --- callout block ---
+    # --- quote block ---
 
-    def test_callout_image_left_renders(self):
+    def test_quote_image_left_renders(self):
         response = self._get()
         self.assertContains(response, "image aligned to the")
         self.assertContains(response, "Learn More")
 
-    def test_callout_image_right_renders(self):
+    def test_quote_image_right_renders(self):
         response = self._get()
         self.assertContains(response, "No CTA button on this one")
 

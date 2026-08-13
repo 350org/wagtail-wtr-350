@@ -16,31 +16,43 @@
     which stacks image-on-top-of-a-2-column-panel instead. Not a shared
     component: the two are genuinely different layouts, not the same shell
     with different content.
+
+    Full-bleed: this block is special-cased in content_page.html/
+    home_page.html (alongside "section" and "card_carousel") to skip the
+    shared `mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8` wrapper every
+    other block gets, so — unlike that wrapper's 1024px cap — the card
+    spans the full viewport width up to the same 1500px cap
+    card_carousel_block.html uses (mx-auto max-w-[1500px] on .wtr-donate
+    itself, centering it once the viewport exceeds that), with its own
+    matching px-4/6/8 (py-8 too, replacing what the shared wrapper would
+    have given it) as left/right gutters.
 {% endcomment %}
-<div class="wtr-donate grid grid-cols-1 overflow-hidden rounded-lg md:grid-cols-2">
-    {% if value.image %}
-        <div class="relative">
-            {% image value.image fill-1200x1200 as img %}
-            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
-                 class="h-64 w-full object-cover md:h-full" loading="lazy">
-            {% if value.image_caption %}
-                <div class="absolute inset-x-0 bottom-0 bg-dark/70 px-4 py-2">
-                    <p class="text-xs text-light">{{ value.image_caption }}</p>
-                </div>
-            {% endif %}
-        </div>
-    {% endif %}
-    <div class="bg-dark px-6 py-12 text-light sm:px-10 sm:py-16">
-        {% if value.heading %}
-            <h2 class="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">{{ value.heading }}</h2>
-        {% endif %}
-        {% if value.description %}
-            <div class="prose prose-invert mt-4 max-w-none">
-                {{ value.description|richtext }}
+<div class="w-full px-4 py-8 sm:px-6 lg:px-8">
+    <div class="wtr-donate mx-auto grid max-w-[1500px] grid-cols-1 overflow-hidden rounded-lg md:grid-cols-2">
+        {% if value.image %}
+            <div class="relative">
+                {% image value.image fill-1200x1200 as img %}
+                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                     class="h-64 w-full object-cover md:h-full" loading="lazy">
+                {% if value.image_caption %}
+                    <div class="absolute inset-x-0 bottom-0 bg-dark/70 px-4 py-2">
+                        <p class="text-xs text-light">{{ value.image_caption }}</p>
+                    </div>
+                {% endif %}
             </div>
         {% endif %}
-        <div class="mt-8">
-            <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+        <div class="bg-dark px-6 py-12 text-light sm:px-10 sm:py-16">
+            {% if value.heading %}
+                <h2 class="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">{{ value.heading }}</h2>
+            {% endif %}
+            {% if value.description %}
+                <div class="prose prose-invert mt-4 max-w-none">
+                    {{ value.description|richtext }}
+                </div>
+            {% endif %}
+            <div class="mt-8">
+                <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+            </div>
         </div>
     </div>
 </div>

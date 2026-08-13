@@ -1,7 +1,7 @@
 """
 Tests for StreamField blocks.
 
-Content blocks (ButtonBlock, VideoBlock), layout blocks (CalloutBlock,
+Content blocks (ButtonBlock, VideoBlock), layout blocks (QuoteBlock,
 HeroBlock, SectionBlock), and action blocks (SignupLinkBlock,
 SignupActionNetworkBlock) are tested here with SimpleTestCase since their
 clean() methods don't require a database.
@@ -17,11 +17,11 @@ from django.test import SimpleTestCase
 from wtrx.blocks import (
     BodyStreamBlock,
     ButtonBlock,
-    CalloutBlock,
     CardBlock,
     DonateBlock,
     HeroBlock,
     HeroCTABlock,
+    QuoteBlock,
     SectionBlock,
     SectionContentBlock,
     SignupActionKitBlock,
@@ -115,9 +115,9 @@ class TestVideoBlockValidation(SimpleTestCase):
         self.assertEqual(cleaned["caption"], "My video caption")
 
 
-class TestCalloutBlockValidation(SimpleTestCase):
+class TestQuoteBlockValidation(SimpleTestCase):
     """
-    CalloutBlock validation: exactly one of image/media_file, at most one link.
+    QuoteBlock validation: exactly one of image/media_file, at most one link.
 
     ImageChooserBlock and VideoChooserBlock both require a DB to resolve
     chooser values, so we cannot call block.clean() end-to-end in
@@ -127,7 +127,7 @@ class TestCalloutBlockValidation(SimpleTestCase):
     """
 
     def _run_media_validation(self, image, media_file):
-        """Mirror the media-exclusivity branch of CalloutBlock.clean()."""
+        """Mirror the media-exclusivity branch of QuoteBlock.clean()."""
         from django.core.exceptions import ValidationError as DjValidationError
         errors = {}
         has_image = bool(image)
@@ -188,7 +188,7 @@ class TestCalloutBlockValidation(SimpleTestCase):
         self.assertIn("media_file", errors)
 
     def test_block_has_expected_fields(self):
-        block = CalloutBlock()
+        block = QuoteBlock()
         self.assertIn("content", block.declared_blocks)
         self.assertIn("image", block.declared_blocks)
         self.assertIn("media_file", block.declared_blocks)
@@ -199,16 +199,16 @@ class TestCalloutBlockValidation(SimpleTestCase):
 
     def test_image_is_optional(self):
         """image must be optional (required=False) to allow media_file instead."""
-        block = CalloutBlock()
+        block = QuoteBlock()
         self.assertFalse(block.declared_blocks["image"].required)
 
     def test_media_file_is_optional(self):
         """media_file must be optional (required=False) to allow image instead."""
-        block = CalloutBlock()
+        block = QuoteBlock()
         self.assertFalse(block.declared_blocks["media_file"].required)
 
     def test_alignment_choices(self):
-        block = CalloutBlock()
+        block = QuoteBlock()
         choices = dict(block.declared_blocks["alignment"].field.choices)
         self.assertIn("image-left", choices)
         self.assertIn("image-right", choices)

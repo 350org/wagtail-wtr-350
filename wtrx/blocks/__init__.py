@@ -2,11 +2,11 @@
 StreamField blocks for the BodyStreamBlock.
 
 Block categories (in definition order):
-  Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock, QuoteBlock,
+  Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock,
             RawHTMLBlock, TableBlock
   Cards:    CardBlock, CarouselCardBlock, PersonCardBlock
   Layout:   AccordionItemBlock, CardGridBlock, CardCarouselBlock,
-            AccordionBlock, CalloutBlock
+            AccordionBlock, QuoteBlock, CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock, SignupLinkBlock
   Layout²:  AnnouncementBarBlock, HeroCTABlock, HeroBlock, SectionBlock
@@ -62,10 +62,23 @@ BUTTON_STYLE_CHOICES = [
     ("outline", _("Outline")),
 ]
 
-CALLOUT_ALIGNMENT_CHOICES = [
+QUOTE_ALIGNMENT_CHOICES = [
     ("image-left", _("Image left")),
     ("image-right", _("Image right")),
 ]
+
+CALLOUT_COLOR_CHOICES = [
+    ("navy", _("Navy")),
+    ("red", _("Red")),
+    ("dark-grey", _("Dark grey")),
+    ("blue-gradient", _("350 blue (gradient)")),
+    ("light-grey", _("Light grey")),
+]
+
+# The one CalloutBlock color light enough to need dark text/buttons instead
+# of light — see CalloutBlock's docstring and main.css's .wtr-callout-*
+# rules, both of which branch on this same set.
+CALLOUT_ON_LIGHT_COLORS = {"light-grey"}
 
 SECTION_BACKGROUND_CHOICES = [
     ("light", _("Light")),
@@ -317,27 +330,6 @@ class ButtonBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/button_block.html"
 
 
-class QuoteBlock(StructBlock):
-    """
-    A pull quote with optional attribution.
-    """
-
-    quote = WagtailTextBlock(
-        label=_("Quote"),
-        help_text=_("The quotation text."),
-    )
-    attribution = CharBlock(
-        required=False,
-        label=_("Attribution"),
-        help_text=_("Who said it (e.g. 'Jane Smith')."),
-    )
-
-    class Meta:
-        icon = "openquote"
-        label = _("Quote")
-        template = "wtrx/components/streamfield/blocks/quote_block.html"
-
-
 class RawHTMLBlock(WagtailRawHTMLBlock):
     """
     A raw HTML passthrough block for embed codes, custom widgets, etc.
@@ -546,7 +538,7 @@ class CardCarouselBlock(StructBlock):
     Cards are manually authored (a ListBlock of CarouselCardBlock, not
     pulled from pages) — minimum 3, no maximum. At most one of link_page or
     link_url may be set; clean() enforces this, same pattern as CardBlock
-    and CalloutBlock.
+    and QuoteBlock.
     """
 
     heading = CharBlock(
@@ -612,9 +604,9 @@ class AccordionBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/accordion_block.html"
 
 
-class CalloutBlock(StructBlock):
+class QuoteBlock(StructBlock):
     """
-    An image or video with highlighted text overlaid on it.
+    An image or video with highlighted (pull-quote-style) text overlaid on it.
 
     The media renders at ~80% width; alignment (image-left / image-right)
     controls which side it sits on, with the text on the opposite side.
@@ -622,6 +614,11 @@ class CalloutBlock(StructBlock):
 
     Exactly one of image or media_file must be set; clean() enforces this.
     At most one of link_page or link_url may be set; clean() enforces this.
+
+    Replaces an earlier, unrelated plain pull-quote block (quote text +
+    attribution, no image) that also used the "Quote" name/block key —
+    that one is gone, not renamed alongside this; this is the image-overlay
+    design becoming "Quote", nothing about it changed for the rename.
     """
 
     content = RichTextBlock(
@@ -656,7 +653,7 @@ class CalloutBlock(StructBlock):
         help_text=_("External link. Set either this or Link page, not both."),
     )
     alignment = ChoiceBlock(
-        choices=CALLOUT_ALIGNMENT_CHOICES,
+        choices=QUOTE_ALIGNMENT_CHOICES,
         default="image-left",
         label=_("Media alignment"),
         help_text=_(
@@ -687,6 +684,78 @@ class CalloutBlock(StructBlock):
 
     class Meta:
         icon = "image"
+        label = _("Quote")
+        template = "wtrx/components/streamfield/blocks/quote_block.html"
+
+
+class CalloutBlock(StructBlock):
+    """
+    A solid-color (or gradient) card: optional heading, optional subheading,
+    optional paragraph, optional CTA button, and an optional low-opacity
+    background image (a subtle texture/watermark behind the text, not a
+    full photo — see callout_block.html).
+
+    Text/button color (light vs dark) is derived from the chosen color, not
+    independently editable — navy/red/dark-grey/blue-gradient are all dark
+    enough to need light (white) text and a light-outline button; light-grey
+    is the one light background, needing dark text and a dark-outline
+    button. See CALLOUT_ON_LIGHT_COLORS below and main.css's
+    .wtr-callout-{color} classes for that pairing.
+    """
+
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Optional. Rendered as an H2."),
+    )
+    subheading = CharBlock(
+        required=False,
+        label=_("Subheading"),
+        help_text=_("Optional. Rendered as an H3."),
+    )
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        required=False,
+        label=_("Paragraph"),
+    )
+    link_text = CharBlock(
+        required=False,
+        label=_("Link text"),
+        help_text=_("CTA button label. Leave blank to omit the button."),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+    color = ChoiceBlock(
+        choices=CALLOUT_COLOR_CHOICES,
+        default="navy",
+        label=_("Color"),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Background image"),
+        help_text=_(
+            "Optional. Rendered as a subtle, low-opacity texture behind the "
+            "text — not a full photo background."
+        ),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "pick"
         label = _("Callout")
         template = "wtrx/components/streamfield/blocks/callout_block.html"
 
@@ -887,8 +956,11 @@ class SuccessMessageBlock(StreamBlock):
     StreamBlock for the optional thank-you content shown after a successful
     Action Network signup.
 
-    Intentionally limited to content blocks (text, image, button, quote) —
-    no action blocks, layout blocks, or section nesting.
+    Intentionally limited to content blocks (text, image, button) — no
+    action blocks, layout blocks, or section nesting. Previously also
+    offered a lightweight pull-quote block, removed when that block was
+    replaced by the (much heavier, image-required) image-overlay Quote
+    design — not a fit for this compact context.
 
     ``to_python`` coerces legacy non-list values (old RichTextBlock empty
     strings) to an empty list so existing pages load without error.
@@ -897,7 +969,6 @@ class SuccessMessageBlock(StreamBlock):
     text = TextBlock()
     image = ImageBlock()
     button = ButtonBlock()
-    quote = QuoteBlock()
 
     @staticmethod
     def _coerce(value):

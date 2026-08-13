@@ -67,6 +67,13 @@
   --color-light: #ffffff;
   --color-dark:  #17292e;
 
+  /* CalloutBlock-only solid colors (Figma) — not part of the general brand
+   * ramp above, used only for the callout's color choice field. Dark grey
+   * and light grey reuse --color-neutral-800/200 instead of a dedicated
+   * token, per Figma's own callout swatches matching those exactly. */
+  --color-callout-navy: #024582;
+  --color-callout-red:  #ed4b0c;
+
   /* Primary brand color — 350.org redesign blue (Figma: #0F81E8) */
   --color-primary:     #0f81e8;  /* Alias for wtr-btn and single-token re-theming */
   --color-primary-50:  #ebf5ff;

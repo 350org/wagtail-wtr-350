@@ -15,7 +15,7 @@ CHARFIELD_MAX_LENGTH = 255
 # Rich text feature sets
 #
 # RICHTEXT_FEATURES_FULL:   headings, inline formatting, links, lists, blockquote.
-#                           Used for body-level rich text (TextBlock, CalloutBlock, etc.).
+#                           Used for body-level rich text (TextBlock, QuoteBlock, etc.).
 #
 # RICHTEXT_FEATURES_INLINE: bold, italic, link only.
 #                           Used for short rich text (descriptions, intro fields).

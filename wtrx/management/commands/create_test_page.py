@@ -44,7 +44,7 @@ def _make_test_image():
     fixture at fixtures/placeholder.jpg (1200×800, indigo background with label).
 
     Using a real JPEG ensures image-bearing blocks render visually during QA
-    (hero, callout, card, person card, image block).
+    (hero, quote, card, person card, image block).
     """
     import os
 
@@ -137,26 +137,6 @@ def _button_block_outline():
             "link_page": None,
             "link_url": "https://example.com",
             "style": "outline",
-        },
-    }
-
-
-def _quote_block_with_attribution():
-    return {
-        "type": "quote",
-        "value": {
-            "quote": "The change we need starts with each of us showing up.",
-            "attribution": "A. Organizer",
-        },
-    }
-
-
-def _quote_block_no_attribution():
-    return {
-        "type": "quote",
-        "value": {
-            "quote": "Unattributed quote — no attribution field set.",
-            "attribution": "",
         },
     }
 
@@ -287,12 +267,12 @@ def _accordion_block():
     }
 
 
-def _callout_block_image_left(image_id):
-    """CalloutBlock: image on the left, with a CTA link."""
+def _quote_block_image_left(image_id):
+    """QuoteBlock: image on the left, with a CTA link."""
     return {
-        "type": "callout",
+        "type": "quote",
         "value": {
-            "content": "<p>Callout block with the image aligned to the <strong>left</strong>. This supports rich text and a CTA button.</p>",
+            "content": "<p>Quote block with the image aligned to the <strong>left</strong>. This supports rich text and a CTA button.</p>",
             "image": image_id,
             "alignment": "image-left",
             "link_text": "Learn More",
@@ -302,12 +282,12 @@ def _callout_block_image_left(image_id):
     }
 
 
-def _callout_block_image_right(image_id):
-    """CalloutBlock: image on the right, no CTA."""
+def _quote_block_image_right(image_id):
+    """QuoteBlock: image on the right, no CTA."""
     return {
-        "type": "callout",
+        "type": "quote",
         "value": {
-            "content": "<p>Callout block with the image aligned to the <strong>right</strong>. No CTA button on this one.</p>",
+            "content": "<p>Quote block with the image aligned to the <strong>right</strong>. No CTA button on this one.</p>",
             "image": image_id,
             "alignment": "image-right",
             "link_text": "",
@@ -413,14 +393,13 @@ def _section_block(background, padding, anchor_suffix, image_id):
     inner_blocks = [
         _text_block(),
         _button_block_primary(),
-        _quote_block_with_attribution(),
         _table_block(),
         _accordion_block(),
         _donate_block_full(),
         _signup_link_block(),
         _image_block_full(image_id),
         _card_grid_block(image_id),
-        _callout_block_image_left(image_id),
+        _quote_block_image_left(image_id),
     ]
     return {
         "type": "section",
@@ -444,8 +423,6 @@ def _build_flat_blocks(image_id):
         _button_block_primary(),
         _button_block_secondary(),
         _button_block_outline(),
-        _quote_block_with_attribution(),
-        _quote_block_no_attribution(),
         _raw_html_block(),
         _table_block(),
         _card_block_full(image_id),
@@ -454,8 +431,8 @@ def _build_flat_blocks(image_id):
         _person_card_block_minimal(),
         _card_grid_block(image_id),
         _accordion_block(),
-        _callout_block_image_left(image_id),
-        _callout_block_image_right(image_id),
+        _quote_block_image_left(image_id),
+        _quote_block_image_right(image_id),
         _hero_block_full(),
         _hero_block_minimal(),
         _donate_block_full(),
