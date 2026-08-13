@@ -6,7 +6,7 @@ Block categories (in definition order):
             RawHTMLBlock, TableBlock
   Cards:    CardBlock, CarouselCardBlock, PersonCardBlock
   Layout:   AccordionItemBlock, CardGridBlock, CardCarouselBlock,
-            AccordionBlock, QuoteBlock, CalloutBlock
+            PageCardsBlock, AccordionBlock, QuoteBlock, CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock, SignupLinkBlock
   Layout²:  AnnouncementBarBlock, HeroCTABlock, HeroBlock, SectionBlock
@@ -582,6 +582,74 @@ class CardCarouselBlock(StructBlock):
         icon = "grip"
         label = _("Card Carousel")
         template = "wtrx/components/streamfield/blocks/card_carousel_block.html"
+
+
+class PageCardsBlock(StructBlock):
+    """
+    A heading + optional subheading, and a row of cards auto-generated from
+    the most recently published child pages of a chosen index page, plus an
+    optional CTA button linking to that index page.
+
+    Unlike CardCarouselBlock, cards aren't manually authored — they're the 3
+    most recently published live/public children of index_page (same
+    get_children().live().public().specific() query IndexPage.get_context()
+    uses), converted to card dicts via the same page_as_card() tag
+    index_page.html uses, so this always reflects whatever's actually
+    published there. "Latest" = first_published_at, since no page type has a
+    dedicated date field.
+    """
+
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
+    subheading = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        required=False,
+        label=_("Subheading"),
+    )
+    index_page = PageChooserBlock(
+        page_type="wtrx.IndexPage",
+        label=_("Index page"),
+        help_text=_(
+            "The 3 most recently published pages under this index page are shown as cards."
+        ),
+    )
+    link_text = CharBlock(
+        required=False,
+        default=_("Read more"),
+        label=_("Button text"),
+        help_text=_(
+            "Optional CTA button below the cards. Always links to the index page above."
+        ),
+    )
+
+    def get_context(self, value, parent_context=None):
+        from wtrx.templatetags.wtrx_tags import page_as_card
+
+        context = super().get_context(value, parent_context=parent_context)
+        index_page = value.get("index_page")
+        cards = []
+        if index_page is not None:
+            children = (
+                index_page.specific.get_children()
+                .live()
+                .public()
+                .specific()
+                .order_by("-first_published_at")[:3]
+            )
+            for child in children:
+                card = page_as_card(child)
+                card["date"] = child.first_published_at
+                cards.append(card)
+        context["cards"] = cards
+        return context
+
+    class Meta:
+        icon = "grip"
+        label = _("Page Cards")
+        template = "wtrx/components/streamfield/blocks/page_cards_block.html"
 
 
 class AccordionBlock(StructBlock):
@@ -1389,6 +1457,7 @@ class SectionContentBlock(StreamBlock):
     person_card = PersonCardBlock()
     card_grid = CardGridBlock()
     card_carousel = CardCarouselBlock()
+    page_cards = PageCardsBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
     hero = HeroBlock()
@@ -1468,6 +1537,7 @@ class BodyStreamBlock(StreamBlock):
     person_card = PersonCardBlock()
     card_grid = CardGridBlock()
     card_carousel = CardCarouselBlock()
+    page_cards = PageCardsBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
     hero = HeroBlock()

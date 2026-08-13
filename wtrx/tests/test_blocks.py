@@ -11,8 +11,12 @@ are validated by Wagtail's built-in block validation, so no additional unit
 tests are needed here.
 """
 
+from datetime import timedelta
+
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
+from wagtail.models import Page
 
 from wtrx.blocks import (
     BodyStreamBlock,
@@ -21,6 +25,7 @@ from wtrx.blocks import (
     DonateBlock,
     HeroBlock,
     HeroCTABlock,
+    PageCardsBlock,
     QuoteBlock,
     SectionBlock,
     SectionContentBlock,
@@ -32,6 +37,7 @@ from wtrx.blocks import (
     _validate_at_most_one_link,
     parse_action_network_url,
 )
+from wtrx.models import ContentPage, HomePage, IndexPage
 
 
 class TestButtonBlockValidation(SimpleTestCase):
@@ -345,6 +351,7 @@ class TestSectionBlockStructure(SimpleTestCase):
         "person_card",
         "card_grid",
         "card_carousel",
+        "page_cards",
         "accordion",
         "callout",
         "hero",
@@ -396,6 +403,63 @@ class TestCardBlockFields(SimpleTestCase):
     def test_heading_is_required(self):
         block = CardBlock()
         self.assertTrue(block.declared_blocks["heading"].required)
+
+
+class TestPageCardsBlockGetContext(TestCase):
+    """
+    PageCardsBlock.get_context() must pull the 3 most recently published
+    live/public children of index_page, newest first, as page_as_card()
+    dicts with a "date" key added.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-pcb")
+        root.add_child(instance=home)
+        cls.index = IndexPage(title="Blog", slug="blog-pcb")
+        home.add_child(instance=cls.index)
+
+        base_time = timezone.now() - timedelta(days=10)
+        cls.children = []
+        for i in range(5):
+            child = ContentPage(title=f"Post {i}", slug=f"post-pcb-{i}")
+            cls.index.add_child(instance=child)
+            child.first_published_at = base_time + timedelta(days=i)
+            child.save()
+            cls.children.append(child)
+
+        cls.draft_child = ContentPage(title="Draft Post", slug="draft-post-pcb", live=False)
+        cls.index.add_child(instance=cls.draft_child)
+
+    def test_returns_three_most_recent_cards_newest_first(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Post 4", "Post 3", "Post 2"])
+
+    def test_excludes_non_live_children(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertNotIn("Draft Post", headings)
+
+    def test_card_date_is_first_published_at(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        newest_card = context["cards"][0]
+        self.assertEqual(newest_card["date"], self.children[4].first_published_at)
+
+    def test_card_link_page_is_the_child_page(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        newest_card = context["cards"][0]
+        self.assertEqual(newest_card["link_page"].pk, self.children[4].pk)
+
+    def test_no_index_page_returns_no_cards(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": None})
+        self.assertEqual(context["cards"], [])
 
 
 class TestSectionContentBlockExtensibility(SimpleTestCase):
