@@ -11,157 +11,153 @@
     layout        — "centered" (default) or "left"
     cta           — optional HeroCTABlock stream value (0 or 1 items: signup/donate/announcement)
 
-  Layout behaviour:
-    - No video: centered text over optional background image (original layout).
-    - With video: two-column grid — text left (right-aligned on md+), video right.
-      On mobile both columns go full-width; video appears below text (DOM order).
-      Background image overlay is not shown when a video is present.
+  Layout: centered or left-aligned text (hero.layout) over a full-bleed
+  background — a video if hero.video is set, else hero.image, else plain
+  dark background. HeroBlock never sets video (see its get_context()), so
+  it always takes the image/plain path; only page-level heroes (HeroMixin)
+  currently offer a video chooser.
+
+  Background video: autoplay/muted/loop/playsinline, no native controls —
+  data-hero-video-toggle is the only playback control, custom-built instead
+  of relying on browser-native video controls so it can sit as a small pill
+  in the corner rather than a full control bar across a background element.
 
   Poster fallback chain (video only):
     1. wagtailmedia thumbnail (editor-uploaded on the Media item)
-    2. hero_image rendered at 1280×720 via Wagtail renditions
+    2. hero_image rendered at 1600×700 via Wagtail renditions
     3. No poster (browser shows first frame or black)
 
   Page templates pass `hero` via the template context (set in get_context()).
   HeroBlock.get_context() builds this dict automatically (video is always None there).
+
+  Height: viewport height minus the site nav's height (h-16 = 4rem in
+  header.html) when the nav is in normal flow; full viewport when the nav is
+  transparent/overlaid (see HomePage.use_transparent_header —
+  transparent_header is set on the page-level context and inherited here
+  since hero.html is {% include %}'d without `only`).
 {% endcomment %}
-{% if hero.video %}
+<div class="wtr-hero relative overflow-hidden bg-dark flex flex-col
+            {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}
+            {% if hero.layout == 'left' %}justify-end{% else %}justify-center{% endif %}"
+     {% if hero.video %}data-hero{% endif %}>
 
-    {# ------------------------------------------------------------------ #}
-    {# VIDEO LAYOUT — two-column: text left, video right                  #}
-    {# ------------------------------------------------------------------ #}
-    <div class="wtr-hero bg-dark text-light">
-        <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
-            <div class="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
-
-                {# Left column — text content #}
-                <div class="text-left md:text-right">
-                    <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                        {{ hero.headline }}
-                    </h1>
-
-                    {% if hero.copy %}
-                        <div class="wtr-hero-copy mt-4 prose prose-invert text-lg">
-                            {% if hero.copy_is_block %}
-                                {% include_block hero.copy %}
-                            {% else %}
-                                {{ hero.copy|richtext }}
-                            {% endif %}
-                        </div>
-                    {% endif %}
-
-                    {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
-                    {% for cta_block in hero.cta %}
-                        <div class="mt-8">
-                            {% include_block cta_block with compact=True %}
-                        </div>
-                    {% endfor %}
-                </div>
-
-                {# Right column — video #}
-                <div>
-                    {% if hero.video.thumbnail %}
-                        {% comment %}wagtailmedia thumbnail — editor-uploaded poster frame{% endcomment %}
-                        <video
-                            controls
-                            preload="metadata"
-                            class="w-full h-auto rounded-lg"
-                            aria-label="{{ hero.video.title }}"
-                            poster="{{ hero.video.thumbnail.url }}"
-                        >
-                            {% for source in hero.video.sources %}
-                                <source src="{{ source.src }}" type="{{ source.type }}">
-                            {% endfor %}
-                            {% trans "Your browser does not support the video tag." %}
-                        </video>
-                    {% elif hero.image %}
-                        {% comment %}Fallback poster: hero_image rendered at 1280x720{% endcomment %}
-                        {% image hero.image fill-1280x720 as poster_img %}
-                        <video
-                            controls
-                            preload="metadata"
-                            class="w-full h-auto rounded-lg"
-                            aria-label="{{ hero.video.title }}"
-                            poster="{{ poster_img.url }}"
-                        >
-                            {% for source in hero.video.sources %}
-                                <source src="{{ source.src }}" type="{{ source.type }}">
-                            {% endfor %}
-                            {% trans "Your browser does not support the video tag." %}
-                        </video>
-                    {% else %}
-                        {% comment %}No poster available{% endcomment %}
-                        <video
-                            controls
-                            preload="metadata"
-                            class="w-full h-auto rounded-lg"
-                            aria-label="{{ hero.video.title }}"
-                        >
-                            {% for source in hero.video.sources %}
-                                <source src="{{ source.src }}" type="{{ source.type }}">
-                            {% endfor %}
-                            {% trans "Your browser does not support the video tag." %}
-                        </video>
-                    {% endif %}
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-{% else %}
-
-    {# ------------------------------------------------------------------ #}
-    {# STANDARD LAYOUT — background image, text either centered (default) #}
-    {# or left-aligned and anchored toward the bottom (hero.layout="left")#}
-    {#                                                                     #}
-    {# Height: viewport height minus the site nav's height (h-16 = 4rem   #}
-    {# in header.html) when the nav is in normal flow; full viewport when #}
-    {# the nav is transparent/overlaid (see HomePage.use_transparent_header#}
-    {# — transparent_header is set on the page-level context and inherited#}
-    {# here since hero.html is {% include %}'d without `only`).           #}
-    {# ------------------------------------------------------------------ #}
-    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col
-                {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}
-                {% if hero.layout == 'left' %}justify-end{% else %}justify-center{% endif %}">
-
-        {% if hero.image %}
-            {% image hero.image fill-1600x700 as bg %}
-            <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}" alt="" role="presentation"
-                 class="absolute inset-0 h-full w-full object-cover"
-                 style="{{ hero.image.object_position_style }}" loading="lazy">
-            {# Linear gradient scrim over the image (dark, fading from bottom to transparent
-               at top) at 80% opacity — matches the Figma hero fill stack: FFFFFF base,
-               Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
-               busy photos without flattening the whole image like a uniform opacity did. #}
-            <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
+    {% if hero.video %}
+        {# ---------------------------------------------------------------- #}
+        {# Full-bleed background video, poster fallback chain (see above)   #}
+        {# ---------------------------------------------------------------- #}
+        {% if hero.video.thumbnail %}
+            <video autoplay muted loop playsinline preload="metadata"
+                   class="absolute inset-0 h-full w-full object-cover"
+                   aria-hidden="true" tabindex="-1"
+                   poster="{{ hero.video.thumbnail.url }}" data-hero-video>
+                {% for source in hero.video.sources %}
+                    <source src="{{ source.src }}" type="{{ source.type }}">
+                {% endfor %}
+            </video>
+        {% elif hero.image %}
+            {% image hero.image fill-1600x700 as poster_img %}
+            <video autoplay muted loop playsinline preload="metadata"
+                   class="absolute inset-0 h-full w-full object-cover"
+                   aria-hidden="true" tabindex="-1"
+                   poster="{{ poster_img.url }}" data-hero-video>
+                {% for source in hero.video.sources %}
+                    <source src="{{ source.src }}" type="{{ source.type }}">
+                {% endfor %}
+            </video>
+        {% else %}
+            <video autoplay muted loop playsinline preload="metadata"
+                   class="absolute inset-0 h-full w-full object-cover"
+                   aria-hidden="true" tabindex="-1" data-hero-video>
+                {% for source in hero.video.sources %}
+                    <source src="{{ source.src }}" type="{{ source.type }}">
+                {% endfor %}
+            </video>
         {% endif %}
 
-        <div class="relative mx-auto w-full px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-light
-                    {% if hero.layout == 'left' %}max-w-7xl text-left{% else %}max-w-4xl text-center{% endif %}">
+        <button type="button" class="wtr-hero-video-toggle absolute top-4 right-4 z-10 sm:top-6 sm:right-6"
+                data-hero-video-toggle aria-pressed="true">
+            <svg data-hero-video-toggle-icon-pause width="14" height="14" viewBox="0 0 20 20" aria-hidden="true">
+                <rect x="5" y="4" width="3" height="12" rx="1" fill="currentColor"/>
+                <rect x="12" y="4" width="3" height="12" rx="1" fill="currentColor"/>
+            </svg>
+            <svg data-hero-video-toggle-icon-play width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" class="hidden">
+                <path d="M6 4.5v11l9-5.5-9-5.5z" fill="currentColor"/>
+            </svg>
+            <span data-hero-video-toggle-label
+                  data-label-pause="{% trans 'Pause Video' %}"
+                  data-label-play="{% trans 'Play Video' %}">{% trans "Pause Video" %}</span>
+        </button>
+    {% elif hero.image %}
+        {% image hero.image fill-1600x700 as bg %}
+        <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}" alt="" role="presentation"
+             class="absolute inset-0 h-full w-full object-cover"
+             style="{{ hero.image.object_position_style }}" loading="lazy">
+    {% endif %}
 
-            <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-8xl">
-                {{ hero.headline }}
-            </h1>
+    {% if hero.video or hero.image %}
+        {# Linear gradient scrim over the background (dark, fading from bottom to transparent
+           at top) at 80% opacity — matches the Figma hero fill stack: FFFFFF base,
+           Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
+           busy photos/video without flattening the whole background like a uniform opacity did. #}
+        <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
+    {% endif %}
 
-            {% if hero.copy %}
-                <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
-                    {% if hero.copy_is_block %}
-                        {% include_block hero.copy %}
-                    {% else %}
-                        {{ hero.copy|richtext }}
-                    {% endif %}
-                </div>
-            {% endif %}
+    <div class="relative mx-auto w-full px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-light
+                {% if hero.layout == 'left' %}max-w-7xl text-left{% else %}max-w-4xl text-center{% endif %}">
 
-            {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
-            {% for cta_block in hero.cta %}
-                <div class="mt-8 max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
-                    {% include_block cta_block with compact=True %}
-                </div>
-            {% endfor %}
+        <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-8xl">
+            {{ hero.headline }}
+        </h1>
 
-        </div>
+        {% if hero.copy %}
+            <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
+                {% if hero.copy_is_block %}
+                    {% include_block hero.copy %}
+                {% else %}
+                    {{ hero.copy|richtext }}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
+        {% for cta_block in hero.cta %}
+            <div class="mt-8 max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
+                {% include_block cta_block with compact=True %}
+            </div>
+        {% endfor %}
+
     </div>
+</div>
+{% if hero.video %}
+    <script>
+        (function () {
+            document.querySelectorAll("[data-hero]").forEach(function (root) {
+                if (root.__wtrHeroInit) { return; }
+                root.__wtrHeroInit = true;
 
+                var video = root.querySelector("[data-hero-video]");
+                var toggle = root.querySelector("[data-hero-video-toggle]");
+                if (!video || !toggle) { return; }
+
+                var pauseIcon = toggle.querySelector("[data-hero-video-toggle-icon-pause]");
+                var playIcon = toggle.querySelector("[data-hero-video-toggle-icon-play]");
+                var label = toggle.querySelector("[data-hero-video-toggle-label]");
+
+                function sync() {
+                    var isPaused = video.paused;
+                    pauseIcon.classList.toggle("hidden", isPaused);
+                    playIcon.classList.toggle("hidden", !isPaused);
+                    label.textContent = isPaused ? label.dataset.labelPlay : label.dataset.labelPause;
+                    toggle.setAttribute("aria-pressed", String(!isPaused));
+                }
+
+                toggle.addEventListener("click", function () {
+                    if (video.paused) { video.play(); } else { video.pause(); }
+                });
+                video.addEventListener("play", sync);
+                video.addEventListener("pause", sync);
+                sync();
+            });
+        })();
+    </script>
 {% endif %}

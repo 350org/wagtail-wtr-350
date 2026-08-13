@@ -453,3 +453,32 @@ html {
     cursor: not-allowed;
 }
 
+/* ============================================================
+ * Hero background-video pause/play toggle — .wtr-hero-video-toggle
+ * ============================================================
+ *
+ * A pill sitting over the video itself, so it needs its own contrast
+ * (translucent dark fill + blur) independent of the hero's text scrim,
+ * which fades out toward the top-right corner where this button sits.
+ * ============================================================ */
+.wtr-hero-video-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    border: none;
+    background-color: rgb(0 0 0 / 45%);
+    backdrop-filter: blur(4px);
+    color: var(--color-light);
+    font-family: var(--font-heading);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.wtr-hero-video-toggle:hover {
+    background-color: rgb(0 0 0 / 65%);
+}
+

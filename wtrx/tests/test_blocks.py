@@ -2,13 +2,23 @@
 Tests for StreamField blocks.
 
 Content blocks (ButtonBlock, VideoBlock), layout blocks (QuoteBlock,
-HeroBlock, SectionBlock), and action blocks (SignupLinkBlock,
-SignupActionNetworkBlock) are tested here with SimpleTestCase since their
-clean() methods don't require a database.
+HeroBlock, SectionBlock, CardCarouselBlock, CalloutBlock), and action blocks
+(SignupLinkBlock, SignupActionNetworkBlock) are tested here with
+SimpleTestCase since their clean() methods don't require a database.
 
-DonateBlock and SignupWagtailFormsBlock have no custom clean() — their fields
-are validated by Wagtail's built-in block validation, so no additional unit
-tests are needed here.
+DonateBlock, DonateFundraiseUpBlock, and SignupWagtailFormsBlock have no
+custom clean() — their fields are validated by Wagtail's built-in block
+validation, so only field-structure tests are needed for them.
+
+CardCarouselBlock and CalloutBlock both reuse the shared
+_validate_at_most_one_link() helper for their clean() methods (same as
+QuoteBlock) — its link/no-link/both-links behavior is exercised generically
+in TestQuoteBlockValidation, so per-block tests here only check field
+structure, not the link-validation logic itself. Both blocks also contain
+ImageChooserBlock fields (CalloutBlock.image, CardCarouselBlock's required
+CarouselCardBlock.image), so — like QuoteBlock — a full block.clean() call
+isn't exercised end-to-end here: resolving a real image PK needs a database,
+which SimpleTestCase doesn't have.
 """
 
 from datetime import timedelta
@@ -21,8 +31,11 @@ from wagtail.models import Page
 from wtrx.blocks import (
     BodyStreamBlock,
     ButtonBlock,
+    CalloutBlock,
     CardBlock,
+    CardCarouselBlock,
     DonateBlock,
+    DonateFundraiseUpBlock,
     HeroBlock,
     HeroCTABlock,
     PageCardsBlock,
@@ -403,6 +416,135 @@ class TestCardBlockFields(SimpleTestCase):
     def test_heading_is_required(self):
         block = CardBlock()
         self.assertTrue(block.declared_blocks["heading"].required)
+
+
+class TestCardCarouselBlockFields(SimpleTestCase):
+    """
+    CardCarouselBlock field structure. Link-validation logic (clean()
+    wraps _validate_at_most_one_link) is covered generically in
+    TestQuoteBlockValidation — see module docstring.
+    """
+
+    def test_has_expected_fields(self):
+        block = CardCarouselBlock()
+        expected = {"heading", "content", "link_text", "link_page", "link_url", "cards"}
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_heading_is_required(self):
+        block = CardCarouselBlock()
+        self.assertTrue(block.declared_blocks["heading"].required)
+
+    def test_content_is_required(self):
+        block = CardCarouselBlock()
+        self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_link_fields_are_optional(self):
+        block = CardCarouselBlock()
+        self.assertFalse(block.declared_blocks["link_text"].required)
+        self.assertFalse(block.declared_blocks["link_page"].required)
+        self.assertFalse(block.declared_blocks["link_url"].required)
+
+    def test_cards_min_num_is_three(self):
+        block = CardCarouselBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.min_num, 3)
+
+    def test_cards_have_no_max_num(self):
+        block = CardCarouselBlock()
+        self.assertIsNone(block.declared_blocks["cards"].meta.max_num)
+
+    def test_carousel_card_image_is_required(self):
+        """
+        CarouselCardBlock overrides CardBlock.image to be required — every
+        carousel card needs one, unlike the general-purpose CardBlock.
+        """
+        block = CardCarouselBlock()
+        card_block = block.declared_blocks["cards"].child_block
+        self.assertTrue(card_block.declared_blocks["image"].required)
+
+
+class TestCalloutBlockFields(SimpleTestCase):
+    """
+    CalloutBlock field structure. Link-validation logic (clean() wraps
+    _validate_at_most_one_link) is covered generically in
+    TestQuoteBlockValidation — see module docstring.
+    """
+
+    def test_has_expected_fields(self):
+        block = CalloutBlock()
+        expected = {
+            "heading",
+            "subheading",
+            "content",
+            "link_text",
+            "link_page",
+            "link_url",
+            "color",
+            "image",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_heading_is_optional(self):
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["heading"].required)
+
+    def test_subheading_is_optional(self):
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["subheading"].required)
+
+    def test_content_is_optional(self):
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_image_is_optional(self):
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["image"].required)
+
+    def test_link_fields_are_optional(self):
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["link_text"].required)
+        self.assertFalse(block.declared_blocks["link_page"].required)
+        self.assertFalse(block.declared_blocks["link_url"].required)
+
+    def test_color_default_is_navy(self):
+        block = CalloutBlock()
+        self.assertEqual(block.declared_blocks["color"].meta.default, "navy")
+
+    def test_color_choices(self):
+        block = CalloutBlock()
+        choices = dict(block.declared_blocks["color"].field.choices)
+        self.assertEqual(
+            set(choices.keys()),
+            {"navy", "red", "dark-grey", "blue-gradient", "light-grey"},
+        )
+
+
+class TestDonateFundraiseUpBlockFields(SimpleTestCase):
+    """
+    DonateFundraiseUpBlock field structure. No custom clean() — element_id
+    is the only field Wagtail's built-in required-field validation needs to
+    enforce, so no separate validation test class is needed.
+    """
+
+    def test_has_expected_fields(self):
+        block = DonateFundraiseUpBlock()
+        expected = {
+            "heading",
+            "description",
+            "image",
+            "image_caption",
+            "element_id",
+            "designation_id",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_element_id_is_required(self):
+        block = DonateFundraiseUpBlock()
+        self.assertTrue(block.declared_blocks["element_id"].required)
+
+    def test_other_fields_are_optional(self):
+        block = DonateFundraiseUpBlock()
+        for name in ("heading", "description", "image", "image_caption", "designation_id"):
+            self.assertFalse(block.declared_blocks[name].required, f"{name} should be optional")
 
 
 class TestPageCardsBlockGetContext(TestCase):

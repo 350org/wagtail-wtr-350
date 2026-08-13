@@ -97,8 +97,12 @@ class HeroMixin(models.Model):
     Fields:
     - hero_headline: optional override for the page title as the displayed h1
     - hero_copy: optional subtext below the headline
-    - hero_image: optional background/feature image (also used as video poster fallback)
-    - hero_video: optional video; switches hero to two-column text-left / video-right layout
+    - hero_image: optional background/feature image; also used as the video
+      poster fallback, and as the background itself when no video is set
+    - hero_video: optional full-bleed background video (autoplay/muted/loop),
+      with a custom pause/play toggle in the corner. Takes over the
+      background from hero_image when set; hero_image is still used as the
+      poster fallback if the video has none.
     - hero_layout: centered or left-aligned text
     - hero_cta: optional signup/donate/announcement widget (HeroCTABlock, at most one)
 
@@ -140,8 +144,9 @@ class HeroMixin(models.Model):
         limit_choices_to={"type": "video"},
         verbose_name=_("hero video"),
         help_text=_(
-            "Optional video displayed in the hero. When set, the layout switches to "
-            "two columns: text on the left, video on the right. "
+            "Optional. When set, this video autoplays (muted, looping) as the "
+            "hero's full-bleed background instead of the hero image, with a "
+            "pause/play button in the corner. "
             "Upload a thumbnail on the video in the media library to use as a poster frame; "
             "falls back to the hero image above if no thumbnail is set."
         ),
