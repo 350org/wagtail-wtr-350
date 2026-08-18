@@ -24,12 +24,7 @@
     padding: 0.625rem 1.25rem;
     font-family: var(--font-heading);
     font-size: 1rem;
-    /* KlimaWeb only ships weights 500/800 (see theme.css) — 600 silently
-     * rounds down to 500 via normal font matching, rendering identical to
-     * unbolded text. Figma specs every button label as "Klima:Bold", so
-     * use the one bold weight the font actually has instead of a value
-     * that quietly does nothing. */
-    font-weight: 800;
+    font-weight: var(--font-weight-bold);
     line-height: 1.5;
     color: var(--color-light);
     background-color: var(--color-primary);
@@ -248,7 +243,7 @@ html {
     flex: 0 0 auto;
     padding: 0.625rem 1.25rem;
     font-family: var(--font-heading);
-    font-weight: 800;
+    font-weight: var(--font-weight-bold);
     color: var(--color-light);
     background-color: var(--color-primary);
     border: 2px solid transparent;

@@ -164,30 +164,17 @@
   --color-warning-900: #78350f;
   --color-warning-950: #451a03;
 
-  /* Button corner radius — single token so every wtr-btn (and the
-   * ActionKit embed's own button/input, which duplicate the same visual
-   * treatment against foreign third-party markup — see main.css) stays in
-   * sync. Forks re-theming button roundness should override this one
-   * value rather than editing main.css directly.
-   * 350's redesign (Figma: 350 Figma MCP, node 1:556) uses an 8px radius
-   * on every button in the mock (nav Donate, hero Sign Up, Take action,
-   * Support Us Donate, footer Join Us) — well short of the 16px this
-   * previously rendered at. */
+  /* wtr-btn / ActionKit embed button corner radius (main.css). */
   --radius-button: 0.5rem;
 
-  /* Typography — KlimaWeb (self-hosted, @font-face above) for both
-   * headings and body text; only weights 500 and 800 are available.
-   * Utility classes requesting other weights (e.g. font-semibold=600)
-   * resolve to the nearest declared weight via the browser's normal font
-   * matching — 600 rounds down to 500, so font-semibold text renders
-   * visually identical to font-normal.
-   * .wtr-btn (main.css) is fixed to explicit font-weight: 800 for this
-   * reason. font-semibold is still used elsewhere (card.html, header.html,
-   * footer.html, pagination.html, table_block.html, etc.) and still
-   * silently renders as 500 there — left as-is pending a design decision,
-   * since switching all of those to font-bold would be a much
-   * higher-blast-radius, sitewide typography change rather than a
-   * button-scoped one. */
+  /* wtr-btn's bold label weight (main.css). KlimaWeb only ships 500/800,
+   * so font-semibold(600) elsewhere in the app still silently renders as
+   * 500 — unaddressed here since fixing that sitewide is a separate,
+   * bigger call. */
+  --font-weight-bold: 800;
+
+  /* Typography — KlimaWeb (self-hosted, @font-face above), weights 500
+   * and 800 only. */
   --font-heading: 'KlimaWeb', system-ui, sans-serif;
   --font-body:    'KlimaWeb', system-ui, sans-serif;
   --font-mono:    ui-monospace, monospace;
