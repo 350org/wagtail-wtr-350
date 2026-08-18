@@ -7,7 +7,7 @@
 
 {% block content %}
 {% for block in page.body %}
-    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" %}
+    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" %}
         {% include_block block %}
     {% else %}
         <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8">

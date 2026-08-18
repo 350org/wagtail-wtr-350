@@ -5,7 +5,8 @@ Block categories (in definition order):
   Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock,
             RawHTMLBlock, TableBlock
   Cards:    CardBlock, CarouselCardBlock, PersonCardBlock
-  Layout:   AccordionItemBlock, CardGridBlock, CardCarouselBlock,
+  Layout:   AccordionItemBlock, CardGridBlock, ImageCardListItemBlock,
+            ImageCardListBlock, ImageTextBlock, CardCarouselBlock,
             PageCardsBlock, AccordionBlock, QuoteBlock, CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock, SignupLinkBlock
@@ -528,6 +529,82 @@ class CardGridBlock(StructBlock):
         icon = "grip"
         label = _("Card Grid")
         template = "wtrx/components/streamfield/blocks/card_grid_block.html"
+
+
+class ImageCardListItemBlock(StructBlock):
+    """
+    A single item in an ImageCardListBlock's `cards` list: a heading and a
+    description, nothing else — no icon/image/link, unlike CardBlock. This
+    layout's cards are plain bordered text boxes (see image_card_list_block.html),
+    so reusing CardBlock would expose fields the template never renders.
+    """
+
+    heading = CharBlock(label=_("Heading"))
+    description = WagtailTextBlock(label=_("Description"))
+
+    class Meta:
+        icon = "doc-full"
+        label = _("Card")
+
+
+class ImageCardListBlock(StructBlock):
+    """
+    A centered heading above a two-column split: an image on the left, a
+    vertical stack of simple text cards (ImageCardListItemBlock) on the
+    right. Both columns share the same height (image is object-cover'd to
+    match), single column on mobile — see image_card_list_block.html.
+
+    Full-bleed-ish width: special-cased in content_page.html/home_page.html
+    to skip the shared max-w-5xl wrapper, same width (max-w-7xl / 1280px) as
+    CalloutBlock — see that block's template comment for the two-tier
+    w-full-outer / max-w-inner pattern this reuses.
+    """
+
+    heading = CharBlock(
+        label=_("Heading"),
+        help_text=_("Centered heading above the image and cards."),
+    )
+    image = ImageChooserBlock(label=_("Image"))
+    cards = ListBlock(
+        ImageCardListItemBlock(),
+        min_num=2,
+        label=_("Cards"),
+    )
+
+    class Meta:
+        icon = "grip"
+        label = _("Image Card List")
+        template = "wtrx/components/streamfield/blocks/image_card_list_block.html"
+
+
+class ImageTextBlock(StructBlock):
+    """
+    A two-column split: an image on the left (natural aspect ratio, not
+    stretched to match the text column like ImageCardListBlock's image
+    does), a heading + richtext body on the right. Both columns are
+    top-aligned, single column on mobile — see image_text_block.html.
+
+    Distinct from ImageCardListBlock: that one has a heading spanning
+    above both columns and a fixed list of bordered cards; this one has no
+    top heading at all — its heading sits inline in the text column — and
+    the "cards" are just one richtext field, for freeform paragraph copy
+    (e.g. a campaign pitch) rather than a repeatable list of short points.
+    """
+
+    heading = CharBlock(
+        label=_("Heading"),
+        help_text=_("Heading above the text, in the right-hand column."),
+    )
+    image = ImageChooserBlock(label=_("Image"))
+    text = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        label=_("Text"),
+    )
+
+    class Meta:
+        icon = "image"
+        label = _("Image + Text")
+        template = "wtrx/components/streamfield/blocks/image_text_block.html"
 
 
 class CardCarouselBlock(StructBlock):
@@ -1458,6 +1535,8 @@ class SectionContentBlock(StreamBlock):
     card = CardBlock()
     person_card = PersonCardBlock()
     card_grid = CardGridBlock()
+    image_card_list = ImageCardListBlock()
+    image_text = ImageTextBlock()
     card_carousel = CardCarouselBlock()
     page_cards = PageCardsBlock()
     accordion = AccordionBlock()
@@ -1538,6 +1617,8 @@ class BodyStreamBlock(StreamBlock):
     card = CardBlock()
     person_card = PersonCardBlock()
     card_grid = CardGridBlock()
+    image_card_list = ImageCardListBlock()
+    image_text = ImageTextBlock()
     card_carousel = CardCarouselBlock()
     page_cards = PageCardsBlock()
     accordion = AccordionBlock()

@@ -26,6 +26,7 @@ from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
+from wagtail.blocks import RichTextBlock
 from wagtail.models import Page
 
 from wtrx.blocks import (
@@ -38,6 +39,9 @@ from wtrx.blocks import (
     DonateFundraiseUpBlock,
     HeroBlock,
     HeroCTABlock,
+    ImageCardListBlock,
+    ImageCardListItemBlock,
+    ImageTextBlock,
     PageCardsBlock,
     QuoteBlock,
     SectionBlock,
@@ -383,6 +387,8 @@ class TestSectionBlockStructure(SimpleTestCase):
         "card",
         "person_card",
         "card_grid",
+        "image_card_list",
+        "image_text",
         "card_carousel",
         "page_cards",
         "accordion",
@@ -436,6 +442,74 @@ class TestCardBlockFields(SimpleTestCase):
     def test_heading_is_required(self):
         block = CardBlock()
         self.assertTrue(block.declared_blocks["heading"].required)
+
+
+class TestImageCardListItemBlockFields(SimpleTestCase):
+    """ImageCardListItemBlock field structure: heading + description only."""
+
+    def test_has_expected_fields(self):
+        block = ImageCardListItemBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "description"})
+
+    def test_heading_is_required(self):
+        block = ImageCardListItemBlock()
+        self.assertTrue(block.declared_blocks["heading"].required)
+
+    def test_description_is_required(self):
+        block = ImageCardListItemBlock()
+        self.assertTrue(block.declared_blocks["description"].required)
+
+
+class TestImageCardListBlockFields(SimpleTestCase):
+    """ImageCardListBlock field structure: heading + image + cards (min 2)."""
+
+    def test_has_expected_fields(self):
+        block = ImageCardListBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "image", "cards"})
+
+    def test_heading_is_required(self):
+        block = ImageCardListBlock()
+        self.assertTrue(block.declared_blocks["heading"].required)
+
+    def test_image_is_required(self):
+        block = ImageCardListBlock()
+        self.assertTrue(block.declared_blocks["image"].required)
+
+    def test_cards_min_num_is_two(self):
+        block = ImageCardListBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.min_num, 2)
+
+    def test_cards_have_no_max_num(self):
+        block = ImageCardListBlock()
+        self.assertIsNone(block.declared_blocks["cards"].meta.max_num)
+
+    def test_cards_child_block_is_image_card_list_item(self):
+        block = ImageCardListBlock()
+        self.assertIsInstance(block.declared_blocks["cards"].child_block, ImageCardListItemBlock)
+
+
+class TestImageTextBlockFields(SimpleTestCase):
+    """ImageTextBlock field structure: heading + image + text, all required."""
+
+    def test_has_expected_fields(self):
+        block = ImageTextBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "image", "text"})
+
+    def test_heading_is_required(self):
+        block = ImageTextBlock()
+        self.assertTrue(block.declared_blocks["heading"].required)
+
+    def test_image_is_required(self):
+        block = ImageTextBlock()
+        self.assertTrue(block.declared_blocks["image"].required)
+
+    def test_text_is_required(self):
+        block = ImageTextBlock()
+        self.assertTrue(block.declared_blocks["text"].required)
+
+    def test_text_is_richtext(self):
+        block = ImageTextBlock()
+        self.assertIsInstance(block.declared_blocks["text"], RichTextBlock)
 
 
 class TestCardCarouselBlockFields(SimpleTestCase):

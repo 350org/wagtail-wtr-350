@@ -1,0 +1,42 @@
+{% load i18n wagtailimages_tags %}
+{% comment %}
+Centered heading above a two-column split — image left, vertical stack of
+simple text cards right (ImageCardListItemBlock: heading + description
+only, plain bordered boxes, no icon/link/image of their own). Single
+column on mobile (image, then cards, in that DOM order — grid-cols-1
+below md:).
+
+Column heights: the grid's default align-items: stretch (md:items-stretch
+is explicit here for clarity, matching the same pattern in hero.html/
+card_carousel_block.html) makes both columns match the taller one's natural
+height — normally the cards column, since it's a vertical stack. The image
+wrapper's min-h-[280px] is only a mobile fallback (single-column rows have
+no sibling to stretch to); on desktop the stretch pushes it taller than
+that floor to match the cards column instead.
+
+Full-bleed-ish width: same w-full-outer / max-w-7xl-inner two-tier pattern
+as callout_block.html — see that file's comment for why a bare
+`50% - 50vw` bleed isn't used instead.
+{% endcomment %}
+<div class="w-full px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl">
+        <h2 class="font-heading text-center text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-6xl">
+            {{ value.heading }}
+        </h2>
+        <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-8">
+            <div class="relative min-h-[280px]">
+                {% image value.image fill-900x900 as img %}
+                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                     class="absolute inset-0 h-full w-full rounded-lg object-cover" loading="lazy">
+            </div>
+            <div class="flex flex-col gap-4">
+                {% for card in value.cards %}
+                    <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-6">
+                        <h3 class="font-heading text-lg font-bold text-dark">{{ card.heading }}</h3>
+                        <p class="mt-2 text-sm text-neutral-700 sm:text-base">{{ card.description }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>

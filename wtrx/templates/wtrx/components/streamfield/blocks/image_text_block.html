@@ -1,0 +1,31 @@
+{% load i18n wagtailcore_tags wagtailimages_tags %}
+{% comment %}
+Two-column split: image on the left at its own natural aspect ratio (not
+stretched to match the text column — contrast ImageCardListBlock, which
+force-fills its image to match a taller cards column via absolute
+positioning; this block's image is a fixed aspect-[4/3] box instead, more
+suited to a logo/graphic than a full-bleed photo). Heading + richtext body
+on the right, top-aligned with the image (md:items-start). Single column
+on mobile (image, then heading/text, in that DOM order).
+
+Full-bleed-ish width: same w-full-outer / max-w-7xl-inner two-tier pattern
+as callout_block.html/image_card_list_block.html — see callout_block.html's
+comment for why a bare `50% - 50vw` bleed isn't used instead.
+{% endcomment %}
+<div class="w-full px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl">
+        <div class="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-start">
+            {% image value.image fill-900x675 as img %}
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                 class="aspect-[4/3] w-full rounded-lg object-cover" loading="lazy">
+            <div>
+                <h2 class="font-heading text-3xl font-bold tracking-tight text-dark sm:text-4xl lg:text-5xl">
+                    {{ value.heading }}
+                </h2>
+                <div class="prose prose-neutral mt-4 max-w-none">
+                    {{ value.text|richtext }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
