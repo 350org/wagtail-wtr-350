@@ -168,8 +168,12 @@
    * ActionKit embed's own button/input, which duplicate the same visual
    * treatment against foreign third-party markup — see main.css) stays in
    * sync. Forks re-theming button roundness should override this one
-   * value rather than editing main.css directly. */
-  --radius-button: 1rem;
+   * value rather than editing main.css directly.
+   * 350's redesign (Figma: 350 Figma MCP, node 1:556) uses an 8px radius
+   * on every button in the mock (nav Donate, hero Sign Up, Take action,
+   * Support Us Donate, footer Join Us) — well short of the 16px this
+   * previously rendered at. */
+  --radius-button: 0.5rem;
 
   /* Typography — KlimaWeb (self-hosted, @font-face above) for both
    * headings and body text; only weights 500 and 800 are available.
