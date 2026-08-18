@@ -65,8 +65,13 @@
                         {{ hero.headline }}
                     </h1>
                     {% if hero.copy %}
+                        {% comment %}
+                        [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
+                        prose-invert body color (a muted ~87%-lightness gray) to pure white — same
+                        fix as callout_block.html's paragraph text.
+                        {% endcomment %}
                         <div class="wtr-hero-copy prose max-w-none
-                                    {% if hero.banner_color == 'light-grey' %}prose-neutral{% else %}prose-invert{% endif %}">
+                                    {% if hero.banner_color == 'light-grey' %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
                             {% if hero.copy_is_block %}
                                 {% include_block hero.copy %}
                             {% else %}

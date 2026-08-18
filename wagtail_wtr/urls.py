@@ -34,6 +34,7 @@ urlpatterns = [
 
 urlpatterns += i18n_patterns(
     path("search/", views.search, name="search"),
+    path("no-cms-access/", views.no_cms_access, name="no_cms_access"),
     path("", include(wagtail_urls)),
     # English (the default language) is served at / without a language prefix.
     # Non-default languages added by forks are still prefixed (e.g. /es/).

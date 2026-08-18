@@ -14,6 +14,7 @@ from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.urls import reverse
 
 
 class DomainRestrictedSocialAccountAdapter(DefaultSocialAccountAdapter):
@@ -50,3 +51,21 @@ class NoSignupAccountAdapter(DefaultAccountAdapter):
 
     def is_open_for_signup(self, request) -> bool:
         return False
+
+    def get_login_redirect_url(self, request):
+        """
+        Where to send a user immediately after login, when they didn't
+        arrive via an explicit `?next=` (allauth checks that first and
+        only falls back to this). Without this override that fallback is
+        Django's global default, `/accounts/profile/` — not a real page
+        here, so it 404s. This is the common case for a brand-new Google
+        SSO signup: they have no admin permissions yet (a superuser has to
+        add them to an Editor/Moderator group first), so send them
+        somewhere that explains that instead of a broken page; a user who
+        already has admin access goes to the admin home instead.
+        """
+        if request.user.is_authenticated and request.user.has_perm(
+            "wagtailadmin.access_admin"
+        ):
+            return reverse("wagtailadmin_home")
+        return reverse("no_cms_access")

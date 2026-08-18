@@ -5,8 +5,9 @@ Tests for allauth_adapter.py.
 from unittest.mock import MagicMock
 
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import reverse
 
-from wtrx.allauth_adapter import DomainRestrictedSocialAccountAdapter
+from wtrx.allauth_adapter import DomainRestrictedSocialAccountAdapter, NoSignupAccountAdapter
 
 
 class TestIsOpenForSignup(SimpleTestCase):
@@ -61,3 +62,36 @@ class TestPreSocialLogin(SimpleTestCase):
 
         with self.assertRaises(ImmediateHttpResponse):
             adapter.pre_social_login(request, sociallogin)
+
+
+class TestGetLoginRedirectUrl(SimpleTestCase):
+    """
+    NoSignupAccountAdapter.get_login_redirect_url() must send a user with
+    Wagtail admin access to the admin home, and everyone else — most
+    commonly a brand-new Google SSO signup with no permissions yet, since a
+    superuser still has to add them to an Editor/Moderator group — to the
+    "no CMS access" page. Without this override, allauth falls back to
+    Django's default `/accounts/profile/`, which isn't a real page in this
+    project and 404s.
+    """
+
+    def _adapter_and_request(self, *, has_admin_access):
+        adapter = NoSignupAccountAdapter()
+        request = RequestFactory().get("/accounts/google/login/callback/")
+        request.user = MagicMock()
+        request.user.is_authenticated = True
+        request.user.has_perm.return_value = has_admin_access
+        return adapter, request
+
+    def test_admin_user_redirected_to_admin_home(self):
+        adapter, request = self._adapter_and_request(has_admin_access=True)
+        self.assertEqual(adapter.get_login_redirect_url(request), reverse("wagtailadmin_home"))
+
+    def test_user_without_admin_access_redirected_to_no_cms_access(self):
+        adapter, request = self._adapter_and_request(has_admin_access=False)
+        self.assertEqual(adapter.get_login_redirect_url(request), reverse("no_cms_access"))
+
+    def test_checks_wagtailadmin_access_admin_permission(self):
+        adapter, request = self._adapter_and_request(has_admin_access=True)
+        adapter.get_login_redirect_url(request)
+        request.user.has_perm.assert_called_once_with("wagtailadmin.access_admin")

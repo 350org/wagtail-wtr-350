@@ -1,0 +1,13 @@
+{% extends "wtrx/base_page.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "No CMS access" %}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-16 text-center">
+    <h1 class="font-heading text-4xl font-bold mb-4">{% trans "Oops! You don't have access to the CMS" %}</h1>
+    <p class="text-neutral-600">
+        {% blocktrans %}Please contact the Tech &amp; Security team at <a href="mailto:tech-help@350.org" class="underline">tech-help@350.org</a> and we can help you out!{% endblocktrans %}
+    </p>
+</div>
+{% endblock %}

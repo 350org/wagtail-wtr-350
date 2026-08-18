@@ -97,6 +97,21 @@ def actionkit_inline_signup(request):
     return JsonResponse({"success": True})
 
 
+def no_cms_access(request):
+    """
+    Landing page for a logged-in user with no Wagtail admin access.
+
+    Google SSO auto-creates an account for anyone in the allowed domain
+    (see allauth_adapter.py), but that alone grants no CMS permissions — a
+    superuser still has to add them to an Editor/Moderator group. Before
+    that happens, allauth's default post-login redirect
+    (NoSignupAccountAdapter.get_login_redirect_url) sends them here instead
+    of Django's default `/accounts/profile/`, which isn't a real page in
+    this project and 404s.
+    """
+    return render(request, "wtrx/no_cms_access.html")
+
+
 def search(request):
     search_query = request.GET.get("query", None)
 
