@@ -1,0 +1,37 @@
+{% load wagtailimages_tags %}
+{% comment %}
+Background <video> with poster fallback chain: wagtailmedia thumbnail →
+hero.image rendition → no poster. Shared by both of hero.html's variants
+("full" and "banner") since both need the same fallback logic, just at
+different sizes/positions — pass `video_class` for that, and `poster_spec`
+(a Wagtail image spec string, e.g. "fill-1600x700") for the image-fallback
+rendition size.
+
+Not given its own pause/play toggle markup — hero.html renders that once,
+scoped to the shared [data-hero] root each variant wraps itself in.
+{% endcomment %}
+{% if hero.video.thumbnail %}
+    <video autoplay muted loop playsinline preload="metadata"
+           class="{{ video_class }}" aria-hidden="true" tabindex="-1"
+           poster="{{ hero.video.thumbnail.url }}" data-hero-video>
+        {% for source in hero.video.sources %}
+            <source src="{{ source.src }}" type="{{ source.type }}">
+        {% endfor %}
+    </video>
+{% elif hero.image %}
+    {% image hero.image poster_spec as poster_img %}
+    <video autoplay muted loop playsinline preload="metadata"
+           class="{{ video_class }}" aria-hidden="true" tabindex="-1"
+           poster="{{ poster_img.url }}" data-hero-video>
+        {% for source in hero.video.sources %}
+            <source src="{{ source.src }}" type="{{ source.type }}">
+        {% endfor %}
+    </video>
+{% else %}
+    <video autoplay muted loop playsinline preload="metadata"
+           class="{{ video_class }}" aria-hidden="true" tabindex="-1" data-hero-video>
+        {% for source in hero.video.sources %}
+            <source src="{{ source.src }}" type="{{ source.type }}">
+        {% endfor %}
+    </video>
+{% endif %}

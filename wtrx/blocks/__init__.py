@@ -831,9 +831,8 @@ class CalloutBlock(StructBlock):
 # ---------------------------------------------------------------------------
 # Action blocks
 #
-# HeroBlock is defined further below (after these) since its optional `cta`
-# field needs to instantiate DonateBlock and SignupActionNetworkBlock — same
-# reason SectionBlock is defined after this section too.
+# SectionBlock is defined after this section since its `content` field needs
+# to instantiate DonateBlock and SignupActionNetworkBlock.
 # ---------------------------------------------------------------------------
 
 
@@ -1372,15 +1371,24 @@ class HeroCTABlock(StreamBlock):
 
 class HeroBlock(StructBlock):
     """
-    A mid-page hero section within the StreamField body.
+    A mid-page hero banner within the StreamField body: headline + optional
+    copy in a solid-color panel beside an optional image, on components/
+    hero.html's "banner" variant (see CalloutBlock for the same 5-color
+    system this reuses).
 
-    Distinct from HeroMixin (which provides a dedicated hero at the top of a
-    page). HeroBlock can appear anywhere in the body.
+    Distinct from HeroMixin (which provides the dedicated hero at the top of
+    a page — "full" variant on HomePage, "banner" variant on ContentPage/
+    IndexPage). HeroBlock can appear anywhere in the body, on any page type,
+    and always renders as "banner" — there's no full-viewport option here,
+    so unlike HeroMixin there's no layout field (banner's text-left/image-
+    right structure is fixed) and no cta field (banner never renders one,
+    see components/hero.html).
 
     headline is a plain text field (mirroring HeroMixin). content is richtext
     for the supporting copy below the headline. Uses the same component
     template as the page-level hero (components/hero.html) via get_context(),
-    which normalises field names so the template needs no branch logic.
+    which normalises field names so the template needs no block-type branch
+    logic — only a variant branch.
     """
 
     headline = CharBlock(
@@ -1397,31 +1405,25 @@ class HeroBlock(StructBlock):
         required=False,
         label=_("Image"),
     )
-    layout = ChoiceBlock(
-        choices=HERO_LAYOUT_CHOICES,
-        default="centered",
-        label=_("Layout"),
-    )
-    cta = HeroCTABlock(
-        label=_("Call to action"),
-        help_text=_(
-            "Optional signup bar, donate block, or announcement bar shown "
-            "below the headline. At most one — enforced by min_num=0/max_num=1 "
-            "on HeroCTABlock."
-        ),
+    banner_color = ChoiceBlock(
+        choices=CALLOUT_COLOR_CHOICES,
+        default="navy",
+        label=_("Color"),
     )
 
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
         # Normalise to the same shape expected by components/hero.html.
         ctx["hero"] = {
+            "variant": "banner",
             "headline": value.get("headline"),
             "copy": value.get("content"),
             "copy_is_block": False,
             "image": value.get("image"),
             "video": None,  # HeroBlock does not support video; key kept for template contract
-            "layout": value.get("layout"),
-            "cta": value.get("cta"),
+            "layout": None,  # banner variant ignores layout; key kept for template contract
+            "banner_color": value.get("banner_color"),
+            "cta": [],  # banner variant never renders a cta; key kept for template contract
         }
         return ctx
 

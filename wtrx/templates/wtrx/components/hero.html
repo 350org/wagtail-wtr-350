@@ -3,132 +3,164 @@
   Shared hero component used by both HeroMixin (page-level) and HeroBlock (StreamField).
 
   Expects a `hero` dict (or object) with these keys/attributes:
+    variant       — "full" (HomePage's page-level hero only) or "banner"
+                    (every other HeroMixin page, and always for HeroBlock)
     headline      — the heading text (str)
     copy          — optional richtext value (rendered via |richtext or include_block)
     copy_is_block — True if copy should be rendered via include_block, False for |richtext
     image         — optional CustomImage instance
     video         — optional wagtailmedia Media instance (type="video")
-    layout        — "centered" (default) or "left"
-    cta           — optional HeroCTABlock stream value (0 or 1 items: signup/donate/announcement)
+    layout        — "centered" (default) or "left". "full" variant only.
+    banner_color  — one of CALLOUT_COLOR_CHOICES. "banner" variant only.
+    cta           — optional HeroCTABlock stream value (0 or 1 items: signup/donate/announcement).
+                    "full" variant only — "banner" never renders one.
 
-  Layout: centered or left-aligned text (hero.layout) over a full-bleed
-  background — a video if hero.video is set, else hero.image, else plain
-  dark background. HeroBlock never sets video (see its get_context()), so
-  it always takes the image/plain path; only page-level heroes (HeroMixin)
-  currently offer a video chooser.
+  variant switch:
+    - "full": the original full-viewport hero — background video/image
+      behind centered or left-aligned text, with a dark gradient scrim and
+      room for a cta widget below the copy. See HeroMixin.hero_variant.
+    - "banner": a compact rounded panel — solid/gradient color background
+      (hero.banner_color, reusing CalloutBlock's 5-color system, see
+      main.css's .wtr-hero-banner-{color}) on the left beside an image or
+      video on the right, blended together with a matching-color fade (see
+      .wtr-hero-banner-fade-{color}). No cta; much shorter than "full".
 
-  Background video: autoplay/muted/loop/playsinline, no native controls —
-  data-hero-video-toggle is the only playback control, custom-built instead
-  of relying on browser-native video controls so it can sit as a small pill
-  in the corner rather than a full control bar across a background element.
-
-  Poster fallback chain (video only):
-    1. wagtailmedia thumbnail (editor-uploaded on the Media item)
-    2. hero_image rendered at 1600×700 via Wagtail renditions
-    3. No poster (browser shows first frame or black)
+  Background video (either variant): autoplay/muted/loop/playsinline, no
+  native controls — the pause/play pill (components/_hero_video_toggle.html)
+  is the only playback control, custom-built instead of relying on
+  browser-native video controls so it can sit as a small pill in the corner
+  rather than a full control bar. Poster fallback chain (wagtailmedia
+  thumbnail → hero.image rendition → none) lives in components/
+  _hero_background_video.html, shared by both variants since the logic is
+  identical, just at different sizes (video_class/poster_spec).
 
   Page templates pass `hero` via the template context (set in get_context()).
-  HeroBlock.get_context() builds this dict automatically (video is always None there).
+  HeroBlock.get_context() builds this dict automatically (video is always
+  None there — HeroBlock has no video field, only a page's own hero does).
 
-  Height: viewport height minus the site nav's height (h-16 = 4rem in
-  header.html) when the nav is in normal flow; full viewport when the nav is
-  transparent/overlaid (see HomePage.use_transparent_header —
+  Height (full variant only): viewport height minus the site nav's height
+  (h-16 = 4rem in header.html) when the nav is in normal flow; full viewport
+  when the nav is transparent/overlaid (see HomePage.use_transparent_header —
   transparent_header is set on the page-level context and inherited here
   since hero.html is {% include %}'d without `only`).
 {% endcomment %}
-<div class="wtr-hero relative overflow-hidden bg-dark flex flex-col
-            {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}
-            {% if hero.layout == 'left' %}justify-end{% else %}justify-center{% endif %}"
-     {% if hero.video %}data-hero{% endif %}>
+{% if hero.variant == "banner" %}
 
-    {% if hero.video %}
-        {# ---------------------------------------------------------------- #}
-        {# Full-bleed background video, poster fallback chain (see above)   #}
-        {# ---------------------------------------------------------------- #}
-        {% if hero.video.thumbnail %}
-            <video autoplay muted loop playsinline preload="metadata"
-                   class="absolute inset-0 h-full w-full object-cover"
-                   aria-hidden="true" tabindex="-1"
-                   poster="{{ hero.video.thumbnail.url }}" data-hero-video>
-                {% for source in hero.video.sources %}
-                    <source src="{{ source.src }}" type="{{ source.type }}">
-                {% endfor %}
-            </video>
-        {% elif hero.image %}
-            {% image hero.image fill-1600x700 as poster_img %}
-            <video autoplay muted loop playsinline preload="metadata"
-                   class="absolute inset-0 h-full w-full object-cover"
-                   aria-hidden="true" tabindex="-1"
-                   poster="{{ poster_img.url }}" data-hero-video>
-                {% for source in hero.video.sources %}
-                    <source src="{{ source.src }}" type="{{ source.type }}">
-                {% endfor %}
-            </video>
-        {% else %}
-            <video autoplay muted loop playsinline preload="metadata"
-                   class="absolute inset-0 h-full w-full object-cover"
-                   aria-hidden="true" tabindex="-1" data-hero-video>
-                {% for source in hero.video.sources %}
-                    <source src="{{ source.src }}" type="{{ source.type }}">
-                {% endfor %}
-            </video>
-        {% endif %}
+    {# ------------------------------------------------------------------ #}
+    {# BANNER VARIANT — compact color panel beside an image/video          #}
+    {# ------------------------------------------------------------------ #}
+    <div class="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
+        <div class="wtr-hero-banner wtr-hero-banner-{{ hero.banner_color }} relative flex flex-col overflow-hidden rounded-lg md:min-h-[385px]"
+             {% if hero.video %}data-hero{% endif %}>
+            {% comment %}flex-1 makes this grid (and via md:items-stretch, both its columns) fill the
+               parent's full md:min-h-[385px] — a block child doesn't stretch to a min-height
+               parent on its own, so without flex on the parent the columns would only be as
+               tall as their own content (leaving a gap under a shorter image/video).{% endcomment %}
+            <div class="grid flex-1 grid-cols-1 md:grid-cols-2 md:items-stretch">
 
-        <button type="button" class="wtr-hero-video-toggle absolute top-4 right-4 z-10 sm:top-6 sm:right-6"
-                data-hero-video-toggle aria-pressed="true">
-            <svg data-hero-video-toggle-icon-pause width="14" height="14" viewBox="0 0 20 20" aria-hidden="true">
-                <rect x="5" y="4" width="3" height="12" rx="1" fill="currentColor"/>
-                <rect x="12" y="4" width="3" height="12" rx="1" fill="currentColor"/>
-            </svg>
-            <svg data-hero-video-toggle-icon-play width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" class="hidden">
-                <path d="M6 4.5v11l9-5.5-9-5.5z" fill="currentColor"/>
-            </svg>
-            <span data-hero-video-toggle-label
-                  data-label-pause="{% trans 'Pause Video' %}"
-                  data-label-play="{% trans 'Play Video' %}">{% trans "Pause Video" %}</span>
-        </button>
-    {% elif hero.image %}
-        {% image hero.image fill-1600x700 as bg %}
-        <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}" alt="" role="presentation"
-             class="absolute inset-0 h-full w-full object-cover"
-             style="{{ hero.image.object_position_style }}" loading="lazy">
-    {% endif %}
+                {# Left column — text content #}
+                <div class="relative z-10 flex flex-col justify-center gap-3 px-6 py-10 sm:px-10 sm:py-12
+                            {% if hero.banner_color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
+                    <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
+                        {{ hero.headline }}
+                    </h1>
+                    {% if hero.copy %}
+                        <div class="wtr-hero-copy prose max-w-none
+                                    {% if hero.banner_color == 'light-grey' %}prose-neutral{% else %}prose-invert{% endif %}">
+                            {% if hero.copy_is_block %}
+                                {% include_block hero.copy %}
+                            {% else %}
+                                {{ hero.copy|richtext }}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
 
-    {% if hero.video or hero.image %}
-        {# Linear gradient scrim over the background (dark, fading from bottom to transparent
-           at top) at 80% opacity — matches the Figma hero fill stack: FFFFFF base,
-           Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
-           busy photos/video without flattening the whole background like a uniform opacity did. #}
-        <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
-    {% endif %}
+                {% comment %}Right column — image or video, min-height keeps it visible on mobile
+                   where the grid stacks to one column.{% endcomment %}
+                <div class="relative min-h-[220px]">
+                    {% if hero.video %}
+                        {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1000x800" %}
+                        {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-3 right-3" %}
+                    {% elif hero.image %}
+                        {% image hero.image fill-1000x800 as bg %}
+                        <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}" alt="" role="presentation"
+                             class="absolute inset-0 h-full w-full object-cover"
+                             style="{{ hero.image.object_position_style }}" loading="lazy">
+                    {% endif %}
+                    {% if hero.video or hero.image %}
+                        {% comment %}Blends the color panel into the media — see main.css; picks the
+                           matching-color fade class so the seam between panel and media
+                           reads as one continuous surface rather than a hard vertical edge.{% endcomment %}
+                        <div class="wtr-hero-banner-fade-{{ hero.banner_color }} absolute inset-y-0 left-0 w-1/3" aria-hidden="true"></div>
+                    {% endif %}
+                </div>
 
-    <div class="relative mx-auto w-full px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-light
-                {% if hero.layout == 'left' %}max-w-7xl text-left{% else %}max-w-4xl text-center{% endif %}">
-
-        <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-8xl">
-            {{ hero.headline }}
-        </h1>
-
-        {% if hero.copy %}
-            <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
-                {% if hero.copy_is_block %}
-                    {% include_block hero.copy %}
-                {% else %}
-                    {{ hero.copy|richtext }}
-                {% endif %}
             </div>
-        {% endif %}
-
-        {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
-        {% for cta_block in hero.cta %}
-            <div class="mt-8 max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
-                {% include_block cta_block with compact=True %}
-            </div>
-        {% endfor %}
-
+        </div>
     </div>
-</div>
+
+{% else %}
+
+    {# ------------------------------------------------------------------ #}
+    {# FULL VARIANT — background image/video, text centered (default)     #}
+    {# or left-aligned and anchored toward the bottom (hero.layout="left")#}
+    {# ------------------------------------------------------------------ #}
+    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col
+                {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}
+                {% if hero.layout == 'left' %}justify-end{% else %}justify-center{% endif %}"
+         {% if hero.video %}data-hero{% endif %}>
+
+        {% if hero.video %}
+            {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1600x700" %}
+            {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-4 right-4 z-10 sm:top-6 sm:right-6" %}
+        {% elif hero.image %}
+            {% image hero.image fill-1600x700 as bg %}
+            <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}" alt="" role="presentation"
+                 class="absolute inset-0 h-full w-full object-cover"
+                 style="{{ hero.image.object_position_style }}" loading="lazy">
+        {% endif %}
+
+        {% if hero.video or hero.image %}
+            {% comment %}Linear gradient scrim over the background (dark, fading from bottom to transparent
+               at top) at 80% opacity — matches the Figma hero fill stack: FFFFFF base,
+               Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
+               busy photos/video without flattening the whole background like a uniform opacity did.{% endcomment %}
+            <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
+        {% endif %}
+
+        <div class="relative mx-auto w-full px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-light
+                    {% if hero.layout == 'left' %}max-w-7xl text-left{% else %}max-w-4xl text-center{% endif %}">
+
+            <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-8xl">
+                {{ hero.headline }}
+            </h1>
+
+            {% if hero.copy %}
+                <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
+                    {% if hero.copy_is_block %}
+                        {% include_block hero.copy %}
+                    {% else %}
+                        {{ hero.copy|richtext }}
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {# hero.cta — at most one of a signup bar, donate block, or announcement bar. #}
+            {% for cta_block in hero.cta %}
+                <div class="mt-8 max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
+                    {% include_block cta_block with compact=True %}
+                </div>
+            {% endfor %}
+
+        </div>
+    </div>
+
+{% endif %}
 {% if hero.video %}
+    {% comment %}Single script block per hero.html include — harmless if a page has multiple
+       heroes with video (page hero + HeroBlock(s) in the body), since it queries
+       every [data-hero] root and each root guards its own init with __wtrHeroInit.{% endcomment %}
     <script>
         (function () {
             document.querySelectorAll("[data-hero]").forEach(function (root) {

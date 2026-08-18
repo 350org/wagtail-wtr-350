@@ -264,18 +264,38 @@ class TestHeroBlockFields(SimpleTestCase):
     """
 
     def test_block_has_expected_fields(self):
+        """
+        No layout or cta fields — HeroBlock always renders as hero.html's
+        "banner" variant, which has a fixed layout and never renders a cta
+        (see HeroBlock's docstring).
+        """
         block = HeroBlock()
-        self.assertIn("headline", block.declared_blocks)
-        self.assertIn("content", block.declared_blocks)
-        self.assertIn("image", block.declared_blocks)
-        self.assertIn("layout", block.declared_blocks)
-        self.assertIn("cta", block.declared_blocks)
+        self.assertEqual(
+            set(block.declared_blocks.keys()),
+            {"headline", "content", "image", "banner_color"},
+        )
 
     def test_image_is_not_required(self):
         """The image field should be optional (required=False)."""
         block = HeroBlock()
         image_block = block.declared_blocks["image"]
         self.assertFalse(image_block.required)
+
+    def test_banner_color_default_is_navy(self):
+        block = HeroBlock()
+        self.assertEqual(block.declared_blocks["banner_color"].meta.default, "navy")
+
+    def test_get_context_always_variant_banner(self):
+        block = HeroBlock()
+        value = block.to_python(
+            {"headline": "Take Action", "content": "", "image": None, "banner_color": "red"}
+        )
+        ctx = block.get_context(value)
+        self.assertEqual(ctx["hero"]["variant"], "banner")
+        self.assertEqual(ctx["hero"]["headline"], "Take Action")
+        self.assertEqual(ctx["hero"]["banner_color"], "red")
+        self.assertEqual(ctx["hero"]["cta"], [])
+        self.assertIsNone(ctx["hero"]["video"])
 
 
 class TestHeroCTABlock(SimpleTestCase):

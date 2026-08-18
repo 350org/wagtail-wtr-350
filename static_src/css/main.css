@@ -372,6 +372,61 @@ html {
 }
 
 /* ============================================================
+ * Hero banner color variants — .wtr-hero-banner-{color}
+ * ============================================================
+ * Used by hero.html's "banner" variant (HeroMixin.hero_banner_color /
+ * HeroBlock.banner_color). Same 5 choices, same tokens, as
+ * .wtr-callout-{color} above — kept as separate classes rather than
+ * reused directly since the hero banner is a different component; see
+ * that block's comment for what each token is and why.
+ * ============================================================ */
+.wtr-hero-banner-navy {
+    background-color: var(--color-callout-navy);
+}
+
+.wtr-hero-banner-red {
+    background-color: var(--color-callout-red);
+}
+
+.wtr-hero-banner-dark-grey {
+    background-color: var(--color-dark);
+}
+
+.wtr-hero-banner-light-grey {
+    background-color: var(--color-neutral-200);
+}
+
+.wtr-hero-banner-blue-gradient {
+    background: linear-gradient(135deg, var(--color-primary-400), var(--color-primary-800));
+}
+
+/* Blends the color panel into the image/video beside it — a fade from
+ * that same color (opaque) to transparent, layered over the media's left
+ * edge, one class per color/gradient so the seam always matches the panel
+ * it's attached to. blue-gradient fades from its darker end
+ * (--color-primary-800) — an exact gradient-into-image blend isn't
+ * feasible with a flat CSS gradient, so this approximates it. */
+.wtr-hero-banner-fade-navy {
+    background: linear-gradient(to right, var(--color-callout-navy), transparent);
+}
+
+.wtr-hero-banner-fade-red {
+    background: linear-gradient(to right, var(--color-callout-red), transparent);
+}
+
+.wtr-hero-banner-fade-dark-grey {
+    background: linear-gradient(to right, var(--color-dark), transparent);
+}
+
+.wtr-hero-banner-fade-light-grey {
+    background: linear-gradient(to right, var(--color-neutral-200), transparent);
+}
+
+.wtr-hero-banner-fade-blue-gradient {
+    background: linear-gradient(to right, var(--color-primary-800), transparent);
+}
+
+/* ============================================================
  * Card carousel — .wtr-card-carousel-track / .wtr-carousel-arrow
  * ============================================================
  * Used by card_carousel_block.html. scroll-snap-type + each card's

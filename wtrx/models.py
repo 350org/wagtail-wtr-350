@@ -17,7 +17,7 @@ from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
-from .blocks import HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
+from .blocks import CALLOUT_COLOR_CHOICES, HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
 from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
@@ -92,22 +92,38 @@ class BasePage(Page):
 
 class HeroMixin(models.Model):
     """
-    Mixin adding a full hero section to any page type.
+    Mixin adding a hero section to any page type.
+
+    Renders as one of two variants (see components/hero.html): "full" — the
+    original full-viewport hero, background image or video, centered/left
+    text, optional cta — or "banner" — a compact rounded panel, solid/
+    gradient color background (reusing CalloutBlock's 5-color system) beside
+    an image, no cta. Which variant a page gets is fixed per page type via
+    the hero_variant class attribute, not editor-controlled: HomePage
+    overrides it to "full"; every other HeroMixin page type (ContentPage,
+    IndexPage) uses the "banner" default.
 
     Fields:
     - hero_headline: optional override for the page title as the displayed h1
     - hero_copy: optional subtext below the headline
-    - hero_image: optional background/feature image; also used as the video
-      poster fallback, and as the background itself when no video is set
-    - hero_video: optional full-bleed background video (autoplay/muted/loop),
-      with a custom pause/play toggle in the corner. Takes over the
-      background from hero_image when set; hero_image is still used as the
-      poster fallback if the video has none.
-    - hero_layout: centered or left-aligned text
-    - hero_cta: optional signup/donate/announcement widget (HeroCTABlock, at most one)
+    - hero_image: optional background/feature image. "full" variant: also
+      used as the video poster fallback, and as the background itself when
+      no video is set. "banner" variant: the image beside the color panel.
+    - hero_video: optional background video (autoplay/muted/loop), with a
+      custom pause/play toggle in the corner. Takes over from hero_image as
+      the background/image area on both variants; hero_image is still used
+      as the poster fallback if the video has none.
+    - hero_layout: centered or left-aligned text. "full" variant only —
+      "banner" has a fixed text-left/image-right structure.
+    - hero_banner_color: background color/gradient. "banner" variant only —
+      "full" never shows a solid color background.
+    - hero_cta: optional signup/donate/announcement widget (HeroCTABlock, at
+      most one). "full" variant only — "banner" never renders one.
 
     Use: include `components/hero.html` in the page template.
     """
+
+    hero_variant = "banner"
 
     hero_headline = models.CharField(
         max_length=255,
@@ -156,7 +172,21 @@ class HeroMixin(models.Model):
         choices=HERO_LAYOUT_CHOICES,
         default="centered",
         verbose_name=_("hero layout"),
-        help_text=_("Centered text over the image, or left-aligned and anchored toward the bottom."),
+        help_text=_(
+            "Centered text over the image, or left-aligned and anchored toward the bottom. "
+            "Only affects the homepage's full-viewport hero — every other page's hero "
+            "renders as a compact banner with a fixed layout."
+        ),
+    )
+    hero_banner_color = models.CharField(
+        max_length=20,
+        choices=CALLOUT_COLOR_CHOICES,
+        default="navy",
+        verbose_name=_("hero banner color"),
+        help_text=_(
+            "Background color for the compact hero banner. Only affects pages whose "
+            "hero renders as a banner (i.e. every page except the homepage)."
+        ),
     )
     hero_cta = StreamField(
         HeroCTABlock(),
@@ -177,6 +207,7 @@ class HeroMixin(models.Model):
                 FieldPanel("hero_image"),
                 MediaChooserPanel("hero_video", media_type="video"),
                 FieldPanel("hero_layout"),
+                FieldPanel("hero_banner_color"),
                 FieldPanel("hero_cta"),
             ],
             heading=_("Hero"),
@@ -193,12 +224,14 @@ class HeroMixin(models.Model):
         not a StreamField block value — the template renders it with |richtext.
         """
         return {
+            "variant": self.hero_variant,
             "headline": self.hero_headline or self.title,
             "copy": self.hero_copy,
             "copy_is_block": False,
             "image": self.hero_image,
             "video": self.hero_video,
             "layout": self.hero_layout,
+            "banner_color": self.hero_banner_color,
             "cta": self.hero_cta,
         }
 
@@ -219,9 +252,14 @@ class HomePage(BasePage, HeroMixin):
 
     Combines a full hero section (from HeroMixin) with a flexible StreamField
     body. Intended as the root page of the site.
+
+    The only page type using HeroMixin's "full" hero variant (see
+    HeroMixin.hero_variant) — every other page type gets the compact
+    "banner" variant instead.
     """
 
     template = "wtrx/pages/home_page.html"
+    hero_variant = "full"
 
     body = StreamField(
         BodyStreamBlock(),

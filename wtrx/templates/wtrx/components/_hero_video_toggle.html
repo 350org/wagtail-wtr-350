@@ -1,0 +1,22 @@
+{% load i18n %}
+{% comment %}
+Pause/play pill for a background video. Shared by both of hero.html's
+variants; pass `toggle_class` for positioning since "full" pins it to the
+whole hero's corner while "banner" pins it to just the media column.
+Behavior is wired up by the single script block at the bottom of hero.html,
+scoped per [data-hero] root (see there for why one script block covers
+every instance on the page).
+{% endcomment %}
+<button type="button" class="wtr-hero-video-toggle {{ toggle_class }}"
+        data-hero-video-toggle aria-pressed="true">
+    <svg data-hero-video-toggle-icon-pause width="14" height="14" viewBox="0 0 20 20" aria-hidden="true">
+        <rect x="5" y="4" width="3" height="12" rx="1" fill="currentColor"/>
+        <rect x="12" y="4" width="3" height="12" rx="1" fill="currentColor"/>
+    </svg>
+    <svg data-hero-video-toggle-icon-play width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" class="hidden">
+        <path d="M6 4.5v11l9-5.5-9-5.5z" fill="currentColor"/>
+    </svg>
+    <span data-hero-video-toggle-label
+          data-label-pause="{% trans 'Pause Video' %}"
+          data-label-play="{% trans 'Play Video' %}">{% trans "Pause Video" %}</span>
+</button>

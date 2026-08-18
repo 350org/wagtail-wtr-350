@@ -91,15 +91,26 @@ class TestHomePageGetContext(TestCase):
         ctx = self._get_context(self.home)
         self.assertEqual(ctx["hero"]["layout"], "centered")
 
+    def test_hero_variant_is_full(self):
+        """HomePage is the only page type using the "full" hero variant."""
+        ctx = self._get_context(self.home)
+        self.assertEqual(ctx["hero"]["variant"], "full")
+
+    def test_hero_banner_color_defaults_navy(self):
+        ctx = self._get_context(self.home)
+        self.assertEqual(ctx["hero"]["banner_color"], "navy")
+
     def test_hero_dict_has_all_required_keys(self):
         ctx = self._get_context(self.home)
         required_keys = {
+            "variant",
             "headline",
             "copy",
             "copy_is_block",
             "image",
             "video",
             "layout",
+            "banner_color",
             "cta",
         }
         self.assertEqual(set(ctx["hero"].keys()), required_keys)
@@ -179,15 +190,22 @@ class TestContentPageGetContext(TestCase):
         ctx = self._get_context(self.page)
         self.assertIsNone(ctx["hero"]["video"])
 
+    def test_hero_variant_is_banner(self):
+        """ContentPage uses HeroMixin's default "banner" variant, unlike HomePage."""
+        ctx = self._get_context(self.page)
+        self.assertEqual(ctx["hero"]["variant"], "banner")
+
     def test_hero_dict_keys(self):
         ctx = self._get_context(self.page)
         expected = {
+            "variant",
             "headline",
             "copy",
             "copy_is_block",
             "image",
             "video",
             "layout",
+            "banner_color",
             "cta",
         }
         self.assertEqual(set(ctx["hero"].keys()), expected)
@@ -248,6 +266,11 @@ class TestIndexPageGetContext(TestCase):
     def test_hero_dict_present(self):
         ctx = self._get_context(self.index)
         self.assertIn("hero", ctx)
+
+    def test_hero_variant_is_banner(self):
+        """IndexPage uses HeroMixin's default "banner" variant, unlike HomePage."""
+        ctx = self._get_context(self.index)
+        self.assertEqual(ctx["hero"]["variant"], "banner")
 
     def test_children_in_context(self):
         ctx = self._get_context(self.index)
