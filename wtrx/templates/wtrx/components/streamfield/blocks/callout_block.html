@@ -1,12 +1,17 @@
 {% load i18n wagtailcore_tags wagtailimages_tags %}
 {% comment %}
-Solid-color (or gradient) card: optional heading (H2), optional subheading
-(H3), optional paragraph, optional CTA button, on a background chosen via
-value.color — see CalloutBlock's docstring and main.css's
-.wtr-callout-{color} classes for the five choices. Card is a normal
-(non-full-bleed) block, sized to its container like most other blocks —
-unlike card_carousel/donate_fundraiseup, nothing here needs to escape the
-page's shared content-width wrapper.
+Solid-color card: optional heading (H2), optional subheading (H3), optional
+paragraph, optional CTA button, on a background chosen via value.color —
+see CalloutBlock's docstring and main.css's .wtr-callout-{color} classes
+for the five choices.
+
+Full-bleed-ish width: special-cased in content_page.html/home_page.html
+(alongside section/card_carousel/donate_fundraiseup) to skip the shared
+max-w-5xl wrapper, same w-full-outer / max-w-inner two-tier pattern as
+donate_fundraiseup_block.html — see that file's comment for why a bare
+`50% - 50vw` bleed isn't used instead. Capped at max-w-7xl (1280px, not
+the wider max-w-[1500px] used by the hero banner/card carousel/donate
+block) — deliberately narrower than those per design.
 
 Text/button color: light-grey is the only one of the five colors light
 enough to need dark text/button instead of light — the
@@ -25,31 +30,40 @@ per the reference design (a giant faint "350" numeral), not a full photo
 background; object-cover so it fills the card regardless of the card's
 own aspect ratio, which the image's own is unlikely to match.
 {% endcomment %}
-<div class="wtr-callout wtr-callout-{{ value.color }} relative overflow-hidden rounded-2xl px-6 py-10 sm:px-10 sm:py-14">
-    {% if value.image %}
-        {% image value.image fill-1600x900 as bg_img %}
-        <img src="{{ bg_img.url }}" alt="" class="wtr-callout-bg-image absolute inset-0 h-full w-full object-cover" aria-hidden="true">
-    {% endif %}
-    <div class="relative ml-auto max-w-2xl text-right {% if value.color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
-        {% if value.heading %}
-            <h2 class="font-heading text-2xl font-bold sm:text-3xl">{{ value.heading }}</h2>
+<div class="w-full px-4 py-8 sm:px-6 lg:px-8">
+    <div class="wtr-callout wtr-callout-{{ value.color }} relative mx-auto max-w-7xl overflow-hidden rounded-2xl px-6 py-10 sm:px-10 sm:py-14">
+        {% if value.image %}
+            {% image value.image fill-1600x900 as bg_img %}
+            <img src="{{ bg_img.url }}" alt="" class="wtr-callout-bg-image absolute inset-0 h-full w-full object-cover" aria-hidden="true">
         {% endif %}
-        {% if value.subheading %}
-            <h3 class="font-heading mt-2 text-lg font-semibold sm:text-xl">{{ value.subheading }}</h3>
-        {% endif %}
-        {% if value.content %}
-            <div class="prose mt-4 max-w-none text-right text-[40px] leading-[1.35] {% if value.color == 'light-grey' %}prose-neutral{% else %}prose-invert{% endif %}">
-                {{ value.content|richtext }}
-            </div>
-        {% endif %}
-        {% if value.link_text %}
-            <div class="mt-6">
-                {% if value.color == "light-grey" %}
-                    {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline" %}
-                {% else %}
-                    {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline-light" %}
-                {% endif %}
-            </div>
-        {% endif %}
+        <div class="relative max-w-3xl {% if value.color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
+            {% if value.heading %}
+                <h2 class="font-heading text-3xl font-bold sm:text-4xl lg:text-[64px]">{{ value.heading }}</h2>
+            {% endif %}
+            {% if value.subheading %}
+                <h3 class="font-heading mt-2 text-lg font-semibold sm:text-xl">{{ value.subheading }}</h3>
+            {% endif %}
+            {% if value.content %}
+                {% comment %}
+                [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
+                prose-invert body color (a muted ~87%-lightness gray, meant for long-form
+                reading) to pure white, matching the reference design — headings/bold/links
+                already default to white in prose-invert, only body text doesn't.
+                {% endcomment %}
+                <div class="prose mt-4 max-w-none text-lg leading-[1.35] sm:text-xl lg:text-[24px]
+                            {% if value.color == 'light-grey' %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                    {{ value.content|richtext }}
+                </div>
+            {% endif %}
+            {% if value.link_text %}
+                <div class="mt-6">
+                    {% if value.color == "light-grey" %}
+                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline" %}
+                    {% else %}
+                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline-light" %}
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
     </div>
 </div>

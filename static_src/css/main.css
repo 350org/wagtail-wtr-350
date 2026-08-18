@@ -336,11 +336,15 @@ html {
  * (not a separate token — this *is* 350's existing dark color, just also
  * offered as a callout background); light-grey reuses --color-neutral-200
  * (already labeled "Figma: gray callout" in theme.css, predating this
- * block). blue-gradient is the only one without a direct Figma hex — a
- * diagonal gradient across the existing primary blue ramp, light-to-dark,
- * approximating the reference design's gradient + faint "350" watermark
- * (the watermark itself is CalloutBlock's own optional `image` field, not
- * baked into this gradient).
+ * block). blue-gradient is a flat fill too — confirmed against Figma's own
+ * layer stack (Image 20% / Blue / FFFFFF base, no gradient stop in there
+ * at all) at #0F81E8, which is exactly --color-primary; what reads as a
+ * gradient in the reference design is the faint "350" watermark
+ * (CalloutBlock's own optional `image` field) sitting at 20% opacity over
+ * this flat color, not an actual two-stop background gradient. The choice
+ * key stays "blue-gradient" (only its label dropped "(gradient)") since
+ * it's already the stored value in existing StreamField content — renaming
+ * the key would need a data migration for no functional benefit.
  * ============================================================ */
 .wtr-callout-navy {
     background-color: var(--color-callout-navy);
@@ -359,7 +363,7 @@ html {
 }
 
 .wtr-callout-blue-gradient {
-    background: linear-gradient(135deg, var(--color-primary-400), var(--color-primary-800));
+    background-color: var(--color-primary);
 }
 
 /* Background image: a subtle texture/watermark behind the text, not a
@@ -397,15 +401,13 @@ html {
 }
 
 .wtr-hero-banner-blue-gradient {
-    background: linear-gradient(135deg, var(--color-primary-400), var(--color-primary-800));
+    background-color: var(--color-primary);
 }
 
 /* Blends the color panel into the image/video beside it — a fade from
  * that same color (opaque) to transparent, layered over the media's left
- * edge, one class per color/gradient so the seam always matches the panel
- * it's attached to. blue-gradient fades from its darker end
- * (--color-primary-800) — an exact gradient-into-image blend isn't
- * feasible with a flat CSS gradient, so this approximates it. */
+ * edge, one class per color so the seam always matches the panel it's
+ * attached to. */
 .wtr-hero-banner-fade-navy {
     background: linear-gradient(to right, var(--color-callout-navy), transparent);
 }
@@ -423,7 +425,7 @@ html {
 }
 
 .wtr-hero-banner-fade-blue-gradient {
-    background: linear-gradient(to right, var(--color-primary-800), transparent);
+    background: linear-gradient(to right, var(--color-primary), transparent);
 }
 
 /* ============================================================

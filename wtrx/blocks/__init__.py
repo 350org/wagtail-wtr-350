@@ -71,7 +71,7 @@ CALLOUT_COLOR_CHOICES = [
     ("navy", _("Navy")),
     ("red", _("Red")),
     ("dark-grey", _("Dark grey")),
-    ("blue-gradient", _("350 blue (gradient)")),
+    ("blue-gradient", _("350 Blue")),
     ("light-grey", _("Light grey")),
 ]
 
@@ -758,7 +758,7 @@ class QuoteBlock(StructBlock):
 
 class CalloutBlock(StructBlock):
     """
-    A solid-color (or gradient) card: optional heading, optional subheading,
+    A solid-color card: optional heading, optional subheading,
     optional paragraph, optional CTA button, and an optional low-opacity
     background image (a subtle texture/watermark behind the text, not a
     full photo — see callout_block.html).
