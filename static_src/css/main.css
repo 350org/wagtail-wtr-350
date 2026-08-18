@@ -26,6 +26,7 @@
  * Usage in templates:
  *   <a class="wtr-btn hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-sm hover:bg-primary-500">Label</a>
+ *   <a class="wtr-btn wtr-btn-lg hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-outline hover:bg-primary-50">Label</a>
  *   <a class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">Label</a>
  * ============================================================ */
@@ -86,6 +87,11 @@ html {
 @utility wtr-btn-sm {
     padding: 0.375rem 0.875rem;
     font-size: 0.875rem;
+}
+
+@utility wtr-btn-lg {
+    padding: 1.5rem 2.25rem;
+    font-size: 1.5rem;
 }
 
 /*

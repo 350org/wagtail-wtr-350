@@ -58,9 +58,9 @@ own aspect ratio, which the image's own is unlikely to match.
             {% if value.link_text %}
                 <div class="mt-6">
                     {% if value.color == "light-grey" %}
-                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline" %}
+                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline" size="lg" %}
                     {% else %}
-                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline-light" %}
+                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline-light" size="lg" %}
                     {% endif %}
                 </div>
             {% endif %}
