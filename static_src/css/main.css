@@ -29,7 +29,7 @@
     color: var(--color-light);
     background-color: var(--color-primary);
     border: 2px solid transparent;
-    border-radius: 1rem;
+    border-radius: var(--radius-button);
     text-decoration: none;
     cursor: pointer;
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
@@ -231,7 +231,7 @@ html {
     width: 100%;
     padding: 0.625rem 1rem;
     border: 1px solid var(--color-neutral-300);
-    border-radius: 1rem;
+    border-radius: var(--radius-button);
     background-color: var(--color-light);
     color: var(--color-dark);
     font-family: var(--font-body);
@@ -247,7 +247,7 @@ html {
     color: var(--color-light);
     background-color: var(--color-primary);
     border: 2px solid transparent;
-    border-radius: 1rem;
+    border-radius: var(--radius-button);
     cursor: pointer;
 }
 

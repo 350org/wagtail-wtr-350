@@ -164,6 +164,13 @@
   --color-warning-900: #78350f;
   --color-warning-950: #451a03;
 
+  /* Button corner radius — single token so every wtr-btn (and the
+   * ActionKit embed's own button/input, which duplicate the same visual
+   * treatment against foreign third-party markup — see main.css) stays in
+   * sync. Forks re-theming button roundness should override this one
+   * value rather than editing main.css directly. */
+  --radius-button: 1rem;
+
   /* Typography — KlimaWeb (self-hosted, @font-face above) for both
    * headings and body text; only weights 500 and 800 are available.
    * Utility classes requesting other weights (e.g. font-semibold=600)
