@@ -5,6 +5,17 @@
 @plugin '@tailwindcss/forms';
 
 /* ============================================================
+ * Border-radius convention
+ * ============================================================
+ * rounded-lg   — cards, media, panels, hero/callout containers (default)
+ * rounded-full — pills, badges, avatars
+ * rounded-md   — compact form/nav controls (pagination, language switcher,
+ *                search input)
+ * Buttons use --radius-button (theme.css), not a rounded-* utility.
+ * Pick from this list rather than introducing a new radius value.
+ * ============================================================ */
+
+/* ============================================================
  * Button utility — wtr-btn
  * ============================================================
  *
