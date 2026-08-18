@@ -31,7 +31,7 @@ background; object-cover so it fills the card regardless of the card's
 own aspect ratio, which the image's own is unlikely to match.
 {% endcomment %}
 <div class="w-full px-4 py-8 sm:px-6 lg:px-8">
-    <div class="wtr-callout wtr-callout-{{ value.color }} relative mx-auto max-w-7xl overflow-hidden rounded-2xl px-6 py-10 sm:px-10 sm:py-14">
+    <div class="wtr-callout wtr-callout-{{ value.color }} relative mx-auto max-w-7xl overflow-hidden rounded-lg px-6 py-10 sm:px-10 sm:py-14">
         {% if value.image %}
             {% image value.image fill-1600x900 as bg_img %}
             <img src="{{ bg_img.url }}" alt="" class="wtr-callout-bg-image absolute inset-0 h-full w-full object-cover" aria-hidden="true">
