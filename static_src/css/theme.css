@@ -167,10 +167,11 @@
   /* wtr-btn / ActionKit embed button corner radius (main.css). */
   --radius-button: 0.5rem;
 
-  /* wtr-btn's bold label weight (main.css). KlimaWeb only ships 500/800,
-   * so font-semibold(600) elsewhere in the app still silently renders as
-   * 500 — unaddressed here since fixing that sitewide is a separate,
-   * bigger call. */
+  /* KlimaWeb only ships 500/800 — override both weight tokens so
+   * font-bold and font-semibold (600, no matching font file) resolve to
+   * the same actually-available bold weight instead of silently
+   * rendering as 500. */
+  --font-weight-semibold: 800;
   --font-weight-bold: 800;
 
   /* Typography — KlimaWeb (self-hosted, @font-face above), weights 500
