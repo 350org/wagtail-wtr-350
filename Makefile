@@ -1,7 +1,8 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision quickstart
 
 help:
 	@echo "Available commands:"
+	@echo "  make quickstart                  - Full local dev setup (venv + npm + build + migrate + optional setup)"
 	@echo "  make venv                        - Create .venv and install all dependencies"
 	@echo "  make dev                         - Run development server"
 	@echo "  make build                       - Build CSS and JS (development)"
@@ -54,24 +55,39 @@ watch:
 	npm run start
 
 migrate:
-	python manage.py migrate
+	.venv/bin/python manage.py migrate
 
 createsuperuser:
-	python manage.py createsuperuser
+	.venv/bin/python manage.py createsuperuser
 
 setup:
-	python manage.py setup_site
+	.venv/bin/python manage.py setup_site
 
 test:
-	python manage.py test wtrx wagtail_wtr
+	.venv/bin/python manage.py test wtrx wagtail_wtr
 
 load-data:
-	python manage.py migrate
-	@test -f fixtures/demo.json && python manage.py loaddata fixtures/demo.json || echo "No demo fixtures yet — skipping loaddata"
-	python manage.py collectstatic --noinput
+	.venv/bin/python manage.py migrate
+	@test -f fixtures/demo.json && .venv/bin/python manage.py loaddata fixtures/demo.json || echo "No demo fixtures yet — skipping loaddata"
+	.venv/bin/python manage.py collectstatic --noinput
 
 test-page:
-	python manage.py create_test_page --force
+	.venv/bin/python manage.py create_test_page --force
+
+quickstart: venv
+	npm install
+	$(MAKE) build
+	.venv/bin/python manage.py migrate
+	@echo ""
+	@printf "Run interactive site setup now? [y/N] "; read ans; [ "$${ans}" = "y" ] || [ "$${ans}" = "Y" ] && .venv/bin/python manage.py setup_site || true
+	@echo ""
+	@printf "Create a superuser now? [y/N] "; read ans; [ "$${ans}" = "y" ] || [ "$${ans}" = "Y" ] && .venv/bin/python manage.py createsuperuser || true
+	@echo ""
+	@echo "Setup complete. Activate the venv and start the dev server:"
+	@echo ""
+	@echo "  source .venv/bin/activate"
+	@echo "  make dev"
+	@echo ""
 
 provision:
 	@if [ -z "$(SITE)" ]; then echo "Error: SITE is required. Usage: make provision SITE=mysite ENV=production"; exit 1; fi

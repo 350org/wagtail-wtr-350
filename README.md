@@ -34,30 +34,30 @@ git clone https://github.com/withtheranks/wagtail-wtr.git mysite
 cd mysite
 ```
 
-### 2. Set up the virtual environment and install dependencies
+### 2. Run the one-shot setup
+
+```bash
+make quickstart
+```
+
+This creates the virtual environment, installs Python and Node dependencies,
+builds frontend assets, runs migrations, and optionally runs the interactive
+site setup and superuser creation. When it finishes, start the dev server:
+
+```bash
+source .venv/bin/activate
+make dev
+```
+
+**Or run each step manually:**
 
 ```bash
 make venv
 source .venv/bin/activate
 npm install
-```
-
-### 3. Build frontend assets
-
-```bash
 make build
-```
-
-### 4. Run migrations and set up the site
-
-```bash
 make migrate
-make setup       # interactive: site name, donation platform, signup platform
-```
-
-### 5. Create an admin user and start the dev server
-
-```bash
+make setup           # interactive: site name, donation platform, signup platform
 make createsuperuser
 make dev
 ```
@@ -91,13 +91,8 @@ git remote add upstream git@github.com:With-the-Ranks/wagtail-wtr.git
 Follow the [Quickstart](#quickstart) steps above. The short version:
 
 ```bash
-make venv
+make quickstart
 source .venv/bin/activate
-npm install
-make build
-make migrate
-make setup          # sets site name, donation platform, signup platform
-make createsuperuser
 make dev
 ```
 
@@ -340,6 +335,7 @@ class HomePage(BasePage, HeroMixin):
 ## Make commands
 
 ```
+make quickstart       Full local dev setup: venv + npm install + build + migrate + optional setup/superuser
 make venv             Create .venv and install all dependencies
 make dev              Run development server (localhost:8000)
 make build            Build CSS + JS — development (Tailwind CLI + JS + fonts + images copy)
