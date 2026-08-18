@@ -180,8 +180,14 @@
    * Utility classes requesting other weights (e.g. font-semibold=600)
    * resolve to the nearest declared weight via the browser's normal font
    * matching — 600 rounds down to 500, so font-semibold text renders
-   * visually identical to font-normal. Worth checking visually wherever
-   * font-semibold is used (button.html, card.html) once this is live. */
+   * visually identical to font-normal.
+   * .wtr-btn (main.css) is fixed to explicit font-weight: 800 for this
+   * reason. font-semibold is still used elsewhere (card.html, header.html,
+   * footer.html, pagination.html, table_block.html, etc.) and still
+   * silently renders as 500 there — left as-is pending a design decision,
+   * since switching all of those to font-bold would be a much
+   * higher-blast-radius, sitewide typography change rather than a
+   * button-scoped one. */
   --font-heading: 'KlimaWeb', system-ui, sans-serif;
   --font-body:    'KlimaWeb', system-ui, sans-serif;
   --font-mono:    ui-monospace, monospace;
