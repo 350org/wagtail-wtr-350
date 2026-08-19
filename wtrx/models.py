@@ -673,6 +673,24 @@ class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
         verbose_name=_("author"),
         help_text=_("Defaults to whoever creates this post. Editable."),
     )
+    author_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("author name"),
+        help_text=_(
+            "Byline for a guest writer or imported post who doesn't have a "
+            "site account. Ignored if Author (above) is set."
+        ),
+    )
+    author_title = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("author title"),
+        help_text=_(
+            "Optional role/affiliation shown next to Author name, e.g. "
+            "\"Senior Campaigner at Oil Change International\"."
+        ),
+    )
     categories = ParentalManyToManyField(
         "wtrx.BlogCategory",
         blank=True,
@@ -693,6 +711,8 @@ class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
         + PublishedDateMixin.published_date_panels
         + [
             FieldPanel("author"),
+            FieldPanel("author_name"),
+            FieldPanel("author_title"),
             FieldPanel("categories", widget=forms.CheckboxSelectMultiple),
             FieldPanel("body"),
         ]
@@ -714,13 +734,26 @@ class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
         verbose_name = _("blog page")
         verbose_name_plural = _("blog pages")
 
+    @property
+    def author_display(self):
+        """
+        Byline text for this post: the site account's name if Author (FK) is
+        set, else the guest/imported Author name (+ title), else None.
+        Shared by the hero banner and the BlogIndexPage listing cards so the
+        two never drift out of sync.
+        """
+        if self.author_id:
+            return self.author.get_full_name() or self.author.get_username()
+        if self.author_name:
+            if self.author_title:
+                return f"{self.author_name}, {self.author_title}"
+            return self.author_name
+        return None
+
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
-        author_display = None
-        if self.author_id:
-            author_display = self.author.get_full_name() or self.author.get_username()
         ctx["hero"] = self.get_banner_hero_context(
-            author=author_display,
+            author=self.author_display,
             published_at=self.published_at,
         )
         return ctx
