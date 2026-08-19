@@ -32,7 +32,7 @@ from datetime import timezone as dt_timezone
 from urllib.parse import urlparse
 
 import requests
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 from django.core.management.base import BaseCommand
 from django.utils import timezone as dj_timezone
 from django.utils.dateparse import parse_datetime
@@ -89,6 +89,8 @@ def _build_clean(node):
     Returns a list of cleaned bs4 nodes (Tag/NavigableString) suitable for
     appending into a parent tag or serializing directly with str().
     """
+    if isinstance(node, Comment):
+        return []
     if isinstance(node, NavigableString):
         return [NavigableString(str(node))]
     if not isinstance(node, Tag):
@@ -190,6 +192,8 @@ def _process_nodes(nodes, blocks, pending, session, stdout, dry_run=False):
             blocks.append({"type": "text", "value": combined})
 
     for node in nodes:
+        if isinstance(node, Comment):
+            continue
         if isinstance(node, NavigableString):
             text = str(node).strip()
             if text:
