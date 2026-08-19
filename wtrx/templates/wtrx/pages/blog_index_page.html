@@ -1,0 +1,72 @@
+{% extends "wtrx/base_page.html" %}
+{% load i18n wagtailcore_tags wagtailimages_tags %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+
+    <h1 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl">{{ page.title }}</h1>
+
+    {% if page.intro %}
+        <div class="prose prose-neutral mt-4 max-w-2xl">
+            {{ page.intro|richtext }}
+        </div>
+    {% endif %}
+
+    {% if categories %}
+        <div class="mt-8 flex flex-wrap gap-2">
+            <a href="{{ page.url }}"
+               class="rounded-full px-4 py-1.5 font-heading text-sm font-semibold transition-colors
+                      {% if not selected_category %}bg-dark text-light{% else %}bg-neutral-200 text-dark hover:bg-neutral-300{% endif %}">
+                {% trans "All" %}
+            </a>
+            {% for category in categories %}
+                <a href="{{ page.url }}?category={{ category.slug }}"
+                   class="rounded-full px-4 py-1.5 font-heading text-sm font-semibold transition-colors
+                          {% if selected_category == category %}bg-dark text-light{% else %}bg-neutral-200 text-dark hover:bg-neutral-300{% endif %}">
+                    {{ category.name }}
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if posts %}
+        <div class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {% for post in posts %}
+                <a href="{{ post.url }}"
+                   class="wtr-page-card flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-light shadow-xs transition-shadow hover:shadow-md">
+                    {% if post.hero_image %}
+                        {% image post.hero_image fill-640x360 as img %}
+                        <div class="aspect-video overflow-hidden">
+                            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ post.hero_image.title }}" class="h-full w-full object-cover" loading="lazy">
+                        </div>
+                    {% endif %}
+                    <div class="flex flex-1 flex-col p-5">
+                        <span class="mb-2 inline-block w-fit rounded-full bg-neutral-200 px-3 py-1 font-heading text-xs font-semibold text-dark">
+                            {{ post.published_at|date:"F j, Y" }}
+                        </span>
+                        <div class="flex items-center justify-between gap-3">
+                            <h3 class="font-heading text-lg font-semibold text-dark">{{ post.title }}</h3>
+                            <svg class="h-5 w-5 shrink-0 text-dark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                <path d="M4 10H16M16 10L11 5M16 10L11 15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        {% if post.search_description %}
+                            <p class="mt-2 flex-1 text-sm text-dark/70">{{ post.search_description }}</p>
+                        {% endif %}
+                        {% if post.author %}
+                            <p class="mt-3 text-xs font-medium text-dark/60">
+                                {% blocktrans with author=post.author.get_full_name|default:post.author.get_username %}By {{ author }}{% endblocktrans %}
+                            </p>
+                        {% endif %}
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+
+        {% include "wtrx/components/pagination.html" with page_obj=posts %}
+    {% else %}
+        <p class="mt-10 text-neutral-600">{% trans "No posts found." %}</p>
+    {% endif %}
+
+</div>
+{% endblock %}

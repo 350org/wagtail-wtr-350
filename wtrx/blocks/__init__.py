@@ -672,8 +672,14 @@ class PageCardsBlock(StructBlock):
     get_children().live().public().specific() query IndexPage.get_context()
     uses), converted to card dicts via the same page_as_card() tag
     index_page.html uses, so this always reflects whatever's actually
-    published there. "Latest" = first_published_at, since no page type has a
-    dedicated date field.
+    published there.
+
+    Ordering is always by first_published_at (present on every Page, so
+    this stays a single query regardless of index_page's child page type
+    mix) — but the date shown on each card prefers published_at when the
+    child has one (BlogPage, PressReleasePage), since that's the
+    editor-controlled display date for those types, over Wagtail's own
+    non-editable first_published_at.
     """
 
     heading = CharBlock(
@@ -687,7 +693,7 @@ class PageCardsBlock(StructBlock):
         label=_("Subheading"),
     )
     index_page = PageChooserBlock(
-        page_type="wtrx.IndexPage",
+        page_type=["wtrx.IndexPage", "wtrx.BlogIndexPage", "wtrx.PressReleaseIndexPage"],
         label=_("Index page"),
         help_text=_(
             "The 3 most recently published pages under this index page are shown as cards."
@@ -718,7 +724,7 @@ class PageCardsBlock(StructBlock):
             )
             for child in children:
                 card = page_as_card(child)
-                card["date"] = child.first_published_at
+                card["date"] = getattr(child, "published_at", None) or child.first_published_at
                 cards.append(card)
         context["cards"] = cards
         return context
