@@ -7,8 +7,8 @@ When transparent: header is position:absolute over the hero, bg is transparent, 
 and the dark_logo variant is used if available.
 {% endcomment %}
 <header class="wtr-header {% if transparent_header %}absolute inset-x-0 top-0 z-30 bg-transparent border-b-0{% else %}relative bg-light border-b border-neutral-200{% endif %}">
-    <div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
+    <div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex items-center justify-between">
 
             {% comment %}
             Logo — uses dark_logo when transparent header is active (dark hero bg),
