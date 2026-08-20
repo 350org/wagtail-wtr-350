@@ -25,33 +25,44 @@
         {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
     </div>
 {% else %}
-    <div class="wtr-signup wtr-signup-actionkit overflow-hidden rounded-lg" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
-        {% if value.image %}
-            <div class="relative">
-                {% image value.image fill-1600x500 as img %}
-                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
-                     class="h-64 w-full object-cover sm:h-80" loading="lazy">
-                {% if value.image_caption %}
-                    <div class="absolute inset-x-0 bottom-0 bg-dark/70 px-4 py-2">
-                        <p class="text-xs text-light">{{ value.image_caption }}</p>
-                    </div>
-                {% endif %}
-            </div>
-        {% endif %}
-        <div class="bg-dark px-6 py-12 sm:px-10 sm:py-16">
-            <div class="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 md:grid-cols-2">
-                <div class="text-light">
-                    {% if value.heading %}
-                        <h2 class="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">{{ value.heading }}</h2>
-                    {% endif %}
-                    {% if value.description %}
-                        <div class="prose prose-invert mt-4 max-w-none">
-                            {{ value.description|richtext }}
+    {% comment %}
+    Full-bleed width, matching donate_fundraiseup_block.html's w-full-outer /
+    max-w-inner two-tier pattern — signup_actionkit is special-cased in
+    content_page.html/home_page.html to skip the shared max-w-5xl wrapper,
+    so this owns its own width instead. max-w-[1330px] matches Figma's
+    signup-with-image frame width. No vertical padding on the w-full-outer
+    wrapper — the 128px gap between body blocks comes from the page
+    templates' space-y-32 on the block loop.
+    {% endcomment %}
+    <div class="w-full px-4 sm:px-6 lg:px-8">
+        <div class="wtr-signup wtr-signup-actionkit mx-auto max-w-[1330px] overflow-hidden rounded-lg" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+            {% if value.image %}
+                <div class="relative">
+                    {% image value.image fill-1600x500 as img %}
+                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                         class="h-64 w-full object-cover sm:h-80" loading="lazy">
+                    {% if value.image_caption %}
+                        <div class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
+                            <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ value.image_caption }}</p>
                         </div>
                     {% endif %}
                 </div>
-                <div>
-                    {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
+            {% endif %}
+            <div class="bg-dark px-6 py-12 sm:px-10 sm:py-16">
+                <div class="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 md:grid-cols-2">
+                    <div class="text-light">
+                        {% if value.heading %}
+                            <h2 class="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">{{ value.heading }}</h2>
+                        {% endif %}
+                        {% if value.description %}
+                            <div class="prose prose-invert mt-4 max-w-none">
+                                {{ value.description|richtext }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
+                    </div>
                 </div>
             </div>
         </div>

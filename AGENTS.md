@@ -618,20 +618,50 @@ Keep the following files up to date whenever relevant changes are made:
 These files should never fall out of sync with the actual repo. Update them in the
 same commit as the code change they describe.
 
+## Context Management
+
+This applies to any session in this repo, regardless of the kind of work —
+not just design/style-alignment passes. Don't wait until you're at the
+context limit and an automatic summarization kicks in:
+
+- Whenever context is getting large in a session, run compaction
+  automatically rather than waiting to be asked — don't treat it as
+  something only the user triggers.
+- Proactively compact or summarize your own progress once a session has done
+  several rounds of investigation-and-fix, rather than letting raw tool
+  output (especially image reads, large file dumps, and long command
+  output) pile up unbounded.
+- Prefer forking to a subagent for exploratory or one-off investigation whose
+  raw output you won't need again (e.g. "where does this block render"),
+  instead of keeping it all in the main conversation's context.
+- When you no longer need a screenshot's full detail (you've already reported
+  what it showed), don't re-read it — trust your own prior summary instead of
+  pulling the image back into context again.
+
 ## Code Review Requirement
 
-**Before creating any commit**, two reviews are required in this order:
+**Run the agent code review once per session, immediately before the final
+commit of that session** — not before every individual commit. If a session
+produces several small commits in sequence, only the last one needs the
+agent review first; don't re-run it after each intermediate commit. Human
+review (below) still applies to every commit regardless.
 
-1. **Agent code review** — Run the `code-reviewer` agent on all changed files
-   using the Task tool with `subagent_type: "code-reviewer"`. Provide:
+1. **Agent code review** — Run the `code-reviewer` agent (or the
+   `/code-review` skill if that agent type isn't available in the current
+   environment) on the session's changed files, scoped to the diff that is
+   actually about to be committed (not the whole branch vs `main`) using the
+   Task tool with `subagent_type: "code-reviewer"`. Provide:
    - A summary of what was built and why
    - The full list of files changed
    - Any specific areas of concern or uncertainty
 
-   Address any issues the reviewer raises before proceeding.
+   Address any issues the reviewer raises before proceeding. Findings that
+   fall outside the diff being committed (pre-existing issues elsewhere on
+   the branch) should be surfaced to the user separately, not treated as
+   blocking the current commit.
 
 2. **Human code review** — Present the changes to the user and explicitly ask
    them to review. Wait for their sign-off before committing.
 
 Only create the commit after both reviews are complete and any issues have
-been addressed. This applies to all commits, including small fixes.
+been addressed.

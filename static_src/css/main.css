@@ -5,6 +5,17 @@
 @plugin '@tailwindcss/forms';
 
 /* ============================================================
+ * Border-radius convention
+ * ============================================================
+ * rounded-lg   — cards, media, panels, hero/callout containers (default)
+ * rounded-full — pills, badges, avatars
+ * rounded-md   — compact form/nav controls (pagination, language switcher,
+ *                search input)
+ * Buttons use --radius-button (theme.css), not a rounded-* utility.
+ * Pick from this list rather than introducing a new radius value.
+ * ============================================================ */
+
+/* ============================================================
  * Button utility — wtr-btn
  * ============================================================
  *
@@ -15,6 +26,7 @@
  * Usage in templates:
  *   <a class="wtr-btn hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-sm hover:bg-primary-500">Label</a>
+ *   <a class="wtr-btn wtr-btn-lg hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-outline hover:bg-primary-50">Label</a>
  *   <a class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">Label</a>
  * ============================================================ */
@@ -24,12 +36,12 @@
     padding: 0.625rem 1.25rem;
     font-family: var(--font-heading);
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-bold);
     line-height: 1.5;
     color: var(--color-light);
     background-color: var(--color-primary);
     border: 2px solid transparent;
-    border-radius: 1rem;
+    border-radius: var(--radius-button);
     text-decoration: none;
     cursor: pointer;
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
@@ -75,6 +87,11 @@ html {
 @utility wtr-btn-sm {
     padding: 0.375rem 0.875rem;
     font-size: 0.875rem;
+}
+
+@utility wtr-btn-lg {
+    padding: 1.5rem 2.25rem;
+    font-size: 1.5rem;
 }
 
 /*
@@ -231,7 +248,7 @@ html {
     width: 100%;
     padding: 0.625rem 1rem;
     border: 1px solid var(--color-neutral-300);
-    border-radius: 1rem;
+    border-radius: var(--radius-button);
     background-color: var(--color-light);
     color: var(--color-dark);
     font-family: var(--font-body);
@@ -241,13 +258,13 @@ html {
 .wtr-actionkit-embed-inline button[type='submit'],
 .wtr-actionkit-embed-inline input[type='submit'] {
     flex: 0 0 auto;
-    padding: 0.625rem 1.25rem;
+    padding: 0.625rem 2.5rem 0.625rem 1.25rem;
     font-family: var(--font-heading);
-    font-weight: 800;
+    font-weight: var(--font-weight-bold);
     color: var(--color-light);
     background-color: var(--color-primary);
     border: 2px solid transparent;
-    border-radius: 1rem;
+    border-radius: var(--radius-button);
     cursor: pointer;
 }
 
@@ -326,6 +343,22 @@ html {
 }
 
 /* ============================================================
+ * Photo caption overlay pill — .wtr-image-caption
+ * ============================================================
+ * Dark semi-transparent pill centered near the bottom of a photo, per
+ * Figma's photo-caption pattern. Shared by image_block.html,
+ * donate_fundraiseup_block.html, and signup_actionkit_block.html — was
+ * duplicated as an inline bg-black/50 utility in the latter two; a named
+ * class here both de-duplicates it and gets it off a raw Tailwind color
+ * utility (AGENTS.md: semantic tokens only). rgb(0 0 0 / 0.5) matches
+ * Figma's own fill exactly — not close enough to --color-dark to reuse
+ * that token instead.
+ * ============================================================ */
+.wtr-image-caption {
+    background-color: rgb(0 0 0 / 0.5);
+}
+
+/* ============================================================
  * Callout color variants — .wtr-callout-{color}
  * ============================================================
  * Used by callout_block.html. Five choices from CalloutBlock.color;
@@ -371,7 +404,7 @@ html {
  * `relative` text block purely via DOM order (it's the first child), so
  * no z-index is needed on either side. */
 .wtr-callout-bg-image {
-    opacity: 0.2;
+    opacity: 0.1;
     pointer-events: none;
 }
 
@@ -530,7 +563,7 @@ html {
     color: var(--color-light);
     font-family: var(--font-heading);
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-bold);
     cursor: pointer;
     transition: background-color 0.15s ease-in-out;
 }

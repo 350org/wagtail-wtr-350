@@ -1,4 +1,4 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision quickstart
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db quickstart
 
 help:
 	@echo "Available commands:"
@@ -19,6 +19,7 @@ help:
 	@echo "  make test-page                   - Create (or refresh) the block test page"
 	@echo "  make provision SITE=x ENV=y      - Provision AWS S3 bucket + IAM user (ENV: staging|production)"
 	@echo "                 [PROFILE=p]         Optional: AWS CLI profile (default: default)"
+	@echo "  make import-db BACKUP=path       - Restore a Postgres backup into local dev (DB=name, --force via FORCE=1)"
 
 venv:
 	python3 -m venv .venv
@@ -28,7 +29,7 @@ venv:
 	@echo "Virtual environment ready. Activate with: source .venv/bin/activate"
 
 dev:
-	python manage.py runserver
+	.venv/bin/python manage.py runserver
 
 build-js:
 	mkdir -p static_compiled/js
@@ -92,5 +93,9 @@ quickstart: venv
 provision:
 	@if [ -z "$(SITE)" ]; then echo "Error: SITE is required. Usage: make provision SITE=mysite ENV=production"; exit 1; fi
 	@bash bin/provision.sh "$(SITE)" "$(ENV)" $(if $(PROFILE),--profile "$(PROFILE)")
+
+import-db:
+	@if [ -z "$(BACKUP)" ]; then echo "Error: BACKUP is required. Usage: make import-db BACKUP=path/to/dump.dump"; exit 1; fi
+	@bash bin/import_db.sh "$(BACKUP)" $(if $(DB),"$(DB)") $(if $(FORCE),--force)
 
 ENV ?= production

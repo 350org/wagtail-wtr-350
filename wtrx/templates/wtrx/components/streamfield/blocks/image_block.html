@@ -1,17 +1,46 @@
 {% load i18n wagtailimages_tags %}
-<figure>
-    {% image value.image width-1200 as img %}
-    <img
-        src="{{ img.url }}"
-        width="{{ img.width }}"
-        height="{{ img.height }}"
-        alt="{{ value.alt_text|default:value.image.title }}"
-        class="w-full rounded-lg"
-        loading="lazy"
-    />
-    {% if value.caption %}
-        <figcaption class="mt-2 text-sm opacity-60 text-center">
-            {{ value.caption }}
-        </figcaption>
-    {% endif %}
-</figure>
+{% comment %}
+Caption renders as a dark pill overlaid near the bottom of the photo, not
+below it — same .wtr-image-caption treatment as donate_fundraiseup_block.html
+and signup_actionkit_block.html's image captions, per Figma.
+
+Full-bleed-ish width: this block is special-cased in content_page.html/
+home_page.html (alongside "callout"/"image_text"/etc.) to skip the shared
+`mx-auto max-w-5xl px-4 sm:px-6 lg:px-8` wrapper, so it owns its own width
+instead — Figma's photo-caption section runs edge-to-edge (16px gutters
+only, no inner max-width cap), unlike the narrower text column other
+blocks sit in. Same w-full-outer pattern as callout_block.html — see that
+file's comment for why a bare `50% - 50vw` bleed isn't used instead.
+width-1600 (up from width-1200) matches the wider rendered display size.
+
+Known gap, shared with every other full-bleed block (callout, image_text,
+card_carousel, donate_fundraiseup, signup_actionkit, image_card_list):
+section_block.html doesn't special-case any of these when they're nested
+inside a SectionBlock (they're all valid SectionContentBlock children), so
+this block's own px-4/6/8 stacks on top of section_block.html's own
+`max-w-6xl px-4 sm:px-6 lg:px-8` instead of being subsumed by it, same as
+the page-template case above is designed to avoid. Pre-existing across all
+of these blocks, not fixed here — fixing it needs a way for a block's
+template to know it's being rendered inside a SectionBlock vs. at the page
+body's top level.
+{% endcomment %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <figure class="wtr-image relative">
+        {% image value.image width-1600 as img %}
+        <img
+            src="{{ img.url }}"
+            width="{{ img.width }}"
+            height="{{ img.height }}"
+            alt="{{ value.alt_text|default:value.image.title }}"
+            class="w-full rounded-lg"
+            loading="lazy"
+        />
+        {% if value.caption %}
+            <figcaption class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
+                <span class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">
+                    {{ value.caption }}
+                </span>
+            </figcaption>
+        {% endif %}
+    </figure>
+</div>

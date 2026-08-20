@@ -5,14 +5,25 @@
     {% include "wtrx/components/hero.html" %}
 {% endblock %}
 
+{% comment %}
+Blocks are spaced 128px apart via space-y-32 here, not per-block padding —
+every block template's own outer wrapper carries horizontal gutters only
+(no vertical py), so this is the single source of inter-block spacing.
+The one exception is "section": its padding field (sm/default/lg) is an
+editor-configurable choice about the section's own internal breathing
+room, not inter-block spacing, so it's left alone and stacks on top of
+(not instead of) this gap.
+{% endcomment %}
 {% block content %}
+<div class="space-y-32">
 {% for block in page.body %}
-    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" %}
+    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "signup_actionkit" or block.block_type == "image" %}
         {% include_block block %}
     {% else %}
-        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
             {% include_block block %}
         </div>
     {% endif %}
 {% endfor %}
+</div>
 {% endblock %}

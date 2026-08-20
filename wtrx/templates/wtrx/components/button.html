@@ -5,7 +5,8 @@
               {% if style == 'secondary' %}wtr-btn-secondary hover:bg-secondary-700
               {% elif style == 'outline' %}wtr-btn-outline hover:bg-primary-50
               {% elif style == 'outline-light' %}wtr-btn-outline-light hover:bg-white/10
-              {% else %}hover:bg-primary-500{% endif %}">
+              {% else %}hover:bg-primary-500{% endif %}
+              {% if size == 'sm' %}wtr-btn-sm{% elif size == 'lg' %}wtr-btn-lg{% endif %}">
         {{ text }}
     </a>
 {% elif link_url %}
@@ -15,7 +16,8 @@
               {% if style == 'secondary' %}wtr-btn-secondary hover:bg-secondary-700
               {% elif style == 'outline' %}wtr-btn-outline hover:bg-primary-50
               {% elif style == 'outline-light' %}wtr-btn-outline-light hover:bg-white/10
-              {% else %}hover:bg-primary-500{% endif %}">
+              {% else %}hover:bg-primary-500{% endif %}
+              {% if size == 'sm' %}wtr-btn-sm{% elif size == 'lg' %}wtr-btn-lg{% endif %}">
         {{ text }}
     </a>
 {% endif %}
