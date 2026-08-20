@@ -194,6 +194,20 @@
 }
 
 /* ------------------------------------------------------------
+ * Trailing arrow on the ActionKit inline embed's submit button
+ * (main.css's .wtr-actionkit-embed-inline — base padding/color/border
+ * live there), per Figma's "Sign Up" button (Hero Video - Condensed
+ * Signup). A background-image (not ::after) so it renders whether
+ * ActionKit emits <button> or the void <input type="submit">.
+ * ------------------------------------------------------------ */
+.wtr-actionkit-embed-inline button[type='submit'],
+.wtr-actionkit-embed-inline input[type='submit'] {
+  background-image: var(--icon-arrow-right);
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+}
+
+/* ------------------------------------------------------------
  * Theme preset: "Grassroots" (green / amber / teal)
  * Applied when <html data-theme="grassroots"> is set.
  * Only tokens that differ from the base theme are listed.
