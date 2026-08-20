@@ -267,8 +267,6 @@ html {
     border-radius: var(--radius-button);
     cursor: pointer;
 }
-/* Trailing arrow (background-image, color/position) lives in theme.css —
- * see .wtr-actionkit-embed-inline button[type='submit'] there. */
 
 .wtr-actionkit-embed-inline .input-text > label,
 .wtr-actionkit-embed-inline .input-select > label {
