@@ -14,6 +14,7 @@ dependencies = [
     "wagtailmedia",
     "dj-database-url",
     "psycopg[binary]",
+    "python-dotenv",
     "whitenoise",
     "gunicorn",
     "django-storages[s3]",

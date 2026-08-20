@@ -1,4 +1,4 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db
 
 help:
 	@echo "Available commands:"
@@ -18,6 +18,7 @@ help:
 	@echo "  make test-page                   - Create (or refresh) the block test page"
 	@echo "  make provision SITE=x ENV=y      - Provision AWS S3 bucket + IAM user (ENV: staging|production)"
 	@echo "                 [PROFILE=p]         Optional: AWS CLI profile (default: default)"
+	@echo "  make import-db BACKUP=path       - Restore a Postgres backup into local dev (DB=name, --force via FORCE=1)"
 
 venv:
 	python3 -m venv .venv
@@ -27,7 +28,7 @@ venv:
 	@echo "Virtual environment ready. Activate with: source .venv/bin/activate"
 
 dev:
-	python manage.py runserver
+	.venv/bin/python manage.py runserver
 
 build-js:
 	mkdir -p static_compiled/js
@@ -54,27 +55,31 @@ watch:
 	npm run start
 
 migrate:
-	python manage.py migrate
+	.venv/bin/python manage.py migrate
 
 createsuperuser:
-	python manage.py createsuperuser
+	.venv/bin/python manage.py createsuperuser
 
 setup:
-	python manage.py setup_site
+	.venv/bin/python manage.py setup_site
 
 test:
-	python manage.py test wtrx wagtail_wtr
+	.venv/bin/python manage.py test wtrx wagtail_wtr
 
 load-data:
-	python manage.py migrate
-	@test -f fixtures/demo.json && python manage.py loaddata fixtures/demo.json || echo "No demo fixtures yet — skipping loaddata"
-	python manage.py collectstatic --noinput
+	.venv/bin/python manage.py migrate
+	@test -f fixtures/demo.json && .venv/bin/python manage.py loaddata fixtures/demo.json || echo "No demo fixtures yet — skipping loaddata"
+	.venv/bin/python manage.py collectstatic --noinput
 
 test-page:
-	python manage.py create_test_page --force
+	.venv/bin/python manage.py create_test_page --force
 
 provision:
 	@if [ -z "$(SITE)" ]; then echo "Error: SITE is required. Usage: make provision SITE=mysite ENV=production"; exit 1; fi
 	@bash bin/provision.sh "$(SITE)" "$(ENV)" $(if $(PROFILE),--profile "$(PROFILE)")
+
+import-db:
+	@if [ -z "$(BACKUP)" ]; then echo "Error: BACKUP is required. Usage: make import-db BACKUP=path/to/dump.dump"; exit 1; fi
+	@bash bin/import_db.sh "$(BACKUP)" $(if $(DB),"$(DB)") $(if $(FORCE),--force)
 
 ENV ?= production
