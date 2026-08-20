@@ -4,15 +4,22 @@ Centered heading above a two-column split — image left, vertical stack of
 simple text cards right (ImageCardListItemBlock: heading + description
 only, plain bordered boxes, no icon/link/image of their own). Single
 column on mobile (image, then cards, in that DOM order — grid-cols-1
-below md:).
+below md:, where the sticky behavior below is also disabled).
 
-Column heights: the grid's default align-items: stretch (md:items-stretch
-is explicit here for clarity, matching the same pattern in hero.html/
-card_carousel_block.html) makes both columns match the taller one's natural
-height — normally the cards column, since it's a vertical stack. The image
-wrapper's min-h-[280px] is only a mobile fallback (single-column rows have
-no sibling to stretch to); on desktop the stretch pushes it taller than
-that floor to match the cards column instead.
+Sticky image: per Figma (this section's image frame is itself
+`sticky top-0`), the image pins to the top of the viewport while the
+(usually taller) cards column scrolls past it, then scrolls away
+normally once the cards column ends. This needs two nested elements,
+not one:
+  - the OUTER grid cell (the bare `<div>` immediately inside the grid)
+    is left to the grid's default align-items: stretch (md:items-stretch
+    is explicit here for clarity, matching hero.html/card_carousel_block.html)
+    so it's stretched to the cards column's full height — this tall cell
+    is the box the sticky child has room to travel/pin within.
+  - the INNER `md:sticky md:top-0` div is only as tall as the image
+    itself (aspect-square). Without the outer stretched cell, this inner
+    div's own container would only be as tall as the image, leaving no
+    room for it to stick anywhere.
 
 Full-bleed-ish width: same w-full-outer / max-w-7xl-inner two-tier pattern
 as callout_block.html — see that file's comment for why a bare
@@ -20,16 +27,18 @@ as callout_block.html — see that file's comment for why a bare
 w-full-outer wrapper — the 128px gap between body blocks comes from the
 page templates' space-y-32 on the block loop.
 {% endcomment %}
-<div class="w-full px-4 sm:px-6 lg:px-8">
+<div class="wtr-image-card-list w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-7xl">
-        <h2 class="font-heading text-center text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-6xl">
+        <h2 class="font-heading text-center text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl">
             {{ value.heading }}
         </h2>
         <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-8">
-            <div class="relative min-h-[280px]">
-                {% image value.image fill-900x900 as img %}
-                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
-                     class="absolute inset-0 h-full w-full rounded-lg object-cover" loading="lazy">
+            <div>
+                <div class="md:sticky md:top-0">
+                    {% image value.image fill-1200x1200 as img %}
+                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                         class="aspect-square w-full rounded-lg object-cover" loading="lazy">
+                </div>
             </div>
             <div class="flex flex-col gap-4">
                 {% for card in value.cards %}

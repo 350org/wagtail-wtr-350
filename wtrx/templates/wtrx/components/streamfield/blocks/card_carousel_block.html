@@ -73,13 +73,13 @@ column width), so no extra padding is needed there.
 <div class="wtr-card-carousel mx-auto flex max-w-[1500px] flex-col gap-8 pl-4 sm:pl-6 lg:flex-row lg:items-center lg:gap-12 lg:pl-8" data-carousel>
     <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 lg:w-[583px] lg:shrink-0 lg:pr-0">
         <h2 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl">{{ value.heading }}</h2>
-        <div class="prose prose-neutral max-w-none text-xl leading-[1.2] lg:text-32">
+        <div class="prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl lg:text-2xl">
             {{ value.content|richtext }}
         </div>
         {% if value.link_page or value.link_url %}
             <div class="mt-2">
                 {% trans "Take action" as default_link_text %}
-                {% include "wtrx/components/button.html" with text=value.link_text|default:default_link_text link_page=value.link_page link_url=value.link_url style="outline" %}
+                {% include "wtrx/components/button.html" with text=value.link_text|default:default_link_text link_page=value.link_page link_url=value.link_url style="primary" %}
             </div>
         {% endif %}
     </div>
@@ -88,7 +88,7 @@ column width), so no extra padding is needed there.
             <div class="wtr-card-carousel-track flex gap-6 overflow-x-auto" data-carousel-track>
                 {% for card in value.cards %}
                     <div class="flex w-[85%] shrink-0 sm:w-80" data-carousel-item>
-                        {% include "wtrx/components/card.html" with card=card %}
+                        {% include "wtrx/components/card.html" with card=card description_size="text-xl" %}
                     </div>
                 {% endfor %}
             </div>

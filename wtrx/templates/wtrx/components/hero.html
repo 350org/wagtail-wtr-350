@@ -50,17 +50,20 @@
     {# BANNER VARIANT — compact color panel beside an image/video          #}
     {# ------------------------------------------------------------------ #}
     {% comment %}
-    py-8 here is load-bearing for the OTHER caller of this template: the
-    page-level HeroMixin hero (ContentPage/IndexPage/FormPage), included by
-    base_page.html's {% block hero %} before <main> — outside the body-block
-    loop and its space-y-32, with a normal header directly above it. When
-    this same template renders as a mid-page HeroBlock inside page.body
-    instead, that py-8 stacks on top of space-y-32's 128px gap rather than
-    being subsumed by it (unlike the other wide blocks). Not fixed here —
-    doing so needs a way to tell the two call sites apart first.
+    Flat px-4/pb-4 (16px), no top padding — matches Figma's Content Hero
+    wrapper exactly (px-[16px] pb-[16px], no pt). The gap above the hero
+    comes entirely from header.html's own py-6 bottom padding, same as
+    Figma's Nav (py-[24px]) sitting directly above with no extra hero-side
+    top padding of its own.
+
+    This also applies when this same template renders as a mid-page
+    HeroBlock inside page.body instead of the page-level HeroMixin hero:
+    with no top padding here, the gap above a mid-page hero now comes
+    purely from space-y-32's own 128px, consistent with every other block
+    — previously py-8 stacked an extra 32px on top of that.
     {% endcomment %}
-    <div class="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
-        <div class="wtr-hero-banner wtr-hero-banner-{{ hero.banner_color }} relative flex flex-col overflow-hidden rounded-lg md:min-h-[385px]"
+    <div class="mx-auto max-w-[1500px] px-4 pb-4">
+        <div class="wtr-hero wtr-hero-banner wtr-hero-banner-{{ hero.banner_color }} relative flex flex-col overflow-hidden rounded-lg md:min-h-[385px]"
              {% if hero.video %}data-hero{% endif %}>
             {% comment %}flex-1 makes this grid (and via md:items-stretch, both its columns) fill the
                parent's full md:min-h-[385px] — a block child doesn't stretch to a min-height
@@ -71,7 +74,7 @@
                 {# Left column — text content #}
                 <div class="relative z-10 flex flex-col justify-center gap-3 px-6 py-10 sm:px-10 sm:py-12
                             {% if hero.banner_color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
-                    <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
+                    <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-64">
                         {{ hero.headline }}
                     </h1>
                     {% if hero.author or hero.published_at %}
@@ -93,7 +96,7 @@
                         prose-invert body color (a muted ~87%-lightness gray) to pure white — same
                         fix as callout_block.html's paragraph text.
                         {% endcomment %}
-                        <div class="wtr-hero-copy prose max-w-none
+                        <div class="wtr-hero-copy prose max-w-none text-lg sm:text-xl lg:text-32
                                     {% if hero.banner_color == 'light-grey' %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
                             {% if hero.copy_is_block %}
                                 {% include_block hero.copy %}

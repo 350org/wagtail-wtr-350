@@ -1,5 +1,11 @@
 {% load i18n wagtailimages_tags %}
-<div class="wtr-card flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-light shadow-xs">
+{% comment %}
+description_size: optional Tailwind text-size utility for card.description,
+default text-base (16px, matches CardGridBlock's "Areas of work" cards
+per Figma). card_carousel_block.html passes text-xl (20px) instead — its
+cards' body copy is sized larger per Figma's "Our work in action" cards.
+{% endcomment %}
+<div class="wtr-card flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 shadow-xs">
     {% if card.image %}
         {% image card.image fill-640x360 as img %}
         <div class="aspect-video overflow-hidden">
@@ -16,18 +22,18 @@
             {% image card.icon fill-24x24 as icon_img %}
             <div class="flex items-center gap-3">
                 <img src="{{ icon_img.url }}" width="{{ icon_img.width }}" height="{{ icon_img.height }}" alt="" class="h-6 w-6 shrink-0" loading="lazy">
-                <h3 class="font-heading text-lg font-semibold text-dark">{{ card.heading }}</h3>
+                <h3 class="font-heading text-2xl font-semibold text-dark">{{ card.heading }}</h3>
             </div>
         {% else %}
-            <h3 class="font-heading text-lg font-semibold text-dark">{{ card.heading }}</h3>
+            <h3 class="font-heading text-2xl font-semibold text-dark">{{ card.heading }}</h3>
         {% endif %}
         {% if card.description %}
-            <p class="mt-2 flex-1 text-sm text-dark">{{ card.description }}</p>
+            <p class="mt-2 flex-1 {{ description_size|default:"text-base" }} text-dark">{{ card.description }}</p>
         {% endif %}
         {% if card.link_page or card.link_url %}
             <div class="mt-4">
                 {% trans "Learn more" as default_link_text %}
-                {% include "wtrx/components/button.html" with text=card.link_text|default:default_link_text link_page=card.link_page link_url=card.link_url style="primary" %}
+                {% include "wtrx/components/button.html" with text=card.link_text|default:default_link_text link_page=card.link_page link_url=card.link_url style="outline" %}
             </div>
         {% endif %}
     </div>

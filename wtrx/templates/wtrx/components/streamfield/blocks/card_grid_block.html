@@ -1,5 +1,19 @@
 {% load i18n %}
-<div class="wtr-card-grid grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+{% comment %}
+Exactly 4 cards get a 2-col grid at lg+ (a balanced 2x2, matching Figma's
+"Areas of work") instead of the usual 3-col — 4 cards in 3 columns leaves
+an unbalanced trailing row of 1. Any other card count keeps the default
+3-col.
+
+Heading size/alignment matches the same 96px left-aligned display-heading
+convention as CardCarouselBlock/ImageCardListBlock's own section headings
+(font-heading ... lg:text-8xl) — per Figma's "Areas of work" (text-[96px],
+left-aligned, not centered like PageCardsBlock's own smaller heading).
+{% endcomment %}
+{% if value.heading %}
+    <h2 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl mb-10">{{ value.heading }}</h2>
+{% endif %}
+<div class="wtr-card-grid grid gap-6 sm:grid-cols-2 {% if value.cards|length == 4 %}lg:grid-cols-2{% else %}lg:grid-cols-3{% endif %}">
     {% for card in value.cards %}
         {% include "wtrx/components/card.html" with card=card %}
     {% endfor %}
