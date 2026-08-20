@@ -41,7 +41,7 @@ and the dark_logo variant is used if available.
             {% if not nav.collapse_desktop_menu %}
                 <nav class="hidden md:flex items-center space-x-6 ml-auto" aria-label="{% trans 'Primary navigation' %}">
                     {% for item in nav.primary_navigation %}
-                        {% if item.block_type == "internal" %}
+                        {% if item.block_type == "internal" and item.value.page %}
                             <a href="{% pageurl item.value.page %}"
                                class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors">
                                 {{ item.value.text }}
@@ -75,7 +75,7 @@ and the dark_logo variant is used if available.
                                 <div class="hidden group-hover:block group-focus-within:block absolute left-0 top-full pt-2 z-40 min-w-48">
                                     <div class="rounded-lg shadow-lg py-2 {% if transparent_header %}bg-dark border border-neutral-700{% else %}bg-light border border-neutral-200{% endif %}">
                                         {% for child in item.value.links %}
-                                            {% if child.block_type == "internal" %}
+                                            {% if child.block_type == "internal" and child.value.page %}
                                                 <a href="{% pageurl child.value.page %}"
                                                    class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-dark hover:bg-neutral-100{% endif %} transition-colors">
                                                     {{ child.value.text }}
@@ -217,7 +217,7 @@ and the dark_logo variant is used if available.
                     {% endif %}
                         <div class="px-4 py-4 space-y-2 text-right">
                             {% for item in nav.primary_navigation %}
-                                {% if item.block_type == "internal" %}
+                                {% if item.block_type == "internal" and item.value.page %}
                                     <a href="{% pageurl item.value.page %}"
                                        class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
                                         {{ item.value.text }}
@@ -240,7 +240,7 @@ and the dark_logo variant is used if available.
                                     </p>
                                     <div class="pr-3 space-y-1">
                                         {% for child in item.value.links %}
-                                            {% if child.block_type == "internal" %}
+                                            {% if child.block_type == "internal" and child.value.page %}
                                                 <a href="{% pageurl child.value.page %}"
                                                    class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
                                                     {{ child.value.text }}
@@ -299,7 +299,7 @@ and the dark_logo variant is used if available.
         {% endif %}
             <div class="px-4 py-4 space-y-2 text-right">
                 {% for item in nav.primary_navigation %}
-                    {% if item.block_type == "internal" %}
+                    {% if item.block_type == "internal" and item.value.page %}
                         <a href="{% pageurl item.value.page %}"
                            class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
                             {{ item.value.text }}
@@ -322,7 +322,7 @@ and the dark_logo variant is used if available.
                         </p>
                         <div class="pr-3 space-y-1">
                             {% for child in item.value.links %}
-                                {% if child.block_type == "internal" %}
+                                {% if child.block_type == "internal" and child.value.page %}
                                     <a href="{% pageurl child.value.page %}"
                                        class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
                                         {{ child.value.text }}

@@ -74,6 +74,19 @@
                     <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
                         {{ hero.headline }}
                     </h1>
+                    {% if hero.author or hero.published_at %}
+                        {% comment %}
+                        Only BlogPage's get_context() sets these two keys (via
+                        BannerHeroMixin.get_banner_hero_context()'s **extra) — every other
+                        "banner" hero producer (ContentPage/IndexPage's HeroMixin,
+                        HeroBlock) leaves both unset, so this is silently skipped for them.
+                        {% endcomment %}
+                        <p class="text-sm font-medium opacity-80">
+                            {% if hero.author %}{% blocktrans with author=hero.author %}By {{ author }}{% endblocktrans %}{% endif %}
+                            {% if hero.author and hero.published_at %}&middot;{% endif %}
+                            {% if hero.published_at %}{{ hero.published_at|date:"F j, Y" }}{% endif %}
+                        </p>
+                    {% endif %}
                     {% if hero.copy %}
                         {% comment %}
                         [--tw-prose-invert-body:var(--color-light)] overrides Typography's default

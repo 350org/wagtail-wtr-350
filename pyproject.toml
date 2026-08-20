@@ -20,6 +20,7 @@ dependencies = [
     "django-storages[s3]",
     "wagtail-storages",
     "requests",
+    "beautifulsoup4",
     "wagtail-ai>=3.1,<4.0",
     "llm-anthropic>=0.25,<0.26",
     "wagtail-2fa>=1.8,<2.0",

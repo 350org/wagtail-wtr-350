@@ -1,10 +1,15 @@
 import logging
 
+from django import forms
+from django.conf import settings
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
 from django.http import JsonResponse
+from django.utils import timezone
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
-from modelcluster.fields import ParentalKey
+from modelcluster.fields import ParentalKey, ParentalManyToManyField
+from wagtail.admin.forms import WagtailAdminPageForm
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
@@ -15,6 +20,7 @@ from wagtail.admin.panels import (
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
+from wagtail.snippets.models import register_snippet
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
 from .blocks import CALLOUT_COLOR_CHOICES, HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
@@ -239,6 +245,181 @@ class HeroMixin(models.Model):
         abstract = True
 
 
+class PublishedDateMixin(models.Model):
+    """
+    Adds an editable "published at" date, independent of Wagtail's own
+    first_published_at.
+
+    Wagtail already tracks first_published_at automatically, but it's not
+    editable and doesn't survive a page being unpublished/republished the
+    way editors expect a display date to (e.g. backdating a post, or fixing
+    a typo weeks later without it looking freshly published). Blog posts
+    and press releases both need editors to control this directly, so it's
+    a real field rather than reusing first_published_at — see
+    PageCardsBlock.get_context(), which prefers this field when present.
+    """
+
+    published_at = models.DateTimeField(
+        default=timezone.now,
+        verbose_name=_("published at"),
+        help_text=_("The date shown on this page and used to order listings."),
+    )
+
+    published_date_panels = [
+        FieldPanel("published_at"),
+    ]
+
+    class Meta:
+        abstract = True
+
+
+class BannerHeroMixin(models.Model):
+    """
+    A small header for page types that always render hero.html's "banner"
+    variant and don't need HeroMixin's video/layout/cta options — currently
+    just BlogPage. See HeroMixin for the full page-hero field set used by
+    HomePage/ContentPage/IndexPage, and hero.html for the "banner" variant
+    itself (same rendering, same 5-color system).
+
+    Deliberately not built on top of HeroMixin: HeroMixin's hero_video,
+    hero_layout, and hero_cta fields would just sit inert here (as they
+    already do for ContentPage/IndexPage's "banner" variant), and per
+    product decision a blog post's header shouldn't offer them as editable
+    options at all, not merely ignore them silently.
+    """
+
+    hero_headline = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("headline"),
+        help_text=_(
+            "Optional. Overrides the page title as the displayed heading. "
+            "Leave blank to use the page title."
+        ),
+    )
+    hero_copy = RichTextField(
+        blank=True,
+        features=RICHTEXT_FEATURES_HERO,
+        verbose_name=_("copy"),
+        help_text=_("Optional subtext displayed below the headline."),
+    )
+    hero_image = models.ForeignKey(
+        CustomImage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("image"),
+    )
+    hero_banner_color = models.CharField(
+        max_length=20,
+        choices=CALLOUT_COLOR_CHOICES,
+        default="navy",
+        verbose_name=_("banner color"),
+    )
+
+    banner_hero_panels = [
+        MultiFieldPanel(
+            [
+                FieldPanel("hero_headline"),
+                FieldPanel("hero_copy"),
+                FieldPanel("hero_image"),
+                FieldPanel("hero_banner_color"),
+            ],
+            heading=_("Header"),
+        ),
+    ]
+
+    def get_banner_hero_context(self, **extra):
+        """
+        Build the "hero" context dict components/hero.html expects, forced
+        to the "banner" variant. **extra lets a subclass merge in fields
+        hero.html doesn't otherwise know about but the "banner" variant
+        renders anyway when present — BlogPage uses this for author/
+        published_at.
+        """
+        context = {
+            "variant": "banner",
+            "headline": self.hero_headline or self.title,
+            "copy": self.hero_copy,
+            "copy_is_block": False,
+            "image": self.hero_image,
+            "video": None,
+            "layout": None,
+            "banner_color": self.hero_banner_color,
+            "cta": [],
+        }
+        context.update(extra)
+        return context
+
+    class Meta:
+        abstract = True
+
+
+@register_snippet
+class BlogCategory(models.Model):
+    """
+    Editor-managed taxonomy for BlogPage.categories — a Snippet (rather
+    than freeform tagging via the already-installed-but-unused `taggit`
+    app) since categories here are meant to be a curated, admin-managed
+    list, not something any author invents ad hoc per post. Snippets get
+    their own list/create/edit/delete admin screens for free.
+    """
+
+    name = models.CharField(max_length=100, unique=True, verbose_name=_("name"))
+    slug = models.SlugField(
+        max_length=100,
+        unique=True,
+        verbose_name=_("slug"),
+        help_text=_("Used in the blog's category filter URL. Auto-filled from the name if left blank."),
+        blank=True,
+    )
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("slug"),
+    ]
+
+    class Meta:
+        verbose_name = _("blog category")
+        verbose_name_plural = _("blog categories")
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+
+class BlogPageForm(WagtailAdminPageForm):
+    """
+    Pre-fills the author field with the current user when creating a new
+    BlogPage — "defaults to whoever publishes, but is editable": rather
+    than a signal that silently overwrites author on publish (fights an
+    editor who already set it, or credits whoever happened to click
+    publish rather than who actually wrote it), this just pre-selects the
+    field on a fresh draft; from then on it's a normal editable field like
+    any other, never touched again by anything but the editor.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk is None and self.for_user is not None:
+            # self.initial (not self.fields["author"].initial) — ModelForm's
+            # __init__ (already run via super() above) builds self.initial
+            # from model_to_dict() on the new/unsaved instance, which
+            # includes "author": None as an explicit key. Form.
+            # get_initial_for_field() checks self.initial before ever
+            # falling back to the field's own .initial, so setting
+            # self.fields["author"].initial here would be silently shadowed
+            # by that pre-existing None and never actually render as the
+            # field's pre-selected value.
+            self.initial["author"] = self.for_user.pk
+
+
 # ---------------------------------------------------------------------------
 # Concrete page models
 # ---------------------------------------------------------------------------
@@ -303,6 +484,8 @@ class HomePage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
+        "wtrx.BlogIndexPage",
+        "wtrx.PressReleaseIndexPage",
     ]
 
     class Meta:
@@ -361,6 +544,8 @@ class ContentPage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
+        "wtrx.BlogIndexPage",
+        "wtrx.PressReleaseIndexPage",
     ]
 
     class Meta:
@@ -427,6 +612,8 @@ class IndexPage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
+        "wtrx.BlogIndexPage",
+        "wtrx.PressReleaseIndexPage",
     ]
 
     class Meta:
@@ -458,6 +645,289 @@ class IndexPage(BasePage, HeroMixin):
             children = paginator.page(paginator.num_pages)
 
         ctx["children"] = children
+        ctx["paginator"] = paginator
+        return ctx
+
+
+class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
+    """
+    A single blog post.
+
+    published_at (PublishedDateMixin) is the editable display/ordering
+    date; author defaults to whoever creates the post (BlogPageForm) but
+    stays freely editable afterwards; categories is an editor-managed
+    multi-select against the BlogCategory snippet. Header is
+    BannerHeroMixin's compact "banner" style (same look as ContentPage's
+    header) with author/date folded in — see get_context().
+    """
+
+    template = "wtrx/pages/blog_page.html"
+    base_form_class = BlogPageForm
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("author"),
+        help_text=_("Defaults to whoever creates this post. Editable."),
+    )
+    author_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("author name"),
+        help_text=_(
+            "Byline for a guest writer or imported post who doesn't have a "
+            "site account. Ignored if Author (above) is set."
+        ),
+    )
+    author_title = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("author title"),
+        help_text=_(
+            "Optional role/affiliation shown next to Author name, e.g. "
+            "\"Senior Campaigner at Oil Change International\"."
+        ),
+    )
+    categories = ParentalManyToManyField(
+        "wtrx.BlogCategory",
+        blank=True,
+        related_name="blog_pages",
+        verbose_name=_("categories"),
+    )
+    body = StreamField(
+        BodyStreamBlock(),
+        blank=True,
+        verbose_name=_("body"),
+        help_text=_("Page body content."),
+        use_json_field=True,
+    )
+
+    content_panels = (
+        Page.content_panels
+        + BannerHeroMixin.banner_hero_panels
+        + PublishedDateMixin.published_date_panels
+        + [
+            FieldPanel("author"),
+            FieldPanel("author_name"),
+            FieldPanel("author_title"),
+            FieldPanel("categories", widget=forms.CheckboxSelectMultiple),
+            FieldPanel("body"),
+        ]
+    )
+
+    promote_panels = BasePage.promote_panels
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+        ]
+    )
+
+    parent_page_types = ["wtrx.BlogIndexPage"]
+    subpage_types = []
+
+    class Meta:
+        verbose_name = _("blog page")
+        verbose_name_plural = _("blog pages")
+
+    @property
+    def author_display(self):
+        """
+        Byline text for this post: the site account's name if Author (FK) is
+        set, else the guest/imported Author name (+ title), else None.
+        Shared by the hero banner and the BlogIndexPage listing cards so the
+        two never drift out of sync.
+        """
+        if self.author_id:
+            return self.author.get_full_name() or self.author.get_username()
+        if self.author_name:
+            if self.author_title:
+                return f"{self.author_name}, {self.author_title}"
+            return self.author_name
+        return None
+
+    def get_context(self, request, *args, **kwargs):
+        ctx = super().get_context(request, *args, **kwargs)
+        ctx["hero"] = self.get_banner_hero_context(
+            author=self.author_display,
+            published_at=self.published_at,
+        )
+        return ctx
+
+
+class BlogIndexPage(BasePage):
+    """
+    Blog listing page.
+
+    Live/public BlogPage children, newest first by published_at, optionally
+    filtered to one category via ?category=<slug>. Unlike the generic
+    IndexPage (which lists any child page type, ordered by title), this is
+    specific to BlogPage and its date/category semantics.
+    """
+
+    template = "wtrx/pages/blog_index_page.html"
+
+    intro = RichTextField(
+        blank=True,
+        features=RICHTEXT_FEATURES_INLINE,
+        verbose_name=_("intro"),
+        help_text=_("Optional introductory text displayed above the post listing."),
+    )
+
+    content_panels = Page.content_panels + [
+        FieldPanel("intro"),
+    ]
+
+    promote_panels = BasePage.promote_panels
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+        ]
+    )
+
+    parent_page_types = [
+        "wtrx.HomePage",
+        "wtrx.ContentPage",
+        "wtrx.IndexPage",
+    ]
+    subpage_types = ["wtrx.BlogPage"]
+
+    class Meta:
+        verbose_name = _("blog index page")
+        verbose_name_plural = _("blog index pages")
+
+    def get_context(self, request, *args, **kwargs):
+        ctx = super().get_context(request, *args, **kwargs)
+
+        posts_qs = BlogPage.objects.child_of(self).live().public().order_by("-published_at")
+
+        selected_category = None
+        category_slug = request.GET.get("category")
+        if category_slug:
+            selected_category = BlogCategory.objects.filter(slug=category_slug).first()
+            if selected_category:
+                posts_qs = posts_qs.filter(categories=selected_category)
+
+        paginator = Paginator(posts_qs, ITEMS_PER_PAGE)
+        page_number = request.GET.get("page", 1)
+        try:
+            posts = paginator.page(page_number)
+        except PageNotAnInteger:
+            posts = paginator.page(1)
+        except EmptyPage:
+            posts = paginator.page(paginator.num_pages)
+
+        ctx["posts"] = posts
+        ctx["paginator"] = paginator
+        ctx["categories"] = BlogCategory.objects.all()
+        ctx["selected_category"] = selected_category
+        return ctx
+
+
+class PressReleasePage(BasePage, PublishedDateMixin):
+    """
+    A single press release. Deliberately minimal — just the editable
+    published_at date plus body, no author/category (not requested for
+    this content type, unlike BlogPage).
+    """
+
+    template = "wtrx/pages/press_release_page.html"
+
+    body = StreamField(
+        BodyStreamBlock(),
+        blank=True,
+        verbose_name=_("body"),
+        help_text=_("Page body content."),
+        use_json_field=True,
+    )
+
+    content_panels = (
+        Page.content_panels
+        + PublishedDateMixin.published_date_panels
+        + [
+            FieldPanel("body"),
+        ]
+    )
+
+    promote_panels = BasePage.promote_panels
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+        ]
+    )
+
+    parent_page_types = ["wtrx.PressReleaseIndexPage"]
+    subpage_types = []
+
+    class Meta:
+        verbose_name = _("press release")
+        verbose_name_plural = _("press releases")
+
+
+class PressReleaseIndexPage(BasePage):
+    """
+    Press release listing page. Live/public PressReleasePage children,
+    newest first by published_at — no category filtering, since
+    PressReleasePage has no categories field.
+    """
+
+    template = "wtrx/pages/press_release_index_page.html"
+
+    intro = RichTextField(
+        blank=True,
+        features=RICHTEXT_FEATURES_INLINE,
+        verbose_name=_("intro"),
+        help_text=_("Optional introductory text displayed above the release listing."),
+    )
+
+    content_panels = Page.content_panels + [
+        FieldPanel("intro"),
+    ]
+
+    promote_panels = BasePage.promote_panels
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+        ]
+    )
+
+    parent_page_types = [
+        "wtrx.HomePage",
+        "wtrx.ContentPage",
+        "wtrx.IndexPage",
+    ]
+    subpage_types = ["wtrx.PressReleasePage"]
+
+    class Meta:
+        verbose_name = _("press release index page")
+        verbose_name_plural = _("press release index pages")
+
+    def get_context(self, request, *args, **kwargs):
+        ctx = super().get_context(request, *args, **kwargs)
+
+        releases_qs = (
+            PressReleasePage.objects.child_of(self).live().public().order_by("-published_at")
+        )
+        paginator = Paginator(releases_qs, ITEMS_PER_PAGE)
+        page_number = request.GET.get("page", 1)
+        try:
+            releases = paginator.page(page_number)
+        except PageNotAnInteger:
+            releases = paginator.page(1)
+        except EmptyPage:
+            releases = paginator.page(paginator.num_pages)
+
+        ctx["releases"] = releases
         ctx["paginator"] = paginator
         return ctx
 
