@@ -1,0 +1,33 @@
+{% extends "wtrx/base_page.html" %}
+{% load i18n wagtailcore_tags %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+
+    <h1 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl">{{ page.title }}</h1>
+
+    {% if page.intro %}
+        <div class="prose prose-neutral mt-4 max-w-2xl">
+            {{ page.intro|richtext }}
+        </div>
+    {% endif %}
+
+    {% if releases %}
+        <ul class="mt-10 divide-y divide-neutral-200 border-t border-neutral-200">
+            {% for release in releases %}
+                <li class="py-6">
+                    <a href="{{ release.url }}" class="group flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-6">
+                        <span class="shrink-0 font-heading text-sm font-semibold text-neutral-500">{{ release.published_at|date:"F j, Y" }}</span>
+                        <span class="font-heading text-lg font-semibold text-dark group-hover:underline">{{ release.title }}</span>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+
+        {% include "wtrx/components/pagination.html" with page_obj=releases %}
+    {% else %}
+        <p class="mt-10 text-neutral-600">{% trans "No press releases found." %}</p>
+    {% endif %}
+
+</div>
+{% endblock %}

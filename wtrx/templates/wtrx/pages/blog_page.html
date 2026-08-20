@@ -1,0 +1,27 @@
+{% extends "wtrx/base_page.html" %}
+{% load i18n wagtailcore_tags %}
+
+{% block hero %}
+    {% include "wtrx/components/hero.html" %}
+{% endblock %}
+
+{% block content %}
+{% if page.categories.all %}
+    <div class="mx-auto flex max-w-5xl flex-wrap gap-2 px-4 pt-8 sm:px-6 lg:px-8">
+        {% for category in page.categories.all %}
+            <span class="rounded-full bg-neutral-200 px-3 py-1 font-heading text-xs font-semibold text-dark">
+                {{ category.name }}
+            </span>
+        {% endfor %}
+    </div>
+{% endif %}
+{% for block in page.body %}
+    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" %}
+        {% include_block block %}
+    {% else %}
+        <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8">
+            {% include_block block %}
+        </div>
+    {% endif %}
+{% endfor %}
+{% endblock %}

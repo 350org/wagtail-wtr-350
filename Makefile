@@ -1,7 +1,8 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db quickstart
 
 help:
 	@echo "Available commands:"
+	@echo "  make quickstart                  - Full local dev setup (venv + npm + build + migrate + optional setup)"
 	@echo "  make venv                        - Create .venv and install all dependencies"
 	@echo "  make dev                         - Run development server"
 	@echo "  make build                       - Build CSS and JS (development)"
@@ -73,6 +74,21 @@ load-data:
 
 test-page:
 	.venv/bin/python manage.py create_test_page --force
+
+quickstart: venv
+	npm install
+	$(MAKE) build
+	.venv/bin/python manage.py migrate
+	@echo ""
+	@printf "Run interactive site setup now? [y/N] "; read ans; [ "$${ans}" = "y" ] || [ "$${ans}" = "Y" ] && .venv/bin/python manage.py setup_site || true
+	@echo ""
+	@printf "Create a superuser now? [y/N] "; read ans; [ "$${ans}" = "y" ] || [ "$${ans}" = "Y" ] && .venv/bin/python manage.py createsuperuser || true
+	@echo ""
+	@echo "Setup complete. Activate the venv and start the dev server:"
+	@echo ""
+	@echo "  source .venv/bin/activate"
+	@echo "  make dev"
+	@echo ""
 
 provision:
 	@if [ -z "$(SITE)" ]; then echo "Error: SITE is required. Usage: make provision SITE=mysite ENV=production"; exit 1; fi

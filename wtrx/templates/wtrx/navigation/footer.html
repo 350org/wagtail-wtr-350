@@ -63,7 +63,7 @@
                 {% if footer.minimal_links %}
                     <nav class="flex items-center flex-wrap gap-x-5 gap-y-2" aria-label="{% trans 'Footer navigation' %}">
                         {% for item in footer.minimal_links %}
-                            {% if item.block_type == "internal" %}
+                            {% if item.block_type == "internal" and item.value.page %}
                                 <a href="{% pageurl item.value.page %}"
                                    class="text-sm text-neutral-400 hover:text-light transition-colors">
                                     {{ item.value.text }}
@@ -141,7 +141,7 @@
                             <ul class="space-y-2">
                                 {% for link in column.value.links %}
                                     <li>
-                                        {% if link.block_type == "internal" %}
+                                        {% if link.block_type == "internal" and link.value.page %}
                                             <a href="{% pageurl link.value.page %}"
                                                class="text-sm text-neutral-400 hover:text-light transition-colors">
                                                 {{ link.value.text }}
