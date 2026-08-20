@@ -10,9 +10,11 @@ on mobile (image, then heading/text, in that DOM order).
 
 Full-bleed-ish width: same w-full-outer / max-w-7xl-inner two-tier pattern
 as callout_block.html/image_card_list_block.html — see callout_block.html's
-comment for why a bare `50% - 50vw` bleed isn't used instead.
+comment for why a bare `50% - 50vw` bleed isn't used instead. No vertical
+padding on the w-full-outer wrapper — the 128px gap between body blocks
+comes from the page templates' space-y-32 on the block loop.
 {% endcomment %}
-<div class="w-full px-4 py-8 sm:px-6 lg:px-8">
+<div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-7xl">
         <div class="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-start">
             {% image value.image fill-900x675 as img %}

@@ -175,8 +175,10 @@
   --font-weight-bold: 800;
 
   /* Type-scale steps this site needs beyond Tailwind's default ramp
-   * (falls between 3xl/4xl and 6xl/7xl respectively). */
+   * (falls between 3xl/4xl and 6xl/7xl respectively; 40 falls between
+   * 4xl/5xl). */
   --text-32: 2rem;
+  --text-40: 2.5rem;
   --text-64: 4rem;
 
   /* Typography — KlimaWeb (self-hosted, @font-face above), weights 500

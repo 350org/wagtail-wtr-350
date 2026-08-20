@@ -258,7 +258,7 @@ html {
 .wtr-actionkit-embed-inline button[type='submit'],
 .wtr-actionkit-embed-inline input[type='submit'] {
     flex: 0 0 auto;
-    padding: 0.625rem 1.25rem;
+    padding: 0.625rem 2.5rem 0.625rem 1.25rem;
     font-family: var(--font-heading);
     font-weight: var(--font-weight-bold);
     color: var(--color-light);
@@ -266,6 +266,12 @@ html {
     border: 2px solid transparent;
     border-radius: var(--radius-button);
     cursor: pointer;
+    /* Trailing arrow per Figma's "Sign Up" button (Hero Video - Condensed
+     * Signup). A background-image (not ::after) so it renders whether
+     * ActionKit emits <button> or the void <input type="submit">. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
 }
 
 .wtr-actionkit-embed-inline .input-text > label,

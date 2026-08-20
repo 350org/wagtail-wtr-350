@@ -23,12 +23,13 @@ the arrow buttons) once nextBtn is disabled — at the end of the scroll
 the last card is fully visible, not cut off, so nothing there should be
 faded.
 
-py-12 on the root: this block is special-cased out of the shared
-`mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8` wrapper every other
+No vertical padding on the root: this block is special-cased out of the
+shared `mx-auto max-w-5xl px-4 sm:px-6 lg:px-8` wrapper every other
 non-"section" block gets from content_page.html/home_page.html (see the
-Width note below for why), so it doesn't inherit that wrapper's py-8
-either — this replaces it directly, padding rather than margin so it
-can't collapse with an adjacent block's own margin at the top edge.
+Width note below for why), so it doesn't inherit that wrapper's horizontal
+gutters either — it owns its own pl-4/6/8 directly. The 128px gap between
+body blocks comes from the page templates' space-y-32 on the block loop,
+not from padding here.
 
 Equal card heights: the track's own flex row already stretches each
 [data-carousel-item] wrapper to match the tallest one (align-items'
@@ -66,11 +67,11 @@ pr-4/sm:pr-6 instead (reset to lg:pr-0), scoped to mobile/tablet only —
 below lg: the columns stack (flex-col) and share the row's full width, so
 without it the right-aligned text/button would run flush to the row's
 own right edge same as the cards; at lg:+ the column's width is already
-capped well short of that edge by lg:w-1/3, so no extra padding is
-needed there.
+capped well short of that edge by lg:w-[583px] (matching Figma's text
+column width), so no extra padding is needed there.
 {% endcomment %}
-<div class="wtr-card-carousel mx-auto flex max-w-[1500px] flex-col gap-8 py-16 pl-4 sm:pl-6 lg:flex-row lg:items-start lg:gap-12 lg:pl-8" data-carousel>
-    <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 lg:w-1/3 lg:shrink-0 lg:pr-0">
+<div class="wtr-card-carousel mx-auto flex max-w-[1500px] flex-col gap-8 pl-4 sm:pl-6 lg:flex-row lg:items-center lg:gap-12 lg:pl-8" data-carousel>
+    <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 lg:w-[583px] lg:shrink-0 lg:pr-0">
         <h2 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl">{{ value.heading }}</h2>
         <div class="prose prose-neutral max-w-none text-xl leading-[1.2] lg:text-32">
             {{ value.content|richtext }}

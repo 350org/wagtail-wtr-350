@@ -9,9 +9,14 @@ Full-bleed-ish width: special-cased in content_page.html/home_page.html
 (alongside section/card_carousel/donate_fundraiseup) to skip the shared
 max-w-5xl wrapper, same w-full-outer / max-w-inner two-tier pattern as
 donate_fundraiseup_block.html — see that file's comment for why a bare
-`50% - 50vw` bleed isn't used instead. Capped at max-w-7xl (1280px, not
-the wider max-w-[1500px] used by the hero banner/card carousel/donate
-block) — deliberately narrower than those per design.
+`50% - 50vw` bleed isn't used instead. Capped at max-w-[932px] (Figma's
+"About 351" card width) — narrower than the max-w-[1500px] used by the
+hero banner/card carousel/donate block, deliberately per design.
+
+No vertical padding on the w-full-outer wrapper — the 128px gap between
+body blocks comes from home_page.html/content_page.html's space-y-32 on
+the block loop, not from here. This div's px-4/6/8 is horizontal gutters
+only.
 
 Text/button color: light-grey is the only one of the five colors light
 enough to need dark text/button instead of light — the
@@ -30,13 +35,13 @@ per the reference design (a giant faint "350" numeral), not a full photo
 background; object-cover so it fills the card regardless of the card's
 own aspect ratio, which the image's own is unlikely to match.
 {% endcomment %}
-<div class="w-full px-4 py-8 sm:px-6 lg:px-8">
-    <div class="wtr-callout wtr-callout-{{ value.color }} relative mx-auto max-w-7xl overflow-hidden rounded-lg px-6 py-10 sm:px-10 sm:py-14">
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="wtr-callout wtr-callout-{{ value.color }} relative mx-auto max-w-[932px] overflow-hidden rounded-lg px-6 py-10 sm:px-10 sm:py-14">
         {% if value.image %}
             {% image value.image fill-1600x900 as bg_img %}
             <img src="{{ bg_img.url }}" alt="" class="wtr-callout-bg-image absolute inset-0 h-full w-full object-cover" aria-hidden="true">
         {% endif %}
-        <div class="relative max-w-3xl {% if value.color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
+        <div class="relative max-w-[804px] {% if value.color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
             {% if value.heading %}
                 <h2 class="font-heading text-3xl font-bold sm:text-4xl lg:text-64">{{ value.heading }}</h2>
             {% endif %}
@@ -50,7 +55,7 @@ own aspect ratio, which the image's own is unlikely to match.
                 reading) to pure white, matching the reference design — headings/bold/links
                 already default to white in prose-invert, only body text doesn't.
                 {% endcomment %}
-                <div class="prose mt-4 max-w-none text-lg leading-[1.35] sm:text-xl lg:text-2xl
+                <div class="prose mt-4 max-w-none text-lg leading-[1.35] sm:text-xl lg:text-40
                             {% if value.color == 'light-grey' %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
                     {{ value.content|richtext }}
                 </div>

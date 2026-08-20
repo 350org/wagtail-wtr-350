@@ -49,6 +49,16 @@
     {# ------------------------------------------------------------------ #}
     {# BANNER VARIANT — compact color panel beside an image/video          #}
     {# ------------------------------------------------------------------ #}
+    {% comment %}
+    py-8 here is load-bearing for the OTHER caller of this template: the
+    page-level HeroMixin hero (ContentPage/IndexPage/FormPage), included by
+    base_page.html's {% block hero %} before <main> — outside the body-block
+    loop and its space-y-32, with a normal header directly above it. When
+    this same template renders as a mid-page HeroBlock inside page.body
+    instead, that py-8 stacks on top of space-y-32's 128px gap rather than
+    being subsumed by it (unlike the other wide blocks). Not fixed here —
+    doing so needs a way to tell the two call sites apart first.
+    {% endcomment %}
     <div class="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
         <div class="wtr-hero-banner wtr-hero-banner-{{ hero.banner_color }} relative flex flex-col overflow-hidden rounded-lg md:min-h-[385px]"
              {% if hero.video %}data-hero{% endif %}>
@@ -111,7 +121,7 @@
     {# FULL VARIANT — background image/video, text centered (default)     #}
     {# or left-aligned and anchored toward the bottom (hero.layout="left")#}
     {# ------------------------------------------------------------------ #}
-    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col
+    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col mx-4 rounded-lg
                 {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}
                 {% if hero.layout == 'left' %}justify-end{% else %}justify-center{% endif %}"
          {% if hero.video %}data-hero{% endif %}>
@@ -137,7 +147,7 @@
         <div class="relative mx-auto w-full px-4 py-20 sm:px-6 sm:py-28 lg:px-8 text-light
                     {% if hero.layout == 'left' %}max-w-7xl text-left{% else %}max-w-4xl text-center{% endif %}">
 
-            <h1 class="font-heading text-4xl font-bold tracking-tight sm:text-5xl lg:text-8xl">
+            <h1 class="font-heading text-4xl font-bold tracking-tight text-balance sm:text-5xl lg:text-8xl lg:max-w-[1033px]">
                 {{ hero.headline }}
             </h1>
 
