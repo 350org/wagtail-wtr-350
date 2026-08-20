@@ -266,13 +266,9 @@ html {
     border: 2px solid transparent;
     border-radius: var(--radius-button);
     cursor: pointer;
-    /* --icon-arrow-right (theme.css) as a background-image, not ::after,
-     * so it renders whether ActionKit emits <button> or the void
-     * <input type="submit">. */
-    background-image: var(--icon-arrow-right);
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
 }
+/* Trailing arrow (background-image, color/position) lives in theme.css —
+ * see .wtr-actionkit-embed-inline button[type='submit'] there. */
 
 .wtr-actionkit-embed-inline .input-text > label,
 .wtr-actionkit-embed-inline .input-select > label {
