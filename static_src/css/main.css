@@ -343,6 +343,22 @@ html {
 }
 
 /* ============================================================
+ * Photo caption overlay pill — .wtr-image-caption
+ * ============================================================
+ * Dark semi-transparent pill centered near the bottom of a photo, per
+ * Figma's photo-caption pattern. Shared by image_block.html,
+ * donate_fundraiseup_block.html, and signup_actionkit_block.html — was
+ * duplicated as an inline bg-black/50 utility in the latter two; a named
+ * class here both de-duplicates it and gets it off a raw Tailwind color
+ * utility (AGENTS.md: semantic tokens only). rgb(0 0 0 / 0.5) matches
+ * Figma's own fill exactly — not close enough to --color-dark to reuse
+ * that token instead.
+ * ============================================================ */
+.wtr-image-caption {
+    background-color: rgb(0 0 0 / 0.5);
+}
+
+/* ============================================================
  * Callout color variants — .wtr-callout-{color}
  * ============================================================
  * Used by callout_block.html. Five choices from CalloutBlock.color;
@@ -388,7 +404,7 @@ html {
  * `relative` text block purely via DOM order (it's the first child), so
  * no z-index is needed on either side. */
 .wtr-callout-bg-image {
-    opacity: 0.2;
+    opacity: 0.1;
     pointer-events: none;
 }
 

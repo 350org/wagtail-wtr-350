@@ -51,7 +51,7 @@ own alignment algorithm doesn't have that gotcha.
     </div>
     <div class="absolute inset-x-4 bottom-4 flex flex-col sm:inset-x-8 sm:bottom-8
                 {% if value.alignment == 'image-right' %}items-start{% else %}items-end{% endif %}">
-        <div class="wtr-quote-highlight prose prose-neutral max-w-none sm:max-w-2xl
+        <div class="wtr-quote-highlight prose prose-neutral max-w-none text-lg sm:max-w-2xl sm:text-xl lg:text-2xl
                     {% if value.alignment == 'image-right' %}text-left{% else %}text-right{% endif %}">
             {{ value.content|richtext }}
         </div>

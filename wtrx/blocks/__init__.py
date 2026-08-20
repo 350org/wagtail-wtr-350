@@ -514,10 +514,22 @@ class CardGridBlock(StructBlock):
     An auto-responsive grid of content cards.
 
     Minimum 2, maximum 12 cards. Column count is determined automatically
-    by CSS (2-col on sm, 3-col on md+). No heading or column-count controls
-    — editors cannot break the layout.
+    by CSS (2-col on sm, 3-col on lg+, except exactly 4 cards which use a
+    2-col grid at lg+ too for a balanced 2x2 instead of an unbalanced
+    3+1 — see card_grid_block.html). No column-count controls — editors
+    cannot break the layout.
+
+    heading is optional (blank renders nothing above the grid), same
+    required=False pattern as PageCardsBlock.heading — for consistency with
+    the other section-heading-plus-cards blocks (CardCarouselBlock,
+    PageCardsBlock), not because CardGridBlock's own layout needs it.
     """
 
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
     cards = ListBlock(
         CardBlock(),
         min_num=2,
