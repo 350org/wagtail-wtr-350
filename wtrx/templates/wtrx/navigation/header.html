@@ -43,31 +43,33 @@ and the dark_logo variant is used if available.
                     {% for item in nav.primary_navigation %}
                         {% if item.block_type == "internal" %}
                             <a href="{% pageurl item.value.page %}"
-                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "external" %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
-                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "anchor" %}
                             <a href="#{{ item.value.anchor }}"
-                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "submenu" %}
                             {% comment %}
                             Dropdown menu. Opens on hover (group-hover) and on keyboard focus
                             (group-focus-within) so it is reachable without JavaScript.
+                            rounded-t-lg + hover:bg pairs with the dropdown panel below it,
+                            per Figma's nav-item spec (px-8 py-lg, rounded top corners only).
                             {% endcomment %}
                             <div class="relative group">
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors"
+                                        class="inline-flex items-center gap-1 rounded-t-lg px-2 py-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-white/10{% else %}text-dark hover:text-primary hover:bg-neutral-100{% endif %} transition-colors"
                                         aria-haspopup="true">
                                     {{ item.value.text }}
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </button>
@@ -107,7 +109,7 @@ and the dark_logo variant is used if available.
             relative here is the containing block for the collapsed desktop dropdown (md:absolute md:right-0 md:top-full).
             Without it the dropdown would be positioned relative to the full-width <header> and overhang the right viewport edge.
             {% endcomment %}
-            <div class="relative flex items-center gap-4 {% if not nav.collapse_desktop_menu %}ml-6{% else %}ml-auto{% endif %}">
+            <div class="relative flex items-center gap-4 {% if not nav.collapse_desktop_menu %}ml-4{% else %}ml-auto{% endif %}">
 
                 {% comment %}
                 Social icons — always shown on desktop when show_in_header is enabled,
@@ -126,22 +128,27 @@ and the dark_logo variant is used if available.
                     </div>
                 {% endif %}
 
-                {% comment %}CTA button — always shown at all breakpoints regardless of collapse_desktop_menu.{% endcomment %}
+                {% comment %}
+                CTA button — always shown at all breakpoints regardless of collapse_desktop_menu.
+                Bespoke red pill per Figma's nav spec (bg-callout-red, rounded 4px, px-4 py-3) —
+                deliberately not wtr-btn, whose blue fill and 8px radius belong to the general
+                button system, not this specific nav component.
+                {% endcomment %}
                 {% if nav.cta_text %}
                     {% if nav.cta_page %}
                         <a href="{% pageurl nav.cta_page %}"
-                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_url %}
                         <a href="{{ nav.cta_url }}"
                            rel="noopener noreferrer"
-                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_anchor %}
                         <a href="#{{ nav.cta_anchor }}"
-                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% endif %}
