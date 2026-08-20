@@ -6,7 +6,7 @@ transparent_header is set in context by HomePage.get_context() when use_transpar
 When transparent: header is position:absolute over the hero, bg is transparent, text switches to light,
 and the dark_logo variant is used if available.
 {% endcomment %}
-<header class="wtr-header {% if transparent_header %}absolute inset-x-0 top-0 z-30 bg-transparent border-b-0{% else %}relative bg-light border-b border-neutral-200{% endif %}">
+<header class="wtr-header {% if transparent_header %}absolute inset-x-0 top-0 z-30 bg-transparent{% else %}relative bg-light{% endif %} border-b-0">
     <div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div class="flex items-center justify-between">
 
@@ -61,12 +61,11 @@ and the dark_logo variant is used if available.
                             {% comment %}
                             Dropdown menu. Opens on hover (group-hover) and on keyboard focus
                             (group-focus-within) so it is reachable without JavaScript.
-                            rounded-t-lg + hover:bg pairs with the dropdown panel below it,
-                            per Figma's nav-item spec (px-8 py-lg, rounded top corners only).
+                            Text color only on hover — no background fill.
                             {% endcomment %}
                             <div class="relative group">
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 rounded-t-lg px-2 py-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-white/10{% else %}text-dark hover:text-primary hover:bg-neutral-100{% endif %} transition-colors"
+                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors"
                                         aria-haspopup="true">
                                     {{ item.value.text }}
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -137,18 +136,18 @@ and the dark_logo variant is used if available.
                 {% if nav.cta_text %}
                     {% if nav.cta_page %}
                         <a href="{% pageurl nav.cta_page %}"
-                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_url %}
                         <a href="{{ nav.cta_url }}"
                            rel="noopener noreferrer"
-                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_anchor %}
                         <a href="#{{ nav.cta_anchor }}"
-                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% endif %}

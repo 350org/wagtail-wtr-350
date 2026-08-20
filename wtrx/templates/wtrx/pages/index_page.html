@@ -28,7 +28,15 @@
     {% endif %}
 
     {% if page.body %}
-        <div class="mt-16 space-y-8">
+        {% comment %}
+        space-y-32 (128px) matches the inter-block spacing convention used
+        by content_page.html/home_page.html's body-block loop — see those
+        files' comments. IndexPage doesn't special-case wide block types
+        out of this max-w-5xl wrapper the way those pages do, so wide
+        blocks here are narrower than on other page types; that's a
+        pre-existing IndexPage limitation, not something this fixes.
+        {% endcomment %}
+        <div class="mt-16 space-y-32">
             {% for block in page.body %}
                 {% include_block block %}
             {% endfor %}
