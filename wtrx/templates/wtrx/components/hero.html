@@ -79,7 +79,7 @@
                     </h1>
                     {% if hero.author or hero.published_at %}
                         {% comment %}
-                        Only BlogPage's get_context() sets these two keys (via
+                        Only Post's get_context() sets these two keys (via
                         BannerHeroMixin.get_banner_hero_context()'s **extra) — every other
                         "banner" hero producer (ContentPage/IndexPage's HeroMixin,
                         HeroBlock) leaves both unset, so this is silently skipped for them.

@@ -1,6 +1,6 @@
 """
-Tests for concrete page models: HomePage, ContentPage, IndexPage, BlogPage,
-BlogIndexPage, PressReleasePage, PressReleaseIndexPage.
+Tests for concrete page models: HomePage, ContentPage, IndexPage, Post,
+Blogs.
 
 WagtailPageTests covers parent/subpage type constraints.
 TestCase with RequestFactory covers get_context() behaviour.
@@ -16,15 +16,13 @@ from wagtail.test.utils import WagtailPageTests
 
 from wtrx.models import (
     BlogCategory,
-    BlogIndexPage,
-    BlogPage,
+    Blogs,
     ContentPage,
     FormPage,
     HomePage,
     IndexPage,
     ITEMS_PER_PAGE,
-    PressReleaseIndexPage,
-    PressReleasePage,
+    Post,
 )
 
 
@@ -47,7 +45,7 @@ class TestHomePageParentSubpageTypes(WagtailPageTests):
 
     def test_allowed_subpage_types(self):
         self.assertAllowedSubpageTypes(
-            HomePage, [ContentPage, IndexPage, FormPage, BlogIndexPage, PressReleaseIndexPage]
+            HomePage, [ContentPage, IndexPage, FormPage, Blogs]
         )
 
 
@@ -160,7 +158,7 @@ class TestContentPageParentSubpageTypes(WagtailPageTests):
 
     def test_allowed_subpage_types(self):
         self.assertAllowedSubpageTypes(
-            ContentPage, [ContentPage, IndexPage, FormPage, BlogIndexPage, PressReleaseIndexPage]
+            ContentPage, [ContentPage, IndexPage, FormPage, Blogs]
         )
 
 
@@ -255,7 +253,7 @@ class TestIndexPageParentSubpageTypes(WagtailPageTests):
 
     def test_allowed_subpage_types(self):
         self.assertAllowedSubpageTypes(
-            IndexPage, [ContentPage, IndexPage, FormPage, BlogIndexPage, PressReleaseIndexPage]
+            IndexPage, [ContentPage, IndexPage, FormPage, Blogs]
         )
 
 
@@ -344,27 +342,27 @@ class TestBlogCategory(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# BlogPage
+# Post
 # ---------------------------------------------------------------------------
 
 
-class TestBlogPageParentSubpageTypes(WagtailPageTests):
-    def test_can_create_under_blog_index_page(self):
-        self.assertCanCreateAt(BlogIndexPage, BlogPage)
+class TestPostParentSubpageTypes(WagtailPageTests):
+    def test_can_create_under_blogs(self):
+        self.assertCanCreateAt(Blogs, Post)
 
     def test_can_not_create_under_home_page(self):
-        self.assertCanNotCreateAt(HomePage, BlogPage)
+        self.assertCanNotCreateAt(HomePage, Post)
 
     def test_can_not_create_under_content_page(self):
-        self.assertCanNotCreateAt(ContentPage, BlogPage)
+        self.assertCanNotCreateAt(ContentPage, Post)
 
     def test_allowed_subpage_types(self):
-        self.assertAllowedSubpageTypes(BlogPage, [])
+        self.assertAllowedSubpageTypes(Post, [])
 
 
-class TestBlogPageGetContext(TestCase):
+class TestPostGetContext(TestCase):
     """
-    BlogPage.get_context() must build a "banner" hero dict (via
+    Post.get_context() must build a "banner" hero dict (via
     BannerHeroMixin.get_banner_hero_context()) with author/published_at
     folded in on top.
     """
@@ -374,22 +372,22 @@ class TestBlogPageGetContext(TestCase):
         root = Page.objects.filter(depth=1).first()
         home = HomePage(title="Home", slug="home-bp")
         root.add_child(instance=home)
-        cls.blog_index = BlogIndexPage(title="Blog", slug="blog-bp")
-        home.add_child(instance=cls.blog_index)
+        cls.blogs = Blogs(title="Blog", slug="blog-bp")
+        home.add_child(instance=cls.blogs)
 
         cls.user = User.objects.create_user(username="jane", first_name="Jane", last_name="Doe")
 
-        cls.post = BlogPage(
+        cls.post = Post(
             title="A Post",
             slug="a-post-bp",
             hero_headline="Custom headline",
             author=cls.user,
             published_at=timezone.now(),
         )
-        cls.blog_index.add_child(instance=cls.post)
+        cls.blogs.add_child(instance=cls.post)
 
-        cls.post_no_author = BlogPage(title="No Author Post", slug="no-author-post-bp")
-        cls.blog_index.add_child(instance=cls.post_no_author)
+        cls.post_no_author = Post(title="No Author Post", slug="no-author-post-bp")
+        cls.blogs.add_child(instance=cls.post_no_author)
 
     def _get_context(self, page):
         request = RequestFactory().get("/")
@@ -421,9 +419,9 @@ class TestBlogPageGetContext(TestCase):
         self.assertEqual(ctx["hero"]["cta"], [])
 
 
-class TestBlogPageForm(TestCase):
+class TestPostForm(TestCase):
     """
-    BlogPageForm must pre-fill author with the creating user, only for new
+    PostForm must pre-fill author with the creating user, only for new
     pages.
 
     Asserts against form["author"].value() (the bound field's actual
@@ -433,7 +431,7 @@ class TestBlogPageForm(TestCase):
     before ever falling back to a field's own .initial attribute, and
     ModelForm.__init__ always populates self.initial from model_to_dict()
     on the instance — including "author": None for a brand new unsaved
-    BlogPage — so asserting on fields["author"].initial alone would pass
+    Post — so asserting on fields["author"].initial alone would pass
     even if the pre-fill were silently shadowed and never actually applied.
     """
 
@@ -442,53 +440,53 @@ class TestBlogPageForm(TestCase):
         root = Page.objects.filter(depth=1).first()
         home = HomePage(title="Home", slug="home-bpf")
         root.add_child(instance=home)
-        cls.blog_index = BlogIndexPage(title="Blog", slug="blog-bpf")
-        home.add_child(instance=cls.blog_index)
+        cls.blogs = Blogs(title="Blog", slug="blog-bpf")
+        home.add_child(instance=cls.blogs)
         cls.user = User.objects.create_user(username="alex")
 
     def test_author_defaults_to_for_user_on_new_page(self):
-        form_class = BlogPage.get_edit_handler().get_form_class()
-        form = form_class(for_user=self.user, parent_page=self.blog_index, instance=BlogPage())
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(for_user=self.user, parent_page=self.blogs, instance=Post())
         self.assertEqual(form["author"].value(), self.user.pk)
 
     def test_author_not_overridden_on_existing_page(self):
         other_user = User.objects.create_user(username="sam")
-        post = BlogPage(title="Existing", slug="existing-bpf", author=other_user)
-        self.blog_index.add_child(instance=post)
+        post = Post(title="Existing", slug="existing-bpf", author=other_user)
+        self.blogs.add_child(instance=post)
 
-        form_class = BlogPage.get_edit_handler().get_form_class()
-        form = form_class(for_user=self.user, parent_page=self.blog_index, instance=post)
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(for_user=self.user, parent_page=self.blogs, instance=post)
         self.assertEqual(form["author"].value(), other_user.pk)
 
 
-class TestBlogPageMeta(TestCase):
+class TestPostMeta(TestCase):
     def test_verbose_name(self):
-        self.assertEqual(BlogPage._meta.verbose_name, "blog page")
+        self.assertEqual(Post._meta.verbose_name, "post")
 
     def test_verbose_name_plural(self):
-        self.assertEqual(BlogPage._meta.verbose_name_plural, "blog pages")
+        self.assertEqual(Post._meta.verbose_name_plural, "posts")
 
 
 # ---------------------------------------------------------------------------
-# BlogIndexPage
+# Blogs
 # ---------------------------------------------------------------------------
 
 
-class TestBlogIndexPageParentSubpageTypes(WagtailPageTests):
+class TestBlogsParentSubpageTypes(WagtailPageTests):
     def test_can_create_under_home_page(self):
-        self.assertCanCreateAt(HomePage, BlogIndexPage)
+        self.assertCanCreateAt(HomePage, Blogs)
 
-    def test_can_not_create_under_blog_index_page(self):
-        self.assertCanNotCreateAt(BlogIndexPage, BlogIndexPage)
+    def test_can_not_create_under_blogs(self):
+        self.assertCanNotCreateAt(Blogs, Blogs)
 
     def test_allowed_subpage_types(self):
-        self.assertAllowedSubpageTypes(BlogIndexPage, [BlogPage])
+        self.assertAllowedSubpageTypes(Blogs, [Post])
 
 
-class TestBlogIndexPageGetContext(TestCase):
+class TestBlogsGetContext(TestCase):
     """
-    BlogIndexPage.get_context() must list live/public BlogPage children
-    newest-first by published_at, and support narrowing to one category via
+    Blogs.get_context() must list live/public Post children newest-first by
+    published_at, and support narrowing to one category via
     ?category=<slug>.
     """
 
@@ -497,8 +495,8 @@ class TestBlogIndexPageGetContext(TestCase):
         root = Page.objects.filter(depth=1).first()
         home = HomePage(title="Home", slug="home-bip")
         root.add_child(instance=home)
-        cls.blog_index = BlogIndexPage(title="Blog", slug="blog-bip")
-        home.add_child(instance=cls.blog_index)
+        cls.blogs = Blogs(title="Blog", slug="blog-bip")
+        home.add_child(instance=cls.blogs)
 
         cls.climate = BlogCategory.objects.create(name="Climate", slug="climate")
         cls.justice = BlogCategory.objects.create(name="Justice", slug="justice")
@@ -506,12 +504,12 @@ class TestBlogIndexPageGetContext(TestCase):
         base_time = timezone.now() - timedelta(days=10)
         cls.posts = []
         for i in range(3):
-            post = BlogPage(
+            post = Post(
                 title=f"Post {i}",
                 slug=f"post-bip-{i}",
                 published_at=base_time + timedelta(days=i),
             )
-            cls.blog_index.add_child(instance=post)
+            cls.blogs.add_child(instance=post)
             cls.posts.append(post)
 
         # ParentalManyToManyField.add() only updates the in-memory cluster —
@@ -526,12 +524,12 @@ class TestBlogIndexPageGetContext(TestCase):
         cls.posts[2].categories.add(cls.climate, cls.justice)
         cls.posts[2].save()
 
-        cls.draft_post = BlogPage(title="Draft", slug="draft-bip", live=False)
-        cls.blog_index.add_child(instance=cls.draft_post)
+        cls.draft_post = Post(title="Draft", slug="draft-bip", live=False)
+        cls.blogs.add_child(instance=cls.draft_post)
 
     def _get_context(self, query_string=""):
         request = RequestFactory().get("/", query_string)
-        return self.blog_index.get_context(request)
+        return self.blogs.get_context(request)
 
     def test_posts_ordered_newest_first(self):
         ctx = self._get_context()
@@ -566,92 +564,9 @@ class TestBlogIndexPageGetContext(TestCase):
         self.assertEqual(len(ctx["posts"].object_list), 3)
 
 
-class TestBlogIndexPageMeta(TestCase):
+class TestBlogsMeta(TestCase):
     def test_verbose_name(self):
-        self.assertEqual(BlogIndexPage._meta.verbose_name, "blog index page")
+        self.assertEqual(Blogs._meta.verbose_name, "Blogs")
 
     def test_verbose_name_plural(self):
-        self.assertEqual(BlogIndexPage._meta.verbose_name_plural, "blog index pages")
-
-
-# ---------------------------------------------------------------------------
-# PressReleasePage
-# ---------------------------------------------------------------------------
-
-
-class TestPressReleasePageParentSubpageTypes(WagtailPageTests):
-    def test_can_create_under_press_release_index_page(self):
-        self.assertCanCreateAt(PressReleaseIndexPage, PressReleasePage)
-
-    def test_can_not_create_under_home_page(self):
-        self.assertCanNotCreateAt(HomePage, PressReleasePage)
-
-    def test_allowed_subpage_types(self):
-        self.assertAllowedSubpageTypes(PressReleasePage, [])
-
-
-class TestPressReleasePageMeta(TestCase):
-    def test_verbose_name(self):
-        self.assertEqual(PressReleasePage._meta.verbose_name, "press release")
-
-    def test_verbose_name_plural(self):
-        self.assertEqual(PressReleasePage._meta.verbose_name_plural, "press releases")
-
-
-# ---------------------------------------------------------------------------
-# PressReleaseIndexPage
-# ---------------------------------------------------------------------------
-
-
-class TestPressReleaseIndexPageParentSubpageTypes(WagtailPageTests):
-    def test_can_create_under_home_page(self):
-        self.assertCanCreateAt(HomePage, PressReleaseIndexPage)
-
-    def test_allowed_subpage_types(self):
-        self.assertAllowedSubpageTypes(PressReleaseIndexPage, [PressReleasePage])
-
-
-class TestPressReleaseIndexPageGetContext(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        root = Page.objects.filter(depth=1).first()
-        home = HomePage(title="Home", slug="home-prip")
-        root.add_child(instance=home)
-        cls.index = PressReleaseIndexPage(title="Press", slug="press-prip")
-        home.add_child(instance=cls.index)
-
-        base_time = timezone.now() - timedelta(days=5)
-        cls.releases = []
-        for i in range(2):
-            release = PressReleasePage(
-                title=f"Release {i}",
-                slug=f"release-prip-{i}",
-                published_at=base_time + timedelta(days=i),
-            )
-            cls.index.add_child(instance=release)
-            cls.releases.append(release)
-
-    def _get_context(self):
-        request = RequestFactory().get("/")
-        return self.index.get_context(request)
-
-    def test_releases_ordered_newest_first(self):
-        ctx = self._get_context()
-        titles = [r.title for r in ctx["releases"].object_list]
-        self.assertEqual(titles, ["Release 1", "Release 0"])
-
-    def test_paginator_in_context(self):
-        ctx = self._get_context()
-        self.assertIn("paginator", ctx)
-
-
-class TestPressReleaseIndexPageMeta(TestCase):
-    def test_verbose_name(self):
-        self.assertEqual(
-            PressReleaseIndexPage._meta.verbose_name, "press release index page"
-        )
-
-    def test_verbose_name_plural(self):
-        self.assertEqual(
-            PressReleaseIndexPage._meta.verbose_name_plural, "press release index pages"
-        )
+        self.assertEqual(Blogs._meta.verbose_name_plural, "Blogs")

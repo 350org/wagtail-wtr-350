@@ -1315,7 +1315,7 @@ does not break silently when upstream changes are merged.
 - **pip extraction of wtrx/ package** (`wagtail-wtrx` on PyPI, following CodeRed CMS pattern)
 - **Theme switching** (multiple built-in themes)
 - **Additional blocks**: Stats, Events, Logo showcase, Countdown, Social links block
-- **Additional pages**: Blog/news listing, event listing
+- **Additional pages**: event listing
 
 ---
 

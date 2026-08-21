@@ -277,7 +277,7 @@ class BannerHeroMixin(models.Model):
     """
     A small header for page types that always render hero.html's "banner"
     variant and don't need HeroMixin's video/layout/cta options — currently
-    just BlogPage. See HeroMixin for the full page-hero field set used by
+    just Post. See HeroMixin for the full page-hero field set used by
     HomePage/ContentPage/IndexPage, and hero.html for the "banner" variant
     itself (same rendering, same 5-color system).
 
@@ -335,7 +335,7 @@ class BannerHeroMixin(models.Model):
         Build the "hero" context dict components/hero.html expects, forced
         to the "banner" variant. **extra lets a subclass merge in fields
         hero.html doesn't otherwise know about but the "banner" variant
-        renders anyway when present — BlogPage uses this for author/
+        renders anyway when present — Post uses this for author/
         published_at.
         """
         context = {
@@ -359,7 +359,7 @@ class BannerHeroMixin(models.Model):
 @register_snippet
 class BlogCategory(models.Model):
     """
-    Editor-managed taxonomy for BlogPage.categories — a Snippet (rather
+    Editor-managed taxonomy for Post.categories — a Snippet (rather
     than freeform tagging via the already-installed-but-unused `taggit`
     app) since categories here are meant to be a curated, admin-managed
     list, not something any author invents ad hoc per post. Snippets get
@@ -394,10 +394,10 @@ class BlogCategory(models.Model):
         super().save(*args, **kwargs)
 
 
-class BlogPageForm(WagtailAdminPageForm):
+class PostForm(WagtailAdminPageForm):
     """
     Pre-fills the author field with the current user when creating a new
-    BlogPage — "defaults to whoever publishes, but is editable": rather
+    Post — "defaults to whoever publishes, but is editable": rather
     than a signal that silently overwrites author on publish (fights an
     editor who already set it, or credits whoever happened to click
     publish rather than who actually wrote it), this just pre-selects the
@@ -484,8 +484,7 @@ class HomePage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
-        "wtrx.BlogIndexPage",
-        "wtrx.PressReleaseIndexPage",
+        "wtrx.Blogs",
     ]
 
     class Meta:
@@ -544,8 +543,7 @@ class ContentPage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
-        "wtrx.BlogIndexPage",
-        "wtrx.PressReleaseIndexPage",
+        "wtrx.Blogs",
     ]
 
     class Meta:
@@ -612,8 +610,7 @@ class IndexPage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
-        "wtrx.BlogIndexPage",
-        "wtrx.PressReleaseIndexPage",
+        "wtrx.Blogs",
     ]
 
     class Meta:
@@ -649,20 +646,24 @@ class IndexPage(BasePage, HeroMixin):
         return ctx
 
 
-class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
+class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
     """
-    A single blog post.
+    A single post — covers both blog posts and press releases, which share
+    an identical shape (see PLAN.md); author and categories are both
+    optional, so a press-release-style post simply leaves them blank.
 
     published_at (PublishedDateMixin) is the editable display/ordering
-    date; author defaults to whoever creates the post (BlogPageForm) but
+    date; author defaults to whoever creates the post (PostForm) but
     stays freely editable afterwards; categories is an editor-managed
     multi-select against the BlogCategory snippet. Header is
     BannerHeroMixin's compact "banner" style (same look as ContentPage's
-    header) with author/date folded in — see get_context().
+    header) with author/date folded in — see get_context(). When author
+    and hero_image are left blank (e.g. an official statement with no
+    byline), the banner just renders the title and date.
     """
 
-    template = "wtrx/pages/blog_page.html"
-    base_form_class = BlogPageForm
+    template = "wtrx/pages/post_page.html"
+    base_form_class = PostForm
 
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -694,7 +695,7 @@ class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
     categories = ParentalManyToManyField(
         "wtrx.BlogCategory",
         blank=True,
-        related_name="blog_pages",
+        related_name="posts",
         verbose_name=_("categories"),
     )
     body = StreamField(
@@ -727,19 +728,19 @@ class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
         ]
     )
 
-    parent_page_types = ["wtrx.BlogIndexPage"]
+    parent_page_types = ["wtrx.Blogs"]
     subpage_types = []
 
     class Meta:
-        verbose_name = _("blog page")
-        verbose_name_plural = _("blog pages")
+        verbose_name = _("post")
+        verbose_name_plural = _("posts")
 
     @property
     def author_display(self):
         """
         Byline text for this post: the site account's name if Author (FK) is
         set, else the guest/imported Author name (+ title), else None.
-        Shared by the hero banner and the BlogIndexPage listing cards so the
+        Shared by the hero banner and the Blogs listing cards so the
         two never drift out of sync.
         """
         if self.author_id:
@@ -759,17 +760,19 @@ class BlogPage(BasePage, PublishedDateMixin, BannerHeroMixin):
         return ctx
 
 
-class BlogIndexPage(BasePage):
+class Blogs(BasePage):
     """
-    Blog listing page.
+    Post listing page — covers both blog posts and press releases, since
+    Post itself covers both (see PLAN.md).
 
-    Live/public BlogPage children, newest first by published_at, optionally
-    filtered to one category via ?category=<slug>. Unlike the generic
-    IndexPage (which lists any child page type, ordered by title), this is
-    specific to BlogPage and its date/category semantics.
+    Live/public Post children, newest first by published_at, optionally
+    filtered to one category via ?category=<slug> (the filter row simply
+    doesn't render when no BlogCategory exists — see blogs_page.html).
+    Unlike the generic IndexPage (which lists any child page type, ordered
+    by title), this is specific to Post and its date/category semantics.
     """
 
-    template = "wtrx/pages/blog_index_page.html"
+    template = "wtrx/pages/blogs_page.html"
 
     intro = RichTextField(
         blank=True,
@@ -796,16 +799,16 @@ class BlogIndexPage(BasePage):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
     ]
-    subpage_types = ["wtrx.BlogPage"]
+    subpage_types = ["wtrx.Post"]
 
     class Meta:
-        verbose_name = _("blog index page")
-        verbose_name_plural = _("blog index pages")
+        verbose_name = _("Blogs")
+        verbose_name_plural = _("Blogs")
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
 
-        posts_qs = BlogPage.objects.child_of(self).live().public().order_by("-published_at")
+        posts_qs = Post.objects.child_of(self).live().public().order_by("-published_at")
 
         selected_category = None
         category_slug = request.GET.get("category")
@@ -827,108 +830,6 @@ class BlogIndexPage(BasePage):
         ctx["paginator"] = paginator
         ctx["categories"] = BlogCategory.objects.all()
         ctx["selected_category"] = selected_category
-        return ctx
-
-
-class PressReleasePage(BasePage, PublishedDateMixin):
-    """
-    A single press release. Deliberately minimal — just the editable
-    published_at date plus body, no author/category (not requested for
-    this content type, unlike BlogPage).
-    """
-
-    template = "wtrx/pages/press_release_page.html"
-
-    body = StreamField(
-        BodyStreamBlock(),
-        blank=True,
-        verbose_name=_("body"),
-        help_text=_("Page body content."),
-        use_json_field=True,
-    )
-
-    content_panels = (
-        Page.content_panels
-        + PublishedDateMixin.published_date_panels
-        + [
-            FieldPanel("body"),
-        ]
-    )
-
-    promote_panels = BasePage.promote_panels
-
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(content_panels, heading=_("Content")),
-            ObjectList(promote_panels, heading=_("Promote")),
-        ]
-    )
-
-    parent_page_types = ["wtrx.PressReleaseIndexPage"]
-    subpage_types = []
-
-    class Meta:
-        verbose_name = _("press release")
-        verbose_name_plural = _("press releases")
-
-
-class PressReleaseIndexPage(BasePage):
-    """
-    Press release listing page. Live/public PressReleasePage children,
-    newest first by published_at — no category filtering, since
-    PressReleasePage has no categories field.
-    """
-
-    template = "wtrx/pages/press_release_index_page.html"
-
-    intro = RichTextField(
-        blank=True,
-        features=RICHTEXT_FEATURES_INLINE,
-        verbose_name=_("intro"),
-        help_text=_("Optional introductory text displayed above the release listing."),
-    )
-
-    content_panels = Page.content_panels + [
-        FieldPanel("intro"),
-    ]
-
-    promote_panels = BasePage.promote_panels
-
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(content_panels, heading=_("Content")),
-            ObjectList(promote_panels, heading=_("Promote")),
-        ]
-    )
-
-    parent_page_types = [
-        "wtrx.HomePage",
-        "wtrx.ContentPage",
-        "wtrx.IndexPage",
-    ]
-    subpage_types = ["wtrx.PressReleasePage"]
-
-    class Meta:
-        verbose_name = _("press release index page")
-        verbose_name_plural = _("press release index pages")
-
-    def get_context(self, request, *args, **kwargs):
-        ctx = super().get_context(request, *args, **kwargs)
-
-        releases_qs = (
-            PressReleasePage.objects.child_of(self).live().public().order_by("-published_at")
-        )
-        paginator = Paginator(releases_qs, ITEMS_PER_PAGE)
-        page_number = request.GET.get("page", 1)
-        try:
-            releases = paginator.page(page_number)
-        except PageNotAnInteger:
-            releases = paginator.page(1)
-        except EmptyPage:
-            releases = paginator.page(paginator.num_pages)
-
-        ctx["releases"] = releases
-        ctx["paginator"] = paginator
         return ctx
 
 
