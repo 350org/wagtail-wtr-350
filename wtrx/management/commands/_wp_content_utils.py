@@ -13,6 +13,7 @@ import re
 import uuid
 from urllib.parse import urlparse
 
+import requests
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 # WordPress rewrites <img src> to a scaled rendition of the original upload
@@ -166,15 +167,22 @@ def download_image(session, url, stdout, dry_run=False):
 
     from django.core.files.uploadedfile import SimpleUploadedFile
 
-    resp = session.get(full_url, timeout=30)
-    if resp.status_code == 404 and full_url != url:
-        # Rare: the unscaled original isn't hosted (e.g. deleted after WP's
-        # "big image threshold" processing) — fall back to the scaled copy
-        # actually linked in the post content rather than failing the import.
-        full_url = url
-        filename = os.path.basename(urlparse(url).path) or "imported-image"
-        resp = session.get(url, timeout=30)
-    resp.raise_for_status()
+    try:
+        resp = session.get(full_url, timeout=30)
+        if resp.status_code == 404 and full_url != url:
+            # Rare: the unscaled original isn't hosted (e.g. deleted after WP's
+            # "big image threshold" processing) — fall back to the scaled copy
+            # actually linked in the post content rather than failing the import.
+            full_url = url
+            filename = os.path.basename(urlparse(url).path) or "imported-image"
+            resp = session.get(url, timeout=30)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        # A single broken/dead image link on the source WP site shouldn't
+        # abort the whole import run — skip it and keep going.
+        stdout.write(f"    WARNING: failed to download image {full_url} — {exc}")
+        return None
+
     uploaded = SimpleUploadedFile(filename, resp.content)
     image = CustomImage(title=filename, file=uploaded)
     image.save()
