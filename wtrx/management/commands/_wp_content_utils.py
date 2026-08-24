@@ -14,6 +14,40 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
+
+def resolve_blogs_target(stderr, style, target_slug):
+    """
+    Resolve which Blogs page an import command should add children under.
+
+    With --target given, looks it up by slug. Without it, only succeeds if
+    exactly one Blogs page exists — sites with more than one (e.g. separate
+    "Blog Index" and "Press Releases" pages) must pick explicitly, rather
+    than the command silently guessing via Blogs.objects.first().
+
+    Returns the Blogs instance, or None (having already written an error
+    to stderr) if it can't be resolved.
+    """
+    # Deferred import to avoid import-time DB access.
+    from wtrx.models import Blogs
+
+    if target_slug:
+        blogs = Blogs.objects.filter(slug=target_slug).first()
+        if blogs is None:
+            stderr.write(style.ERROR(f"No Blogs page found with slug '{target_slug}'."))
+        return blogs
+
+    all_blogs = list(Blogs.objects.all())
+    if not all_blogs:
+        stderr.write(style.ERROR("No Blogs page found. Create one first."))
+        return None
+    if len(all_blogs) > 1:
+        slugs = ", ".join(f"'{b.slug}'" for b in all_blogs)
+        stderr.write(
+            style.ERROR(f"Multiple Blogs pages exist ({slugs}). Pass --target <slug> to pick one.")
+        )
+        return None
+    return all_blogs[0]
+
 # Block-level tags kept as-is (mapped to themselves or normalized), matching
 # wtrx.constants.RICHTEXT_FEATURES_FULL: h2/h3/h4, lists, blockquote.
 _BLOCK_TAG_MAP = {

@@ -1,9 +1,57 @@
 import os
+from urllib.parse import unquote, urlparse
 
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401, F403
+
+
+def _s3_settings_from_dsn(dsn):
+    """
+    Parse a Divio-style DEFAULT_STORAGE_DSN (e.g.
+    "s3://key:secret@mybucket.s3.amazonaws.com", or for other S3-compatible
+    providers "s3://key:secret@mybucket.region.endpoint") into the discrete
+    AWS_* env vars the S3 config below already reads — so provisioning
+    Divio's "Object Storage" service (which hands you one DSN, not
+    individual credentials) works as a drop-in alternative to setting those
+    vars by hand. Only sets vars that aren't already set (see setdefault()
+    below), so an explicit AWS_* var always wins, and Render deployments
+    (which set discrete AWS_* vars against a real AWS bucket, no DSN
+    involved) are unaffected.
+
+    Deliberately does NOT attempt to guess AWS_S3_REGION_NAME from the DSN —
+    the "region" segment's exact position isn't reliably documented across
+    S3-compatible providers, and getting it wrong risks a signature
+    validation error that's confusing to debug. If your provider needs a
+    specific region for signing, set AWS_S3_REGION_NAME explicitly.
+    """
+    parsed = urlparse(dsn)
+    if parsed.scheme != "s3":
+        raise ImproperlyConfigured(
+            f"Unsupported DEFAULT_STORAGE_DSN scheme {parsed.scheme!r} — only s3:// is "
+            "supported (Divio's Azure-backed storage isn't)."
+        )
+    hostname = parsed.hostname or ""
+    bucket, sep, endpoint_host = hostname.partition(".")
+    if not sep:
+        raise ImproperlyConfigured(
+            f"DEFAULT_STORAGE_DSN host {hostname!r} doesn't look like "
+            "'<bucket>.<endpoint>' (e.g. 'mybucket.s3.amazonaws.com')."
+        )
+    return {
+        "AWS_STORAGE_BUCKET_NAME": bucket,
+        "AWS_ACCESS_KEY_ID": unquote(parsed.username) if parsed.username else "",
+        "AWS_SECRET_ACCESS_KEY": unquote(parsed.password) if parsed.password else "",
+        "AWS_S3_ENDPOINT_URL": f"https://{endpoint_host}",
+        "AWS_S3_CUSTOM_DOMAIN": hostname,
+    }
+
+
+_storage_dsn = os.environ.get("DEFAULT_STORAGE_DSN")
+if _storage_dsn:
+    for _dsn_key, _dsn_value in _s3_settings_from_dsn(_storage_dsn).items():
+        os.environ.setdefault(_dsn_key, _dsn_value)
 
 DEBUG = False
 
@@ -90,10 +138,12 @@ if _s3_bucket:
     # Only pass explicit credentials when set — omitting them lets boto3 use its
     # full credential chain (env vars, ~/.aws/credentials, IAM instance role).
     _s3_region = os.environ.get("AWS_S3_REGION_NAME", "us-east-1")
+    _s3_endpoint_url = os.environ.get("AWS_S3_ENDPOINT_URL")
     _s3_opts_base = {
         "bucket_name": _s3_bucket,
         "region_name": _s3_region,
         "custom_domain": _s3_custom_domain,
+        "endpoint_url": _s3_endpoint_url,  # non-AWS S3-compatible providers (e.g. Divio Object Storage)
         "querystring_auth": False,  # public read; all objects in this bucket are publicly accessible via direct URL
     }
     if os.environ.get("AWS_ACCESS_KEY_ID"):

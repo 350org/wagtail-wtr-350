@@ -15,6 +15,7 @@ Usage:
     python manage.py import_350_press_releases --since 2026-01-01
     python manage.py import_350_press_releases --dry-run        # preview only
     python manage.py import_350_press_releases --update         # overwrite already-imported
+    python manage.py import_350_press_releases --target press-releases  # pick a Blogs page
 
 Field mapping:
     Page <h2> in #press-release-header  -> Post.title
@@ -39,7 +40,7 @@ from bs4 import BeautifulSoup
 from django.core.management.base import BaseCommand
 from django.utils import timezone as dj_timezone
 
-from wtrx.management.commands._wp_content_utils import convert_body
+from wtrx.management.commands._wp_content_utils import convert_body, resolve_blogs_target
 
 SITEMAP_INDEX_URL = "https://350.org/sitemap_index.xml"
 USER_AGENT = "350-wagtail-press-release-import/1.0 (+https://github.com/)"
@@ -140,10 +141,15 @@ class Command(BaseCommand):
             help="Overwrite Posts that were already imported (matched by "
             "slug), instead of skipping them.",
         )
+        parser.add_argument(
+            "--target",
+            help="Slug of the Blogs page to import under. Required if more than one "
+            "Blogs page exists; optional (and inferred) if there's only one.",
+        )
 
     def handle(self, *args, **options):
         # Deferred imports to avoid import-time DB access (architecture rule #4).
-        from wtrx.models import Blogs, Post
+        from wtrx.models import Post
 
         limit = options["limit"] or None
         since = options["since"]
@@ -151,9 +157,8 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         update = options["update"]
 
-        blogs_index = Blogs.objects.first()
+        blogs_index = resolve_blogs_target(self.stderr, self.style, options["target"])
         if blogs_index is None:
-            self.stderr.write(self.style.ERROR("No Blogs page found. Create one first."))
             return
 
         session = requests.Session()

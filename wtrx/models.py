@@ -766,8 +766,10 @@ class Blogs(BasePage):
     Post itself covers both (see PLAN.md).
 
     Live/public Post children, newest first by published_at, optionally
-    filtered to one category via ?category=<slug> (the filter row simply
-    doesn't render when no BlogCategory exists — see blogs_page.html).
+    filtered to one category via ?category=<slug>. The filter row (see
+    blogs_page.html) only lists categories actually used by this page's own
+    posts, so it disappears on its own for a page whose posts never carry
+    categories (e.g. a press-release-only Blogs page) — see get_context().
     Unlike the generic IndexPage (which lists any child page type, ordered
     by title), this is specific to Post and its date/category semantics.
     """
@@ -810,10 +812,17 @@ class Blogs(BasePage):
 
         posts_qs = Post.objects.child_of(self).live().public().order_by("-published_at")
 
+        # Scoped to categories actually used by this page's own posts (not
+        # every BlogCategory site-wide) so the filter row disappears on its
+        # own wherever it doesn't apply — e.g. a press-release-only Blogs
+        # page, where posts never carry categories — with no separate
+        # toggle for editors to manage.
+        available_categories = BlogCategory.objects.filter(posts__in=posts_qs).distinct()
+
         selected_category = None
         category_slug = request.GET.get("category")
         if category_slug:
-            selected_category = BlogCategory.objects.filter(slug=category_slug).first()
+            selected_category = available_categories.filter(slug=category_slug).first()
             if selected_category:
                 posts_qs = posts_qs.filter(categories=selected_category)
 
@@ -828,7 +837,7 @@ class Blogs(BasePage):
 
         ctx["posts"] = posts
         ctx["paginator"] = paginator
-        ctx["categories"] = BlogCategory.objects.all()
+        ctx["categories"] = available_categories
         ctx["selected_category"] = selected_category
         return ctx
 

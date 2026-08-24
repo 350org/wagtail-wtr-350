@@ -33,7 +33,11 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone as dj_timezone
 from django.utils.dateparse import parse_datetime
 
-from wtrx.management.commands._wp_content_utils import convert_body, download_image
+from wtrx.management.commands._wp_content_utils import (
+    convert_body,
+    download_image,
+    resolve_blogs_target,
+)
 
 WP_API_URL = "https://350.org/wp-json/wp/v2/posts"
 USER_AGENT = "350-wagtail-blog-import/1.0 (+https://github.com/)"
@@ -137,19 +141,23 @@ class Command(BaseCommand):
             help="Overwrite Posts that were already imported (matched by slug), "
             "instead of skipping them.",
         )
+        parser.add_argument(
+            "--target",
+            help="Slug of the Blogs page to import under. Required if more than one "
+            "Blogs page exists; optional (and inferred) if there's only one.",
+        )
 
     def handle(self, *args, **options):
         # Deferred imports to avoid import-time DB access (architecture rule #4).
-        from wtrx.models import BlogCategory, Blogs, Post
+        from wtrx.models import BlogCategory, Post
 
         limit = options["limit"] or None
         since = options["since"]
         dry_run = options["dry_run"]
         update = options["update"]
 
-        blogs_index = Blogs.objects.first()
+        blogs_index = resolve_blogs_target(self.stderr, self.style, options["target"])
         if blogs_index is None:
-            self.stderr.write(self.style.ERROR("No Blogs page found. Create one first."))
             return
 
         session = requests.Session()
