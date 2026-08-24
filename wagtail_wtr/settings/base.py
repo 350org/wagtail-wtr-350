@@ -164,6 +164,14 @@ WAGTAIL_ENABLE_UPDATE_CHECK = False
 # Wagtail 2FA — required for all staff/superusers accessing the admin.
 # Disabled in dev.py so local development doesn't require TOTP enrollment.
 WAGTAIL_2FA_REQUIRED = True
+# Shown as the issuer name next to each account's label in an authenticator
+# app during TOTP enrolment (django_otp reads this directly — see
+# OTP_TOTP_ISSUER in its docs). wagtail_2fa would otherwise fall back to
+# WAGTAIL_SITE_NAME above, which is still Wagtail's own unconfigured "My
+# Site" placeholder, not a useful identifier. The per-account label itself
+# is the user's email — see NoSignupAccountAdapter.populate_username in
+# wtrx/allauth_adapter.py.
+OTP_TOTP_ISSUER = "350 Wagtail CMS"
 
 # Wagtail AI — content-assist tools (title/description suggestions, rich text
 # actions, etc.) backed by Claude via the `llm` library's Anthropic plugin

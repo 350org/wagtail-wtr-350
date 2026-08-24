@@ -64,6 +64,28 @@ class TestPreSocialLogin(SimpleTestCase):
             adapter.pre_social_login(request, sociallogin)
 
 
+class TestPopulateUsername(SimpleTestCase):
+    """
+    NoSignupAccountAdapter.populate_username() must set the username to the
+    email address, not allauth's default of slugifying the first name Google
+    supplies — the username is what shows as the per-account label in an
+    authenticator app during 2FA enrolment (django_otp reads
+    user.get_username()), where a first-name-only label doesn't identify the
+    account as clearly as the email does with several staff enrolled.
+    """
+
+    def test_sets_username_to_email(self):
+        from django.contrib.auth.models import User
+
+        adapter = NoSignupAccountAdapter()
+        user = User(email="sukhada@withtheranks.com", first_name="Sukhada")
+        request = RequestFactory().get("/accounts/google/login/callback/")
+
+        adapter.populate_username(request, user)
+
+        self.assertEqual(user.username, "sukhada@withtheranks.com")
+
+
 class TestGetLoginRedirectUrl(SimpleTestCase):
     """
     NoSignupAccountAdapter.get_login_redirect_url() must send a user with

@@ -52,6 +52,21 @@ class NoSignupAccountAdapter(DefaultAccountAdapter):
     def is_open_for_signup(self, request) -> bool:
         return False
 
+    def populate_username(self, request, user):
+        """
+        Use the Google-verified email as the username, rather than allauth's
+        default of slugifying the first name it got from Google. This
+        account's username is what shows as the per-account label next to
+        OTP_TOTP_ISSUER in every staff member's authenticator app during 2FA
+        enrolment (django_otp.TOTPDevice.config_url reads user.get_username())
+        — a first-name-only label like "sukhada" doesn't identify the
+        account as clearly as the full email does, especially with several
+        staff enrolled.
+        """
+        from allauth.account.utils import user_email, user_username
+
+        user_username(user, user_email(user))
+
     def get_login_redirect_url(self, request):
         """
         Where to send a user immediately after login, when they didn't
