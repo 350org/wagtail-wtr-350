@@ -12,6 +12,12 @@ relative paths (not full URLs), so they resolve correctly once the bytes
 exist at the same path in whichever bucket is currently active -- no
 database changes are made or needed.
 
+Applies the destination environment's AWS_S3_DEFAULT_ACL (read from
+settings.STORAGES["default"]["OPTIONS"]["default_acl"]) to every copied
+object, same as a normal upload through the app would get -- required for
+providers like Divio's Object Storage, whose objects are private unless
+individually given a public-read ACL (see production.py).
+
 Run this ON the environment whose *destination* bucket you want to fill
 (e.g. `divio app ssh live`, then run this command there) so it picks up
 that environment's current settings.STORAGES config automatically. The old
@@ -107,6 +113,9 @@ class Command(BaseCommand):
             config=_PATH_STYLE_CONFIG,
         )
 
+        dest_acl = dest_opts.get("default_acl")
+        put_kwargs = {"ACL": dest_acl} if dest_acl else {}
+
         self.stdout.write(f"Listing objects under '{prefix}' in '{old_bucket}'…")
         paginator = source_client.get_paginator("list_objects_v2")
         copied, skipped, failed = 0, 0, 0
@@ -133,7 +142,7 @@ class Command(BaseCommand):
 
                 try:
                     body = source_client.get_object(Bucket=old_bucket, Key=key)["Body"].read()
-                    dest_client.put_object(Bucket=dest_bucket, Key=key, Body=body)
+                    dest_client.put_object(Bucket=dest_bucket, Key=key, Body=body, **put_kwargs)
                     self.stdout.write(f"  copied: {key}")
                     copied += 1
                 except Exception as exc:  # noqa: BLE001 -- report and keep going

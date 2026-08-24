@@ -125,7 +125,34 @@ if _s3_bucket:
         "region_name": _s3_region,
         "custom_domain": _s3_custom_domain,
         "endpoint_url": _s3_endpoint_url,  # non-AWS S3-compatible providers (e.g. Divio Object Storage)
-        "querystring_auth": False,  # public read; all objects in this bucket are publicly accessible via direct URL
+        # Public read is achieved differently depending on how the bucket was
+        # provisioned:
+        #
+        # - A manually-provisioned AWS bucket (bin/provision.sh) blocks
+        #   public ACLs and grants public read via an explicit bucket policy
+        #   instead (its "Apply bucket policy" step) — no per-object ACL
+        #   needed, so AWS_S3_DEFAULT_ACL should stay unset there (sending an
+        #   ACL header to a bucket that blocks public ACLs is a hard error).
+        # - Divio's "Object Storage" service does the opposite: its
+        #   documentation (docs.divio.com/how-to/interact-storage/) says
+        #   objects are private by default and must be given the
+        #   'public-read' ACL individually, and confirms its credentials
+        #   don't grant s3:PutBucketPolicy/PutPublicAccessBlock (verified
+        #   directly — that call returns AccessDenied). Set
+        #   AWS_S3_DEFAULT_ACL=public-read there; django-storages then sends
+        #   an ACL header on every upload automatically.
+        "default_acl": os.environ.get("AWS_S3_DEFAULT_ACL") or None,
+        # Alternative to the ACL approach above, for a bucket that supports
+        # neither a public bucket policy nor public ACLs: presigned URLs need
+        # only s3:GetObject on our own credentials. Off by default since
+        # every provider this project currently targets supports one of the
+        # two options above.
+        "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "false").lower() in ("true", "1", "yes"),
+        # Only takes effect when querystring_auth is True. Matches the
+        # CacheControl max-age below so a signed URL stays valid at least as
+        # long as a client/CDN might cache the page embedding it — a signed
+        # URL that outlives its own page's cache window would 403 on reuse.
+        "querystring_expire": _aws_expiry,
         # "path" (not virtual-hosted, boto3's default) works for every bucket
         # name, including ones containing a dot (e.g. "example.com") — a
         # dotted bucket name breaks HTTPS virtual-hosted-style addressing,
