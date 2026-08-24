@@ -9,10 +9,27 @@ import_350_blog.py and import_350_press_releases.py.
 """
 
 import os
+import re
 import uuid
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+
+# WordPress rewrites <img src> to a scaled rendition of the original upload
+# (e.g. "photo-700x560.jpg") sized for its theme's display context; the
+# unscaled original is almost always still hosted alongside it at the
+# un-suffixed filename (e.g. "photo.jpg"). Matches that "-WIDTHxHEIGHT"
+# suffix so we can strip it and import the original instead.
+_WP_SCALED_IMAGE_RE = re.compile(r"^(?P<base>.+)-\d+x\d+(?P<ext>\.[A-Za-z0-9]+)$")
+
+
+def _full_size_wp_image_url(url):
+    """Strip WordPress's "-WIDTHxHEIGHT" scaled-image suffix from a URL's path, if present."""
+    parsed = urlparse(url)
+    match = _WP_SCALED_IMAGE_RE.match(parsed.path)
+    if not match:
+        return url
+    return parsed._replace(path=match.group("base") + match.group("ext")).geturl()
 
 
 def resolve_blogs_target(stderr, style, target_slug):
@@ -137,18 +154,26 @@ def download_image(session, url, stdout, dry_run=False):
     # Deferred import to avoid import-time DB access.
     from wtrx.images import CustomImage
 
-    filename = os.path.basename(urlparse(url).path) or "imported-image"
+    full_url = _full_size_wp_image_url(url)
+    filename = os.path.basename(urlparse(full_url).path) or "imported-image"
     existing = CustomImage.objects.filter(title=filename).first()
     if existing:
         return existing
 
     if dry_run:
-        stdout.write(f"    [dry-run] would download image: {url}")
+        stdout.write(f"    [dry-run] would download image: {full_url}")
         return None
 
     from django.core.files.uploadedfile import SimpleUploadedFile
 
-    resp = session.get(url, timeout=30)
+    resp = session.get(full_url, timeout=30)
+    if resp.status_code == 404 and full_url != url:
+        # Rare: the unscaled original isn't hosted (e.g. deleted after WP's
+        # "big image threshold" processing) — fall back to the scaled copy
+        # actually linked in the post content rather than failing the import.
+        full_url = url
+        filename = os.path.basename(urlparse(url).path) or "imported-image"
+        resp = session.get(url, timeout=30)
     resp.raise_for_status()
     uploaded = SimpleUploadedFile(filename, resp.content)
     image = CustomImage(title=filename, file=uploaded)
