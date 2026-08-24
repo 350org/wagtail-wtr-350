@@ -752,15 +752,39 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
         return None
 
     def get_context(self, request, *args, **kwargs):
+        from wtrx.templatetags.wtrx_tags import page_as_card
+
         ctx = super().get_context(request, *args, **kwargs)
+        parent = self.get_parent().specific
         ctx["hero"] = self.get_banner_hero_context(
             author=self.author_display,
             published_at=self.published_at,
+            tag=parent.title,
         )
+
+        # "Related blogs" — the 3 most recent other live/public posts under
+        # this post's own Blogs parent, per Figma's fixed (non-editor-
+        # configurable) section at the bottom of every post. Same card
+        # conversion PageCardsBlock/Blogs.get_context() use.
+        related = (
+            Post.objects.child_of(parent)
+            .live()
+            .public()
+            .exclude(pk=self.pk)
+            .order_by("-published_at")[:3]
+        )
+        related_posts = []
+        for post in related:
+            card = page_as_card(post)
+            card["date"] = post.published_at
+            related_posts.append(card)
+        ctx["related_posts"] = related_posts
+        ctx["parent_page"] = parent
+
         return ctx
 
 
-class Blogs(BasePage):
+class Blogs(BasePage, HeroMixin):
     """
     Post listing page — covers both blog posts and press releases, since
     Post itself covers both (see PLAN.md).
@@ -772,20 +796,15 @@ class Blogs(BasePage):
     categories (e.g. a press-release-only Blogs page) — see get_context().
     Unlike the generic IndexPage (which lists any child page type, ordered
     by title), this is specific to Post and its date/category semantics.
+
+    Uses HeroMixin's "banner" default variant (per Figma's "Blog" hero) —
+    hero_headline/hero_copy cover what a separate "intro" field used to,
+    so there's no dedicated intro field here.
     """
 
     template = "wtrx/pages/blogs_page.html"
 
-    intro = RichTextField(
-        blank=True,
-        features=RICHTEXT_FEATURES_INLINE,
-        verbose_name=_("intro"),
-        help_text=_("Optional introductory text displayed above the post listing."),
-    )
-
-    content_panels = Page.content_panels + [
-        FieldPanel("intro"),
-    ]
+    content_panels = Page.content_panels + HeroMixin.hero_panels
 
     promote_panels = BasePage.promote_panels
 
@@ -809,6 +828,7 @@ class Blogs(BasePage):
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
+        ctx["hero"] = self.get_hero_context()
 
         posts_qs = Post.objects.child_of(self).live().public().order_by("-published_at")
 
@@ -835,7 +855,16 @@ class Blogs(BasePage):
         except EmptyPage:
             posts = paginator.page(paginator.num_pages)
 
+        from wtrx.templatetags.wtrx_tags import page_as_card
+
+        cards = []
+        for post in posts:
+            card = page_as_card(post)
+            card["date"] = post.published_at
+            cards.append(card)
+
         ctx["posts"] = posts
+        ctx["cards"] = cards
         ctx["paginator"] = paginator
         ctx["categories"] = available_categories
         ctx["selected_category"] = selected_category

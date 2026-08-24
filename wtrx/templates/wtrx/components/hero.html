@@ -14,6 +14,15 @@
     banner_color  — one of CALLOUT_COLOR_CHOICES. "banner" variant only.
     cta           — optional HeroCTABlock stream value (0 or 1 items: signup/donate/announcement).
                     "full" variant only — "banner" never renders one.
+    tag           — optional small pill label above the headline (e.g. Post's
+                    parent Blogs page title, "Blog"). "banner" variant only.
+    author/published_at — optional, set only by Post via BannerHeroMixin's
+                    **extra (see get_banner_hero_context callers). Presence of
+                    published_at switches the "banner" variant to its compact
+                    Post styling: date above the headline at a smaller size
+                    (text-40 instead of text-64) and the author name below it,
+                    per Figma's "Content Hero" instance on the Blog Post
+                    mockups vs. the larger plain instance on About/etc.
 
   variant switch:
     - "full": the original full-viewport hero — background video/image
@@ -72,23 +81,31 @@
             <div class="grid flex-1 grid-cols-1 md:grid-cols-2 md:items-stretch">
 
                 {# Left column — text content #}
-                <div class="relative z-10 flex flex-col justify-center gap-3 px-6 py-10 sm:px-10 sm:py-12
+                <div class="relative z-10 flex flex-col justify-center gap-3 px-6 py-10 sm:px-10 sm:py-12 lg:px-32 lg:py-16
                             {% if hero.banner_color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
-                    <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-64">
+                    {% if hero.tag %}
+                        <span class="inline-flex w-fit items-center gap-2 rounded-full px-4 py-2 font-heading text-base font-bold
+                                     {% if hero.banner_color == 'light-grey' %}bg-dark/10{% else %}bg-white/10{% endif %}">
+                            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden="true"></span>
+                            {{ hero.tag }}
+                        </span>
+                    {% endif %}
+                    {% comment %}
+                    hero.published_at is only ever set by Post (via BannerHeroMixin's
+                    get_banner_hero_context()'s **extra) — every other "banner" hero
+                    producer (ContentPage/IndexPage's HeroMixin, HeroBlock) leaves it
+                    unset, so this compact date/40px-headline/author layout only ever
+                    applies to Post, per Figma's smaller "Content Hero" instance there.
+                    {% endcomment %}
+                    {% if hero.published_at %}
+                        <p class="text-sm">{{ hero.published_at|date:"F j, Y" }}</p>
+                    {% endif %}
+                    <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl
+                               {% if hero.published_at %}lg:text-40{% else %}lg:text-64{% endif %}">
                         {{ hero.headline }}
                     </h1>
-                    {% if hero.author or hero.published_at %}
-                        {% comment %}
-                        Only Post's get_context() sets these two keys (via
-                        BannerHeroMixin.get_banner_hero_context()'s **extra) — every other
-                        "banner" hero producer (ContentPage/IndexPage's HeroMixin,
-                        HeroBlock) leaves both unset, so this is silently skipped for them.
-                        {% endcomment %}
-                        <p class="text-sm font-medium opacity-80">
-                            {% if hero.author %}{% blocktrans with author=hero.author %}By {{ author }}{% endblocktrans %}{% endif %}
-                            {% if hero.author and hero.published_at %}&middot;{% endif %}
-                            {% if hero.published_at %}{{ hero.published_at|date:"F j, Y" }}{% endif %}
-                        </p>
+                    {% if hero.published_at and hero.author %}
+                        <p class="text-sm font-bold">{{ hero.author }}</p>
                     {% endif %}
                     {% if hero.copy %}
                         {% comment %}

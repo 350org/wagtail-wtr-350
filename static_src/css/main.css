@@ -92,6 +92,7 @@ html {
 @utility wtr-btn-lg {
     padding: 1.5rem 2.25rem;
     font-size: 1.5rem;
+    border-width: 4px;
 }
 
 /*
