@@ -1,4 +1,4 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db quickstart
+.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db import-media quickstart
 
 help:
 	@echo "Available commands:"
@@ -20,6 +20,7 @@ help:
 	@echo "  make provision SITE=x ENV=y      - Provision AWS S3 bucket + IAM user (ENV: staging|production)"
 	@echo "                 [PROFILE=p]         Optional: AWS CLI profile (default: default)"
 	@echo "  make import-db BACKUP=path       - Restore a Postgres backup into local dev (DB=name, --force via FORCE=1)"
+	@echo "  make import-media BACKUP=path    - Import an object storage media backup into local dev (--force via FORCE=1)"
 
 venv:
 	python3 -m venv .venv
@@ -97,5 +98,9 @@ provision:
 import-db:
 	@if [ -z "$(BACKUP)" ]; then echo "Error: BACKUP is required. Usage: make import-db BACKUP=path/to/dump.dump"; exit 1; fi
 	@bash bin/import_db.sh "$(BACKUP)" $(if $(DB),"$(DB)") $(if $(FORCE),--force)
+
+import-media:
+	@if [ -z "$(BACKUP)" ]; then echo "Error: BACKUP is required. Usage: make import-media BACKUP=path/to/media-backup"; exit 1; fi
+	@bash bin/import_media.sh "$(BACKUP)" $(if $(FORCE),--force)
 
 ENV ?= production
