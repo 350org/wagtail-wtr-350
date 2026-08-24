@@ -1,10 +1,29 @@
 import os
+import re
 from urllib.parse import unquote, urlparse
 
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401, F403
+
+# Matches AWS S3's own hostname convention (".s3.amazonaws.com",
+# ".s3.us-east-1.amazonaws.com", ".s3-us-east-1.amazonaws.com", ...) so the
+# bucket/endpoint split below works even when the bucket name itself
+# contains a dot (e.g. a bucket literally named "example.com") — a plain
+# "split on the first dot" would wrongly cut such a bucket name in half.
+_AWS_S3_HOST_ANCHOR_RE = re.compile(r"\.s3[.-]")
+
+
+def _split_bucket_and_endpoint(hostname):
+    match = _AWS_S3_HOST_ANCHOR_RE.search(hostname)
+    if match:
+        return hostname[: match.start()], hostname[match.start() + 1 :]
+    # Non-AWS S3-compatible provider (e.g. "bucket.region.endpoint") — no
+    # reliable anchor, so fall back to a first-dot split. Only correct when
+    # the bucket name itself has no embedded dot.
+    bucket, sep, endpoint_host = hostname.partition(".")
+    return (bucket, endpoint_host) if sep else (None, None)
 
 
 def _s3_settings_from_dsn(dsn):
@@ -25,6 +44,14 @@ def _s3_settings_from_dsn(dsn):
     S3-compatible providers, and getting it wrong risks a signature
     validation error that's confusing to debug. If your provider needs a
     specific region for signing, set AWS_S3_REGION_NAME explicitly.
+
+    Also deliberately does NOT set AWS_S3_CUSTOM_DOMAIN — django-storages
+    concatenates custom_domain directly with "/{key}" (see its url()
+    method), so a virtual-hosted-style value here (bucket baked into the
+    domain) would break exactly like the raw DSN host would for a bucket
+    name containing a dot. Leaving it unset lets django-storages generate
+    URLs itself via boto3, which correctly respects AWS_S3_ADDRESSING_STYLE
+    (see the "path" default set below) for any bucket name.
     """
     parsed = urlparse(dsn)
     if parsed.scheme != "s3":
@@ -32,11 +59,10 @@ def _s3_settings_from_dsn(dsn):
             f"Unsupported DEFAULT_STORAGE_DSN scheme {parsed.scheme!r} — only s3:// is "
             "supported (Divio's Azure-backed storage isn't)."
         )
-    hostname = parsed.hostname or ""
-    bucket, sep, endpoint_host = hostname.partition(".")
-    if not sep:
+    bucket, endpoint_host = _split_bucket_and_endpoint(parsed.hostname or "")
+    if bucket is None:
         raise ImproperlyConfigured(
-            f"DEFAULT_STORAGE_DSN host {hostname!r} doesn't look like "
+            f"DEFAULT_STORAGE_DSN host {parsed.hostname!r} doesn't look like "
             "'<bucket>.<endpoint>' (e.g. 'mybucket.s3.amazonaws.com')."
         )
     return {
@@ -44,7 +70,6 @@ def _s3_settings_from_dsn(dsn):
         "AWS_ACCESS_KEY_ID": unquote(parsed.username) if parsed.username else "",
         "AWS_SECRET_ACCESS_KEY": unquote(parsed.password) if parsed.password else "",
         "AWS_S3_ENDPOINT_URL": f"https://{endpoint_host}",
-        "AWS_S3_CUSTOM_DOMAIN": hostname,
     }
 
 
@@ -145,6 +170,13 @@ if _s3_bucket:
         "custom_domain": _s3_custom_domain,
         "endpoint_url": _s3_endpoint_url,  # non-AWS S3-compatible providers (e.g. Divio Object Storage)
         "querystring_auth": False,  # public read; all objects in this bucket are publicly accessible via direct URL
+        # "path" (not virtual-hosted, boto3's default) works for every bucket
+        # name, including ones containing a dot (e.g. "example.com") — a
+        # dotted bucket name breaks HTTPS virtual-hosted-style addressing,
+        # since it produces a hostname like "example.com.s3.amazonaws.com"
+        # that AWS's own wildcard cert (*.s3.amazonaws.com) doesn't cover,
+        # causing an SSL validation error on every request.
+        "addressing_style": os.environ.get("AWS_S3_ADDRESSING_STYLE", "path"),
     }
     if os.environ.get("AWS_ACCESS_KEY_ID"):
         _secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
@@ -172,13 +204,17 @@ if _s3_bucket:
     # NOTE: static files are intentionally NOT placed on S3. STORAGES["staticfiles"]
     # keeps its WhiteNoise default (set above), and STATIC_URL keeps its local
     # default from base.py. Only media (STORAGES["default"]) uses S3.
-
-    _s3_base_url = (
-        f"https://{_s3_custom_domain}"
-        if _s3_custom_domain
-        else f"https://{_s3_bucket}.s3.{_s3_region}.amazonaws.com"
-    )
-    MEDIA_URL = f"{_s3_base_url}/media/"  # noqa: F405
+    #
+    # settings.MEDIA_URL is NOT set here (base.py's "/media/" default is left
+    # as-is) — it's vestigial for S3-backed media: urls.py only ever consumes
+    # it inside `if settings.DEBUG`, which production never is, and Wagtail's
+    # own image rendering calls the storage instance's .url() directly
+    # (django-storages' S3Storage.url(), which — since AWS_S3_CUSTOM_DOMAIN is
+    # unset above — builds the URL itself via boto3, correctly respecting
+    # addressing_style for any bucket name). A hand-built MEDIA_URL here would
+    # just be a second, easy-to-drift copy of that same logic — see git log
+    # for a prior version of this file that got the dotted-bucket-name case
+    # wrong by doing exactly that.
 
 # ---------------------------------------------------------------------------
 # Email / SMTP (optional — omit EMAIL_HOST to fall back to console backend)

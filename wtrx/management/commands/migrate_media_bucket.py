@@ -33,9 +33,17 @@ so an interrupted run can simply be repeated.
 """
 
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+
+# "path" (not virtual-hosted, boto3's default) works for every bucket name,
+# including ones containing a dot (e.g. "example.com") — a dotted bucket
+# name breaks HTTPS virtual-hosted-style addressing (produces a hostname
+# like "example.com.s3.amazonaws.com" that AWS's own wildcard cert doesn't
+# cover) — see production.py's matching AWS_S3_ADDRESSING_STYLE default.
+_PATH_STYLE_CONFIG = Config(s3={"addressing_style": "path"})
 
 
 class Command(BaseCommand):
@@ -88,6 +96,7 @@ class Command(BaseCommand):
             aws_secret_access_key=options["old_secret_key"],
             region_name=options["old_region"],
             endpoint_url=options["old_endpoint_url"],
+            config=_PATH_STYLE_CONFIG,
         )
         dest_client = boto3.client(
             "s3",
@@ -95,6 +104,7 @@ class Command(BaseCommand):
             aws_secret_access_key=dest_opts.get("secret_key") or None,
             region_name=dest_opts.get("region_name") or "us-east-1",
             endpoint_url=dest_opts.get("endpoint_url") or None,
+            config=_PATH_STYLE_CONFIG,
         )
 
         self.stdout.write(f"Listing objects under '{prefix}' in '{old_bucket}'…")
