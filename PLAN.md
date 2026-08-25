@@ -376,7 +376,8 @@ more than one signup variant can be available to editors at once.
 - **Inherits**: BasePage + HeroMixin
 - **Fields**: body (BodyStreamBlock), use_transparent_header (BooleanField)
 - **Template**: `pages/home_page.html`
-- **Parent**: Root (Site root page)
+- **Parent**: Root (Site root page) or another HomePage (country/region
+  sub-home, e.g. `/canada`). Not allowed under ContentPage or IndexPage.
 - **Notes**: Hero at top (from HeroMixin), StreamField body below.
   `use_transparent_header=True` makes the header `position:absolute` so the hero
   image extends behind it; automatically uses `BrandingSEOSettings.dark_logo` if set.

@@ -18,7 +18,7 @@ uses) per Figma's Post body text frame width.
 {% block content %}
 <div class="space-y-32">
 {% for block in page.body %}
-    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "image" %}
+    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "image" or block.block_type == "page_cards" %}
         {% include_block block %}
     {% else %}
         <div class="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8">
@@ -29,21 +29,26 @@ uses) per Figma's Post body text frame width.
 </div>
 
 {% comment %}
-"Related blogs" — fixed (non-editor-configurable) section on every post,
-per Figma's Frame 5922. Not a StreamField block since it always appears
-and its content (posts, heading/subheading copy) isn't editor-authored —
-see Post.get_context() for the related_posts query.
+"Related <posts>" — fixed (non-block) section on every post, per Figma's
+Frame 5922. Not a StreamField block since it always appears and its posts
+aren't editor-authored. The heading/button copy adapts to the Blogs page
+this post lives under ("Related blogs" vs "Related press releases") and
+the subheading comes from that page's related_intro / header copy — see
+Post.get_context() and Blogs.post_label / Blogs.get_related_intro().
 {% endcomment %}
 {% if related_posts %}
-    <div class="mx-auto mt-32 max-w-[1346px] px-4 sm:px-6 lg:px-8">
+    <div class="mt-32 w-full px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-[1346px]">
         <div class="wtr-related-posts flex flex-col items-center gap-8 rounded-2xl bg-dark px-8 py-12 text-center sm:px-16 sm:py-16">
             <div class="mx-auto flex max-w-3xl flex-col items-center gap-[21px]">
                 <h2 class="font-heading text-4xl font-bold tracking-tight text-light sm:text-5xl lg:text-8xl">
-                    {% trans "Related blogs" %}
+                    {{ related_heading }}
                 </h2>
-                <p class="max-w-[628px] text-lg text-light sm:text-xl lg:text-36">
-                    {% trans "News, stories, and insights from the global climate movement." %}
-                </p>
+                {% if related_intro %}
+                    <p class="max-w-[628px] text-lg text-light sm:text-xl lg:text-36">
+                        {{ related_intro }}
+                    </p>
+                {% endif %}
             </div>
             <div class="grid w-full grid-cols-1 gap-[30px] sm:grid-cols-2 lg:grid-cols-3">
                 {% for card in related_posts %}
@@ -52,13 +57,14 @@ see Post.get_context() for the related_posts query.
             </div>
             {% if parent_page %}
                 <a href="{{ parent_page.url }}" class="wtr-btn wtr-btn-outline-light wtr-btn-lg inline-flex items-center gap-2 hover:bg-white/10">
-                    {% trans "Read more blogs" %}
+                    {{ related_link_text }}
                     <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
                         <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </a>
             {% endif %}
         </div>
+    </div>
     </div>
 {% endif %}
 {% endblock %}

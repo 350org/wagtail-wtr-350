@@ -4,13 +4,23 @@
     HeroBlock.cta choice (see components/hero.html) — it picks the slim
     inline CTA wrapper (no image, no card, light-on-dark text sitting
     directly in the hero's own dark overlay) over the standalone image +
-    dark split panel card.
+    color split panel card.
 
-    _actionkit_form.html's own compact=True, by contrast, is passed in
-    BOTH branches below — the fetched form's fields always render as a
-    single wrapping inline row (see main.css's .wtr-actionkit-embed-inline),
-    never ActionKit's normal vertical stack, regardless of which wrapper
-    chrome this block itself is using.
+    The two branches pass different layout flags on to _actionkit_form.html:
+
+      - compact=True (hero CTA)     → inline=True: one wrapping row of pill
+                                      inputs with the submit button on the
+                                      same line, since the hero CTA is a
+                                      full-width strip with no room to stack.
+      - the standalone panel below  → stacked=True: a 370px column of
+                                      full-width fields, per Figma's Signup
+                                      component (node 1:1245). It used to
+                                      pass inline=True here too, which left
+                                      four fields squeezed onto one row
+                                      across the whole panel width instead
+                                      of the narrow stack the design draws.
+
+    See main.css's .wtr-actionkit-embed-inline / -stacked rules.
 {% endcomment %}
 {% if compact %}
     <div class="wtr-signup wtr-signup-actionkit wtr-signup-inline" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
@@ -22,20 +32,27 @@
                 {{ value.description|richtext }}
             </div>
         {% endif %}
-        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
+        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with inline=True %}
     </div>
 {% else %}
     {% comment %}
     Full-bleed width, matching donate_fundraiseup_block.html's w-full-outer /
     max-w-inner two-tier pattern — signup_actionkit is special-cased in
     content_page.html/home_page.html to skip the shared max-w-5xl wrapper,
-    so this owns its own width instead. max-w-[1330px] matches Figma's
-    signup-with-image frame width. No vertical padding on the w-full-outer
-    wrapper — the 128px gap between body blocks comes from the page
-    templates' space-y-32 on the block loop.
+    so this owns its own width instead. max-w-[1426px] is Figma's petition
+    panel width (node 1:1239); its 800px copy column + 128px gutter + 370px
+    form column sit inside that with the panel's own 64px padding. No
+    vertical padding on the w-full-outer wrapper — the 128px gap between
+    body blocks comes from the page templates' space-y-32 on the block loop.
+
+    background picks the panel fill only; the text, pill and form chrome are
+    light-on-color either way, so nothing else branches on it (contrast
+    feature_panel_block.html, whose light option really does invert).
     {% endcomment %}
     <div class="w-full px-4 sm:px-6 lg:px-8">
-        <div class="wtr-signup wtr-signup-actionkit mx-auto max-w-[1330px] overflow-hidden rounded-lg" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+        <div class="wtr-signup wtr-signup-actionkit mx-auto max-w-[1426px] overflow-hidden rounded-lg
+                    {% if value.background == 'red' %}bg-callout-red{% else %}bg-dark{% endif %}"
+             {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
             {% if value.image %}
                 <div class="relative">
                     {% image value.image fill-1600x500 as img %}
@@ -48,21 +65,38 @@
                     {% endif %}
                 </div>
             {% endif %}
-            <div class="bg-dark px-6 py-12 sm:px-10 sm:py-16">
-                <div class="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 md:grid-cols-2">
-                    <div class="text-light">
-                        {% if value.heading %}
-                            <h2 class="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">{{ value.heading }}</h2>
-                        {% endif %}
-                        {% if value.description %}
-                            <div class="prose prose-invert mt-4 max-w-none">
-                                {{ value.description|richtext }}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div>
-                        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with compact=True %}
-                    </div>
+            {% comment %}
+            The two columns are bottom-aligned (lg:items-end) and sized to
+            Figma exactly — 800px of copy, a 128px gutter, a 370px form that
+            never grows or shrinks. A plain 2-col grid split them 50/50 and
+            centred them vertically, which stretched the form to ~460px and
+            left the copy's last bullet floating well above the panel floor.
+            {% endcomment %}
+            <div class="flex flex-col gap-10 p-6 sm:p-10 lg:flex-row lg:items-end lg:justify-center lg:gap-32 lg:p-16">
+                <div class="flex flex-col items-start gap-8 text-light lg:max-w-[800px] lg:flex-1">
+                    {% if value.eyebrow %}
+                        {# Same dark pill as feature_panel_block.html's eyebrow, at Figma's 24px. #}
+                        <p class="wtr-signup-eyebrow font-heading inline-block rounded-full bg-dark px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] text-light sm:text-lg lg:text-2xl">
+                            {{ value.eyebrow }}
+                        </p>
+                    {% endif %}
+                    {% if value.heading %}
+                        <h2 class="font-heading text-3xl font-bold leading-[1.2] tracking-tight sm:text-4xl lg:text-64">{{ value.heading }}</h2>
+                    {% endif %}
+                    {% if value.description %}
+                        {% comment %}
+                        [--tw-prose-invert-body:var(--color-light)] overrides Typography's
+                        default prose-invert body color (a muted ~87%-lightness gray) to
+                        pure white — same fix callout_block.html applies, for the same
+                        reason. Figma sets this copy at 24px/1.2.
+                        {% endcomment %}
+                        <div class="prose prose-invert max-w-none text-lg leading-[1.2] [--tw-prose-invert-body:var(--color-light)] sm:text-xl lg:text-2xl">
+                            {{ value.description|richtext }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="w-full lg:w-[370px] lg:shrink-0">
+                    {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with stacked=True %}
                 </div>
             </div>
         </div>

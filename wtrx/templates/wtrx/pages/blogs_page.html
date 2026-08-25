@@ -5,8 +5,23 @@
     {% include "wtrx/components/hero.html" %}
 {% endblock %}
 
+{% comment %}
+Two-tier width: the outer div only provides mobile-edge gutters (w-full +
+responsive px-*); the inner div carries the exact max-w-[1218px] Figma
+content width on its own, with no padding of its own eating into it —
+same pattern as callout_block.html's w-full-outer / max-w-inner split.
+Stacking px-* and max-w-* on the SAME element (as an earlier version of
+this template did) subtracts the padding from the 1218 target instead of
+sitting outside it, squeezing the card grid narrower than Figma.
+
+No pt/pb here — base.html's <main class="my-32"> already gives every page
+the standard 128px gap above/below {% block content %}, same as content_
+page.html/home_page.html/post_page.html rely on. Adding pt-32 pb-16 here
+too just doubled it.
+{% endcomment %}
 {% block content %}
-<div class="mx-auto max-w-[1218px] px-4 pt-32 pb-16 sm:px-6 lg:px-8">
+<div class="w-full px-4 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1218px]">
 
     {% if categories %}
         <div class="flex flex-wrap items-center gap-4">
@@ -40,5 +55,6 @@
         <p class="mt-10 text-neutral-600">{% trans "No posts found." %}</p>
     {% endif %}
 
+</div>
 </div>
 {% endblock %}

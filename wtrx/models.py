@@ -6,6 +6,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
 from django.http import JsonResponse
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
@@ -437,6 +438,14 @@ class HomePage(BasePage, HeroMixin):
     The only page type using HeroMixin's "full" hero variant (see
     HeroMixin.hero_variant) — every other page type gets the compact
     "banner" variant instead.
+
+    A HomePage may also be nested under another HomePage. That is the
+    country/region sub-home pattern (350.org/canada, 350.org/africa): a
+    landing page that is structurally a home page — full-viewport hero with
+    its own CTA, self-contained campaign body — rather than an article. It
+    is deliberately *only* allowed under another HomePage, not under
+    ContentPage or IndexPage, so "home page" keeps meaning "top of a site or
+    of a region" instead of becoming a general-purpose page type.
     """
 
     template = "wtrx/pages/home_page.html"
@@ -479,8 +488,9 @@ class HomePage(BasePage, HeroMixin):
         ]
     )
 
-    parent_page_types = ["wagtailcore.Page"]
+    parent_page_types = ["wagtailcore.Page", "wtrx.HomePage"]
     subpage_types = [
+        "wtrx.HomePage",
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
@@ -760,12 +770,18 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             author=self.author_display,
             published_at=self.published_at,
             tag=parent.title,
+            tag_url=parent.url,
         )
 
-        # "Related blogs" — the 3 most recent other live/public posts under
+        # "Related <posts>" — the 3 most recent other live/public posts under
         # this post's own Blogs parent, per Figma's fixed (non-editor-
         # configurable) section at the bottom of every post. Same card
         # conversion PageCardsBlock/Blogs.get_context() use.
+        #
+        # Headings adapt to whichever Blogs page this post lives under, so a
+        # post under "Press Releases" reads "Related press releases" /
+        # "Read more press releases" with no per-page configuration — see
+        # Blogs.post_label / Blogs.get_related_intro().
         related = (
             Post.objects.child_of(parent)
             .live()
@@ -780,6 +796,12 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             related_posts.append(card)
         ctx["related_posts"] = related_posts
         ctx["parent_page"] = parent
+        label = getattr(parent, "post_label", None) or _("posts")
+        ctx["related_heading"] = _("Related %(label)s") % {"label": label}
+        ctx["related_link_text"] = _("Read more %(label)s") % {"label": label}
+        ctx["related_intro"] = (
+            parent.get_related_intro() if hasattr(parent, "get_related_intro") else ""
+        )
 
         return ctx
 
@@ -800,11 +822,26 @@ class Blogs(BasePage, HeroMixin):
     Uses HeroMixin's "banner" default variant (per Figma's "Blog" hero) —
     hero_headline/hero_copy cover what a separate "intro" field used to,
     so there's no dedicated intro field here.
+
+    Also supplies the copy for the "Related <posts>" section at the bottom
+    of each of its child posts (see Post.get_context()), so that section
+    adapts to the index page a post lives under instead of always saying
+    "blogs".
     """
 
     template = "wtrx/pages/blogs_page.html"
 
-    content_panels = Page.content_panels + HeroMixin.hero_panels
+    related_intro = models.TextField(
+        blank=True,
+        verbose_name=_("related posts intro"),
+        help_text=_(
+            "Supporting copy under the \"Related …\" heading at the bottom of "
+            "each post under this page. Falls back to this page's header copy "
+            "when blank."
+        ),
+    )
+
+    content_panels = Page.content_panels + HeroMixin.hero_panels + [FieldPanel("related_intro")]
 
     promote_panels = BasePage.promote_panels
 
@@ -825,6 +862,35 @@ class Blogs(BasePage, HeroMixin):
     class Meta:
         verbose_name = _("Blogs")
         verbose_name_plural = _("Blogs")
+
+    @property
+    def post_label(self):
+        """
+        Lowercase plural noun for this page's posts, used to build the
+        "Related …" / "Read more …" headings on each child Post (see
+        Post.get_context()). Derived from the page title so a "Press
+        Releases" page reads "press releases" and a "Blog" page reads
+        "blogs" with nothing for an editor to configure — pluralisation is
+        deliberately naive (append "s" unless the title already ends in
+        one), since the title is the only signal available.
+        """
+        label = self.title.strip().lower()
+        if not label:
+            return ""
+        if not label.endswith("s"):
+            label = f"{label}s"
+        return label
+
+    def get_related_intro(self):
+        """
+        Supporting copy for a child Post's "Related …" section: the
+        editor-set related_intro, else this page's own header copy with
+        markup stripped (hero_copy is a RichTextField, the section renders
+        plain text), else "".
+        """
+        if self.related_intro:
+            return self.related_intro
+        return strip_tags(self.hero_copy or "").strip()
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)

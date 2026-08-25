@@ -295,6 +295,158 @@ html {
 }
 
 /* ============================================================
+ * ActionKit stacked embed override — .wtr-actionkit-embed-stacked
+ * ============================================================
+ *
+ * The standalone signup panel's form column (signup_actionkit_block.html's
+ * non-compact branch). Same fetched ActionKit markup as the inline variant
+ * above — see that block comment for the selector archaeology, all of which
+ * applies here too — laid out as Figma's Signup component (node 1:1245)
+ * instead: a 370px column of full-width fields, one per row, with a
+ * full-width submit button below them and the privacy fine print in a dark
+ * box at the bottom.
+ *
+ * The field chrome differs from the inline variant in one structural way:
+ * the bordered, filled box is the .input-text/.input-select *wrapper*, not
+ * the <input> — so the field's label sits inside the box above its own
+ * input, per Figma, rather than floating above the box in the panel's own
+ * text color. The input itself is stripped to a transparent, borderless
+ * line inside that box.
+ *
+ * #action-form's !important is required for the same reason as inline: the
+ * fetched fragment hard-codes style="display: block" on the element.
+ * ============================================================ */
+.wtr-actionkit-embed-stacked #action-header,
+.wtr-actionkit-embed-stacked #recent-actions,
+.wtr-actionkit-embed-stacked #known_user {
+    display: none;
+}
+
+.wtr-actionkit-embed-stacked #action-form {
+    display: flex !important;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.wtr-actionkit-embed-stacked #unknown_user,
+.wtr-actionkit-embed-stacked .user-form {
+    display: contents;
+}
+
+.wtr-actionkit-embed-stacked .input-text,
+.wtr-actionkit-embed-stacked .input-select {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--color-neutral-50);
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-button);
+}
+
+.wtr-actionkit-embed-stacked .input-text > label,
+.wtr-actionkit-embed-stacked .input-select > label {
+    display: block;
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 0.625rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-dark);
+}
+
+.wtr-actionkit-embed-stacked .ak-userfield-input,
+.wtr-actionkit-embed-stacked select {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background-color: transparent;
+    color: var(--color-dark);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+}
+
+.wtr-actionkit-embed-stacked .input-wrapper.input-submit {
+    margin: 0;
+}
+
+.wtr-actionkit-embed-stacked button[type='submit'],
+.wtr-actionkit-embed-stacked input[type='submit'] {
+    width: 100%;
+    padding: 1rem;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.3px;
+    text-align: center;
+    color: var(--color-light);
+    background-color: var(--color-primary);
+    border: 2px solid transparent;
+    border-radius: var(--radius-button);
+    cursor: pointer;
+}
+
+/* Fine print sits in its own dark box below the button, per Figma — the
+ * panel behind it can be red, where the inline variant's plain 80%-opacity
+ * white text would read as washed out rather than as deliberate fine print. */
+.wtr-actionkit-embed-stacked .general-privacy-notice {
+    padding: 1rem;
+    background-color: var(--color-dark);
+    border-radius: var(--radius-button);
+    font-size: 0.625rem;
+    line-height: 1.6;
+    color: var(--color-light);
+}
+
+.wtr-actionkit-embed-stacked .general-privacy-notice a {
+    color: var(--color-primary-50);
+    text-decoration: underline;
+}
+
+/* ============================================================
+ * Rich text block headings — .wtr-text-block
+ * ============================================================
+ * Used by text_block.html. Tailwind Typography sizes headings relative to
+ * the prose body (h2 = 1.5em → ~36px here), but Figma sets a section
+ * heading at 64px and a sub-heading at 40px regardless of the body size
+ * around it — the same steps CardGridBlock, ImageTextBlock and the hero's
+ * own heading fields use. Without this, the same heading rendered from a
+ * rich text block came out visibly smaller than one typed into a block's
+ * heading field.
+ *
+ * The element selector (not `:where(h2)`) is deliberate: it outranks
+ * Typography's 0,1,0 `:where(h2):not(...)` rule, which the equivalent
+ * prose-h2:* utilities tie with and then lose to on source order.
+ * ============================================================ */
+.wtr-text-block h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-3xl);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+
+.wtr-text-block h3 {
+    font-family: var(--font-heading);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+
+@media (width >= 40rem) {
+    .wtr-text-block h2 {
+        font-size: var(--text-4xl);
+    }
+}
+
+@media (width >= 64rem) {
+    .wtr-text-block h2 {
+        font-size: var(--text-64);
+    }
+
+    .wtr-text-block h3 {
+        font-size: var(--text-40);
+    }
+}
+
+/* ============================================================
  * Quote image-overlay "highlighter" text — .wtr-quote-highlight
  * ============================================================
  * Used by quote_block.html: text sits directly on the photo with a tight
