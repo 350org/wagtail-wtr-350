@@ -315,6 +315,15 @@ class BrandingSEOSettings(BaseSiteSetting):
         verbose_name=_("site description"),
         help_text=_("Default meta description for the site."),
     )
+    twitter_site = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name=_("Twitter/X account"),
+        help_text=_(
+            "The @username of the site's Twitter/X account, e.g. @350. "
+            "Used in the twitter:site meta tag on every page."
+        ),
+    )
 
     panels = [
         MultiFieldPanel(
@@ -322,7 +331,11 @@ class BrandingSEOSettings(BaseSiteSetting):
             heading=_("Logos"),
         ),
         MultiFieldPanel(
-            [FieldPanel("default_meta_image"), AIDescriptionFieldPanel("site_description")],
+            [
+                FieldPanel("default_meta_image"),
+                AIDescriptionFieldPanel("site_description"),
+                FieldPanel("twitter_site"),
+            ],
             heading=_("SEO defaults"),
         ),
     ]

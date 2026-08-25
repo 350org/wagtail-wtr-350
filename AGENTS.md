@@ -838,6 +838,20 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     clobbered). `python manage.py backfill_first_published` repairs content
     imported before this was in place.
 
+33. **`WTRX_GOOGLE_SSO_ONLY` hides the login form, it doesn't disable password
+    auth**: Setting this env var to hide the username/password fields (see
+    `templates/wagtailadmin/login.html` and
+    `wtrx.context_processors.google_sso`) is a UI-only change — the `login_form`/
+    `submit_buttons` blocks are conditionally emptied client-side of the
+    server, but `AUTHENTICATION_BACKENDS` still includes `ModelBackend`, so a
+    direct POST to `/admin/login/` with valid credentials still authenticates.
+    This is deliberate (a superuser fallback if Google SSO is ever
+    misconfigured), not a bug to fix. `google_sso_only` in the context
+    processor is always `False` when `google_sso_enabled` is `False`,
+    regardless of the env var — never let a site end up with the password
+    form hidden and Google not actually configured, which would lock
+    everyone out.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive branch names: `feature/signup-block`,

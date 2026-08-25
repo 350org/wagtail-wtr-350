@@ -68,6 +68,15 @@ class BasePage(Page):
         verbose_name=_("hide from search"),
         help_text=_("Exclude this page from search results and the sitemap."),
     )
+    canonical_url = models.URLField(
+        blank=True,
+        verbose_name=_("canonical URL"),
+        help_text=_(
+            "Optional. Set if this page's content is duplicated elsewhere "
+            "and search engines should treat another URL as the primary "
+            "version. Defaults to this page's own URL."
+        ),
+    )
 
     # AI-assisted title panel, reused by every concrete page model below in
     # place of Page.content_panels (which is just [TitleFieldPanel("title")])
@@ -103,6 +112,7 @@ class BasePage(Page):
             [
                 FieldPanel("meta_image"),
                 FieldPanel("hide_from_search"),
+                FieldPanel("canonical_url"),
             ],
             heading=_("SEO"),
         ),

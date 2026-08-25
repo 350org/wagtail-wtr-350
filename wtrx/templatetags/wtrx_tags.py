@@ -1,7 +1,17 @@
-from django import template
-from django.utils.html import format_html
+import json
 
-from wtrx.site_settings import SOCIAL_PLATFORM_CHOICES, NavigationSettings
+from django import template
+from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.html import _json_script_escapes, format_html
+from django.utils.safestring import mark_safe
+from wagtail.models import Site
+
+from wtrx.site_settings import (
+    SOCIAL_PLATFORM_CHOICES,
+    BrandingSEOSettings,
+    NavigationSettings,
+    SocialSettings,
+)
 
 
 register = template.Library()
@@ -263,3 +273,53 @@ def page_as_card(page):
         "link_page": page,
         "link_url": None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Structured data (JSON-LD)
+# ---------------------------------------------------------------------------
+
+
+@register.simple_tag(takes_context=True)
+def organization_structured_data(context):
+    """
+    Render a <script type="application/ld+json"> Organization entry for
+    search engines (Google Knowledge Panel, sitelinks, etc.), built entirely
+    from existing Branding & SEO / Social settings data — no dedicated
+    structured-data fields to keep in sync.
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% organization_structured_data %}
+
+    Returns an empty string if there's no site to resolve for the request.
+    """
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    site = Site.find_for_request(request)
+    if site is None:
+        return ""
+
+    branding = BrandingSEOSettings.for_request(request)
+    social = SocialSettings.for_request(request)
+
+    data = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": site.site_name or site.hostname,
+        "url": request.build_absolute_uri("/"),
+    }
+    if branding.site_description:
+        data["description"] = branding.site_description
+    if branding.logo:
+        rendition = branding.logo.get_rendition("max-600x600")
+        data["logo"] = request.build_absolute_uri(rendition.url)
+
+    same_as = [item.value["url"] for item in social.social_links if item.value["url"]]
+    if same_as:
+        data["sameAs"] = same_as
+
+    json_str = json.dumps(data, cls=DjangoJSONEncoder).translate(_json_script_escapes)
+    return mark_safe(f'<script type="application/ld+json">{json_str}</script>')
