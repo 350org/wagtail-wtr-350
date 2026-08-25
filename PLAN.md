@@ -1005,6 +1005,9 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   is what enables previews at all), `Meta.description` + `Meta.preview_value` on
   the blocks, `ContentPreviewMixin` sourcing previews from real site content, and
   `manage.py harvest_block_previews` to regenerate `wtrx/previews/block_previews.json`
+- [x] `first_published_at` set by the WordPress importers, plus
+  `manage.py backfill_first_published` for content imported before that
+  (NULLs sort first under `DESC` in PostgreSQL, which broke `PageCardsBlock`)
 - [ ] `fixtures/demo.json` -- demo content (deferred)
 - [ ] Verify settings panels work
 - [ ] Verify AJAX form submission

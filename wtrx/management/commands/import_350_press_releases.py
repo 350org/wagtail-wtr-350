@@ -21,6 +21,8 @@ Field mapping:
     Page <h2> in #press-release-header  -> Post.title
     URL slug                            -> Post.slug
     "#post-time" text (e.g. "August 19, 2026") -> Post.published_at
+                                (also first_published_at, which Wagtail
+                                only sets on an admin publish)
     <article class="clearfix"> content  -> Post.body (StreamField)
 
 Post's author/categories/hero_image are all optional (see wtrx.models) and
@@ -208,6 +210,12 @@ class Command(BaseCommand):
             if existing:
                 existing.title = title
                 existing.published_at = published_at
+                # Only fill it in when it is missing: a page published through
+                # the admin since the last import has a real value that must not
+                # be overwritten by the source's date.
+                existing.first_published_at = (
+                    existing.first_published_at or published_at
+                )
                 existing.body = body
                 existing.save()
                 updated += 1
@@ -216,6 +224,15 @@ class Command(BaseCommand):
                     title=title,
                     slug=slug,
                     published_at=published_at,
+                    # Wagtail only sets first_published_at when a page is
+                    # published through the admin, so an imported page would
+                    # otherwise have none. Anything ordering by it then sorts on
+                    # mostly-NULL data -- and PostgreSQL puts NULLs *first* under
+                    # DESC, so genuinely recent pages sink below every import.
+                    # PageCardsBlock ("3 most recently published") is the visible
+                    # casualty. See `manage.py backfill_first_published`, which
+                    # repairs content imported before this was set here.
+                    first_published_at=published_at,
                     body=body,
                 )
                 blogs_index.add_child(instance=page)

@@ -824,6 +824,19 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     reports "no usable image" rather than letting a required-image block
     preview as broken markup.
 
+32. **Imported pages must set `first_published_at` themselves**: Wagtail only
+    populates that field when a page is published *through the admin*, so
+    anything created directly by an import script (`import_350_blog`,
+    `import_350_press_releases`) is live with the field NULL. Anything ordering
+    by it is then sorting mostly-NULL data — and PostgreSQL sorts NULLs
+    **first** under `DESC`, so genuinely recent pages sink beneath every
+    imported one. `PageCardsBlock` ("3 most recently published") is the visible
+    casualty. Both importers now set it from the source publication date on
+    create, and fill it in on update only when it is missing (a page published
+    through the admin since the last import has a real value that must not be
+    clobbered). `python manage.py backfill_first_published` repairs content
+    imported before this was in place.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive branch names: `feature/signup-block`,

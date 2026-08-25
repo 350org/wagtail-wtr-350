@@ -13,6 +13,8 @@ Usage:
 
 Field mapping:
     WP title/slug/date_gmt   -> Post title/slug/published_at
+                                (also first_published_at, which Wagtail
+                                only sets on an admin publish)
     WP content.rendered      -> Post.body (StreamField: text + image blocks)
     WP featured media        -> Post.hero_image
     WP categories (subset)   -> Post.categories (see CATEGORY_SLUG_MAP)
@@ -208,6 +210,12 @@ class Command(BaseCommand):
             if existing:
                 existing.title = title
                 existing.published_at = published_at
+                # Only fill it in when it is missing: a page published through
+                # the admin since the last import has a real value that must not
+                # be overwritten by the source's date.
+                existing.first_published_at = (
+                    existing.first_published_at or published_at
+                )
                 existing.hero_image = hero_image
                 existing.body = body
                 existing.author_name = author_name
@@ -220,6 +228,15 @@ class Command(BaseCommand):
                     slug=slug,
                     author_name=author_name,
                     published_at=published_at,
+                    # Wagtail only sets first_published_at when a page is
+                    # published through the admin, so an imported page would
+                    # otherwise have none. Anything ordering by it then sorts on
+                    # mostly-NULL data -- and PostgreSQL puts NULLs *first* under
+                    # DESC, so genuinely recent pages sink below every import.
+                    # PageCardsBlock ("3 most recently published") is the visible
+                    # casualty. See `manage.py backfill_first_published`, which
+                    # repairs content imported before this was set here.
+                    first_published_at=published_at,
                     hero_image=hero_image,
                     body=body,
                 )
