@@ -48,6 +48,48 @@ def resolved_navigation(context):
     return nav_settings.resolved_for_page(context.get("page"))
 
 
+def _page_is_within(page, target):
+    """
+    True when ``page`` is ``target`` itself or a descendant of it. Wagtail
+    stores tree paths as fixed-width segments, so a string prefix test is an
+    exact ancestry test (the same trick NavigationSettings.resolved_for_page()
+    uses to match override root pages).
+    """
+    if target is None:
+        return False
+    return page.path.startswith(target.path)
+
+
+@register.simple_tag(takes_context=True)
+def nav_item_is_active(context, item):
+    """
+    True when a primary-navigation item points at the section the visitor is
+    currently in — used to draw the active underline in header.html.
+
+    An internal link matches its own page and everything beneath it; a submenu
+    matches when any of its internal children does, so "Media & Resources"
+    stays underlined while you are reading a blog post under it. External and
+    anchor links never match: there is no reliable way to tell whether an
+    arbitrary URL or on-page anchor is "the current page".
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% nav_item_is_active item as is_active %}
+    """
+    page = context.get("page")
+    if page is None:
+        return False
+    if item.block_type == "internal":
+        return _page_is_within(page, item.value.get("page"))
+    if item.block_type == "submenu":
+        return any(
+            child.block_type == "internal"
+            and _page_is_within(page, child.value.get("page"))
+            for child in item.value.get("links")
+        )
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Social platform helpers
 # ---------------------------------------------------------------------------

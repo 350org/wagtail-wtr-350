@@ -28,11 +28,18 @@
     color this block's `background` field has no say over.
 {% endcomment %}
 {% if form_html %}
-    <script>
-        if (typeof jQuery === "undefined") {
-            document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
-        }
-    </script>
+    {% comment %}
+    The block picker preview renders a static stand-in form (see
+    SignupActionKitBlock.PREVIEW_FORM_HTML), which needs neither jQuery nor the
+    submit/UTM wiring below -- and must not pull either from a third party.
+    {% endcomment %}
+    {% if not is_block_preview %}
+        <script>
+            if (typeof jQuery === "undefined") {
+                document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
+            }
+        </script>
+    {% endif %}
     <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% if panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}{% endif %} mt-8" data-form-container>
         {{ form_html|safe }}
     </div>
@@ -46,6 +53,7 @@
     <script>
         (function () {
             if (window.__wtrAkInit) { return; }
+            {% if is_block_preview %}return;{% endif %}
             window.__wtrAkInit = true;
             function populateUtmFields() {
                 var form = document.getElementById("action-form");

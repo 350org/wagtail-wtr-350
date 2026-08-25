@@ -1,6 +1,14 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 {% resolved_navigation as nav %}
-{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings %}
+{% comment %}
+nav_active_link — the active-page indicator from Figma's nav (node 1:965): a
+text-decoration underline in brand blue, 4px below the baseline. Thickness is
+0.3em — deliberately double Figma's 15%, which read too fine in the browser.
+Held in one variable so all three nav renderings (desktop bar, collapsed
+desktop dropdown, mobile panel) can't drift apart. Tailwind's scanner reads
+class names as plain text, so the literal here is enough for JIT.
+{% endcomment %}
+{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings nav_active_link="underline decoration-primary-600 decoration-[0.3em] underline-offset-4" %}
 {% comment %}
 transparent_header is set in context by HomePage.get_context() when use_transparent_header is True.
 When transparent: header is position:absolute over the hero, bg is transparent, text switches to light,
@@ -11,26 +19,49 @@ and the dark_logo variant is used if available.
         <div class="flex items-center justify-between">
 
             {% comment %}
-            Logo — uses dark_logo when transparent header is active (dark hero bg),
+            Logo lockup — logo plus, on a section with a regional label, the
+            region badge beside it (Figma "Regional Nav": 16px gap, solid blue
+            pill). The whole lockup is one link: to the override's root page
+            when there is one, otherwise the site root.
+
+            Logo uses dark_logo when transparent header is active (dark hero bg),
             falls back to primary logo, then site name text.
+
+            The logo hovers with the badge (both driven by "group" on the
+            anchor). A CSS filter is the only recolour that works on every
+            logo: an <img> is opaque to colour properties whether it holds an
+            SVG or a PNG. brightness(0.55) takes 350's #0F81E9 to #084780 —
+            6/255 off --color-navy, imperceptible — while a differently
+            coloured logo simply darkens proportionally instead of breaking.
+            Transparent headers brighten instead, matching the badge.
             {% endcomment %}
-            <a href="/" class="flex items-center shrink-0">
+            <a href="{% if nav.root_page %}{% pageurl nav.root_page %}{% else %}/{% endif %}" class="group flex items-center gap-4 shrink-0">
                 {% if transparent_header and branding.dark_logo %}
                     {% image branding.dark_logo max-160x60 as logo_img %}
                     <img src="{{ logo_img.url }}"
                          width="{{ logo_img.width }}"
                          height="{{ logo_img.height }}"
                          alt="{{ current_site.site_name }}"
-                         class="h-10 w-auto object-contain">
+                         class="wtr-logo h-10 w-auto object-contain transition group-hover:brightness-125">
                 {% elif branding.logo %}
                     {% image branding.logo max-160x60 as logo_img %}
                     <img src="{{ logo_img.url }}"
                          width="{{ logo_img.width }}"
                          height="{{ logo_img.height }}"
                          alt="{{ current_site.site_name }}"
-                         class="h-10 w-auto object-contain">
+                         class="wtr-logo h-10 w-auto object-contain transition {% if transparent_header %}group-hover:brightness-125{% else %}group-hover:brightness-[0.55]{% endif %}">
                 {% else %}
                     <span class="font-heading font-bold text-xl {% if transparent_header %}text-light{% else %}text-dark{% endif %}">{{ current_site.site_name }}</span>
+                {% endif %}
+                {% comment %}
+                The badge fill is the same blue on both header variants — it
+                reads against either — but its hover follows the nav links, so
+                it needs the branch: darken to navy on a light header, lighten
+                on a transparent one, where a navy pill would vanish against a
+                navy hero. Hover is driven by "group" on the lockup anchor.
+                {% endcomment %}
+                {% if nav.regional_label %}
+                    <span class="wtr-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white transition-colors {% if transparent_header %}group-hover:bg-primary-400{% else %}group-hover:bg-navy{% endif %}">{{ nav.regional_label }}</span>
                 {% endif %}
             </a>
 
@@ -41,20 +72,21 @@ and the dark_logo variant is used if available.
             {% if not nav.collapse_desktop_menu %}
                 <nav class="hidden md:flex items-center space-x-6 ml-auto" aria-label="{% trans 'Primary navigation' %}">
                     {% for item in nav.primary_navigation %}
+                        {% nav_item_is_active item as is_active %}
                         {% if item.block_type == "internal" and item.value.page %}
                             <a href="{% pageurl item.value.page %}"
-                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors">
+                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "external" %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
-                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors">
+                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "anchor" %}
                             <a href="#{{ item.value.anchor }}"
-                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors">
+                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "submenu" %}
@@ -65,9 +97,9 @@ and the dark_logo variant is used if available.
                             {% endcomment %}
                             <div class="relative group">
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-primary{% endif %} transition-colors"
+                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} transition-colors"
                                         aria-haspopup="true">
-                                    {{ item.value.text }}
+                                    <span class="{% if is_active %}{{ nav_active_link }}{% endif %}">{{ item.value.text }}</span>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
@@ -77,18 +109,18 @@ and the dark_logo variant is used if available.
                                         {% for child in item.value.links %}
                                             {% if child.block_type == "internal" and child.value.page %}
                                                 <a href="{% pageurl child.value.page %}"
-                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-dark hover:bg-neutral-100{% endif %} transition-colors">
+                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-navy hover:bg-neutral-100{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "external" %}
                                                 <a href="{{ child.value.url }}"
                                                    rel="noopener noreferrer"
-                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-dark hover:bg-neutral-100{% endif %} transition-colors">
+                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-navy hover:bg-neutral-100{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "anchor" %}
                                                 <a href="#{{ child.value.anchor }}"
-                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-dark hover:bg-neutral-100{% endif %} transition-colors">
+                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-navy hover:bg-neutral-100{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% endif %}
@@ -163,14 +195,14 @@ and the dark_logo variant is used if available.
                 {% if nav.collapse_desktop_menu %}
                     {% if transparent_header %}
                         <button type="button"
-                                class="p-2 text-neutral-200 hover:text-light"
+                                class="p-2 cursor-pointer text-neutral-200 hover:text-light"
                                 aria-label="{% trans 'Open menu' %}"
                                 aria-expanded="false"
                                 aria-controls="mobile-menu"
                                 data-mobile-menu-toggle>
                     {% else %}
                         <button type="button"
-                                class="p-2 text-neutral-600 hover:text-dark"
+                                class="p-2 cursor-pointer text-neutral-600 hover:text-dark"
                                 aria-label="{% trans 'Open menu' %}"
                                 aria-expanded="false"
                                 aria-controls="mobile-menu"
@@ -179,14 +211,14 @@ and the dark_logo variant is used if available.
                 {% else %}
                     {% if transparent_header %}
                         <button type="button"
-                                class="md:hidden p-2 text-neutral-200 hover:text-light"
+                                class="md:hidden p-2 cursor-pointer text-neutral-200 hover:text-light"
                                 aria-label="{% trans 'Open menu' %}"
                                 aria-expanded="false"
                                 aria-controls="mobile-menu"
                                 data-mobile-menu-toggle>
                     {% else %}
                         <button type="button"
-                                class="md:hidden p-2 text-neutral-600 hover:text-dark"
+                                class="md:hidden p-2 cursor-pointer text-neutral-600 hover:text-dark"
                                 aria-label="{% trans 'Open menu' %}"
                                 aria-expanded="false"
                                 aria-controls="mobile-menu"
@@ -217,43 +249,44 @@ and the dark_logo variant is used if available.
                     {% endif %}
                         <div class="px-4 py-4 space-y-2 text-right">
                             {% for item in nav.primary_navigation %}
+                                {% nav_item_is_active item as is_active %}
                                 {% if item.block_type == "internal" and item.value.page %}
                                     <a href="{% pageurl item.value.page %}"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "external" %}
                                     <a href="{{ item.value.url }}"
                                        rel="noopener noreferrer"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "anchor" %}
                                     <a href="#{{ item.value.anchor }}"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "submenu" %}
                                     {% comment %}In the collapsed vertical menu a dropdown becomes a labelled, indented sub-group.{% endcomment %}
-                                    <p class="pt-2 pb-1 text-xs font-bold uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %}">
+                                    <p class="pt-2 pb-1 text-xs font-bold uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %}">
                                         {{ item.value.text }}
                                     </p>
                                     <div class="pr-3 space-y-1">
                                         {% for child in item.value.links %}
                                             {% if child.block_type == "internal" and child.value.page %}
                                                 <a href="{% pageurl child.value.page %}"
-                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "external" %}
                                                 <a href="{{ child.value.url }}"
                                                    rel="noopener noreferrer"
-                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "anchor" %}
                                                 <a href="#{{ child.value.anchor }}"
-                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% endif %}
@@ -299,43 +332,44 @@ and the dark_logo variant is used if available.
         {% endif %}
             <div class="px-4 py-4 space-y-2 text-right">
                 {% for item in nav.primary_navigation %}
+                    {% nav_item_is_active item as is_active %}
                     {% if item.block_type == "internal" and item.value.page %}
                         <a href="{% pageurl item.value.page %}"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                             {{ item.value.text }}
                         </a>
                     {% elif item.block_type == "external" %}
                         <a href="{{ item.value.url }}"
                            rel="noopener noreferrer"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                             {{ item.value.text }}
                         </a>
                     {% elif item.block_type == "anchor" %}
                         <a href="#{{ item.value.anchor }}"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
                             {{ item.value.text }}
                         </a>
                     {% elif item.block_type == "submenu" %}
                         {% comment %}In the mobile panel a dropdown becomes a labelled, indented sub-group.{% endcomment %}
-                        <p class="pt-2 pb-1 text-xs font-bold uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %}">
+                        <p class="pt-2 pb-1 text-xs font-bold uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %}">
                             {{ item.value.text }}
                         </p>
                         <div class="pr-3 space-y-1">
                             {% for child in item.value.links %}
                                 {% if child.block_type == "internal" and child.value.page %}
                                     <a href="{% pageurl child.value.page %}"
-                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                         {{ child.value.text }}
                                     </a>
                                 {% elif child.block_type == "external" %}
                                     <a href="{{ child.value.url }}"
                                        rel="noopener noreferrer"
-                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                         {{ child.value.text }}
                                     </a>
                                 {% elif child.block_type == "anchor" %}
                                     <a href="#{{ child.value.anchor }}"
-                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                         {{ child.value.text }}
                                     </a>
                                 {% endif %}

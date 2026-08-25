@@ -24,7 +24,38 @@
                 </div>
             </noscript>
             <div data-form-container>
-                <p class="text-sm text-neutral-500">{% trans "Loading form..." %}</p>
+                {% if is_block_preview %}
+                    {% comment %}
+                    The real form is fetched from the chosen Form page by
+                    signup JS, which previews neither run nor should -- and the
+                    fields are whatever that page defines, so there is nothing
+                    to capture ahead of time. These placeholders stand in for
+                    the usual shape of one.
+                    {% endcomment %}
+                    <form role="presentation" onsubmit="return false">
+                        <div class="grid grid-cols-2 gap-4">
+                            <label class="block text-sm font-semibold text-dark">{% trans "First name" %}
+                                <input type="text" value="Jane" readonly
+                                       class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                            </label>
+                            <label class="block text-sm font-semibold text-dark">{% trans "Last name" %}
+                                <input type="text" value="Doe" readonly
+                                       class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                            </label>
+                        </div>
+                        <label class="mt-4 block text-sm font-semibold text-dark">{% trans "Email" %}
+                            <input type="email" value="you@example.org" readonly
+                                   class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                        </label>
+                        <label class="mt-4 block text-sm font-semibold text-dark">{% trans "Message" %}
+                            <textarea rows="3" readonly
+                                      class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">Tell us what you care about.</textarea>
+                        </label>
+                        <span class="wtr-btn mt-6 inline-block">{{ value.button_text|default:default_signup_text }}</span>
+                    </form>
+                {% else %}
+                    <p class="text-sm text-neutral-500">{% trans "Loading form..." %}</p>
+                {% endif %}
             </div>
             <div data-thank-you class="hidden">
                 <p class="text-neutral-700">{{ value.success_message|default:default_success_msg }}</p>

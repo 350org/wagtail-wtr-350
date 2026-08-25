@@ -152,6 +152,7 @@ MEDIA_URL = "/media/"
 WAGTAIL_SITE_NAME = "My Site"
 # WAGTAILADMIN_BASE_URL is set in dev.py and production.py
 WAGTAILIMAGES_IMAGE_MODEL = "wtrx.CustomImage"
+WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
 
 WAGTAILSEARCH_BACKENDS = {
     "default": {

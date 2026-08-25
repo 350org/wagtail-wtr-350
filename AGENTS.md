@@ -74,7 +74,8 @@ make venv                    # Create .venv and install all dependencies
 source .venv/bin/activate
 make migrate                 # Run migrations
 make test                    # Run all tests
-make dev                     # Dev server at localhost:8000
+make dev                     # Dev server at localhost:8000 + Tailwind CSS watcher
+make dev-server              # Dev server only (no CSS watcher)
 make createsuperuser         # Create admin user
 make setup                   # Interactive initial setup
 ```
@@ -110,7 +111,7 @@ make build-prod              # Production build (CSS minified + JS + fonts + ima
 make build-js                # Copy JS source to static_compiled/js/
 make build-fonts             # Copy font files to static_compiled/fonts/
 make build-images            # Copy static images to static_compiled/images/
-make watch                   # Watch mode (rebuilds CSS on change)
+make watch                   # Watch mode, standalone (rebuilds CSS on change)
 ```
 
 `static_compiled/` is **gitignored** — build output is never committed. Run
@@ -691,6 +692,151 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     at the old location for as long as that migration exists — this is a
     permanent Django migration contract, not a stale backwards-compat shim to
     clean up later.
+
+26. **`resolved_for_page()` must answer to the same attribute names on both
+    return types**: `NavigationSettings.resolved_for_page(page)` returns either
+    the `NavigationSettings` model instance (site default) or a
+    `NavigationOverrideBlock` `StructValue` (the most specific matching entry in
+    `navigation_overrides`), and `header.html` reads attributes off whichever it
+    got without branching. Every attribute the template touches therefore has to
+    exist on *both* — `primary_navigation`, `regional_label`, `root_page`,
+    `cta_text`, `cta_page`, `cta_url`, `cta_anchor`, `collapse_desktop_menu`.
+    Adding a field to `NavigationOverrideBlock` alone is a silent half-fix:
+    Django templates resolve a missing attribute to the empty string, so the
+    site-default branch renders nothing instead of raising. `root_page` is the
+    asymmetric case — it is a real field on the override and a `@property`
+    returning `None` on `NavigationSettings`, which is what lets the logo
+    lockup's `href` fall back to `/`.
+
+27. **Regional label badge is nav-scoped, not page-scoped**: The region name
+    beside the logo (Figma "Regional Nav" — 350 logo + solid blue pill, e.g.
+    `CANADA`) comes from `regional_label` on the resolved navigation, *not* from
+    a field on `HomePage`. That is deliberate: `resolved_for_page()` already
+    walks `path`/`depth` to find the most specific override, so every page
+    beneath `/canada/` inherits the badge with no extra ancestor walk. Set it
+    per-section on a navigation override, or site-wide on `NavigationSettings`
+    for a standalone regional fork. The badge markup lives inside the logo
+    anchor in `header.html` (`wtr-regional-label`) and needs no
+    `transparent_header` variant — a solid `bg-primary-600` fill reads on both
+    light and dark hero backgrounds.
+
+28. **Nav interaction states — navy hover, blue active underline**: Both come
+    from Figma's nav (node 1:965) and are applied in
+    `wtrx/templates/wtrx/navigation/header.html`.
+    - **Hover** is `hover:text-navy` (`--color-navy: #024582`) on the
+      *non-transparent* branches only. The transparent-header branches keep
+      `hover:text-light` — navy on a dark hero is unreadable, so those hover
+      *lighter*, not darker. The same split governs the regional badge
+      (`group-hover:bg-navy` on a light header, `group-hover:bg-primary-400`
+      on a transparent one, since a navy pill vanishes against
+      `wtr-hero-banner-navy`) and the logo.
+    - **The logo hovers with a CSS filter, not a colour**: an `<img>` is opaque
+      to colour properties — no `fill`, `color` or `currentColor` reaches
+      inside it — and that is true whether the file is an SVG or a PNG.
+      `group-hover:brightness-[0.55]` takes 350's `#0F81E9` to `#084780`,
+      6/255 away from `--color-navy`; transparent headers use
+      `group-hover:brightness-125` instead. Do **not** replace this with a
+      `mask-image` recolour: a mask keys off the alpha channel only, so it
+      flattens a multi-colour logo to one flat fill and turns any SVG carrying
+      an opaque background `<rect>` (a common export artifact) into a solid
+      block. The filter degrades gracefully instead — an unexpected logo just
+      darkens proportionally. `transition` (not `transition-colors`) is the
+      right utility here; only the former lists `filter`.
+    - **Navy is a brand token, not a callout token**: `--color-navy` in
+      `theme.css` is the real definition and `--color-callout-navy` is now an
+      alias for it, so the CalloutBlock swatch and the nav can never drift.
+      Use `navy` (`text-navy`, `bg-navy`); reach for `callout-navy` only in
+      CalloutBlock's own styles.
+    - **Active state is a `text-decoration`, not a border**: the
+      `nav_active_link` string on `header.html`'s outer `{% with %}` —
+      `underline decoration-primary-600 decoration-[0.3em]
+      underline-offset-4` — mirrors Figma's underlined text node (4px below
+      the baseline), except for thickness: Figma specifies 15% of font size
+      (≈2.4px) but that reads too fine in the browser, so this is doubled to
+      0.3em (≈4.8px). It lives in one variable because
+      three separate nav renderings (desktop bar, collapsed desktop dropdown,
+      mobile panel) each need it. Tailwind's scanner reads class names as
+      plain text, so a literal inside a `{% with %}` is enough for JIT — no
+      need to spell the branches out the way `collapse_desktop_menu` does.
+    - On a **submenu**, the underline goes on a `<span>` around the label, not
+      on the `<button>`: `text-decoration` propagates to inline children, so
+      putting it on the button would strike through the dropdown caret. Figma
+      underlines the text node only.
+    - **Buttons need explicit `cursor-pointer`**: Tailwind v4's preflight sets
+      `button { cursor: default }`. Anchors are unaffected. Any new
+      `<button>` in the nav must carry `cursor-pointer` or it will silently
+      lose the hand pointer.
+
+29. **`nav_item_is_active` matches sections, not exact pages**: the tag in
+    `wtrx/templatetags/wtrx_tags.py` returns True when the current page *is or
+    is beneath* an internal link's target, and for a submenu when any internal
+    child matches — so a blog post keeps "Media & Resources" underlined. It
+    relies on Wagtail's fixed-width tree `path` segments, where a string
+    prefix test is an exact ancestry test (same trick as
+    `resolved_for_page()`). External and anchor links never match: there is no
+    reliable way to tell whether an arbitrary URL is the current page. A
+    submenu's own label is not a link, so visiting a page that merely shares
+    its name does not activate it.
+
+30. **Block picker previews need three pieces, and the template is
+    load-bearing**: a block only shows a preview in the "Add block" picker when
+    all of these line up.
+    - `templates/wagtailcore/shared/block_preview.html` — a self-extending
+      override of Wagtail's own template (same pattern as
+      `templates/wagtailadmin/login.html`) that injects the compiled Tailwind
+      bundle, so previews render as the block actually looks. **Its existence
+      is what switches previews on at all**: `Block.is_previewable` calls
+      `wagtail.utils.templates.template_is_overridden`, which compares the
+      resolved template path against the copy inside the `wagtail` package.
+      Delete the file and every preview in the picker silently disappears —
+      no error, just nothing.
+    - A preview value, from one of two mutually exclusive sources.
+      `Meta.preview_value` is a hand-written literal (wrap a *callable* in
+      `staticmethod()` — Wagtail instantiates the `Meta` class, so a bare
+      function there gets bound and called with `self`). `ContentPreviewMixin`
+      instead pulls the value from `wtrx/previews/block_previews.json`,
+      harvested from real page content by
+      `python manage.py harvest_block_previews`. Never do both on one block.
+    - Optional layout hints as **class attributes, not `Meta` fields** —
+      `preview_layout`, `preview_target_width`, `preview_max_width` are read
+      off the block instance by the preview template.
+    Anything a preview touches runs at request time inside the admin, so the
+    import-time DB rule (#1) applies with full force: `preview_image()` and
+    every `_*_preview_value()` helper must stay callables, never module-level
+    values.
+
+31. **`ContentPreviewMixin` overrides `is_previewable` on purpose — don't
+    "simplify" it back**: two non-obvious constraints are baked in.
+    - Harvested JSON is in `get_prep_value()` form, where an image is a bare
+      pk. It must be revived with `to_python()`, not `normalize()` — only the
+      former turns a pk back into an image, and the difference shows up as an
+      integer rendered where a template expects an image object.
+    - Wagtail's default `is_previewable` is "does this block override
+      `get_preview_value`", which the mixin does unconditionally — so without
+      the override *every* mixed-in block would advertise a preview and render
+      a blank one when the JSON has no entry for it. The replacement is also
+      deliberately a plain `property`, not Wagtail's `cached_property`: one
+      block instance is shared across every StreamBlock that declares it, so a
+      cached answer computed from database state would freeze process-wide.
+      The queries behind it are cached for `PREVIEW_LOOKUP_CACHE_TIMEOUT`
+      instead.
+    Harvested image pks only mean anything in the database they came from, so
+    `_repair_image_references()` swaps dangling ones for any real image, and
+    reports "no usable image" rather than letting a required-image block
+    preview as broken markup.
+
+32. **Imported pages must set `first_published_at` themselves**: Wagtail only
+    populates that field when a page is published *through the admin*, so
+    anything created directly by an import script (`import_350_blog`,
+    `import_350_press_releases`) is live with the field NULL. Anything ordering
+    by it is then sorting mostly-NULL data — and PostgreSQL sorts NULLs
+    **first** under `DESC`, so genuinely recent pages sink beneath every
+    imported one. `PageCardsBlock` ("3 most recently published") is the visible
+    casualty. Both importers now set it from the source publication date on
+    create, and fill it in on update only when it is missing (a page published
+    through the admin since the last import has a real value that must not be
+    clobbered). `python manage.py backfill_first_published` repairs content
+    imported before this was in place.
 
 ## Git Conventions
 

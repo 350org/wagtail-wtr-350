@@ -902,6 +902,13 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
 - [x] `wtrx_tags.py` -- `social_icon` tag + `social_platform_label` filter
 - [x] `template` attribute added to all concrete page models
 - [x] Fix `{# ... #}` multi-line comment in `hero.html` → `{% comment %}...{% endcomment %}`
+- [x] Per-section navigation overrides (`NavigationOverrideBlock`,
+  `NavigationSettings.resolved_for_page()`, `{% resolved_navigation %}`)
+- [x] Regional label badge beside the logo for sub-regional sections
+  (`regional_label`; Figma "Regional Nav" node 83:1815)
+- [x] Nav interaction states (Figma nav node 1:965): navy hover, blue active
+  underline via `nav_item_is_active`, `cursor-pointer` on nav buttons,
+  logo brightness-filter hover matching the regional badge
 
 ### ✅ Phase 5: Frontend Build & Styling — COMPLETE (commit f56c74d)
 - [x] `tailwind.config.js` (TW3) with full semantic token system (primary, secondary,
@@ -993,6 +1000,14 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   updated with conditional icon rendering. `create_test_page` and tests updated.
 - [x] README `Customizing Blocks` section — documents the subclass-and-override
   pattern for fork sites, with a concrete example of adding a field to `CardBlock`
+- [x] Block picker previews: `templates/wagtailcore/shared/block_preview.html`
+  (global override that loads the compiled Tailwind bundle, and whose existence
+  is what enables previews at all), `Meta.description` + `Meta.preview_value` on
+  the blocks, `ContentPreviewMixin` sourcing previews from real site content, and
+  `manage.py harvest_block_previews` to regenerate `wtrx/previews/block_previews.json`
+- [x] `first_published_at` set by the WordPress importers, plus
+  `manage.py backfill_first_published` for content imported before that
+  (NULLs sort first under `DESC` in PostgreSQL, which broke `PageCardsBlock`)
 - [ ] `fixtures/demo.json` -- demo content (deferred)
 - [ ] Verify settings panels work
 - [ ] Verify AJAX form submission
