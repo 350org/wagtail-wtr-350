@@ -217,6 +217,12 @@ WAGTAIL_AI = {
 # domain, enforced server-side in wtrx.allauth_adapter — leaving it unset
 # disables the domain check (any Google account could sign in), so it should
 # always be set outside of local dev.
+# WTRX_GOOGLE_SSO_ONLY hides the username/password fields and submit button
+# on the login page (see wtrx.context_processors.google_sso and the
+# templates/wagtailadmin/login.html override) when Google SSO is configured.
+# This is a UI-only change — password authentication itself still works if
+# posted directly to the login form — so a superuser always has a fallback
+# if Google SSO is ever misconfigured or Google has an outage.
 SITE_ID = 1
 
 AUTHENTICATION_BACKENDS = [
@@ -237,6 +243,11 @@ ACCOUNT_EMAIL_VERIFICATION = "none"  # Google has already verified the email
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
 WTRX_GOOGLE_SSO_DOMAIN = os.environ.get("WTRX_GOOGLE_SSO_DOMAIN", "")
+WTRX_GOOGLE_SSO_ONLY = os.environ.get("WTRX_GOOGLE_SSO_ONLY", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {

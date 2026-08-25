@@ -11,6 +11,20 @@
         >
             {% trans "Sign in with Google" %}
         </a>
-        <p style="text-align: center; margin-bottom: 1em;">{% trans "or sign in with a password" %}</p>
+        {% if not google_sso_only %}
+            <p style="text-align: center; margin-bottom: 1em;">{% trans "or sign in with a password" %}</p>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block fields %}
+    {% if not google_sso_only %}
+        {{ block.super }}
+    {% endif %}
+{% endblock %}
+
+{% block submit_buttons %}
+    {% if not google_sso_only %}
+        {{ block.super }}
     {% endif %}
 {% endblock %}
