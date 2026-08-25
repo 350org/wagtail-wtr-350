@@ -69,7 +69,7 @@ one element whose class alone can flip all three.
                         {{ value.text|richtext }}
                     </div>
                 {% endif %}
-                {% if value.link_text and value.link_page or value.link_text and value.link_url %}
+                {% if value.link_text and value.link_page or value.link_text and value.link_url or value.link_text and value.anchor %}
                     {% comment %}
                     max-w-full + whitespace-normal on the button: wtr-btn is
                     nowrap by default, and a long label ("Join the Great Power
@@ -79,8 +79,21 @@ one element whose class alone can flip all three.
                     Wrapping is what keeps one button size across breakpoints.
                     {% endcomment %}
                     <div class="mt-8">
-                        <a href="{% if value.link_page %}{{ value.link_page.url }}{% else %}{{ value.link_url }}{% endif %}"
-                           {% if not value.link_page %}rel="noopener noreferrer"{% endif %}
+                        {% comment %}
+                        Three link targets, resolved in the same order
+                        components/button.html resolves them: page, then
+                        external URL, then a same-page anchor (see
+                        FeaturePanelBlock.anchor for why that third one is
+                        its own field). rel is only for the external case —
+                        an internal page link and a jump link both stay on
+                        the site. This button is not the shared
+                        components/button.html include, because its trailing
+                        arrow and wrapping behaviour are specific to the
+                        panel; the link resolution is deliberately kept
+                        identical to it all the same.
+                        {% endcomment %}
+                        <a href="{% if value.link_page %}{{ value.link_page.url }}{% elif value.link_url %}{{ value.link_url }}{% else %}#{{ value.anchor }}{% endif %}"
+                           {% if value.link_url and not value.link_page %}rel="noopener noreferrer"{% endif %}
                            class="wtr-btn wtr-btn-lg inline-flex max-w-full items-center gap-2 whitespace-normal
                                   {% if value.background == 'dark' %}wtr-btn-outline-light hover:bg-white/10{% else %}hover:bg-primary-500{% endif %}">
                             {{ value.link_text }}

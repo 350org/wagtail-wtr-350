@@ -45,13 +45,24 @@
     vertical padding on the w-full-outer wrapper — the 128px gap between
     body blocks comes from the page templates' space-y-32 on the block loop.
 
-    background picks the panel fill only; the text, pill and form chrome are
-    light-on-color either way, so nothing else branches on it (contrast
-    feature_panel_block.html, whose light option really does invert).
+    background offers the same five colors as the page hero banner and
+    CalloutBlock — see SIGNUP_BACKGROUND_CHOICES and main.css's
+    .wtr-signup-bg-{color} classes, which reuse the hero's own tokens.
+    Three things branch off it, each check written out separately rather
+    than computed once, the same way callout_block.html and
+    feature_panel_block.html do it (there is no single element whose class
+    can flip all of them):
+
+      - the panel text and prose invert on light-grey, the one fill light
+        enough to need dark text;
+      - the eyebrow pill inverts on dark grey, the one fill the pill's own
+        --color-dark background would otherwise vanish into;
+      - the fetched ActionKit form's chrome reacts via a .wtr-ak-{tone}
+        modifier class, computed in SignupActionKitBlock.PANEL_TONES and
+        applied by _actionkit_form.html.
     {% endcomment %}
     <div class="w-full px-4 sm:px-6 lg:px-8">
-        <div class="wtr-signup wtr-signup-actionkit mx-auto max-w-[1426px] overflow-hidden rounded-lg
-                    {% if value.background == 'red' %}bg-callout-red{% else %}bg-dark{% endif %}"
+        <div class="wtr-signup wtr-signup-actionkit wtr-signup-bg-{{ value.background }} mx-auto max-w-[1426px] overflow-hidden rounded-lg"
              {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
             {% if value.image %}
                 <div class="relative">
@@ -73,10 +84,18 @@
             left the copy's last bullet floating well above the panel floor.
             {% endcomment %}
             <div class="flex flex-col gap-10 p-6 sm:p-10 lg:flex-row lg:items-end lg:justify-center lg:gap-32 lg:p-16">
-                <div class="flex flex-col items-start gap-8 text-light lg:max-w-[800px] lg:flex-1">
+                <div class="flex flex-col items-start gap-8 lg:max-w-[800px] lg:flex-1
+                            {% if value.background == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
                     {% if value.eyebrow %}
-                        {# Same dark pill as feature_panel_block.html's eyebrow, at Figma's 24px. #}
-                        <p class="wtr-signup-eyebrow font-heading inline-block rounded-full bg-dark px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] text-light sm:text-lg lg:text-2xl">
+                        {% comment %}
+                        Same dark pill as feature_panel_block.html's eyebrow, at Figma's
+                        24px — except on the dark grey panel, where that pill is the same
+                        --color-dark as the panel behind it and would read as invisible
+                        text; there it flips to light-on-dark, exactly as
+                        feature_panel_block.html's pill does on its own dark background.
+                        {% endcomment %}
+                        <p class="wtr-signup-eyebrow font-heading inline-block rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
+                                  {% if value.background == 'dark' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
                             {{ value.eyebrow }}
                         </p>
                     {% endif %}
@@ -90,7 +109,8 @@
                         pure white — same fix callout_block.html applies, for the same
                         reason. Figma sets this copy at 24px/1.2.
                         {% endcomment %}
-                        <div class="prose prose-invert max-w-none text-lg leading-[1.2] [--tw-prose-invert-body:var(--color-light)] sm:text-xl lg:text-2xl">
+                        <div class="prose max-w-none text-lg leading-[1.2] sm:text-xl lg:text-2xl
+                                    {% if value.background == 'light-grey' %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
                             {{ value.description|richtext }}
                         </div>
                     {% endif %}

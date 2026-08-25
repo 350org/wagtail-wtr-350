@@ -18,6 +18,14 @@
 
     Neither flag renders ActionKit's own unstyled vertical stack; both are
     full restyles of the same fetched markup. See main.css for each.
+
+    `panel_tone` (from SignupActionKitBlock.get_context(), via
+    SignupActionKitBlock.PANEL_TONES) adds a .wtr-ak-on-{tone} modifier for
+    the panel fills the stacked chrome collides with — a dark panel behind
+    the dark fine-print box, a blue panel behind the blue submit button, a
+    light panel behind light-on-color labels. Applied only alongside
+    stacked=True: the inline variant sits in the hero's own overlay, whose
+    color this block's `background` field has no say over.
 {% endcomment %}
 {% if form_html %}
     <script>
@@ -25,7 +33,7 @@
             document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
         }
     </script>
-    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% endif %} mt-8" data-form-container>
+    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% if panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}{% endif %} mt-8" data-form-container>
         {{ form_html|safe }}
     </div>
     {% if success_message %}
