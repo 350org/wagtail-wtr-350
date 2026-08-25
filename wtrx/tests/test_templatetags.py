@@ -4,9 +4,11 @@ Tests for custom template tags in wtrx_tags.py.
 
 from unittest.mock import MagicMock
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from wagtail.models import Page
 
-from wtrx.templatetags.wtrx_tags import page_as_card
+from wtrx.site_settings import NavigationSettings
+from wtrx.templatetags.wtrx_tags import nav_item_is_active, page_as_card
 
 
 class TestPageAsCard(SimpleTestCase):
@@ -71,3 +73,93 @@ class TestPageAsCard(SimpleTestCase):
         page = self._make_page()
         card = page_as_card(page)
         self.assertEqual(set(card.keys()), {"heading", "description", "image", "link_page", "link_url"})
+
+
+class TestNavItemIsActive(TestCase):
+    """
+    nav_item_is_active drives the active-page underline in header.html
+    (Figma nav, node 1:965). A nav item is active for the section the visitor
+    is in, not just for an exact page match.
+
+    Tree:
+        home
+        ├── about          (top-level internal link)
+        ├── media          (submenu parent — not itself linked)
+        │   └── blogs      (the submenu's only internal child)
+        │       └── post
+        └── elsewhere
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = Page(title="Home", slug="nav-active-home")
+        root.add_child(instance=cls.home)
+        cls.about = Page(title="About", slug="about")
+        cls.home.add_child(instance=cls.about)
+        cls.media = Page(title="Media", slug="media")
+        cls.home.add_child(instance=cls.media)
+        cls.blogs = Page(title="Blogs", slug="blogs")
+        cls.media.add_child(instance=cls.blogs)
+        cls.post = Page(title="Post", slug="post")
+        cls.blogs.add_child(instance=cls.post)
+        cls.elsewhere = Page(title="Elsewhere", slug="elsewhere")
+        cls.home.add_child(instance=cls.elsewhere)
+
+    def setUp(self):
+        """
+        Built per-test, not in setUpTestData: Django deep-copies class
+        attributes between tests for isolation, and a StreamValue that was
+        never bound to a saved field has no _stream_field to copy.
+        """
+        nav = NavigationSettings()
+        nav.primary_navigation = [
+            ("internal", {"text": "About", "page": self.about}),
+            ("external", {"text": "Donate", "url": "https://example.org/"}),
+            ("anchor", {"text": "Top", "anchor": "top"}),
+            (
+                "submenu",
+                {
+                    "text": "Media & Resources",
+                    "links": [("internal", {"text": "Blogs", "page": self.blogs})],
+                },
+            ),
+        ]
+        self.internal, self.external, self.anchor, self.submenu = list(
+            nav.primary_navigation
+        )
+
+    def _active(self, item, page):
+        return nav_item_is_active({"page": page}, item)
+
+    def test_internal_link_active_on_its_own_page(self):
+        self.assertTrue(self._active(self.internal, self.about))
+
+    def test_internal_link_inactive_elsewhere(self):
+        self.assertFalse(self._active(self.internal, self.elsewhere))
+
+    def test_submenu_active_on_a_child_link_page(self):
+        self.assertTrue(self._active(self.submenu, self.blogs))
+
+    def test_submenu_active_deep_under_a_child_link(self):
+        """A blog post keeps its parent submenu underlined."""
+        self.assertTrue(self._active(self.submenu, self.post))
+
+    def test_submenu_inactive_elsewhere(self):
+        self.assertFalse(self._active(self.submenu, self.elsewhere))
+
+    def test_submenu_inactive_on_its_unlinked_parent_page(self):
+        """
+        "Media" is only a label — the submenu tracks its child links, not a
+        page of its own, so visiting /media/ does not light it up.
+        """
+        self.assertFalse(self._active(self.submenu, self.media))
+
+    def test_external_and_anchor_links_are_never_active(self):
+        for item in (self.external, self.anchor):
+            with self.subTest(block_type=item.block_type):
+                self.assertFalse(self._active(item, self.about))
+
+    def test_no_current_page_is_never_active(self):
+        """Views without a `page` in context (search, 404) underline nothing."""
+        self.assertFalse(nav_item_is_active({}, self.internal))

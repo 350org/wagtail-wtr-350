@@ -119,6 +119,15 @@ class NavigationOverrideBlock(StructBlock):
             "page wins."
         ),
     )
+    regional_label = CharBlock(
+        required=False,
+        max_length=50,
+        label=_("Regional label"),
+        help_text=_(
+            "Region name shown as a badge beside the logo for this section, "
+            "e.g. \"Canada\". Leave blank for no badge."
+        ),
+    )
     primary_navigation = StreamBlock(
         _primary_navigation_blocks(),
         blank=True,
@@ -333,6 +342,16 @@ class NavigationSettings(BaseSiteSetting):
         help_text=_("Links shown in the main navigation bar."),
         use_json_field=True,
     )
+    regional_label = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name=_("regional label"),
+        help_text=_(
+            "Region name shown as a badge beside the logo across the whole "
+            "site, e.g. \"Canada\". Leave blank for no badge. Sections with "
+            "their own navigation override set this on the override instead."
+        ),
+    )
     cta_text = models.CharField(
         max_length=100,
         blank=True,
@@ -389,6 +408,7 @@ class NavigationSettings(BaseSiteSetting):
 
     panels = [
         FieldPanel("primary_navigation"),
+        FieldPanel("regional_label"),
         MultiFieldPanel(
             [
                 AIFieldPanel("cta_text"),
@@ -437,6 +457,16 @@ class NavigationSettings(BaseSiteSetting):
         if errors:
             raise ValidationError(errors)
 
+    @property
+    def root_page(self):
+        """
+        Always ``None`` for the site default. Present so templates can read
+        ``nav.root_page`` off whatever ``resolved_for_page()`` handed them —
+        a NavigationOverrideBlock StructValue has a real root page, the site
+        default has none (its logo lockup links to ``/``).
+        """
+        return None
+
     def resolved_for_page(self, page):
         """
         Return the navigation to render for ``page``: either this settings
@@ -446,9 +476,12 @@ class NavigationSettings(BaseSiteSetting):
         specific/nested override wins over a broader one.
 
         The returned object exposes the same attribute names either way
-        (``primary_navigation``, ``cta_text``, ``cta_page``, ``cta_url``,
-        ``cta_anchor``, ``collapse_desktop_menu``), so templates don't need
-        to care which one they got.
+        (``primary_navigation``, ``regional_label``, ``root_page``,
+        ``cta_text``, ``cta_page``, ``cta_url``, ``cta_anchor``,
+        ``collapse_desktop_menu``), so templates don't need to care which one
+        they got. ``root_page`` only exists on an override — the ``root_page``
+        property below supplies the ``None`` the site default would otherwise
+        be missing.
         """
         if page is None:
             return self

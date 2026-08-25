@@ -67,11 +67,16 @@
   --color-light: #ffffff;
   --color-dark:  #17292e;
 
+  /* Navy — brand color. Used for nav link hover/active states and, via the
+   * --color-callout-navy alias below, as the CalloutBlock "navy" swatch. */
+  --color-navy: #024582;
+
   /* CalloutBlock-only solid colors (Figma) — not part of the general brand
    * ramp above, used only for the callout's color choice field. Dark grey
    * and light grey reuse --color-neutral-800/200 instead of a dedicated
-   * token, per Figma's own callout swatches matching those exactly. */
-  --color-callout-navy: #024582;
+   * token, per Figma's own callout swatches matching those exactly.
+   * Navy is an alias so the callout and the nav can never drift apart. */
+  --color-callout-navy: var(--color-navy);
   --color-callout-red:  #ed4b0c;
 
   /* Primary brand color — 350.org redesign blue (Figma: #0F81E8) */

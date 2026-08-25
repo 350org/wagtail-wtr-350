@@ -902,6 +902,13 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
 - [x] `wtrx_tags.py` -- `social_icon` tag + `social_platform_label` filter
 - [x] `template` attribute added to all concrete page models
 - [x] Fix `{# ... #}` multi-line comment in `hero.html` → `{% comment %}...{% endcomment %}`
+- [x] Per-section navigation overrides (`NavigationOverrideBlock`,
+  `NavigationSettings.resolved_for_page()`, `{% resolved_navigation %}`)
+- [x] Regional label badge beside the logo for sub-regional sections
+  (`regional_label`; Figma "Regional Nav" node 83:1815)
+- [x] Nav interaction states (Figma nav node 1:965): navy hover, blue active
+  underline via `nav_item_is_active`, `cursor-pointer` on nav buttons,
+  logo brightness-filter hover matching the regional badge
 
 ### ✅ Phase 5: Frontend Build & Styling — COMPLETE (commit f56c74d)
 - [x] `tailwind.config.js` (TW3) with full semantic token system (primary, secondary,
