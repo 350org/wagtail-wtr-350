@@ -124,13 +124,29 @@ SECTION_WIDTH_CHOICES = [
     ("wide", _("Wide (1266px)")),
 ]
 
-# The ActionKit signup panel's fill. Same two-value reasoning as
-# FEATURE_PANEL_BACKGROUND_CHOICES — both are light-text-on-solid-color, so
-# this picks which solid color, not whether the text inverts.
+# The ActionKit signup panel's fill — the same five colors the hero banner
+# and CalloutBlock offer (CALLOUT_COLOR_CHOICES), so a signup panel can sit
+# in the same palette as the page it's on. Unlike
+# FEATURE_PANEL_BACKGROUND_CHOICES this is not just a fill choice: light-grey
+# is light enough that the panel text, eyebrow pill and form chrome all
+# invert off it, exactly as they do in callout_block.html.
+#
+# The dark-grey entry keeps the legacy key "dark" rather than adopting
+# CALLOUT_COLOR_CHOICES' "dark-grey", since "dark" is already the stored
+# value (and the default) in existing StreamField content — the same
+# reasoning that kept CalloutBlock's "blue-gradient" key. Both keys name the
+# same --color-dark fill; only the label was brought in line with the hero's.
 SIGNUP_BACKGROUND_CHOICES = [
-    ("dark", _("Dark")),
+    ("navy", _("Navy")),
     ("red", _("Red")),
+    ("dark", _("Dark grey")),
+    ("blue-gradient", _("350 Blue")),
+    ("light-grey", _("Light grey")),
 ]
+
+# The one SIGNUP_BACKGROUND_CHOICES fill light enough to need dark text and
+# an inverted eyebrow pill — mirrors CALLOUT_ON_LIGHT_COLORS above.
+SIGNUP_ON_LIGHT_BACKGROUNDS = {"light-grey"}
 
 HERO_LAYOUT_CHOICES = [
     ("centered", _("Centered")),
@@ -209,15 +225,31 @@ def parse_action_network_url(url):
     }
 
 
-def _validate_at_most_one_link(cleaned, errors):
+def _validate_at_most_one_link(cleaned, errors, extra_fields=()):
     """
-    Raise if both link_page and link_url are set.
+    Raise if more than one link target is set.
+
+    The base pair is link_page/link_url, which every caller has.
+    ``extra_fields`` names further link fields a block also offers —
+    FeaturePanelBlock passes ("anchor",) — so a block that gained a third
+    target does not need its own copy of this check. Blocks that pass
+    nothing keep the original two-field message verbatim.
+
     Modifies the errors dict in place and returns it.
     """
-    if bool(cleaned.get("link_page")) and bool(cleaned.get("link_url")):
-        msg = ValidationError(_("Provide either a link page or a link URL, not both."))
-        errors["link_page"] = msg
-        errors["link_url"] = msg
+    fields = ("link_page", "link_url", *extra_fields)
+    set_fields = [name for name in fields if cleaned.get(name)]
+    if len(set_fields) > 1:
+        if extra_fields:
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, or anchor.")
+            )
+        else:
+            msg = ValidationError(
+                _("Provide either a link page or a link URL, not both.")
+            )
+        for name in set_fields:
+            errors[name] = msg
     return errors
 
 
@@ -699,8 +731,12 @@ class FeaturePanelBlock(StructBlock):
     (any background image is a faint full-bleed watermark, not a subject);
     this one gives the image its own column at full opacity.
 
-    At most one of link_page or link_url may be set; clean() enforces this,
-    same pattern as CardBlock and QuoteBlock.
+    At most one of link_page, link_url or anchor may be set; clean()
+    enforces this, same pattern as CardBlock and QuoteBlock. `anchor` exists
+    for the same reason it does on ButtonBlock — link_url is a URLBlock and
+    Django's URLValidator rejects a bare "#petition", so a panel whose CTA
+    scrolls to a signup block further down the same page had no way to
+    express that target at all.
     """
 
     eyebrow = CharBlock(
@@ -747,12 +783,21 @@ class FeaturePanelBlock(StructBlock):
     link_url = URLBlock(
         required=False,
         label=_("Link URL"),
-        help_text=_("External link. Set either this or Link page, not both."),
+        help_text=_("External link. Set only one of the three link fields."),
+    )
+    anchor = CharBlock(
+        required=False,
+        label=_("Anchor"),
+        help_text=_(
+            "Jump to a block on this same page, by its Anchor ID and without "
+            "the # symbol (e.g. 'petition'). Set only one of the three link "
+            "fields."
+        ),
     )
 
     def clean(self, value):
         cleaned = super().clean(value)
-        errors = _validate_at_most_one_link(cleaned, {})
+        errors = _validate_at_most_one_link(cleaned, {}, extra_fields=("anchor",))
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
@@ -1407,6 +1452,22 @@ class SignupActionKitBlock(StructBlock):
     FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
     _FAILURE_SENTINEL = "__actionkit_embed_fetch_failed__"
 
+    # Which panel fills the fetched ActionKit form's own chrome has to react
+    # to, mapped to the .wtr-ak-{tone} modifier class _actionkit_form.html
+    # puts on the embed wrapper (see main.css). The form's default chrome —
+    # a blue submit button and a --color-dark fine-print box — only reads
+    # correctly against a panel that is neither of those colors, which is
+    # navy and red; those two are deliberately absent here and take no
+    # modifier. The other three each collide with one piece of that chrome:
+    # "dark" hides the fine-print box, "blue-gradient" hides the submit
+    # button, and "light-grey" is the one fill that inverts the panel's own
+    # text, so the form's light-on-color labels have to invert with it.
+    PANEL_TONES = {
+        "dark": "on-dark",
+        "blue-gradient": "on-primary",
+        "light-grey": "on-light",
+    }
+
     eyebrow = CharBlock(
         required=False,
         label=_("Eyebrow"),
@@ -1430,7 +1491,10 @@ class SignupActionKitBlock(StructBlock):
         choices=SIGNUP_BACKGROUND_CHOICES,
         default="dark",
         label=_("Background"),
-        help_text=_("Panel fill behind the heading, copy and form."),
+        help_text=_(
+            "Panel fill behind the heading, copy and form. Same five colors "
+            "as the page hero banner and callout blocks."
+        ),
     )
     image = ImageChooserBlock(
         required=False,
@@ -1513,6 +1577,7 @@ class SignupActionKitBlock(StructBlock):
         ctx["form_html"] = form_html
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
         ctx["success_message"] = value.get("success_message")
+        ctx["panel_tone"] = self.PANEL_TONES.get(value.get("background"), "")
         return ctx
 
     class Meta:

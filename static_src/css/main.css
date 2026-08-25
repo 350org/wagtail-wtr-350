@@ -322,6 +322,20 @@ html {
     display: none;
 }
 
+/* The fetched form has bare text of its own between the styled field boxes
+ * — the "Sign the petition now:" lead-in, each opt-in group's question
+ * label, the privacy notice paragraph — none of which sits on a surface of
+ * its own, so all of it reads directly against the panel fill. The panel's
+ * text-light/text-dark class is on the copy column, not this one, so
+ * without a color here that text falls back to the document default and
+ * goes near-invisible on every dark fill (which, before the background
+ * choice was widened, was every fill but red). Set once on the wrapper and
+ * inherited; the field-box labels, submit button and fine-print box below
+ * each override it against their own surface. */
+.wtr-actionkit-embed-stacked {
+    color: var(--color-light);
+}
+
 .wtr-actionkit-embed-stacked #action-form {
     display: flex !important;
     flex-direction: column;
@@ -354,7 +368,11 @@ html {
     color: var(--color-dark);
 }
 
-.wtr-actionkit-embed-stacked .ak-userfield-input,
+/* :not() on the type here because ActionKit puts .ak-userfield-input on
+ * every user field including the opt-in checkbox and radios — a 100%-wide,
+ * borderless, transparent checkbox is not a checkbox. Those two get their
+ * own rules below instead. */
+.wtr-actionkit-embed-stacked .ak-userfield-input:not([type='checkbox']):not([type='radio']),
 .wtr-actionkit-embed-stacked select {
     width: 100%;
     padding: 0;
@@ -363,6 +381,45 @@ html {
     color: var(--color-dark);
     font-family: var(--font-body);
     font-size: 0.875rem;
+}
+
+/* ActionKit's fetched fragment ships inline <style> blocks that hide the
+ * native checkbox/radio (position:absolute; opacity:0; height/width:0) and
+ * expect its own drawn replacement in their place — a .checkmark span for
+ * checkboxes, a .larger-radios-choice-label for radios. Its templates emit
+ * neither inside .ak-userfield-checkbox-set / .ak-userfield-radio-set, so
+ * on the `ppg` page those two opt-ins render as bold text with no control
+ * visible and no checked state at all. (Its *privacy* radios are a
+ * different markup path — .ak-privacy .input-radio-group — and do get a
+ * drawn circle, so they are deliberately left alone here.) Undoing the
+ * hide, and the 35px label indent that reserved space for the control that
+ * never arrived, restores plain native controls.
+ *
+ * !important is required rather than merely nice: those AK rules are
+ * .input-radio.ak-input-type-action input[type="radio"] and
+ * .input-checkbox.ak-input-type-action .ak-userfield-checkbox-set label —
+ * the same specificity these selectors can reach, in a <style> block that
+ * arrives inside the fetched fragment and therefore always later in source
+ * order than this file. Matching specificity loses that tie every time;
+ * out-specifying it would mean hard-coding AK's own ak-input-type-* class
+ * names into our selectors, which breaks the moment a page uses the
+ * ak-input-type-custom variant AK's CSS also targets. */
+.wtr-actionkit-embed-stacked .ak-userfield-checkbox-set input[type='checkbox'],
+.wtr-actionkit-embed-stacked .ak-userfield-radio-set input[type='radio'] {
+    position: static !important;
+    height: 0.9375rem !important;
+    width: 0.9375rem !important;
+    margin-right: 0.5rem;
+    opacity: 1 !important;
+    accent-color: var(--color-primary);
+}
+
+.wtr-actionkit-embed-stacked .ak-userfield-checkbox-set label,
+.wtr-actionkit-embed-stacked .ak-userfield-radio-set label {
+    display: flex;
+    align-items: flex-start;
+    padding-left: 0 !important;
+    font-size: inherit;
 }
 
 .wtr-actionkit-embed-stacked .input-wrapper.input-submit {
@@ -400,6 +457,69 @@ html {
 .wtr-actionkit-embed-stacked .general-privacy-notice a {
     color: var(--color-primary-50);
     text-decoration: underline;
+}
+
+/* Opt-in checkbox / consent radio fields. ActionKit wraps these in
+ * .input-checkbox / .input-radio rather than the .input-text /
+ * .input-select boxes styled above, and their labels are bare text next to
+ * the control — so unlike the field boxes (which are their own light
+ * surface) these read directly against the panel fill and have to be
+ * colored to match it. Left unstyled they inherit whatever the browser
+ * defaults to and vanish on half the fills. The `ppg` page has one of each
+ * (a "Sacred Earth" opt-in checkbox and a consent radio pair). */
+.wtr-actionkit-embed-stacked .input-checkbox,
+.wtr-actionkit-embed-stacked .input-radio {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.wtr-actionkit-embed-stacked .input-checkbox a,
+.wtr-actionkit-embed-stacked .input-radio a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+/* ------------------------------------------------------------
+ * Panel-fill modifiers — .wtr-ak-on-{tone}
+ * ------------------------------------------------------------
+ * The rules above are written for a panel that is neither dark nor blue
+ * nor light: navy and red, the two fills this block originally offered
+ * alongside dark. Each modifier below repairs the one piece of chrome its
+ * fill collides with. See SignupActionKitBlock.PANEL_TONES for which
+ * background maps to which tone, and _actionkit_form.html for where the
+ * class lands.
+ * ------------------------------------------------------------ */
+
+/* Dark grey panel: the fine print's own --color-dark box is the same color
+ * as the panel, so the box disappears and its text reads as loose copy
+ * floating under the button. A hairline keeps it a distinct block without
+ * introducing a second dark value. */
+.wtr-actionkit-embed-stacked.wtr-ak-on-dark .general-privacy-notice {
+    background-color: transparent;
+    border: 1px solid rgb(255 255 255 / 0.25);
+}
+
+/* 350 Blue panel: the submit button's --color-primary fill *is* the panel
+ * fill, leaving a button that reads as bare white text. Dark is the same
+ * swap feature_panel_block.html's pill makes against a fill it matches. */
+.wtr-actionkit-embed-stacked.wtr-ak-on-primary button[type='submit'],
+.wtr-actionkit-embed-stacked.wtr-ak-on-primary input[type='submit'] {
+    background-color: var(--color-dark);
+}
+
+/* Light grey panel: the only fill the panel's own text inverts against
+ * (see signup_actionkit_block.html), so the form's light-on-color text
+ * inverts with it. The field boxes also go from --color-neutral-50 to
+ * white — 50 against the panel's 200 is too close to read as a separate
+ * surface, where against navy/red/dark it clearly does. */
+.wtr-actionkit-embed-stacked.wtr-ak-on-light .input-text,
+.wtr-actionkit-embed-stacked.wtr-ak-on-light .input-select {
+    background-color: var(--color-light);
+}
+
+.wtr-actionkit-embed-stacked.wtr-ak-on-light {
+    color: var(--color-dark);
 }
 
 /* ============================================================
@@ -612,6 +732,41 @@ html {
 
 .wtr-hero-banner-fade-blue-gradient {
     background: linear-gradient(to right, var(--color-primary), transparent);
+}
+
+/* ============================================================
+ * Signup panel color variants — .wtr-signup-bg-{color}
+ * ============================================================
+ * Used by signup_actionkit_block.html's standalone panel
+ * (SignupActionKitBlock.background). Same five fills, same tokens, as
+ * .wtr-callout-{color} and .wtr-hero-banner-{color} above — a third class
+ * set for the same reason the second one exists: these are three separate
+ * components that happen to share a palette, not one component reused.
+ *
+ * The dark grey fill is keyed `dark`, not `dark-grey`, because that is the
+ * value already stored in existing StreamField content from back when this
+ * block offered only Dark and Red — see SIGNUP_BACKGROUND_CHOICES for why
+ * the key was kept rather than migrated. It is the same --color-dark the
+ * other two class sets' `dark-grey` resolves to.
+ * ============================================================ */
+.wtr-signup-bg-navy {
+    background-color: var(--color-callout-navy);
+}
+
+.wtr-signup-bg-red {
+    background-color: var(--color-callout-red);
+}
+
+.wtr-signup-bg-dark {
+    background-color: var(--color-dark);
+}
+
+.wtr-signup-bg-light-grey {
+    background-color: var(--color-neutral-200);
+}
+
+.wtr-signup-bg-blue-gradient {
+    background-color: var(--color-primary);
 }
 
 /* ============================================================

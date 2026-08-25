@@ -30,6 +30,7 @@ from wagtail.blocks import RichTextBlock
 from wagtail.models import Page
 
 from wtrx.blocks import (
+    CALLOUT_COLOR_CHOICES,
     BodyStreamBlock,
     ButtonBlock,
     CalloutBlock,
@@ -285,6 +286,33 @@ class TestQuoteBlockValidation(SimpleTestCase):
         errors = _validate_at_most_one_link({"link_page": None, "link_url": ""}, {})
         self.assertEqual(errors, {})
 
+    def test_anchor_alone_is_allowed_when_declared_as_an_extra_field(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": None, "link_url": "", "anchor": "petition"},
+            {},
+            extra_fields=("anchor",),
+        )
+        self.assertEqual(errors, {})
+
+    def test_anchor_conflicts_with_a_page_link(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "", "anchor": "petition"},
+            {},
+            extra_fields=("anchor",),
+        )
+        self.assertEqual(set(errors), {"link_page", "anchor"})
+
+    def test_anchor_is_ignored_by_callers_that_do_not_declare_it(self):
+        """
+        The two-field callers (QuoteBlock, CardBlock, CardCarouselBlock)
+        have no anchor field at all, so a stray key must not be treated as
+        a competing link target.
+        """
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "", "anchor": "petition"}, {}
+        )
+        self.assertEqual(errors, {})
+
 
 class TestHeroBlockFields(SimpleTestCase):
     """
@@ -436,7 +464,53 @@ class TestSignupActionKitBlockPanelFields(SimpleTestCase):
         choices = {
             value for value, _label in block.child_blocks["background"].field.choices
         }
-        self.assertEqual(choices, {"dark", "red"})
+        self.assertEqual(
+            choices, {"navy", "red", "dark", "blue-gradient", "light-grey"}
+        )
+
+    def test_background_offers_the_same_fills_as_the_hero_banner(self):
+        """
+        The panel's fills are CalloutBlock's/the hero banner's five colors,
+        except that dark grey keeps the legacy "dark" key this block already
+        stores rather than adopting "dark-grey" — see
+        SIGNUP_BACKGROUND_CHOICES. Both name the same --color-dark fill, so
+        the two sets should agree once that one rename is applied.
+        """
+        block = SignupActionKitBlock()
+        choices = {
+            value for value, _label in block.child_blocks["background"].field.choices
+        }
+        callout_colors = {value for value, _label in CALLOUT_COLOR_CHOICES}
+        self.assertEqual(
+            (choices - {"dark"}) | {"dark-grey"},
+            callout_colors,
+        )
+
+    def test_panel_tones_cover_only_the_colliding_fills(self):
+        """
+        Navy and red take no tone modifier: the stacked form's default
+        chrome (blue submit button, dark fine-print box, light text) already
+        reads against them. The other three each collide with one piece of
+        it — see SignupActionKitBlock.PANEL_TONES.
+        """
+        self.assertEqual(
+            SignupActionKitBlock.PANEL_TONES,
+            {
+                "dark": "on-dark",
+                "blue-gradient": "on-primary",
+                "light-grey": "on-light",
+            },
+        )
+
+    def test_get_context_passes_the_panel_tone_for_the_background(self):
+        block = SignupActionKitBlock()
+        value = {"short_form_id": "ppg", "background": "light-grey"}
+        self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "on-light")
+
+    def test_get_context_panel_tone_is_blank_for_uncolliding_backgrounds(self):
+        block = SignupActionKitBlock()
+        value = {"short_form_id": "ppg", "background": "red"}
+        self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "")
 
 
 class TestSectionBlockStructure(SimpleTestCase):
@@ -603,6 +677,7 @@ class TestFeaturePanelBlockFields(SimpleTestCase):
             "link_text",
             "link_page",
             "link_url",
+            "anchor",
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
@@ -618,7 +693,7 @@ class TestFeaturePanelBlockFields(SimpleTestCase):
         """Everything but heading/image is optional — the Figma dark panel
         has no eyebrow, and the light one has no body copy."""
         block = FeaturePanelBlock()
-        for name in ("eyebrow", "text", "link_text", "link_page", "link_url"):
+        for name in ("eyebrow", "text", "link_text", "link_page", "link_url", "anchor"):
             with self.subTest(field=name):
                 self.assertFalse(block.declared_blocks[name].required)
 
