@@ -362,6 +362,63 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
       preview panel and both AI title/description generation depend on.
       Without it, `extractContent()` always resolves to `null` and Wagtail's
       own native "Content checks" panel is silently broken too, not just AI.
+    - **Image title/description generation (`/admin/images/<id>/`) needs a
+      template override, not a panel swap.** The Images admin edit view is a
+      plain Django `ModelForm` (`wagtail.images.views.images.EditView`) — it
+      never goes through Wagtail's `Panel`/`content_panels` pipeline, so
+      `AITitleFieldPanel`/`AIDescriptionFieldPanel` can't be used there.
+      `wagtail-ai` does already ship the server-side half of this
+      (`ImageTitlePrompt`/`ImageDescriptionPrompt` agents, and
+      `AgentSettings.image_title_prompt`/`image_description_prompt` fields
+      under Settings → Agents) — only the UI wiring was missing.
+      [templates/wagtailimages/images/edit.html](templates/wagtailimages/images/edit.html)
+      fixes this by extending Wagtail's own template (the same
+      self-extending-override pattern as `templates/wagtailadmin/login.html`)
+      and wrapping the `title`/`description` fields with the same
+      `data-controller="wai-field-panel"` markup `AIFieldPanel` normally
+      generates, plus `data-wai-field-panel-image-id="{{ image.pk }}"` so the
+      backend resolves the image by ID (there's no fresh file upload to read
+      on an edit form). It also explicitly loads
+      `wagtail_ai/field_panel.js`/`.css` via `extra_js`/`extra_css` —
+      normally that JS is pulled in automatically through Wagtail's Panel
+      media-declaration system (`AIPanelMixin.BoundPanel.media`), which this
+      plain-form view never invokes, so without the explicit `<script>` tag
+      the wand buttons render inert (no JS controller registered, clicking
+      does nothing).
+    - **"Get content feedback" button lives in the page editor's Checks side
+      panel**, not on a field — `wagtail_ai` overrides
+      `wagtailadmin/shared/side_panels/checks.html` to inject it there. It
+      depends on `AgentSettings.content_feedback_prompt` (Settings → Agents →
+      Content feedback → Prompt) being non-empty: unlike every other prompt
+      field on `AgentSettingsMixin`, this one has no default value, and
+      `ContentFeedbackAgent._get_prompt_messages()` only emits a `role="user"`
+      message when it's set — every other message the agent builds is
+      `role="system"`. Anthropic's API extracts all `system`-role entries
+      into a separate `system` parameter and rejects an empty `messages`
+      list, so leaving this field blank makes every "Get content feedback"
+      click fail with `messages: at least one message is required`. Fix by
+      entering any text in that settings field — it doesn't need to say
+      anything specific, it just needs to exist.
+    - **`llm-anthropic` must stay pinned to a version compatible with the
+      installed `anthropic` SDK major version** — `anthropic` is an unpinned
+      transitive dependency (no lockfile in this repo; `pip install .`
+      re-resolves "latest" on every build), so local dev and a
+      later-rebuilt production image can silently end up on different
+      `anthropic` majors. `anthropic>=1.0.0` removed `temperature`/`top_p`/
+      `top_k`/`betas` from `Messages.stream()`'s signature (the API still
+      accepts them, just via `extra_body` now); `llm-anthropic<0.27` still
+      passes them as direct kwargs and crashes with `TypeError:
+      Messages.stream() got an unexpected keyword argument 'temperature'` —
+      surfaced via the Draftail rich-text "AI Correction"/"AI Completion"
+      toolbar actions (`wagtail_ai.views.text_completion`, the `llm`/
+      `llm-anthropic` code path — separate from the `any-llm`/
+      `django-ai-core` path used by title/description/image/content-feedback
+      generation, which is why this class of break can affect one AI feature
+      and not others). Fixed by pinning `llm-anthropic>=0.27,<0.28`, the
+      first release built for `anthropic` 1.x. If a similar
+      `TypeError: unexpected keyword argument` surfaces again after an
+      `anthropic`/`llm-anthropic` bump, suspect the same signature-drift
+      pattern before anything else.
 
 ## Error Handling
 
