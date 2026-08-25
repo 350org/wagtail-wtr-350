@@ -74,7 +74,8 @@ make venv                    # Create .venv and install all dependencies
 source .venv/bin/activate
 make migrate                 # Run migrations
 make test                    # Run all tests
-make dev                     # Dev server at localhost:8000
+make dev                     # Dev server at localhost:8000 + Tailwind CSS watcher
+make dev-server              # Dev server only (no CSS watcher)
 make createsuperuser         # Create admin user
 make setup                   # Interactive initial setup
 ```
@@ -110,7 +111,7 @@ make build-prod              # Production build (CSS minified + JS + fonts + ima
 make build-js                # Copy JS source to static_compiled/js/
 make build-fonts             # Copy font files to static_compiled/fonts/
 make build-images            # Copy static images to static_compiled/images/
-make watch                   # Watch mode (rebuilds CSS on change)
+make watch                   # Watch mode, standalone (rebuilds CSS on change)
 ```
 
 `static_compiled/` is **gitignored** — build output is never committed. Run

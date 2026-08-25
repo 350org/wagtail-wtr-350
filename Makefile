@@ -1,10 +1,15 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db import-media quickstart
+.PHONY: help venv dev dev-server build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db import-media quickstart
+
+TAILWIND := ./node_modules/.bin/tailwindcss
+CSS_IN := ./static_src/css/main.css
+CSS_OUT := ./static_compiled/css/main.css
 
 help:
 	@echo "Available commands:"
 	@echo "  make quickstart                  - Full local dev setup (venv + npm + build + migrate + optional setup)"
 	@echo "  make venv                        - Create .venv and install all dependencies"
-	@echo "  make dev                         - Run development server"
+	@echo "  make dev                         - Run development server + Tailwind watcher"
+	@echo "  make dev-server                  - Run development server only (no CSS watcher)"
 	@echo "  make build                       - Build CSS and JS (development)"
 	@echo "  make build-prod                  - Build CSS and JS (production, minified)"
 	@echo "  make watch                       - Watch and rebuild CSS on change"
@@ -30,6 +35,18 @@ venv:
 	@echo "Virtual environment ready. Activate with: source .venv/bin/activate"
 
 dev:
+	@if [ ! -x "$(TAILWIND)" ]; then \
+		echo "Tailwind CLI not found — run 'npm install' first (or use 'make dev-server')."; \
+		exit 1; \
+	fi
+	@mkdir -p $(dir $(CSS_OUT))
+	@echo "Starting Tailwind watcher + Django dev server (Ctrl-C stops both)..."
+	@$(TAILWIND) -i $(CSS_IN) -o $(CSS_OUT) --watch=always < /dev/null & \
+	CSS_WATCH_PID=$$!; \
+	trap 'kill $$CSS_WATCH_PID 2>/dev/null' EXIT INT TERM; \
+	.venv/bin/python manage.py runserver
+
+dev-server:
 	.venv/bin/python manage.py runserver
 
 build-js:
@@ -54,7 +71,7 @@ build-prod: build-js build-fonts build-images
 	npm run build:prod
 
 watch:
-	npm run start
+	$(TAILWIND) -i $(CSS_IN) -o $(CSS_OUT) --watch
 
 migrate:
 	.venv/bin/python manage.py migrate

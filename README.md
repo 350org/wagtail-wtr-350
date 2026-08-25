@@ -337,13 +337,14 @@ class HomePage(BasePage, HeroMixin):
 ```
 make quickstart       Full local dev setup: venv + npm install + build + migrate + optional setup/superuser
 make venv             Create .venv and install all dependencies
-make dev              Run development server (localhost:8000)
+make dev              Run development server + Tailwind CSS watcher (localhost:8000)
+make dev-server       Run development server only (no CSS watcher)
 make build            Build CSS + JS — development (Tailwind CLI + JS + fonts + images copy)
 make build-prod       Build CSS + JS — production (minified CSS + JS + fonts + images copy)
 make build-js         Copy JS source to static_compiled/js/
 make build-fonts      Copy font files to static_compiled/fonts/
 make build-images     Copy static images to static_compiled/images/
-make watch            Watch and rebuild CSS on file changes
+make watch            Watch and rebuild CSS on file changes (standalone)
 make migrate          Run database migrations
 make createsuperuser  Create admin user
 make setup            Interactive initial site setup
@@ -446,7 +447,8 @@ Override per-site in the Wagtail admin under **Settings > Integrations**.
 ## Development
 
 ```bash
-# Watch mode: rebuilds CSS on file changes
+# `make dev` already runs the Tailwind watcher alongside the dev server.
+# Run the watcher on its own (e.g. alongside `make dev-server`):
 make watch
 
 # Run tests
