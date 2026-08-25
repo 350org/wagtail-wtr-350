@@ -9,11 +9,41 @@
         {% endif %}
         {% if action_type and slug %}
             <div class="wtr-action-network-embed mt-8">
-                <link rel="stylesheet" href="https://actionnetwork.org/css/style-embed-v3.css">
-                <script src="https://actionnetwork.org/widgets/v6/{{ action_type }}/{{ slug }}?format=js&source=widget"></script>
-                <div id="can-{{ action_type }}-area-{{ slug }}" style="width: 100%">
-                    {# Action Network widget renders here #}
-                </div>
+                {% if is_block_preview %}
+                    {% comment %}
+                    The block picker preview must not load Action Network's
+                    stylesheet or widget script -- previews open constantly
+                    while editing, and neither the traffic nor the dependency
+                    on an external host belongs there. Action Network draws the
+                    real form entirely client-side, so unlike the ActionKit
+                    block there is no markup to capture up front; these
+                    stand-in fields show the form's shape instead. Exact
+                    fields come from the form's own Action Network settings.
+                    {% endcomment %}
+                    <form class="an-form" role="presentation" onsubmit="return false">
+                        <label class="mt-4 block text-sm font-semibold text-dark">{% trans "Email" %}
+                            <input type="email" value="you@example.org" readonly
+                                   class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                        </label>
+                        <div class="mt-4 grid grid-cols-2 gap-4">
+                            <label class="block text-sm font-semibold text-dark">{% trans "First name" %}
+                                <input type="text" value="Jane" readonly
+                                       class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                            </label>
+                            <label class="block text-sm font-semibold text-dark">{% trans "Last name" %}
+                                <input type="text" value="Doe" readonly
+                                       class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                            </label>
+                        </div>
+                        <span class="wtr-btn mt-6 inline-block">{% trans "Sign Up" %}</span>
+                    </form>
+                {% else %}
+                    <link rel="stylesheet" href="https://actionnetwork.org/css/style-embed-v3.css">
+                    <script src="https://actionnetwork.org/widgets/v6/{{ action_type }}/{{ slug }}?format=js&source=widget"></script>
+                    <div id="can-{{ action_type }}-area-{{ slug }}" style="width: 100%">
+                        {# Action Network widget renders here #}
+                    </div>
+                {% endif %}
                 {% if success_message %}
                     <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
                          data-thank-you>
@@ -37,7 +67,7 @@
         {% endif %}
     </div>
 </div>
-{% if action_type and slug and success_message %}
+{% if action_type and slug and success_message and not is_block_preview %}
 <script type="module">
     (function() {
         var target = document.getElementById('can-{{ action_type }}-area-{{ slug }}');

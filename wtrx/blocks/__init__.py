@@ -18,13 +18,18 @@ Block categories (in definition order):
 All blocks are assembled into BodyStreamBlock at the bottom of this file.
 """
 
+import copy
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
+import json
+from pathlib import Path
 import re
 from urllib.parse import urlparse
 
 import requests
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import (
     CharBlock,
@@ -258,7 +263,251 @@ def _validate_at_most_one_link(cleaned, errors, extra_fields=()):
 # ---------------------------------------------------------------------------
 
 
-class TextBlock(RichTextBlock):
+# ---------------------------------------------------------------------------
+# Block previews
+#
+# Wagtail renders the block picker's preview by server-side rendering the block
+# with a placeholder value (`Meta.preview_value`) through the global preview
+# template at templates/wagtailcore/shared/block_preview.html. A block only
+# becomes previewable once it declares `preview_value` -- see that template's
+# comment for the full contract. `Meta.description` is shown as prose beside
+# the preview, and is worth setting even on blocks with no preview.
+#
+# Keep preview values realistic but obviously fake: they are what an editor
+# sees when deciding which block to reach for.
+# ---------------------------------------------------------------------------
+
+
+PREVIEW_DATA_PATH = Path(__file__).resolve().parent.parent / "previews" / "block_previews.json"
+
+
+@lru_cache(maxsize=1)
+def _preview_data():
+    """
+    Load the harvested block-preview values, keyed by block name.
+
+    Regenerate with `python manage.py harvest_block_previews`. Cached for the
+    process lifetime: this reads a file, never the database, so it is safe to
+    call from `is_previewable` (which Wagtail evaluates while building the
+    picker). A missing file simply means no content-sourced previews.
+    """
+    try:
+        return json.loads(PREVIEW_DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+class ContentPreviewMixin:
+    """
+    Sources a block's picker preview from real site content.
+
+    Mix into any block whose preview should come from
+    `wtrx/previews/block_previews.json` rather than a hand-written
+    `Meta.preview_value`. The two are alternatives -- use this mixin when real
+    content exists for the block, and `Meta.preview_value` when it doesn't.
+
+    Two details make this work:
+
+    - The harvested JSON is in `get_prep_value()` form, where an image is a
+      bare pk. `Block.normalize()` (which `get_preview_value` would otherwise
+      apply) does NOT turn a pk back into an image -- only `to_python()` does,
+      so that is what this uses. Skipping it renders an int where a template
+      expects an image.
+    - Overriding `get_preview_value` is itself what Wagtail's default
+      `is_previewable` looks for, so it would mark *every* mixed-in block as
+      previewable even with no data behind it, producing blank previews.
+      `is_previewable` is therefore pinned to "do we actually have data".
+    """
+
+    #: Key into the harvested JSON. Defaults to the block's name in its parent
+    #: StreamBlock, which is what the harvester keys on.
+    preview_key = None
+
+    #: Optional ``{field_name: count}`` caps applied to list fields in the
+    #: harvested value. Real content is not always the clearest preview: a
+    #: CardGridBlock with exactly four cards deliberately lays out 2x2 rather
+    #: than in three columns, so its preview trims to three to show the layout
+    #: an editor gets by default. Trimming beats hand-authoring the block --
+    #: the copy and images stay real.
+    preview_max_items = {}
+
+    def _harvested_preview(self):
+        entry = self._harvested_entry()
+        return entry.get("value") if entry else None
+
+    def _harvested_entry(self):
+        key = self.preview_key or getattr(self, "name", None)
+        return _preview_data().get(key) if key else None
+
+    def get_preview_value(self):
+        raw = self._harvested_preview()
+        if raw is None:
+            return super().get_preview_value()
+        raw = copy.deepcopy(raw)
+        for field, limit in self.preview_max_items.items():
+            if isinstance(raw.get(field), list):
+                raw[field] = raw[field][:limit]
+        repaired, _ = _repair_image_references(self, raw)
+        return self.to_python(repaired)
+
+    @property
+    def is_previewable(self):
+        # Deliberately a plain property, unlike Wagtail's cached_property.
+        # Wagtail shares one block instance across every StreamBlock that
+        # declares it, so a cached value computed from database state would be
+        # frozen process-wide -- an image library that fills up later would
+        # never start offering previews. The queries behind it are cached
+        # below, and this only runs while building the admin block picker.
+        raw = self._harvested_preview()
+        if raw is None:
+            return False
+        # An image-dependent block with nothing to show would render a broken
+        # preview rather than a degraded one -- better to offer none at all.
+        _, images_ok = _repair_image_references(self, copy.deepcopy(raw))
+        return images_ok
+
+
+def _repair_image_references(block, raw):
+    """
+    Swap any image pk in harvested preview data that no longer resolves for one
+    that does, in place, returning `raw`.
+
+    Harvested previews store images the way StreamField does -- as a primary
+    key -- and those keys only mean anything in the database they came from. A
+    fresh clone, CI, or a re-imported library leaves them dangling, and
+    `to_python()` turns a dangling pk into None. That is not a harmless blank:
+    block templates reasonably assume a required image is present (see
+    image_block.html, which calls `{% image %}` with no None-guard because the
+    field cannot be empty in real content), so the preview breaks rather than
+    degrading. Substituting any real image keeps the preview representative.
+
+    Walks the block tree rather than the raw data alone, because only the block
+    definition says which values are image references and which are ordinary
+    integers.
+    """
+    from wagtail.images.blocks import ImageChooserBlock
+
+    def resolve(block, raw):
+        if isinstance(raw, dict) and hasattr(block, "child_blocks"):
+            for name, value in raw.items():
+                child = block.child_blocks.get(name)
+                if child is None:
+                    continue
+                if isinstance(child, ImageChooserBlock):
+                    if value and not _image_exists(value):
+                        raw[name] = _fallback_image_pk()
+                        if raw[name] is None:
+                            unsatisfied.append(name)
+                else:
+                    resolve(child, value)
+        elif isinstance(raw, list):
+            for item in raw:
+                # ListBlock items are bare values; StreamBlock children are
+                # {type, value, id} dicts naming the child block to use.
+                if hasattr(block, "child_block"):
+                    resolve(block.child_block, item)
+                elif isinstance(item, dict) and "type" in item:
+                    child = getattr(block, "child_blocks", {}).get(item["type"])
+                    if child is not None:
+                        resolve(child, item.get("value"))
+
+    unsatisfied = []
+    resolve(block, raw)
+    return raw, not unsatisfied
+
+
+#: Preview lookups run once per block while rendering the picker, so the
+#: handful of queries behind them are cached briefly rather than per request.
+#: Short enough that a newly-populated image library starts working promptly.
+PREVIEW_LOOKUP_CACHE_TIMEOUT = 60
+
+
+def _image_exists(pk):
+    from wtrx.images import CustomImage
+
+    key = "wtrx:preview_image_exists:%s" % pk
+    cached = cache.get(key)
+    if cached is None:
+        cached = CustomImage.objects.filter(pk=pk).exists()
+        cache.set(key, cached, PREVIEW_LOOKUP_CACHE_TIMEOUT)
+    return cached
+
+
+def _fallback_image_pk():
+    key = "wtrx:preview_fallback_image"
+    cached = cache.get(key)
+    if cached is None:
+        image = preview_image()
+        cached = image.pk if image else 0
+        cache.set(key, cached, PREVIEW_LOOKUP_CACHE_TIMEOUT)
+    return cached or None
+
+
+def preview_image(min_width=800):
+    """
+    Return an arbitrary image from the library, for use as a `preview_value`
+    placeholder on blocks with an ImageChooserBlock field.
+
+    MUST only be called at request time -- from inside a `preview_value`
+    callable, never at import time (AGENTS.md "Common Pitfalls" #1).
+
+    Returns None on an empty image library. Callers must handle that: block
+    templates do NOT all tolerate a missing image (image_block.html calls
+    `{% image %}` unguarded, since its field is required in real content), so a
+    None here means "do not offer a preview", not "preview without the image".
+    """
+    from wtrx.images import CustomImage
+
+    return (
+        CustomImage.objects.filter(width__gte=min_width).order_by("pk").first()
+        or CustomImage.objects.order_by("pk").first()
+    )
+
+
+def _hero_preview_value():
+    """Placeholder value for HeroBlock's picker preview."""
+    return {
+        "headline": _("A future powered by people"),
+        "content": "<p>Supporting copy introducing the section that follows.</p>",
+        "image": preview_image(),
+        "banner_color": "navy",
+    }
+
+
+def _person_card_preview_value():
+    """Placeholder value for PersonCardBlock's picker preview."""
+    return {
+        "name": _("Jane Doe"),
+        "role": _("Regional Organising Lead"),
+        "image": preview_image(),
+        "bio": _(
+            "Jane coordinates campaign partners across the region and has "
+            "organised with the climate movement for over a decade."
+        ),
+        "email": "jane@example.org",
+    }
+
+
+def _signup_wagtail_forms_preview_value():
+    """
+    Placeholder value for SignupWagtailFormsBlock's picker preview.
+
+    `form_page` is required on the block, but a site need not have built a Form
+    page yet -- and there is nothing sensible to invent, since the fields come
+    from whichever page is chosen. Falls back to None, which the template
+    renders as the surrounding prompt without a form body.
+    """
+    from wtrx.models import FormPage
+
+    return {
+        "heading": _("Sign up for updates"),
+        "description": "<p>Tell us where to reach you and we will keep you posted.</p>",
+        "button_text": _("Sign up"),
+        "form_page": FormPage.objects.live().first(),
+    }
+
+
+class TextBlock(ContentPreviewMixin, RichTextBlock):
     """
     A rich text content block.
 
@@ -274,10 +523,14 @@ class TextBlock(RichTextBlock):
         icon = "pilcrow"
         label = _("Text")
         template = "wtrx/components/streamfield/blocks/text_block.html"
+        description = _(
+            "Rich text: paragraphs, headings, lists, bold/italic and links. "
+            "The default choice for ordinary body copy."
+        )
 
 
 @ai_image_block()
-class ImageBlock(StructBlock):
+class ImageBlock(ContentPreviewMixin, StructBlock):
     """
     An image with optional alt text override and caption.
 
@@ -307,7 +560,7 @@ class ImageBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/image_block.html"
 
 
-class VideoBlock(StructBlock):
+class VideoBlock(ContentPreviewMixin, StructBlock):
     """
     A video block supporting either an embed URL (YouTube, Vimeo, etc.)
     or an uploaded media file via wagtailmedia.
@@ -415,10 +668,25 @@ class ButtonBlock(StructBlock):
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
 
+    #: Centred in the pane, and laid out narrow so the preview scales the
+    #: button *up*: at 1:1 a lone button is legible but lost in a pane this
+    #: size. See templates/wagtailcore/shared/block_preview.html.
+    preview_layout = "center"
+    preview_target_width = 340
+
     class Meta:
         icon = "link"
         label = _("Button")
         template = "wtrx/components/streamfield/blocks/button_block.html"
+        description = _(
+            "A single call-to-action button. Links to a page on this site, an "
+            "external URL, or an anchor further down the same page."
+        )
+        preview_value = {
+            "text": _("Take action"),
+            "link_url": "https://example.com",
+            "style": "primary",
+        }
 
 
 class RawHTMLBlock(WagtailRawHTMLBlock):
@@ -429,10 +697,29 @@ class RawHTMLBlock(WagtailRawHTMLBlock):
     the raw markup to translators — brief editor guidance is recommended.
     """
 
+    #: Laid out narrow so the preview scales it up: at the default desktop
+    #: width this block's content is too small to read in the pane.
+    preview_target_width = 700
+
     class Meta:
         icon = "code"
         label = _("Raw HTML")
         template = "wtrx/components/streamfield/blocks/raw_html_block.html"
+        description = _(
+            "Paste in HTML supplied by another service -- an embed, a widget, "
+            "a snippet of markup. It is rendered exactly as given, so only use "
+            "it for code you trust."
+        )
+        preview_value = (
+            '<div style="border:2px dashed #9aa5a8;border-radius:8px;padding:24px;'
+            'font-family:ui-monospace,monospace">'
+            '<p style="margin:0 0 12px;font-weight:700">Embedded HTML</p>'
+            '<p style="margin:0 0 16px">Markup you paste here renders as-is -- '
+            'an embed, an iframe, or a widget from another service.</p>'
+            '<code style="display:block;background:#eef1f2;padding:12px;'
+            'border-radius:6px">&lt;iframe src="..."&gt;&lt;/iframe&gt;</code>'
+            "</div>"
+        )
 
 
 class TableBlock(WagtailTableBlock):
@@ -440,10 +727,29 @@ class TableBlock(WagtailTableBlock):
     A tabular data block using Wagtail's built-in table editor.
     """
 
+    #: Same as RawHTMLBlock: table text is unreadable at the default width.
+    preview_target_width = 800
+
     class Meta:
         icon = "table"
         label = _("Table")
         template = "wtrx/components/streamfield/blocks/table_block.html"
+        description = _(
+            "A simple data table, edited as a spreadsheet-style grid. The first "
+            "row and column can each be marked as headers."
+        )
+        preview_value = {
+            "first_row_is_table_header": True,
+            "first_col_is_header": False,
+            "table_caption": "",
+            "data": [
+                ["Region", "Coal plants retired", "Renewable capacity added"],
+                ["Africa", "12", "4.1 GW"],
+                ["Asia", "48", "31.7 GW"],
+                ["Europe", "23", "18.2 GW"],
+                ["Latin America", "9", "7.5 GW"],
+            ],
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -451,7 +757,7 @@ class TableBlock(WagtailTableBlock):
 # ---------------------------------------------------------------------------
 
 
-class CardBlock(StructBlock):
+class CardBlock(ContentPreviewMixin, StructBlock):
     """
     A content card with a heading, optional icon, optional image, description,
     and link.
@@ -506,10 +812,31 @@ class CardBlock(StructBlock):
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
 
+    #: A card is never full width in practice -- it sits in a grid three to a
+    #: row. Constrain the lone-card preview to the width one occupies there,
+    #: so it matches what the Card Grid preview shows.
+    preview_max_width = 400
+
+    #: ...and lay that out in a narrower viewport than the 1280 default, which
+    #: scales the card up to fill the pane instead of sitting small in the
+    #: middle of it. Safe to do here only because card.html uses no responsive
+    #: variants, so there are no breakpoints to lose.
+    #:
+    #: Height is what caps this, not width. A card is ~450px tall at 400px
+    #: wide, and Wagtail gives the preview pane a 400px minimum height, so
+    #: anything below ~790 here starts clipping the CTA off the bottom in a
+    #: short pane.
+    preview_target_width = 800
+
     class Meta:
         icon = "doc-full"
         label = _("Card")
         template = "wtrx/components/streamfield/blocks/card_block.html"
+        description = _(
+            "A single linked card: heading, short description, optional image, "
+            "tag and icon. Usually reached for via Card Grid, which lays "
+            "several out together."
+        )
 
 
 class CarouselCardBlock(CardBlock):
@@ -565,10 +892,22 @@ class PersonCardBlock(StructBlock):
         label=_("Website"),
     )
 
+    #: A person card sits in a grid alongside others, never full width --
+    #: same treatment as CardBlock, scaled up to fill the pane. It carries no
+    #: image banner so it is shorter than a CardBlock and can be scaled further
+    #: before the pane's 400px minimum height clips it.
+    preview_max_width = 400
+    preview_target_width = 640
+
     class Meta:
         icon = "user"
         label = _("Person")
         template = "wtrx/components/streamfield/blocks/person_card_block.html"
+        description = _(
+            "A person: photo, name, role and short bio, with optional contact "
+            "details. Use for staff, spokespeople or board listings."
+        )
+        preview_value = staticmethod(_person_card_preview_value)
 
 
 # ---------------------------------------------------------------------------
@@ -599,7 +938,7 @@ class AccordionItemBlock(StructBlock):
         label = _("Accordion item")
 
 
-class CardGridBlock(StructBlock):
+class CardGridBlock(ContentPreviewMixin, StructBlock):
     """
     An auto-responsive grid of content cards.
 
@@ -627,10 +966,20 @@ class CardGridBlock(StructBlock):
         label=_("Cards"),
     )
 
+    #: Real content here has four cards, which is the one count that lays out
+    #: 2x2 instead of in three columns -- see card_grid_block.html.
+    preview_max_items = {"cards": 3}
+
     class Meta:
         icon = "grip"
         label = _("Card Grid")
         template = "wtrx/components/streamfield/blocks/card_grid_block.html"
+        description = _(
+            "An auto-responsive grid of 2-12 linked cards, three to a row on a "
+            "wide screen and two on a narrow one. Exactly four cards lay out "
+            "2x2 instead, to avoid a trailing row of one. There are no column "
+            "controls."
+        )
 
 
 class ImageCardListItemBlock(StructBlock):
@@ -649,7 +998,7 @@ class ImageCardListItemBlock(StructBlock):
         label = _("Card")
 
 
-class ImageCardListBlock(StructBlock):
+class ImageCardListBlock(ContentPreviewMixin, StructBlock):
     """
     A centered heading above a two-column split: an image on the left, a
     vertical stack of simple text cards (ImageCardListItemBlock) on the
@@ -679,7 +1028,7 @@ class ImageCardListBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/image_card_list_block.html"
 
 
-class ImageTextBlock(StructBlock):
+class ImageTextBlock(ContentPreviewMixin, StructBlock):
     """
     A two-column split: an image on the left (natural aspect ratio, not
     stretched to match the text column like ImageCardListBlock's image
@@ -709,7 +1058,7 @@ class ImageTextBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/image_text_block.html"
 
 
-class FeaturePanelBlock(StructBlock):
+class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
     """
     A filled, rounded panel holding an image beside a text stack: optional
     eyebrow pill, heading, optional body copy, optional CTA button with a
@@ -808,7 +1157,7 @@ class FeaturePanelBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/feature_panel_block.html"
 
 
-class CardCarouselBlock(StructBlock):
+class CardCarouselBlock(ContentPreviewMixin, StructBlock):
     """
     A heading + supporting copy, an optional CTA button, and a horizontally
     scrollable row of cards with prev/next arrow controls.
@@ -862,7 +1211,7 @@ class CardCarouselBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/card_carousel_block.html"
 
 
-class PageCardsBlock(StructBlock):
+class PageCardsBlock(ContentPreviewMixin, StructBlock):
     """
     A heading + optional subheading, and a row of cards auto-generated from
     the most recently published child pages of a chosen index page, plus an
@@ -935,7 +1284,7 @@ class PageCardsBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/page_cards_block.html"
 
 
-class AccordionBlock(StructBlock):
+class AccordionBlock(ContentPreviewMixin, StructBlock):
     """
     A collapsible accordion (FAQ-style) list.
 
@@ -953,6 +1302,24 @@ class AccordionBlock(StructBlock):
         icon = "list-ul"
         label = _("Accordion")
         template = "wtrx/components/streamfield/blocks/accordion_block.html"
+
+
+def _quote_preview_value():
+    """
+    Placeholder value for QuoteBlock's picker preview.
+
+    A function rather than a dict literal because it needs a real image from
+    the database, which must not be read at import time. Assigned to
+    `Meta.preview_value` via staticmethod() -- Wagtail instantiates the Meta
+    class, so a plain function there would be bound and called with `self`.
+    """
+    return {
+        "content": "<p>A short, punchy line lifted from the page and given room to breathe.</p>",
+        "image": preview_image(),
+        "link_text": _("Read the full story"),
+        "link_url": "https://example.com",
+        "alignment": "image-left",
+    }
 
 
 class QuoteBlock(StructBlock):
@@ -1037,9 +1404,14 @@ class QuoteBlock(StructBlock):
         icon = "image"
         label = _("Quote")
         template = "wtrx/components/streamfield/blocks/quote_block.html"
+        description = _(
+            "A large pull-quote set beside an image or video, with an optional "
+            "button. Best used once on a page, for a testimonial or key line."
+        )
+        preview_value = staticmethod(_quote_preview_value)
 
 
-class CalloutBlock(StructBlock):
+class CalloutBlock(ContentPreviewMixin, StructBlock):
     """
     A solid-color card: optional heading, optional subheading,
     optional paragraph, optional CTA button, and an optional low-opacity
@@ -1109,6 +1481,10 @@ class CalloutBlock(StructBlock):
         icon = "pick"
         label = _("Callout")
         template = "wtrx/components/streamfield/blocks/callout_block.html"
+        description = _(
+            "A solid-colour panel with a heading and a call-to-action button. "
+            "Use it to break up a long page and push readers toward one action."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1193,9 +1569,21 @@ class DonateBlock(StructBlock):
         icon = "pick"
         label = _("Donate")
         template = "wtrx/components/streamfield/blocks/donate_block.html"
+        description = _(
+            "A donation ask with suggested amounts, linking out to ActBlue. "
+            "Amounts and the destination come from Settings > Integrations "
+            "unless overridden here."
+        )
+        preview_value = {
+            "heading": _("Chip in to keep the pressure on"),
+            "description": "<p>Every contribution funds organisers, research and public campaigning.</p>",
+            "button_text": _("Donate"),
+            "override_amounts": ["10", "25", "50", "100"],
+            "override_url": "https://example.com/donate",
+        }
 
 
-class DonateFundraiseUpBlock(StructBlock):
+class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
     """
     A Fundraise Up donate button.
 
@@ -1299,6 +1687,12 @@ class SignupWagtailFormsBlock(StructBlock):
         icon = "form"
         label = _("Sign Up (Wagtail Forms)")
         template = "wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html"
+        description = _(
+            "A form built in this CMS (a Form page), rendered inline. Use it "
+            "when the submissions should live here rather than on an external "
+            "platform."
+        )
+        preview_value = staticmethod(_signup_wagtail_forms_preview_value)
 
 
 class SuccessMessageBlock(StreamBlock):
@@ -1425,9 +1819,18 @@ class SignupActionNetworkBlock(StructBlock):
         icon = "form"
         label = _("Sign Up (Action Network)")
         template = "wtrx/components/streamfield/blocks/signup_action_network_block.html"
+        description = _(
+            "An Action Network form embedded in the page, from its public URL. "
+            "Supporters sign up without leaving the site."
+        )
+        preview_value = {
+            "heading": _("Add your name"),
+            "description": "<p>Join supporters around the world calling for an end to fossil fuel expansion.</p>",
+            "action_url": "https://actionnetwork.org/forms/example-petition",
+        }
 
 
-class SignupActionKitBlock(StructBlock):
+class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
     """
     Auto-renders an ActionKit page's own signup form.
 
@@ -1555,6 +1958,26 @@ class SignupActionKitBlock(StructBlock):
         cache.set(cache_key, html, self.SUCCESS_CACHE_TIMEOUT)
         return html
 
+    #: Stand-in for the real ActionKit form in the block picker preview.
+    #: The live block fetches its form markup from the client's ActionKit
+    #: instance; doing that to render a preview would put third-party traffic
+    #: behind every click in the picker, and fail entirely offline or before
+    #: the integration is configured. The fields mirror a default ActionKit
+    #: signup form closely enough to show an editor what the block looks like.
+    PREVIEW_FORM_HTML = (
+        '<form class="ak-form" onsubmit="return false">'
+        '<div class="ak-field"><label>Email</label>'
+        '<input type="email" value="you@example.org" readonly></div>'
+        '<div class="ak-field"><label>First name</label>'
+        '<input type="text" value="Jane" readonly></div>'
+        '<div class="ak-field"><label>Last name</label>'
+        '<input type="text" value="Doe" readonly></div>'
+        '<div class="ak-field"><label>Country</label>'
+        '<select disabled><option>United States</option></select></div>'
+        '<button type="submit" class="ak-submit">Sign the petition</button>'
+        "</form>"
+    )
+
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
         short_form_id = value.get("short_form_id", "")
@@ -1571,7 +1994,15 @@ class SignupActionKitBlock(StructBlock):
                 hostname = ""
 
         form_html = None
-        if hostname and short_form_id:
+        if (parent_context or {}).get("is_block_preview"):
+            # Never reach out to ActionKit to draw a block picker preview. The
+            # harvest captures the real form markup once (see
+            # `manage.py harvest_block_previews`) so the preview matches the
+            # page it came from; PREVIEW_FORM_HTML covers the case where it
+            # could not be captured.
+            entry = self._harvested_entry() or {}
+            form_html = entry.get("form_html") or self.PREVIEW_FORM_HTML
+        elif hostname and short_form_id:
             form_html = self._fetch_form_html(hostname, short_form_id)
 
         ctx["form_html"] = form_html
@@ -1627,6 +2058,16 @@ class SignupLinkBlock(StructBlock):
         icon = "link"
         label = _("Sign Up (Link)")
         template = "wtrx/components/streamfield/blocks/signup_link_block.html"
+        description = _(
+            "A short sign-up prompt with a button that sends people to a form "
+            "hosted elsewhere, rather than embedding one."
+        )
+        preview_value = {
+            "heading": _("Join the movement"),
+            "description": "<p>Get campaign updates and ways to take action, straight to your inbox.</p>",
+            "button_text": _("Sign up"),
+            "external_url": "https://example.com/signup",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -1756,6 +2197,12 @@ class HeroBlock(StructBlock):
         icon = "image"
         label = _("Hero")
         template = "wtrx/components/streamfield/blocks/hero_block.html"
+        description = _(
+            "A full-width banner with a headline, supporting copy and a "
+            "coloured background -- for opening a section mid-page. A page's "
+            "own hero is set on the page itself, not with this block."
+        )
+        preview_value = staticmethod(_hero_preview_value)
 
 
 class SectionContentBlock(StreamBlock):
@@ -1802,7 +2249,7 @@ class SectionContentBlock(StreamBlock):
         label = _("Content")
 
 
-class SectionBlock(StructBlock):
+class SectionBlock(ContentPreviewMixin, StructBlock):
     """
     A full-width page section with configurable background, padding, and content.
 

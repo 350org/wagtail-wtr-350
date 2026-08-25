@@ -1000,6 +1000,11 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   updated with conditional icon rendering. `create_test_page` and tests updated.
 - [x] README `Customizing Blocks` section — documents the subclass-and-override
   pattern for fork sites, with a concrete example of adding a field to `CardBlock`
+- [x] Block picker previews: `templates/wagtailcore/shared/block_preview.html`
+  (global override that loads the compiled Tailwind bundle, and whose existence
+  is what enables previews at all), `Meta.description` + `Meta.preview_value` on
+  the blocks, `ContentPreviewMixin` sourcing previews from real site content, and
+  `manage.py harvest_block_previews` to regenerate `wtrx/previews/block_previews.json`
 - [ ] `fixtures/demo.json` -- demo content (deferred)
 - [ ] Verify settings panels work
 - [ ] Verify AJAX form submission

@@ -53,7 +53,34 @@
                     </div>
                 {% endif %}
                 <div class="mt-8">
-                    <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+                    {% if is_block_preview %}
+                        {% comment %}
+                        Fundraise Up's script is loaded site-wide in <head> and
+                        is deliberately absent from block previews, so nothing
+                        would hydrate the anchor below and the block would
+                        preview with an empty action area. This stand-in shows
+                        the shape of the control without loading, or calling,
+                        anything from Fundraise Up. The real appearance is
+                        configured in their dashboard, not here.
+                        {% endcomment %}
+                        <div class="wtr-fundraiseup-preview" role="presentation" aria-hidden="true">
+                            <div class="flex rounded-lg border border-light/30 p-1 text-base">
+                                <span class="flex-1 rounded-md bg-light px-4 py-2 text-center font-semibold text-dark">{% trans "One-time" %}</span>
+                                <span class="flex-1 px-4 py-2 text-center font-semibold opacity-70">{% trans "Monthly" %}</span>
+                            </div>
+                            <div class="mt-4 grid grid-cols-3 gap-3 text-lg font-semibold">
+                                <span class="rounded-lg border border-light/30 py-3 text-center">$10</span>
+                                <span class="rounded-lg border border-light/30 py-3 text-center">$25</span>
+                                <span class="rounded-lg border-2 border-light py-3 text-center">$50</span>
+                                <span class="rounded-lg border border-light/30 py-3 text-center">$100</span>
+                                <span class="rounded-lg border border-light/30 py-3 text-center">$250</span>
+                                <span class="rounded-lg border border-light/30 py-3 text-center">{% trans "Other" %}</span>
+                            </div>
+                            <span class="mt-4 block rounded-lg bg-primary-600 px-6 py-3 text-center text-lg font-semibold text-light">{% trans "Donate" %}</span>
+                        </div>
+                    {% else %}
+                        <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+                    {% endif %}
                 </div>
             </div>
         </div>

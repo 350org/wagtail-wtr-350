@@ -777,6 +777,53 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     submenu's own label is not a link, so visiting a page that merely shares
     its name does not activate it.
 
+30. **Block picker previews need three pieces, and the template is
+    load-bearing**: a block only shows a preview in the "Add block" picker when
+    all of these line up.
+    - `templates/wagtailcore/shared/block_preview.html` — a self-extending
+      override of Wagtail's own template (same pattern as
+      `templates/wagtailadmin/login.html`) that injects the compiled Tailwind
+      bundle, so previews render as the block actually looks. **Its existence
+      is what switches previews on at all**: `Block.is_previewable` calls
+      `wagtail.utils.templates.template_is_overridden`, which compares the
+      resolved template path against the copy inside the `wagtail` package.
+      Delete the file and every preview in the picker silently disappears —
+      no error, just nothing.
+    - A preview value, from one of two mutually exclusive sources.
+      `Meta.preview_value` is a hand-written literal (wrap a *callable* in
+      `staticmethod()` — Wagtail instantiates the `Meta` class, so a bare
+      function there gets bound and called with `self`). `ContentPreviewMixin`
+      instead pulls the value from `wtrx/previews/block_previews.json`,
+      harvested from real page content by
+      `python manage.py harvest_block_previews`. Never do both on one block.
+    - Optional layout hints as **class attributes, not `Meta` fields** —
+      `preview_layout`, `preview_target_width`, `preview_max_width` are read
+      off the block instance by the preview template.
+    Anything a preview touches runs at request time inside the admin, so the
+    import-time DB rule (#1) applies with full force: `preview_image()` and
+    every `_*_preview_value()` helper must stay callables, never module-level
+    values.
+
+31. **`ContentPreviewMixin` overrides `is_previewable` on purpose — don't
+    "simplify" it back**: two non-obvious constraints are baked in.
+    - Harvested JSON is in `get_prep_value()` form, where an image is a bare
+      pk. It must be revived with `to_python()`, not `normalize()` — only the
+      former turns a pk back into an image, and the difference shows up as an
+      integer rendered where a template expects an image object.
+    - Wagtail's default `is_previewable` is "does this block override
+      `get_preview_value`", which the mixin does unconditionally — so without
+      the override *every* mixed-in block would advertise a preview and render
+      a blank one when the JSON has no entry for it. The replacement is also
+      deliberately a plain `property`, not Wagtail's `cached_property`: one
+      block instance is shared across every StreamBlock that declares it, so a
+      cached answer computed from database state would freeze process-wide.
+      The queries behind it are cached for `PREVIEW_LOOKUP_CACHE_TIMEOUT`
+      instead.
+    Harvested image pks only mean anything in the database they came from, so
+    `_repair_image_references()` swaps dangling ones for any real image, and
+    reports "no usable image" rather than letting a required-image block
+    preview as broken markup.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive branch names: `feature/signup-block`,
