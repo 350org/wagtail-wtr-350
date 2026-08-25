@@ -37,15 +37,19 @@ class TestHomePageParentSubpageTypes(WagtailPageTests):
     def test_can_create_under_root(self):
         self.assertCanCreateAt(Page, HomePage)
 
-    def test_can_not_create_under_home_page(self):
-        self.assertCanNotCreateAt(HomePage, HomePage)
+    def test_can_create_under_home_page(self):
+        """Country/region sub-homes (e.g. /canada) nest under the site home page."""
+        self.assertCanCreateAt(HomePage, HomePage)
 
     def test_can_not_create_under_content_page(self):
         self.assertCanNotCreateAt(ContentPage, HomePage)
 
+    def test_can_not_create_under_index_page(self):
+        self.assertCanNotCreateAt(IndexPage, HomePage)
+
     def test_allowed_subpage_types(self):
         self.assertAllowedSubpageTypes(
-            HomePage, [ContentPage, IndexPage, FormPage, Blogs]
+            HomePage, [HomePage, ContentPage, IndexPage, FormPage, Blogs]
         )
 
 
@@ -418,6 +422,45 @@ class TestPostGetContext(TestCase):
         ctx = self._get_context(self.post)
         self.assertEqual(ctx["hero"]["cta"], [])
 
+    def test_related_headings_follow_parent_title(self):
+        ctx = self._get_context(self.post)
+        self.assertEqual(ctx["related_heading"], "Related blogs")
+        self.assertEqual(ctx["related_link_text"], "Read more blogs")
+
+    def test_related_posts_are_scoped_to_own_parent(self):
+        """A post under another Blogs page never appears in these related posts."""
+        other_blogs = Blogs(title="Press Releases", slug="press-releases-bp")
+        self.blogs.get_parent().add_child(instance=other_blogs)
+        other_post = Post(title="A Release", slug="a-release-bp", published_at=timezone.now())
+        other_blogs.add_child(instance=other_post)
+
+        headings = [card["heading"] for card in self._get_context(self.post)["related_posts"]]
+        self.assertNotIn("A Release", headings)
+        self.assertIn("No Author Post", headings)
+
+    def test_related_headings_adapt_to_press_releases_parent(self):
+        other_blogs = Blogs(title="Press Releases", slug="press-releases-bp2")
+        self.blogs.get_parent().add_child(instance=other_blogs)
+        release = Post(title="A Release", slug="a-release-bp2", published_at=timezone.now())
+        other_blogs.add_child(instance=release)
+
+        ctx = self._get_context(release)
+        self.assertEqual(ctx["related_heading"], "Related press releases")
+        self.assertEqual(ctx["related_link_text"], "Read more press releases")
+
+    def test_related_intro_uses_parent_related_intro(self):
+        self.blogs.related_intro = "Stories from the movement."
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_intro"], "Stories from the movement.")
+
+    def test_related_intro_falls_back_to_parent_hero_copy(self):
+        self.blogs.related_intro = ""
+        self.blogs.hero_copy = "<p>News and insights.</p>"
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_intro"], "News and insights.")
+
 
 class TestPostForm(TestCase):
     """
@@ -562,6 +605,22 @@ class TestBlogsGetContext(TestCase):
         ctx = self._get_context({"category": "nonexistent"})
         self.assertIsNone(ctx["selected_category"])
         self.assertEqual(len(ctx["posts"].object_list), 3)
+
+
+class TestBlogsPostLabel(TestCase):
+    """
+    Blogs.post_label drives the "Related …" headings on child posts, so it
+    must pluralise the page title without doubling an existing "s".
+    """
+
+    def test_singular_title_is_pluralised(self):
+        self.assertEqual(Blogs(title="Blog").post_label, "blogs")
+
+    def test_plural_title_is_left_alone(self):
+        self.assertEqual(Blogs(title="Press Releases").post_label, "press releases")
+
+    def test_title_ending_in_s_is_left_alone(self):
+        self.assertEqual(Blogs(title="News").post_label, "news")
 
 
 class TestBlogsMeta(TestCase):

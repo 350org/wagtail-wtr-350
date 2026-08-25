@@ -1,4 +1,19 @@
 {% load wagtailcore_tags %}
-<div class="prose prose-neutral max-w-none text-lg sm:text-xl lg:text-2xl in-data-[bg=dark]:prose-invert in-data-[bg=primary]:prose-invert in-data-[bg=secondary]:prose-invert">
+{% comment %}
+prose's own heading scale is relative to the body size (h2 = 1.5em), which
+lands ~36px against this block's 24px body — well under the 64px Figma sets
+for a section heading (The Great Power Shift's "Our Demands" and "Get the
+full picture.", nodes 1:1251 and 1:1272). .wtr-text-block in main.css pins
+h2/h3 to the same text-64/text-40 steps the dedicated heading fields on
+CardGridBlock, ImageTextBlock and the hero already use, so a heading typed
+into a rich text block and one entered in a block's own heading field
+render alike.
+
+That override lives in main.css rather than as prose-h2:* utilities here
+because the two end up at identical specificity (0,1,0) and Tailwind emits
+the typography plugin's rules after the utilities layer, so the plugin wins
+on source order — the utilities compile but never apply.
+{% endcomment %}
+<div class="wtr-text-block prose prose-neutral max-w-none text-lg sm:text-xl lg:text-2xl in-data-[bg=dark]:prose-invert in-data-[bg=primary]:prose-invert in-data-[bg=secondary]:prose-invert">
     {{ value|richtext }}
 </div>

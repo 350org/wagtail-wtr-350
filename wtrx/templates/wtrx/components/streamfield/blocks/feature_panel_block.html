@@ -1,0 +1,96 @@
+{% load i18n wagtailcore_tags wagtailimages_tags %}
+{% comment %}
+Filled, rounded panel: image in one column, a text stack (optional eyebrow
+pill, H2, optional richtext body, optional CTA button with trailing arrow)
+in the other. Columns are vertically centered against each other — contrast
+image_text_block.html, which top-aligns them and has no panel fill at all.
+Single column on mobile, image first in DOM order regardless of alignment.
+
+Per Figma's Take Action page (node 1:1021), this renders both the
+"Featured Campaign" panel above the card grid (light, with pill) and the
+"Looking for more?" panel below it (dark, no pill). One component, two
+configurations — see FeaturePanelBlock's docstring.
+
+Full-bleed-ish width: special-cased in content_page.html/home_page.html/
+post_page.html (alongside section/callout/image_text/etc.) to skip the
+shared max-w-5xl wrapper, same w-full-outer / max-w-inner two-tier pattern
+as callout_block.html — see that file's comment for why a bare
+`50% - 50vw` bleed isn't used instead. Capped at max-w-7xl (1280px), the
+width of Figma's light panel and the same cap image_text_block.html and
+image_card_list_block.html already use. Figma's dark panel is drawn wider
+(1448px) but is otherwise the identical component, so it is brought back
+to the shared cap rather than given a second width.
+
+No vertical padding on the w-full-outer wrapper — the 128px gap between
+body blocks comes from the page templates' space-y-32 on the block loop.
+This div's px-4/6/8 is horizontal gutters only; the panel's own p-6/10/16
+is its internal breathing room (64px at lg, per Figma).
+
+Heading size: lg:text-5xl (48px) for both backgrounds, matching Figma's
+dark panel exactly and image_text_block.html's heading step. Figma draws
+the light panel's heading at 40px, but sizing type off the background
+choice would conflate two unrelated concerns — background controls color
+inversion only.
+
+Dark variant inverts three things together, all keyed off the same
+value.background check rather than a single wrapper class: the pill
+(dark-on-light becomes light-on-dark), the prose color, and the button
+style (filled primary becomes outline-light). Repeating the check is the
+same approach callout_block.html takes, for the same reason — there is no
+one element whose class alone can flip all three.
+{% endcomment %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="wtr-feature-panel mx-auto max-w-7xl overflow-hidden rounded-lg p-6 sm:p-10 lg:p-16
+                {% if value.background == 'dark' %}bg-dark{% else %}border-2 border-neutral-200 bg-neutral-50{% endif %}">
+        <div class="grid grid-cols-1 items-center gap-8 md:grid-cols-2 lg:gap-16">
+            {% image value.image fill-900x675 as img %}
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                 class="aspect-[4/3] w-full rounded-lg object-cover {% if value.alignment == 'image-right' %}md:order-2{% endif %}"
+                 loading="lazy">
+            <div class="{% if value.background == 'dark' %}text-light{% else %}text-dark{% endif %}">
+                {% if value.eyebrow %}
+                    <p class="font-heading mb-4 inline-block rounded-full border px-6 py-3 text-base font-bold tracking-[0.3px] sm:text-lg lg:text-2xl
+                              {% if value.background == 'dark' %}border-dark/20 bg-light text-dark{% else %}border-light/20 bg-dark text-light{% endif %}">
+                        {{ value.eyebrow }}
+                    </p>
+                {% endif %}
+                <h2 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+                    {{ value.heading }}
+                </h2>
+                {% if value.text %}
+                    {% comment %}
+                    [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
+                    prose-invert body color (a muted ~87%-lightness gray, meant for long-form
+                    reading) to pure white, matching Figma — same override callout_block.html
+                    applies for the same reason.
+                    {% endcomment %}
+                    <div class="prose mt-2 max-w-none text-lg sm:text-xl
+                                {% if value.background == 'dark' %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% else %}prose-neutral{% endif %}">
+                        {{ value.text|richtext }}
+                    </div>
+                {% endif %}
+                {% if value.link_text and value.link_page or value.link_text and value.link_url %}
+                    {% comment %}
+                    max-w-full + whitespace-normal on the button: wtr-btn is
+                    nowrap by default, and a long label ("Join the Great Power
+                    Shift") at wtr-btn-lg's 24px text / 36px padding is wider
+                    than the panel's content box on a phone — it would run past
+                    the edge and be clipped by the panel's overflow-hidden.
+                    Wrapping is what keeps one button size across breakpoints.
+                    {% endcomment %}
+                    <div class="mt-8">
+                        <a href="{% if value.link_page %}{{ value.link_page.url }}{% else %}{{ value.link_url }}{% endif %}"
+                           {% if not value.link_page %}rel="noopener noreferrer"{% endif %}
+                           class="wtr-btn wtr-btn-lg inline-flex max-w-full items-center gap-2 whitespace-normal
+                                  {% if value.background == 'dark' %}wtr-btn-outline-light hover:bg-white/10{% else %}hover:bg-primary-500{% endif %}">
+                            {{ value.link_text }}
+                            <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                                <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

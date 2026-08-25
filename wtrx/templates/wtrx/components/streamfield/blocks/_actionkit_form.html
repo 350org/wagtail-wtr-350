@@ -1,16 +1,23 @@
 {% load i18n wagtailcore_tags %}
 {% comment %}
     Shared ActionKit form renderer, used by signup_actionkit_block.html's
-    "default" and "image_split" layouts, and by the hero's signup CTA choice
-    (components/hero.html, via signup_actionkit_block.html with compact=True).
+    standalone panel and by the hero's signup CTA choice (components/
+    hero.html, via signup_actionkit_block.html with compact=True).
 
     Expects from context: form_html, success_message, actionkit_base_url
-    (all set by SignupActionKitBlock.get_context()), and a `compact` flag
-    passed explicitly by the including template.
+    (all set by SignupActionKitBlock.get_context()), and exactly one of the
+    layout flags `inline` / `stacked`, passed explicitly by the including
+    template:
 
-    compact=True swaps wtr-actionkit-embed-inline in, so the CSS overrides
-    in main.css lay the fetched ActionKit form's fields out horizontally
-    instead of stacked.
+      inline=True  → .wtr-actionkit-embed-inline: fields wrap across one
+                     row with the submit button on the same line. For the
+                     hero CTA strip, which is wide and short.
+      stacked=True → .wtr-actionkit-embed-stacked: full-width fields in a
+                     single column with a full-width submit below. For the
+                     panel's 370px form column (Figma node 1:1245).
+
+    Neither flag renders ActionKit's own unstyled vertical stack; both are
+    full restyles of the same fetched markup. See main.css for each.
 {% endcomment %}
 {% if form_html %}
     <script>
@@ -18,7 +25,7 @@
             document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
         }
     </script>
-    <div class="wtr-actionkit-embed {% if compact %}wtr-actionkit-embed-inline{% endif %} mt-8" data-form-container>
+    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% endif %} mt-8" data-form-container>
         {{ form_html|safe }}
     </div>
     {% if success_message %}

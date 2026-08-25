@@ -37,6 +37,7 @@ from wtrx.blocks import (
     CardCarouselBlock,
     DonateBlock,
     DonateFundraiseUpBlock,
+    FeaturePanelBlock,
     HeroBlock,
     HeroCTABlock,
     ImageCardListBlock,
@@ -58,10 +59,20 @@ from wtrx.models import ContentPage, HomePage, IndexPage
 
 
 class TestButtonBlockValidation(SimpleTestCase):
-    """ButtonBlock.clean() must enforce exactly one of link_page or link_url."""
+    """
+    ButtonBlock.clean() must enforce exactly one of link_page, link_url or
+    anchor. anchor exists because link_url is a URLBlock and so cannot hold a
+    bare "#petition" — see ButtonBlock's docstring.
+    """
 
-    def _raw(self, link_url="", text="Click me", style="primary"):
-        return {"text": text, "link_page": None, "link_url": link_url, "style": style}
+    def _raw(self, link_url="", text="Click me", style="primary", anchor=""):
+        return {
+            "text": text,
+            "link_page": None,
+            "link_url": link_url,
+            "anchor": anchor,
+            "style": style,
+        }
 
     def test_valid_with_link_url(self):
         block = ButtonBlock()
@@ -91,8 +102,23 @@ class TestButtonBlockValidation(SimpleTestCase):
                 "text": "",
                 "link_page": None,
                 "link_url": "https://example.com",
+                "anchor": "",
                 "style": "primary",
             }
+        )
+        with self.assertRaises(ValidationError):
+            block.clean(value)
+
+    def test_valid_with_anchor(self):
+        block = ButtonBlock()
+        value = block.to_python(self._raw(anchor="petition"))
+        cleaned = block.clean(value)
+        self.assertEqual(cleaned["anchor"], "petition")
+
+    def test_invalid_anchor_and_url_raises(self):
+        block = ButtonBlock()
+        value = block.to_python(
+            self._raw(link_url="https://example.com", anchor="petition")
         )
         with self.assertRaises(ValidationError):
             block.clean(value)
@@ -305,8 +331,12 @@ class TestHeroBlockFields(SimpleTestCase):
 class TestHeroCTABlock(SimpleTestCase):
     """
     HeroCTABlock is HeroBlock.cta / HeroMixin.hero_cta's block type: at most
-    one of signup (ActionKit), donate, or announcement.
+    one of button, signup (ActionKit), donate, or announcement.
     """
+
+    def test_button_choice_is_button_block(self):
+        block = HeroCTABlock()
+        self.assertIsInstance(block.declared_blocks["button"], ButtonBlock)
 
     def test_signup_choice_is_actionkit(self):
         block = HeroCTABlock()
@@ -370,6 +400,45 @@ class TestSignupLinkBlockValidation(SimpleTestCase):
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
 
+class TestSectionBlockWidth(SimpleTestCase):
+    """
+    SectionBlock.width picks the inner content column's measure — see
+    SECTION_WIDTH_CHOICES for why the section owns this rather than each
+    child block.
+    """
+
+    def test_default_is_default(self):
+        block = SectionBlock()
+        self.assertEqual(block.child_blocks["width"].get_default(), "default")
+
+    def test_all_choices_available(self):
+        block = SectionBlock()
+        choices = {value for value, _label in block.child_blocks["width"].field.choices}
+        self.assertEqual(choices, {"narrow", "default", "wide"})
+
+
+class TestSignupActionKitBlockPanelFields(SimpleTestCase):
+    """
+    The eyebrow pill and background fill added for Figma's petition panel
+    (node 1:1239) — see signup_actionkit_block.html.
+    """
+
+    def test_eyebrow_is_optional(self):
+        block = SignupActionKitBlock()
+        self.assertFalse(block.child_blocks["eyebrow"].required)
+
+    def test_background_defaults_to_dark(self):
+        block = SignupActionKitBlock()
+        self.assertEqual(block.child_blocks["background"].get_default(), "dark")
+
+    def test_background_choices(self):
+        block = SignupActionKitBlock()
+        choices = {
+            value for value, _label in block.child_blocks["background"].field.choices
+        }
+        self.assertEqual(choices, {"dark", "red"})
+
+
 class TestSectionBlockStructure(SimpleTestCase):
     """
     SectionBlock.content must include all BodyStreamBlock block types except
@@ -389,6 +458,7 @@ class TestSectionBlockStructure(SimpleTestCase):
         "card_grid",
         "image_card_list",
         "image_text",
+        "feature_panel",
         "card_carousel",
         "page_cards",
         "accordion",
@@ -510,6 +580,69 @@ class TestImageTextBlockFields(SimpleTestCase):
     def test_text_is_richtext(self):
         block = ImageTextBlock()
         self.assertIsInstance(block.declared_blocks["text"], RichTextBlock)
+
+
+class TestFeaturePanelBlockFields(SimpleTestCase):
+    """
+    FeaturePanelBlock field structure. Link-validation logic (clean() wraps
+    _validate_at_most_one_link) is covered generically in
+    TestQuoteBlockValidation — see module docstring. The block's required
+    ImageChooserBlock means block.clean() can't be exercised end-to-end
+    without a database, same as QuoteBlock/CalloutBlock.
+    """
+
+    def test_has_expected_fields(self):
+        block = FeaturePanelBlock()
+        expected = {
+            "eyebrow",
+            "heading",
+            "text",
+            "image",
+            "alignment",
+            "background",
+            "link_text",
+            "link_page",
+            "link_url",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_heading_is_required(self):
+        block = FeaturePanelBlock()
+        self.assertTrue(block.declared_blocks["heading"].required)
+
+    def test_image_is_required(self):
+        block = FeaturePanelBlock()
+        self.assertTrue(block.declared_blocks["image"].required)
+
+    def test_optional_fields_are_optional(self):
+        """Everything but heading/image is optional — the Figma dark panel
+        has no eyebrow, and the light one has no body copy."""
+        block = FeaturePanelBlock()
+        for name in ("eyebrow", "text", "link_text", "link_page", "link_url"):
+            with self.subTest(field=name):
+                self.assertFalse(block.declared_blocks[name].required)
+
+    def test_text_is_richtext(self):
+        block = FeaturePanelBlock()
+        self.assertIsInstance(block.declared_blocks["text"], RichTextBlock)
+
+    def test_alignment_choices(self):
+        block = FeaturePanelBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = FeaturePanelBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+    def test_background_choices(self):
+        block = FeaturePanelBlock()
+        choices = dict(block.declared_blocks["background"].field.choices)
+        self.assertEqual(set(choices.keys()), {"light", "dark"})
+
+    def test_background_defaults_to_light(self):
+        block = FeaturePanelBlock()
+        self.assertEqual(block.declared_blocks["background"].meta.default, "light")
 
 
 class TestCardCarouselBlockFields(SimpleTestCase):

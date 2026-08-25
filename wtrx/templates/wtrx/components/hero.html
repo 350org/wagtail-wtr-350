@@ -12,8 +12,25 @@
     video         — optional wagtailmedia Media instance (type="video")
     layout        — "centered" (default) or "left". "full" variant only.
     banner_color  — one of CALLOUT_COLOR_CHOICES. "banner" variant only.
-    cta           — optional HeroCTABlock stream value (0 or 1 items: signup/donate/announcement).
-                    "full" variant only — "banner" never renders one.
+    cta           — optional HeroCTABlock stream value (0 or 1 items:
+                    button/signup/donate/announcement). The "full" variant
+                    renders whichever one is set; the "banner" variant renders
+                    only the `button` choice (the embedded widgets are sized for
+                    "full"'s roomier layout and overflow banner's half-width
+                    text column) — see HeroCTABlock's docstring.
+    tag           — optional small pill label above the headline (e.g. Post's
+                    parent Blogs page title, "Blog"). "banner" variant only.
+                    Rendered as a link (back-chevron + label) to tag_url —
+                    both are set together, only by Post.
+    tag_url       — URL the tag pill links to (Post's parent Blogs page).
+                    Required whenever tag is set.
+    author/published_at — optional, set only by Post via BannerHeroMixin's
+                    **extra (see get_banner_hero_context callers). Presence of
+                    published_at switches the "banner" variant to its compact
+                    Post styling: date above the headline at a smaller size
+                    (text-40 instead of text-64) and the author name below it,
+                    per Figma's "Content Hero" instance on the Blog Post
+                    mockups vs. the larger plain instance on About/etc.
 
   variant switch:
     - "full": the original full-viewport hero — background video/image
@@ -23,7 +40,8 @@
       (hero.banner_color, reusing CalloutBlock's 5-color system, see
       main.css's .wtr-hero-banner-{color}) on the left beside an image or
       video on the right, blended together with a matching-color fade (see
-      .wtr-hero-banner-fade-{color}). No cta; much shorter than "full".
+      .wtr-hero-banner-fade-{color}). Much shorter than "full", and its only
+      cta choice is a plain link button.
 
   Background video (either variant): autoplay/muted/loop/playsinline, no
   native controls — the pause/play pill (components/_hero_video_toggle.html)
@@ -72,23 +90,43 @@
             <div class="grid flex-1 grid-cols-1 md:grid-cols-2 md:items-stretch">
 
                 {# Left column — text content #}
-                <div class="relative z-10 flex flex-col justify-center gap-3 px-6 py-10 sm:px-10 sm:py-12
+                {% comment %}
+                Padding is left-only from lg up (lg:pl-32 lg:pr-0), not symmetric —
+                Figma's Content Hero gives this panel pl-[128px] py-[64px] and no
+                right padding at all, so the text column measures the full 612px
+                between the 128px inset and the panel's own half-width edge. With
+                lg:px-32 the headline lost 128px of that and wrapped a line early.
+                gap-4 is Figma's 16px between headline, copy and CTA.
+                {% endcomment %}
+                <div class="relative z-10 flex flex-col justify-center gap-4 px-6 py-10 sm:px-10 sm:py-12 lg:pl-32 lg:pr-0 lg:py-16
                             {% if hero.banner_color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
-                    <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-64">
+                    {% if hero.tag %}
+                        {# tag_url links back to the parent Blogs page — Post is the only current "banner" hero producer that sets tag (and tag_url). #}
+                        <a href="{{ hero.tag_url }}"
+                           class="inline-flex w-fit items-center gap-2 rounded-full px-4 py-2 font-heading text-base font-bold transition-opacity hover:opacity-80
+                                  {% if hero.banner_color == 'light-grey' %}bg-dark/10{% else %}bg-white/10{% endif %}">
+                            <svg class="h-3 w-3 shrink-0" width="12" height="12" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            {{ hero.tag }}
+                        </a>
+                    {% endif %}
+                    {% comment %}
+                    hero.published_at is only ever set by Post (via BannerHeroMixin's
+                    get_banner_hero_context()'s **extra) — every other "banner" hero
+                    producer (ContentPage/IndexPage's HeroMixin, HeroBlock) leaves it
+                    unset, so this compact date/40px-headline/author layout only ever
+                    applies to Post, per Figma's smaller "Content Hero" instance there.
+                    {% endcomment %}
+                    {% if hero.published_at %}
+                        <p class="text-sm">{{ hero.published_at|date:"F j, Y" }}</p>
+                    {% endif %}
+                    <h1 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl
+                               {% if hero.published_at %}lg:text-40{% else %}lg:text-64{% endif %}">
                         {{ hero.headline }}
                     </h1>
-                    {% if hero.author or hero.published_at %}
-                        {% comment %}
-                        Only Post's get_context() sets these two keys (via
-                        BannerHeroMixin.get_banner_hero_context()'s **extra) — every other
-                        "banner" hero producer (ContentPage/IndexPage's HeroMixin,
-                        HeroBlock) leaves both unset, so this is silently skipped for them.
-                        {% endcomment %}
-                        <p class="text-sm font-medium opacity-80">
-                            {% if hero.author %}{% blocktrans with author=hero.author %}By {{ author }}{% endblocktrans %}{% endif %}
-                            {% if hero.author and hero.published_at %}&middot;{% endif %}
-                            {% if hero.published_at %}{{ hero.published_at|date:"F j, Y" }}{% endif %}
-                        </p>
+                    {% if hero.published_at and hero.author %}
+                        <p class="text-sm font-bold">{{ hero.author }}</p>
                     {% endif %}
                     {% if hero.copy %}
                         {% comment %}
@@ -105,6 +143,26 @@
                             {% endif %}
                         </div>
                     {% endif %}
+                    {% comment %}
+                    Only the `button` choice renders here — see the cta note at the
+                    top of this file. Styled as Figma's "outlined / default" with a
+                    trailing right arrow: a 4px border in the panel's own text color,
+                    reusing feature_panel_block.html's arrow glyph and wtr-btn-lg
+                    sizing so every arrow CTA on the site is one shape.
+                    {% endcomment %}
+                    {% for cta_block in hero.cta %}
+                        {% if cta_block.block_type == "button" %}
+                            <a href="{% if cta_block.value.link_page %}{{ cta_block.value.link_page.url }}{% elif cta_block.value.anchor %}#{{ cta_block.value.anchor }}{% else %}{{ cta_block.value.link_url }}{% endif %}"
+                               {% if cta_block.value.link_url %}rel="noopener noreferrer"{% endif %}
+                               class="wtr-btn wtr-btn-lg mt-2 inline-flex w-fit items-center gap-2 border-4
+                                      {% if hero.banner_color == 'light-grey' %}wtr-btn-outline hover:bg-dark/5{% else %}wtr-btn-outline-light hover:bg-white/10{% endif %}">
+                                {{ cta_block.value.text }}
+                                <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                                    <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </a>
+                        {% endif %}
+                    {% endfor %}
                 </div>
 
                 {% comment %}Right column — image or video, min-height keeps it visible on mobile

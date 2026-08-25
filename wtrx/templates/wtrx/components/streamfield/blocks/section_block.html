@@ -1,4 +1,16 @@
 {% load i18n wagtailcore_tags %}
+{% comment %}
+value.width sets the inner content column's measure — see
+SECTION_WIDTH_CHOICES for why the section owns this rather than each child
+block. "default" (max-w-6xl, 1152px) is the historical behaviour and stays
+the default; "narrow" is Figma's 800px reading column for a text +
+accordion stack; "wide" is its 1266px media band.
+
+The heading of a section and everything under it share this one column, so
+a narrow accordion inside a default-width section would sit ~176px right of
+the heading above it — which is exactly what "Get the full picture." looked
+like before this field existed.
+{% endcomment %}
 <section
     class="wtr-section w-full
            {% if value.background == 'dark' %}bg-dark text-light
@@ -12,7 +24,18 @@
     {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}
     data-bg="{{ value.background }}"
 >
-        <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-8">
+    {% comment %}
+    The max-w values are border-box (Tailwind's preflight sets box-sizing
+    globally), so the gutters have to be counted into them for the *content*
+    column to land on Figma's number: 1266px of video needs max-w-[1330px]
+    against lg:px-8. "narrow" instead drops the large-screen gutter entirely
+    — an 800px column already sits ~112px inside a 1024px viewport, so the
+    gutter would only shave the measure without ever preventing an overflow.
+    {% endcomment %}
+    <div class="mx-auto space-y-8 px-4 sm:px-6
+                {% if value.width == 'narrow' %}max-w-[800px] lg:px-0
+                {% elif value.width == 'wide' %}max-w-[1330px] lg:px-8
+                {% else %}max-w-6xl lg:px-8{% endif %}">
         {% for block in value.content %}
             {% include_block block %}
         {% endfor %}

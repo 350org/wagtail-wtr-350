@@ -6,8 +6,9 @@ Block categories (in definition order):
             RawHTMLBlock, TableBlock
   Cards:    CardBlock, CarouselCardBlock, PersonCardBlock
   Layout:   AccordionItemBlock, CardGridBlock, ImageCardListItemBlock,
-            ImageCardListBlock, ImageTextBlock, CardCarouselBlock,
-            PageCardsBlock, AccordionBlock, QuoteBlock, CalloutBlock
+            ImageCardListBlock, ImageTextBlock, FeaturePanelBlock,
+            CardCarouselBlock, PageCardsBlock, AccordionBlock, QuoteBlock,
+            CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock, SignupLinkBlock
   Layout²:  AnnouncementBarBlock, HeroCTABlock, HeroBlock, SectionBlock
@@ -81,6 +82,20 @@ CALLOUT_COLOR_CHOICES = [
 # rules, both of which branch on this same set.
 CALLOUT_ON_LIGHT_COLORS = {"light-grey"}
 
+FEATURE_PANEL_ALIGNMENT_CHOICES = [
+    ("image-left", _("Image left")),
+    ("image-right", _("Image right")),
+]
+
+# Deliberately only two: the panel is a filled card, so its background has
+# to be either dark enough for light text or light enough for dark text.
+# The eyebrow pill, body prose and CTA button all invert together off this
+# one choice — see feature_panel_block.html.
+FEATURE_PANEL_BACKGROUND_CHOICES = [
+    ("light", _("Light")),
+    ("dark", _("Dark")),
+]
+
 SECTION_BACKGROUND_CHOICES = [
     ("light", _("Light")),
     ("dark", _("Dark")),
@@ -93,6 +108,27 @@ SECTION_PADDING_CHOICES = [
     ("sm", _("Small")),
     ("md", _("Medium")),
     ("lg", _("Large")),
+]
+
+# How wide a section's inner content column is. Figma draws sections at three
+# distinct measures rather than one: a 1266px media/full-width band (The Great
+# Power Shift's video section), the shared 1152px default, and an 800px reading
+# column for text + accordion stacks (that page's "Get the full picture."). The
+# section owns this rather than each child block, because every child in a
+# section shares one left edge — a narrow accordion inside a default-width
+# section would sit 176px right of the heading above it.
+SECTION_WIDTH_CHOICES = [
+    ("narrow", _("Narrow (800px)")),
+    ("default", _("Default (1152px)")),
+    ("wide", _("Wide (1266px)")),
+]
+
+# The ActionKit signup panel's fill. Same two-value reasoning as
+# FEATURE_PANEL_BACKGROUND_CHOICES — both are light-text-on-solid-color, so
+# this picks which solid color, not whether the text inverts.
+SIGNUP_BACKGROUND_CHOICES = [
+    ("dark", _("Dark")),
+    ("red", _("Red")),
 ]
 
 HERO_LAYOUT_CHOICES = [
@@ -286,19 +322,36 @@ class ButtonBlock(StructBlock):
     """
     A CTA button with text, style, and exactly one link target.
 
-    Exactly one of link_page or link_url must be set. clean() enforces this.
+    Exactly one of link_page, link_url or anchor must be set. clean()
+    enforces this.
+
+    `anchor` is a separate field rather than something an editor could type
+    into link_url because link_url is a URLBlock — Django's URLValidator
+    rejects a bare "#petition", so a same-page jump link had no way to be
+    expressed at all before. It is the natural target for a hero CTA that
+    scrolls to a signup/donate block further down the same page (see
+    components/hero.html's banner CTA and each block's own anchor_id field).
     """
 
     text = CharBlock(label=_("Button text"))
     link_page = PageChooserBlock(
         required=False,
         label=_("Link page"),
-        help_text=_("Internal page link. Set either this or Link URL, not both."),
+        help_text=_("Internal page link. Set only one of the three link fields."),
     )
     link_url = URLBlock(
         required=False,
         label=_("Link URL"),
-        help_text=_("External link. Set either this or Link page, not both."),
+        help_text=_("External link. Set only one of the three link fields."),
+    )
+    anchor = CharBlock(
+        required=False,
+        label=_("Anchor"),
+        help_text=_(
+            "Jump to a block on this same page, by its Anchor ID and without "
+            "the # symbol (e.g. 'petition'). Set only one of the three link "
+            "fields."
+        ),
     )
     style = ChoiceBlock(
         choices=BUTTON_STYLE_CHOICES,
@@ -308,19 +361,19 @@ class ButtonBlock(StructBlock):
 
     def clean(self, value):
         cleaned = super().clean(value)
+        fields = ("link_page", "link_url", "anchor")
+        set_count = sum(1 for name in fields if cleaned.get(name))
         errors = {}
-        has_page = bool(cleaned.get("link_page"))
-        has_url = bool(cleaned.get("link_url"))
-        if not has_page and not has_url:
-            msg = ValidationError(_("Provide either a link page or a link URL."))
-            errors["link_page"] = msg
-            errors["link_url"] = msg
-        elif has_page and has_url:
+        if set_count == 0:
             msg = ValidationError(
-                _("Provide either a link page or a link URL, not both.")
+                _("Provide a link page, a link URL, or an anchor.")
             )
-            errors["link_page"] = msg
-            errors["link_url"] = msg
+            errors = {name: msg for name in fields}
+        elif set_count > 1:
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, or anchor.")
+            )
+            errors = {name: msg for name in fields if cleaned.get(name)}
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
@@ -617,6 +670,92 @@ class ImageTextBlock(StructBlock):
         icon = "image"
         label = _("Image + Text")
         template = "wtrx/components/streamfield/blocks/image_text_block.html"
+
+
+class FeaturePanelBlock(StructBlock):
+    """
+    A filled, rounded panel holding an image beside a text stack: optional
+    eyebrow pill, heading, optional body copy, optional CTA button with a
+    trailing arrow. Image side (left/right) and background (light/dark) are
+    both editor choices — see feature_panel_block.html.
+
+    Per Figma's Take Action page (node 1:1021), this is the block used both
+    above the card grid ("Featured Campaign" / light panel with a pill) and
+    below it ("Looking for more?" / dark panel without one). They are one
+    component with two configurations, not two blocks.
+
+    Distinct from ImageTextBlock: that block has no panel at all — image and
+    text sit directly on the page background, top-aligned, with no eyebrow
+    and no CTA. This one is a self-contained card with its own fill, border
+    radius and internal padding, and its columns are vertically centered
+    against each other.
+
+    Distinct from CalloutBlock: that block is text-only on a solid color
+    (any background image is a faint full-bleed watermark, not a subject);
+    this one gives the image its own column at full opacity.
+
+    At most one of link_page or link_url may be set; clean() enforces this,
+    same pattern as CardBlock and QuoteBlock.
+    """
+
+    eyebrow = CharBlock(
+        required=False,
+        label=_("Eyebrow"),
+        help_text=_(
+            "Optional short label shown in a pill above the heading, "
+            'e.g. "Featured Campaign". Leave blank to omit the pill.'
+        ),
+    )
+    heading = CharBlock(
+        label=_("Heading"),
+        help_text=_("Panel heading, rendered as an H2."),
+    )
+    text = RichTextBlock(
+        required=False,
+        features=RICHTEXT_FEATURES_INLINE,
+        label=_("Text"),
+        help_text=_("Optional supporting copy shown below the heading."),
+    )
+    image = ImageChooserBlock(label=_("Image"))
+    alignment = ChoiceBlock(
+        choices=FEATURE_PANEL_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Alignment"),
+        help_text=_("Which side of the panel the image sits on."),
+    )
+    background = ChoiceBlock(
+        choices=FEATURE_PANEL_BACKGROUND_CHOICES,
+        default="light",
+        label=_("Background"),
+        help_text=_("Panel fill. Dark inverts the text, pill and button colors."),
+    )
+    link_text = CharBlock(
+        required=False,
+        label=_("Button text"),
+        help_text=_("Optional CTA button label. Leave blank to omit the button."),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "image"
+        label = _("Feature Panel")
+        template = "wtrx/components/streamfield/blocks/feature_panel_block.html"
 
 
 class CardCarouselBlock(StructBlock):
@@ -1263,6 +1402,14 @@ class SignupActionKitBlock(StructBlock):
     FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
     _FAILURE_SENTINEL = "__actionkit_embed_fetch_failed__"
 
+    eyebrow = CharBlock(
+        required=False,
+        label=_("Eyebrow"),
+        help_text=_(
+            "Optional short label shown as a pill above the heading "
+            "(e.g. 'Sign the Petition')."
+        ),
+    )
     heading = CharBlock(
         required=False,
         label=_("Heading"),
@@ -1273,6 +1420,12 @@ class SignupActionKitBlock(StructBlock):
         required=False,
         label=_("Description"),
         help_text=_("Optional supporting text below the heading."),
+    )
+    background = ChoiceBlock(
+        choices=SIGNUP_BACKGROUND_CHOICES,
+        default="dark",
+        label=_("Background"),
+        help_text=_("Panel fill behind the heading, copy and form."),
     )
     image = ImageChooserBlock(
         required=False,
@@ -1448,11 +1601,19 @@ class AnnouncementBarBlock(StructBlock):
 
 class HeroCTABlock(StreamBlock):
     """
-    The hero's optional call-to-action widget: at most one of a signup bar,
-    a donate block, or an announcement bar. min_num=0/max_num=1 make "at most
-    one" a StreamField-level constraint — no clean() needed for it.
+    The hero's optional call-to-action widget: at most one of a plain link
+    button, a signup bar, a donate block, or an announcement bar.
+    min_num=0/max_num=1 make "at most one" a StreamField-level constraint —
+    no clean() needed for it.
+
+    `button` is the only choice the "banner" hero variant renders (as an
+    outlined button with a trailing arrow, per Figma's Content Hero on The
+    Great Power Shift, node 1:1225) — the other three are embedded widgets
+    sized for the "full" variant's roomier layout and would overflow the
+    banner's half-width text column. See components/hero.html.
     """
 
+    button = ButtonBlock()
     signup = SignupActionKitBlock()
     donate = DonateBlock()
     announcement = AnnouncementBarBlock()
@@ -1554,6 +1715,7 @@ class SectionContentBlock(StreamBlock):
     card_grid = CardGridBlock()
     image_card_list = ImageCardListBlock()
     image_text = ImageTextBlock()
+    feature_panel = FeaturePanelBlock()
     card_carousel = CardCarouselBlock()
     page_cards = PageCardsBlock()
     accordion = AccordionBlock()
@@ -1593,6 +1755,15 @@ class SectionBlock(StructBlock):
         choices=SECTION_PADDING_CHOICES,
         default="md",
         label=_("Padding"),
+    )
+    width = ChoiceBlock(
+        choices=SECTION_WIDTH_CHOICES,
+        default="default",
+        label=_("Content width"),
+        help_text=_(
+            "How wide the section's content column is. Narrow suits a text + "
+            "accordion stack; wide suits a full-bleed video or image."
+        ),
     )
     anchor_id = CharBlock(
         required=False,
@@ -1636,6 +1807,7 @@ class BodyStreamBlock(StreamBlock):
     card_grid = CardGridBlock()
     image_card_list = ImageCardListBlock()
     image_text = ImageTextBlock()
+    feature_panel = FeaturePanelBlock()
     card_carousel = CardCarouselBlock()
     page_cards = PageCardsBlock()
     accordion = AccordionBlock()

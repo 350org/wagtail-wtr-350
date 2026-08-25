@@ -1,10 +1,24 @@
 {% load i18n wagtailcore_tags %}
-<div class="wtr-accordion divide-y divide-neutral-200 rounded-lg border border-neutral-200" data-accordion>
+{% comment %}
+Per Figma's "Get the full picture." (node 1:1273): each item is its own
+filled, bordered card — not rows sharing one outer border with hairline
+dividers between them. The 16px gap between cards is the whole visual idea
+of the component, so the outer element carries no chrome at all and each
+.accordion-item carries the fill, border and radius instead.
+
+The cards are light (neutral-50 fill, neutral-200 border, dark text)
+regardless of what they sit on. Figma draws this stack on a dark section,
+and the cards stay light there — so unlike most blocks there is no
+in-data-[bg=dark] inversion on the item chrome itself. Only the expanded
+answer body inverts, and only because prose's own color would otherwise
+fight the card fill.
+{% endcomment %}
+<div class="wtr-accordion flex flex-col gap-4" data-accordion>
     {% for item in value.items %}
-        <div class="accordion-item">
+        <div class="accordion-item overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50">
             <button
                 type="button"
-                class="flex w-full items-center justify-between px-5 py-4 text-left font-heading font-semibold hover:bg-neutral-50/20"
+                class="flex w-full items-center justify-between gap-4 px-8 py-6 text-left font-body text-lg leading-[1.429] text-dark transition-colors hover:bg-neutral-200/50 sm:text-xl"
                 aria-expanded="false"
                 data-accordion-toggle
             >
@@ -13,7 +27,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <div class="hidden px-5 py-4 prose prose-neutral max-w-none in-data-[bg=dark]:prose-invert in-data-[bg=primary]:prose-invert in-data-[bg=secondary]:prose-invert" data-accordion-content>
+            <div class="hidden px-8 pb-6 prose prose-neutral max-w-none" data-accordion-content>
                 {% include_block item.content %}
             </div>
         </div>

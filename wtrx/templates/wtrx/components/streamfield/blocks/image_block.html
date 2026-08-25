@@ -7,10 +7,14 @@ and signup_actionkit_block.html's image captions, per Figma.
 Full-bleed-ish width: this block is special-cased in content_page.html/
 home_page.html (alongside "callout"/"image_text"/etc.) to skip the shared
 `mx-auto max-w-5xl px-4 sm:px-6 lg:px-8` wrapper, so it owns its own width
-instead — Figma's photo-caption section runs edge-to-edge (16px gutters
-only, no inner max-width cap), unlike the narrower text column other
-blocks sit in. Same w-full-outer pattern as callout_block.html — see that
-file's comment for why a bare `50% - 50vw` bleed isn't used instead.
+instead — wider than the narrower text column other blocks sit in.
+Capped at max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 — the exact same
+class combination as the nav's own container (header.html) — not the
+two-tier w-full-outer/max-w-inner split callout_block.html uses, since
+that would let the image's content edge reach the full 1500px unpadded,
+overshooting past the nav's own (padding-inclusive) content edge above
+it. Matching nav's classes exactly, on one element, keeps both edges
+aligned at every viewport width.
 width-1600 (up from width-1200) matches the wider rendered display size.
 
 Known gap, shared with every other full-bleed block (callout, image_text,
@@ -24,7 +28,7 @@ of these blocks, not fixed here — fixing it needs a way for a block's
 template to know it's being rendered inside a SectionBlock vs. at the page
 body's top level.
 {% endcomment %}
-<div class="w-full px-4 sm:px-6 lg:px-8">
+<div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
     <figure class="wtr-image relative">
         {% image value.image width-1600 as img %}
         <img

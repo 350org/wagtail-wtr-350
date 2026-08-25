@@ -1,0 +1,40 @@
+{% load wagtailimages_tags %}
+{% comment %}
+Shared "post card" — the arrow-style card used for Blog Index listings,
+the home page's "Latest Updates" section (PageCardsBlock), and a post's own
+"Related blogs" section, per Figma's "Frame 5906/5907/5908" component
+(identical across all three mockups). Distinct from components/card.html,
+which is a different card shape ("Areas of work" style with a Learn more
+button) used elsewhere.
+
+Expects `card`: heading, description, image, link_page, date — the same
+dict shape page_as_card() returns (link_page always a Page instance, never
+link_url — every caller here is page_as_card()-based, not editor-authored),
+plus a "date" key layered on top by the caller (page_as_card() itself
+doesn't set one — see PageCardsBlock.get_context() and Blogs/Post.get_context()).
+{% endcomment %}
+<a href="{{ card.link_page.url }}"
+   class="wtr-post-card flex flex-col overflow-hidden rounded-lg border-2 border-neutral-200 bg-light">
+    {% if card.image %}
+        {% image card.image fill-640x360 as img %}
+        <div class="aspect-video overflow-hidden bg-neutral-200">
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ card.image.title }}" class="h-full w-full object-cover" loading="lazy">
+        </div>
+    {% endif %}
+    <div class="flex flex-1 items-start gap-4 px-4 pb-4">
+        <div class="flex flex-1 flex-col gap-[7px] pt-4">
+            {% if card.date %}
+                <span class="w-fit rounded-full bg-neutral-200 px-4 py-3 font-heading text-base font-bold text-dark">
+                    {{ card.date|date:"F j, Y" }}
+                </span>
+            {% endif %}
+            <h3 class="font-heading text-2xl font-bold text-dark">{{ card.heading }}</h3>
+            {% if card.description %}
+                <p class="text-base text-dark">{{ card.description }}</p>
+            {% endif %}
+        </div>
+        <svg class="h-10 w-10 shrink-0 text-dark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </div>
+</a>
