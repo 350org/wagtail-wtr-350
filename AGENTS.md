@@ -640,28 +640,10 @@ context limit and an automatic summarization kicks in:
 
 ## Code Review Requirement
 
-**Run the agent code review once per session, immediately before the final
-commit of that session** — not before every individual commit. If a session
-produces several small commits in sequence, only the last one needs the
-agent review first; don't re-run it after each intermediate commit. Human
-review (below) still applies to every commit regardless.
+**Human code review** — Present the changes to the user and explicitly ask
+them to review. Wait for their sign-off before committing.
 
-1. **Agent code review** — Run the `code-reviewer` agent (or the
-   `/code-review` skill if that agent type isn't available in the current
-   environment) on the session's changed files, scoped to the diff that is
-   actually about to be committed (not the whole branch vs `main`) using the
-   Task tool with `subagent_type: "code-reviewer"`. Provide:
-   - A summary of what was built and why
-   - The full list of files changed
-   - Any specific areas of concern or uncertainty
-
-   Address any issues the reviewer raises before proceeding. Findings that
-   fall outside the diff being committed (pre-existing issues elsewhere on
-   the branch) should be surfaced to the user separately, not treated as
-   blocking the current commit.
-
-2. **Human code review** — Present the changes to the user and explicitly ask
-   them to review. Wait for their sign-off before committing.
-
-Only create the commit after both reviews are complete and any issues have
-been addressed.
+There is no mandatory automated agent-review step before committing — the
+agent code review (`/code-review` or similar) is available to run on request,
+but isn't a required gate. Only create the commit after the user has
+reviewed and signed off.
