@@ -174,13 +174,23 @@ WAGTAIL_2FA_REQUIRED = True
 OTP_TOTP_ISSUER = "350 Wagtail CMS"
 
 # Wagtail AI — content-assist tools (title/description suggestions, rich text
-# actions, etc.) backed by Claude via the `llm` library's Anthropic plugin
-# (llm-anthropic). Requires ANTHROPIC_API_KEY to be set in the environment;
-# the anthropic SDK reads it directly, so no key is stored here or in the DB.
-# TOKEN_LIMIT is required explicitly: wagtail-ai only ships default token
-# limits for a handful of OpenAI models (see wagtail_ai.tokens), so Claude
-# models raise ImproperlyConfigured without one. This limits how much text
-# gets sent per completion/correction chunk, well under Claude's 200k context.
+# actions, alt text, etc.) backed by Claude. Requires ANTHROPIC_API_KEY to be
+# set in the environment; the Anthropic SDK reads it directly, so no key is
+# stored here or in the DB.
+#
+# Two separate config blocks are both required — wagtail-ai routes different
+# features through different subsystems, each with its own settings key:
+# - BACKENDS: used by the rich-text Draftail "ai" feature (text_completion/
+#   describe_image views — see wagtail_ai/views.py). TOKEN_LIMIT is required
+#   explicitly here: wagtail-ai only ships default token limits for a
+#   handful of OpenAI models (see wagtail_ai.tokens), so Claude models raise
+#   ImproperlyConfigured without one.
+# - PROVIDERS: used by the newer agents-based actions (AITitleFieldPanel,
+#   AIDescriptionFieldPanel, ai_image_block()'s "generate alt text" — see
+#   wagtail_ai/agents/basic_prompt.py). Without an explicit "default" entry
+#   here, wagtail-ai falls back to a deprecated legacy path that hardcodes
+#   the "openai" provider regardless of BACKENDS' MODEL_ID, raising
+#   MissingApiKeyError since OPENAI_API_KEY isn't (and shouldn't be) set.
 WAGTAIL_AI = {
     "BACKENDS": {
         "default": {
@@ -189,6 +199,12 @@ WAGTAIL_AI = {
                 "MODEL_ID": "anthropic/claude-sonnet-4-5",
                 "TOKEN_LIMIT": 100000,
             },
+        },
+    },
+    "PROVIDERS": {
+        "default": {
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
         },
     },
 }

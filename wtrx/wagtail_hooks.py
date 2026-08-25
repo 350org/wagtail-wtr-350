@@ -3,7 +3,8 @@ Wagtail hooks for the wtrx app.
 
 Hooks registered here:
 - register_admin_urls: adds the block-visibility JS endpoint
-- insert_global_admin_js: loads the block-visibility script in the admin
+- insert_global_admin_js: loads the block-visibility script and the
+  wagtail-ai context-handler fix in the admin
 """
 
 import json
@@ -15,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
+from wagtail.admin.staticfiles import versioned_static
 from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
 
 
@@ -115,6 +117,35 @@ def register_block_visibility_url():
 def insert_block_visibility_js():
     url = reverse("wtrx_block_visibility_js")
     return format_html('<script src="{}"></script>', url)
+
+
+# ---------------------------------------------------------------------------
+# wagtail-ai context-handler fix — see the file itself for the full
+# explanation. Remove both this hook and the static file once wagtail-ai
+# ships a release that awaits PreviewController.extractContent().
+# ---------------------------------------------------------------------------
+
+
+@hooks.register("insert_global_admin_js")
+def insert_wagtail_ai_context_fix_js():
+    return format_html(
+        '<script src="{}"></script>',
+        versioned_static("wtrx/admin/wagtail-ai-context-fix.js"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Draftail toolbar — default to pinned for editors who haven't set a
+# preference yet. See the file itself for the full explanation.
+# ---------------------------------------------------------------------------
+
+
+@hooks.register("insert_global_admin_js")
+def insert_pin_draftail_toolbar_js():
+    return format_html(
+        '<script src="{}"></script>',
+        versioned_static("wtrx/admin/pin-draftail-toolbar.js"),
+    )
 
 
 # Credential-field show/hide is no longer needed: each integration's fields

@@ -18,8 +18,8 @@ venv/
 
 # Django
 db.sqlite3
-static/
-media/
+/static/
+/media/
 *.log
 local_settings.py
 wagtail_wtr/settings/local.py

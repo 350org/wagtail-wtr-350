@@ -16,6 +16,7 @@ from wagtail.blocks import (
 )
 from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
 from wagtail.fields import StreamField
+from wagtail_ai.panels import AIDescriptionFieldPanel, AIFieldPanel
 
 from .images import CustomImage
 from .integrations.actblue import (
@@ -312,7 +313,7 @@ class BrandingSEOSettings(BaseSiteSetting):
             heading=_("Logos"),
         ),
         MultiFieldPanel(
-            [FieldPanel("default_meta_image"), FieldPanel("site_description")],
+            [FieldPanel("default_meta_image"), AIDescriptionFieldPanel("site_description")],
             heading=_("SEO defaults"),
         ),
     ]
@@ -390,7 +391,7 @@ class NavigationSettings(BaseSiteSetting):
         FieldPanel("primary_navigation"),
         MultiFieldPanel(
             [
-                FieldPanel("cta_text"),
+                AIFieldPanel("cta_text"),
                 FieldPanel("cta_page"),
                 FieldPanel("cta_url"),
                 FieldPanel("cta_anchor"),
@@ -522,7 +523,7 @@ class FooterSettings(BaseSiteSetting):
             [FieldPanel("minimal_links")],
             heading=_("Minimal layout"),
         ),
-        FieldPanel("copyright_text"),
+        AIFieldPanel("copyright_text"),
     ]
 
     class Meta:

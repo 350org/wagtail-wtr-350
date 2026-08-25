@@ -320,6 +320,48 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     - Hero-section and nav/footer contribution hooks are reserved for future
       `IntegrationType` fields — not implemented yet, since no current
       integration needs them.
+11. **wagtail-ai integration**: AI-assist buttons are opt-in per field, via
+    drop-in panel replacements from `wagtail_ai.panels` —
+    `AITitleFieldPanel`/`AIDescriptionFieldPanel`/`AIFieldPanel` swap in for
+    `TitleFieldPanel`/`FieldPanel` in a model's `content_panels`/
+    `promote_panels`/`panels`. `BasePage.title_panels` (`wtrx/models.py`) is
+    the reusable `[AITitleFieldPanel("title")]` list every concrete page
+    model uses instead of `Page.content_panels`; `BasePage.promote_panels`
+    similarly rebuilds Wagtail's default "For search engines" panel by hand
+    so `AIDescriptionFieldPanel` can replace the nested `search_description`
+    field — if a future Wagtail release adds a new field to its own default
+    panel there, it won't automatically appear here too.
+    - **`AIFieldPanel` cannot reach inside StreamField blocks** — StructBlock
+      subfields render through Wagtail's block-form machinery, not
+      `content_panels`, so headings/CTA text/etc. inside `wtrx/blocks/`
+      can't get this treatment. The only StreamField-level hook is
+      `wagtail_ai.blocks.ai_image_block()`, applied to `ImageBlock` for a
+      "generate alt text" button (needs matching `image`/`alt_text` field
+      names on the block).
+    - `WAGTAIL_AI` in `wagtail_wtr/settings/base.py` needs **two** config
+      blocks: `BACKENDS` (powers the rich-text Draftail "ai" toolbar
+      feature) and `PROVIDERS` (powers `AITitleFieldPanel`/
+      `AIDescriptionFieldPanel`/`ai_image_block()`'s agent-based actions).
+      Omitting `PROVIDERS` doesn't error at startup — it silently falls
+      back to a deprecated path that hardcodes the `openai` provider
+      regardless of `BACKENDS`' model, raising `MissingApiKeyError` only
+      when an editor actually clicks a wand button.
+    - Two files at `wtrx/static/wtrx/admin/` (loaded via `insert_global_admin_js`
+      hooks in `wagtail_hooks.py`) patch around upstream bugs, not this
+      project's own code: `wagtail-ai-context-fix.js` fixes a missing
+      `await` on Wagtail's `PreviewController.extractContent()` inside
+      wagtail-ai's bundled JS (without it, "Generate title"/"Generate
+      description" send the literal placeholder text `{content_html}`
+      instead of real page content to the LLM); `pin-draftail-toolbar.js`
+      defaults the Draftail toolbar to pinned for editors who haven't
+      chosen a preference. Remove `wagtail-ai-context-fix.js` (and its hook)
+      once `wagtail-ai` ships a release that awaits `extractContent()`.
+    - `{% wagtailuserbar %}` must be present in `wtrx/templates/wtrx/base.html`
+      (or any fork's override) — it loads Wagtail's `userbar.js`, which is
+      what registers the preview-content-extraction bridge the live
+      preview panel and both AI title/description generation depend on.
+      Without it, `extractContent()` always resolves to `null` and Wagtail's
+      own native "Content checks" panel is silently broken too, not just AI.
 
 ## Error Handling
 

@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags wagtailimages_tags static %}{% wagtail_site as current_site %}<!DOCTYPE html>
+{% load i18n wagtailcore_tags wagtailimages_tags wagtailuserbar static %}{% wagtail_site as current_site %}<!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="utf-8" />
@@ -67,5 +67,6 @@
     {% endif %}
     <script type="module" src="{% static 'js/main.js' %}"></script>
     {% block extra_js %}{% endblock %}
+    {% wagtailuserbar %}
 </body>
 </html>

@@ -44,6 +44,7 @@ from wagtail.blocks import RawHTMLBlock as WagtailRawHTMLBlock
 from wagtail.contrib.table_block.blocks import TableBlock as WagtailTableBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Site
+from wagtail_ai.blocks import ai_image_block
 from wagtailmedia.blocks import VideoChooserBlock
 
 from wtrx.constants import (
@@ -243,11 +244,15 @@ class TextBlock(RichTextBlock):
         template = "wtrx/components/streamfield/blocks/text_block.html"
 
 
+@ai_image_block()
 class ImageBlock(StructBlock):
     """
     An image with optional alt text override and caption.
 
     The image's built-in title is used as a fallback when alt_text is blank.
+    Decorated with wagtail-ai's ai_image_block() (default field names match:
+    "image"/"alt_text") to add a "generate alt text from image" button in
+    the admin.
     """
 
     image = ImageChooserBlock(label=_("Image"))

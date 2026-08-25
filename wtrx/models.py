@@ -22,6 +22,7 @@ from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
 from wagtail.snippets.models import register_snippet
+from wagtail_ai.panels import AIDescriptionFieldPanel, AITitleFieldPanel
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
 from .blocks import CALLOUT_COLOR_CHOICES, HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
@@ -68,7 +69,36 @@ class BasePage(Page):
         help_text=_("Exclude this page from search results and the sitemap."),
     )
 
-    promote_panels = Page.promote_panels + [
+    # AI-assisted title panel, reused by every concrete page model below in
+    # place of Page.content_panels (which is just [TitleFieldPanel("title")])
+    # — swaps in wagtail-ai's drop-in replacement so the title field gets an
+    # AI-assist button in the admin.
+    title_panels = [AITitleFieldPanel("title")]
+
+    promote_panels = [
+        # Rebuilt by hand (not Page.promote_panels[0]) because
+        # AIDescriptionFieldPanel needs to replace one nested field
+        # (search_description) inside it — accepted tradeoff: if a future
+        # Wagtail release adds a new field to its own default "For search
+        # engines" panel, it won't automatically appear here too.
+        MultiFieldPanel(
+            [
+                FieldPanel("slug"),
+                FieldPanel("seo_title"),
+                # AI-assisted meta description, in place of Page.promote_panels'
+                # plain FieldPanel("search_description").
+                AIDescriptionFieldPanel("search_description"),
+            ],
+            heading=_("For search engines"),
+        ),
+        # "For site menus" — spelled out explicitly rather than indexing into
+        # Page.promote_panels (a positional index into a third-party list
+        # would silently pick up the wrong panel if Wagtail ever reorders or
+        # extends its own default promote_panels in a future release).
+        MultiFieldPanel(
+            [FieldPanel("show_in_menus")],
+            heading=_("For site menus"),
+        ),
         MultiFieldPanel(
             [
                 FieldPanel("meta_image"),
@@ -468,7 +498,7 @@ class HomePage(BasePage, HeroMixin):
     )
 
     content_panels = (
-        Page.content_panels
+        BasePage.title_panels
         + HeroMixin.hero_panels
         + [
             FieldPanel("body"),
@@ -528,7 +558,7 @@ class ContentPage(BasePage, HeroMixin):
     )
 
     content_panels = (
-        Page.content_panels
+        BasePage.title_panels
         + HeroMixin.hero_panels
         + [
             FieldPanel("body"),
@@ -594,7 +624,7 @@ class IndexPage(BasePage, HeroMixin):
     )
 
     content_panels = (
-        Page.content_panels
+        BasePage.title_panels
         + HeroMixin.hero_panels
         + [
             FieldPanel("intro"),
@@ -717,7 +747,7 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
     )
 
     content_panels = (
-        Page.content_panels
+        BasePage.title_panels
         + BannerHeroMixin.banner_hero_panels
         + PublishedDateMixin.published_date_panels
         + [
@@ -841,7 +871,7 @@ class Blogs(BasePage, HeroMixin):
         ),
     )
 
-    content_panels = Page.content_panels + HeroMixin.hero_panels + [FieldPanel("related_intro")]
+    content_panels = BasePage.title_panels + HeroMixin.hero_panels + [FieldPanel("related_intro")]
 
     promote_panels = BasePage.promote_panels
 
@@ -963,9 +993,9 @@ class FormPage(BasePage, AbstractEmailForm):
     MRO note: BasePage must come before AbstractEmailForm to keep Wagtail's
     page machinery (slug, tree, routing) in the correct resolution order.
 
-    content_panels is explicitly defined starting from
-    AbstractEmailForm.content_panels (== Page.content_panels) to avoid the
-    MRO resolving to BasePage.content_panels and dropping email fields.
+    content_panels is explicitly defined starting from BasePage.title_panels
+    (BasePage itself has no content_panels of its own, so there's no MRO
+    ambiguity to worry about here).
 
     Future: override process_form_submission() to also forward submissions to
     Action Network when that integration is enabled. See PLAN.md FormPage
@@ -997,11 +1027,11 @@ class FormPage(BasePage, AbstractEmailForm):
         ),
     )
 
-    # Explicitly start from AbstractEmailForm.content_panels, which extends
-    # Page.content_panels with the email notification fields (to_address, from_address,
-    # subject). Do NOT use BasePage.content_panels here — Python's MRO would resolve
-    # to BasePage.content_panels and drop those email fields entirely.
-    content_panels = AbstractEmailForm.content_panels + [
+    # Explicitly defined on FormPage itself (not inherited) — BasePage has no
+    # content_panels of its own (only the reusable title_panels list, mixed
+    # in explicitly here), so there's no MRO ambiguity to worry about despite
+    # FormPage(BasePage, AbstractEmailForm)'s multiple inheritance.
+    content_panels = BasePage.title_panels + [
         FieldPanel("intro"),
         InlinePanel("form_fields", label=_("Form fields")),
         FieldPanel("thank_you_text"),
