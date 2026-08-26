@@ -118,6 +118,18 @@ class BasePage(Page):
         ),
     ]
 
+    # Page.settings_panels (scheduled "go live"/"expire" dates, and
+    # internal commenting) — inherited automatically, but every concrete
+    # page model below defines its own edit_handler as a TabbedInterface of
+    # explicit ObjectLists, which does NOT pull in settings_panels the way
+    # Wagtail's own default single-ObjectList edit_handler would. Named here
+    # (matching the title_panels/promote_panels pattern above) so it's
+    # obvious every concrete model must include
+    # ObjectList(settings_panels, heading=_("Settings")) as a third tab —
+    # omit it and the whole Settings tab, including comments, silently
+    # disappears with no error.
+    settings_panels = Page.settings_panels
+
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
         # Ensure transparent_header is always present in context so header.html
@@ -520,11 +532,13 @@ class HomePage(BasePage, HeroMixin):
     )
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -576,11 +590,13 @@ class ContentPage(BasePage, HeroMixin):
     )
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -643,11 +659,13 @@ class IndexPage(BasePage, HeroMixin):
     )
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -770,11 +788,13 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
     )
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -884,11 +904,13 @@ class Blogs(BasePage, HeroMixin):
     content_panels = BasePage.title_panels + HeroMixin.hero_panels + [FieldPanel("related_intro")]
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -1060,11 +1082,13 @@ class FormPage(BasePage, AbstractEmailForm):
     ]
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
