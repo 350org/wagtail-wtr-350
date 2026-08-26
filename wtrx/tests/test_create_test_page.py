@@ -143,6 +143,128 @@ class TestCreateTestPageCommand(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Block coverage — the page must exercise every registered block
+# ---------------------------------------------------------------------------
+
+
+@override_settings(DEBUG=True, WAGTAILEMBEDS_FINDERS=[], MEDIA_ROOT=_TEMP_MEDIA)
+class TestCreateTestPageCoverage(TestCase):
+    """
+    Every block registered in BodyStreamBlock / SectionContentBlock must appear
+    on the generated page.
+
+    This is the guard that keeps create_test_page honest: adding a block to
+    blocks.py without adding a builder to the command fails here rather than
+    quietly leaving the new block untested.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        Site.objects.filter(is_default_site=True).delete()
+        cls.site, cls.home = _make_site()
+        _run_command(slug="coverage-test")
+        cls.page = ContentPage.objects.get(slug="coverage-test")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(_TEMP_MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
+    def _used_block_types(self):
+        """Block type names present in the page body, sections included."""
+        used = set()
+
+        def walk(stream):
+            for child in stream:
+                used.add(child.block_type)
+                if child.block_type == "section":
+                    walk(child.value["content"])
+
+        walk(self.page.body)
+        return used
+
+    def test_every_body_block_is_present(self):
+        from wtrx.blocks import BodyStreamBlock
+
+        registered = set(BodyStreamBlock().child_blocks.keys())
+        missing = registered - self._used_block_types()
+        self.assertEqual(
+            missing,
+            set(),
+            f"Block types registered in BodyStreamBlock but absent from the "
+            f"test page: {sorted(missing)}. Add a builder in create_test_page.py.",
+        )
+
+    def test_every_section_block_is_present_inside_a_section(self):
+        """
+        SectionBlock nesting works at all — at least one block renders inside a
+        section, so a section's inner StreamBlock is genuinely exercised.
+        """
+        sections = [c for c in self.page.body if c.block_type == "section"]
+        self.assertTrue(sections)
+        self.assertTrue(all(len(s.value["content"]) for s in sections))
+
+    def test_background_palette_is_fully_covered(self):
+        """
+        Every colour in BACKGROUND_COLOR_CHOICES appears as a section
+        background, a callout colour, a hero banner colour and an ActionKit
+        signup background.
+        """
+        from wtrx.blocks import BACKGROUND_COLOR_CHOICES
+
+        palette = {key for key, _label in BACKGROUND_COLOR_CHOICES}
+        seen = {
+            "section": set(),
+            "callout": set(),
+            "hero": set(),
+            "signup_actionkit": set(),
+        }
+        for child in self.page.body:
+            if child.block_type == "section":
+                seen["section"].add(child.value["background"])
+            elif child.block_type == "callout":
+                seen["callout"].add(child.value["color"])
+            elif child.block_type == "hero":
+                seen["hero"].add(child.value["banner_color"])
+            elif child.block_type == "signup_actionkit":
+                seen["signup_actionkit"].add(child.value["background"])
+
+        for name, values in seen.items():
+            self.assertEqual(
+                palette - values, set(), f"{name} is missing background colours"
+            )
+
+    def test_supporting_pages_are_created(self):
+        """PageCards and the Wagtail-forms signup need real pages to point at."""
+        from wtrx.models import FormPage, IndexPage
+
+        index_page = IndexPage.objects.get(slug="block-test-index")
+        self.assertEqual(index_page.get_parent().pk, self.page.pk)
+        self.assertEqual(index_page.get_children().live().count(), 3)
+
+        form_page = FormPage.objects.get(slug="block-test-form")
+        self.assertEqual(form_page.get_parent().pk, self.page.pk)
+        self.assertEqual(form_page.form_fields.count(), 2)
+
+    def test_index_children_have_first_published_at(self):
+        """
+        PageCardsBlock orders by first_published_at, which Wagtail only sets on
+        an admin publish — the command must set it itself (AGENTS.md #32).
+        """
+        index_page = self.page.get_children().get(slug="block-test-index")
+        for child in index_page.get_children():
+            self.assertIsNotNone(child.first_published_at)
+
+    def test_force_removes_supporting_pages(self):
+        """--force deletes the whole fixture, children included."""
+        from wtrx.models import FormPage, IndexPage
+
+        _run_command(slug="coverage-test", force=True)
+        self.assertEqual(IndexPage.objects.filter(slug="block-test-index").count(), 1)
+        self.assertEqual(FormPage.objects.filter(slug="block-test-form").count(), 1)
+
+
+# ---------------------------------------------------------------------------
 # Rendering tests — HTTP 200 + block content assertions
 # ---------------------------------------------------------------------------
 
@@ -155,6 +277,10 @@ class TestCreateTestPageRendering(TestCase):
     WAGTAILEMBEDS_FINDERS=[] prevents the video block from making a real HTTP
     request to YouTube. The embed tag silently returns "" when no finder
     matches, so the rest of the page still renders correctly.
+
+    SignupActionKitBlock makes no network call here either: it only fetches
+    when the ActionKit integration supplies a hostname, and no
+    IntegrationSettings exists in these tests.
     """
 
     @classmethod
@@ -187,6 +313,47 @@ class TestCreateTestPageRendering(TestCase):
         response = self._get()
         self.assertContains(response, "Block Test Page")
 
+    # --- typography reference ---
+
+    def test_heading_ramp_covers_h1_to_h6(self):
+        """The typography reference renders every heading level, h1 through h6."""
+        response = self._get()
+        html = response.content.decode()
+        for level in range(1, 7):
+            self.assertIn(
+                f"<h{level}>Heading {level}",
+                html,
+                f"h{level} missing from the typography reference",
+            )
+
+    def test_heading_ramp_uses_the_rich_text_container(self):
+        """
+        The ramp renders inside .wtr-text-block, so h2/h3/h4 pick up the real
+        heading rules from main.css rather than prose defaults.
+        """
+        response = self._get()
+        self.assertContains(response, "wtr-text-block prose")
+
+    def test_type_scale_lists_every_step(self):
+        response = self._get()
+        html = response.content.decode()
+        for utility in ("text-8xl", "text-64", "text-40", "text-xl", "text-sm"):
+            self.assertIn(utility, html)
+
+    def test_rich_text_sample_covers_every_editor_feature(self):
+        """RICHTEXT_FEATURES_FULL: h2, h3, h4, bold, italic, link, ol, ul, blockquote."""
+        response = self._get()
+        html = response.content.decode()
+        for fragment in (
+            "Rich text heading 2",
+            "Rich text heading 3",
+            "Rich text heading 4",
+            "<ul>",
+            "<ol>",
+            "<blockquote>",
+        ):
+            self.assertIn(fragment, html)
+
     # --- content blocks ---
 
     def test_text_block_renders(self):
@@ -202,48 +369,122 @@ class TestCreateTestPageRendering(TestCase):
         response = self._get()
         self.assertContains(response, "Primary Button")
 
+    def test_button_secondary_renders(self):
+        response = self._get()
+        self.assertContains(response, "Secondary Button")
+
+    def test_button_outline_renders(self):
+        response = self._get()
+        self.assertContains(response, "Outline Button")
+
+    def test_button_anchor_variant_renders(self):
+        """The anchor button links to another block's anchor_id on this page."""
+        response = self._get()
+        self.assertContains(response, "#signup-actionkit-navy")
+
     def test_raw_html_block_renders(self):
         response = self._get()
-        self.assertContains(response, "Raw HTML block")
+        self.assertContains(response, "Embedded HTML")
 
     def test_table_block_renders(self):
         response = self._get()
-        self.assertContains(response, "Alice Example")
+        self.assertContains(response, "Renewable capacity added")
+
+    def test_image_block_with_caption_renders(self):
+        response = self._get()
+        self.assertContains(response, "Sample image caption")
+
+    def test_image_block_alt_text_renders(self):
+        response = self._get()
+        self.assertContains(response, 'alt="A test image with explicit alt text"')
+
+    # --- card blocks ---
+
+    def test_card_block_with_all_fields_renders(self):
+        response = self._get()
+        self.assertContains(response, "Standalone Card (all fields)")
+
+    def test_card_block_minimal_renders(self):
+        response = self._get()
+        self.assertContains(response, "Standalone Card (minimal)")
+
+    def test_card_grid_three_and_four_card_variants_render(self):
+        """Four cards lay out 2x2, three lay out in columns — both are present."""
+        response = self._get()
+        self.assertContains(response, "Card Grid (3 cards)")
+        self.assertContains(response, "Card Grid (4 cards)")
+
+    def test_person_card_full_renders(self):
+        response = self._get()
+        self.assertContains(response, "Jane Sample")
+        self.assertContains(response, "Campaign Manager")
+
+    def test_person_card_minimal_renders(self):
+        response = self._get()
+        self.assertContains(response, "Bob Minimal")
+
+    def test_card_carousel_renders(self):
+        response = self._get()
+        self.assertContains(response, "Carousel card 1")
+
+    def test_page_cards_renders_index_children(self):
+        """PageCardsBlock lists the children of the generated index page."""
+        response = self._get()
+        self.assertContains(response, "Index Child Page 1")
 
     # --- layout blocks ---
 
-    def test_card_grid_block_renders(self):
+    def test_image_card_list_renders(self):
         response = self._get()
-        self.assertContains(response, "Card Grid — With Image")
-        self.assertContains(response, "Card Grid — No Image")
-        self.assertContains(response, "Card Grid — Description Only")
+        self.assertContains(response, "Image Card List")
+        self.assertContains(response, "First point")
+
+    def test_image_text_renders(self):
+        response = self._get()
+        self.assertContains(response, "Image + Text")
+
+    def test_feature_panel_variants_render(self):
+        response = self._get()
+        self.assertContains(response, "Feature Panel (image-left, white)")
+        self.assertContains(response, "Feature Panel (image-right, dark-grey)")
+
+    def test_feature_panel_eyebrow_renders(self):
+        response = self._get()
+        self.assertContains(response, "Featured Campaign")
 
     def test_accordion_block_renders(self):
         response = self._get()
         self.assertContains(response, "What is this accordion?")
 
-    def test_section_block_light_renders(self):
+    def test_callout_renders_every_colour(self):
         response = self._get()
-        # SectionBlock with background=light wraps inner blocks; check anchor
-        self.assertContains(response, "section-light")
+        html = response.content.decode()
+        for colour in ("white", "light-grey", "dark-grey", "navy", "red", "blue-gradient"):
+            self.assertIn(f"Callout ({colour})", html)
 
-    def test_section_block_dark_renders(self):
+    def test_hero_block_renders_every_colour(self):
         response = self._get()
-        self.assertContains(response, "section-dark")
+        html = response.content.decode()
+        for colour in ("white", "light-grey", "dark-grey", "navy", "red", "blue-gradient"):
+            self.assertIn(f"Hero Block ({colour})", html)
 
-    def test_section_block_primary_renders(self):
+    # --- sections ---
+
+    def test_section_renders_every_background(self):
         response = self._get()
-        self.assertContains(response, "section-primary")
+        html = response.content.decode()
+        for colour in ("white", "light-grey", "dark-grey", "navy", "red", "blue-gradient"):
+            self.assertIn(f'id="section-{colour}"', html)
 
-    def test_section_block_muted_renders(self):
+    def test_section_padding_variants_render(self):
         response = self._get()
-        self.assertContains(response, "section-muted")
+        self.assertContains(response, 'id="section-padding-sm"')
+        self.assertContains(response, 'id="section-padding-lg"')
 
-    # --- composite blocks ---
-
-    def test_hero_block_renders(self):
+    def test_section_width_variants_render(self):
         response = self._get()
-        self.assertContains(response, "Hero Block Inside Body")
+        self.assertContains(response, 'id="section-width-narrow"')
+        self.assertContains(response, 'id="section-width-wide"')
 
     # --- action blocks ---
 
@@ -256,89 +497,40 @@ class TestCreateTestPageRendering(TestCase):
         # override_amounts = [10, 25, 50, 100] — at least one should appear
         self.assertContains(response, "$10")
 
-    def test_signup_link_block_renders(self):
-        response = self._get()
-        self.assertContains(response, "Join Our Movement")
-
-    def test_signup_action_network_block_renders(self):
-        response = self._get()
-        self.assertContains(response, "Action Network Signup")
-
-    # --- image block ---
-
-    def test_image_block_with_caption_renders(self):
-        response = self._get()
-        self.assertContains(response, "Sample image caption")
-
-    def test_image_block_alt_text_renders(self):
-        response = self._get()
-        self.assertContains(response, 'alt="A test image with explicit alt text"')
-
-    # --- button style variants ---
-
-    def test_button_secondary_renders(self):
-        response = self._get()
-        self.assertContains(response, "Secondary Button")
-
-    def test_button_outline_renders(self):
-        response = self._get()
-        self.assertContains(response, "Outline Button")
-
-    # --- standalone card block ---
-
-    def test_card_block_with_image_renders(self):
-        response = self._get()
-        self.assertContains(response, "Standalone Card (with image)")
-
-    def test_card_block_with_icon_renders(self):
-        """Full card includes an icon — verify the flex icon+heading layout."""
-        response = self._get()
-        self.assertContains(response, 'class="flex items-center gap-3"')
-
-    def test_card_block_minimal_renders(self):
-        response = self._get()
-        self.assertContains(response, "Standalone Card (minimal)")
-
-    # --- person card block ---
-
-    def test_person_card_full_renders(self):
-        response = self._get()
-        self.assertContains(response, "Jane Sample")
-        self.assertContains(response, "Campaign Manager")
-
-    def test_person_card_minimal_renders(self):
-        response = self._get()
-        self.assertContains(response, "Bob Minimal")
-
-    # --- quote block ---
-
-    def test_quote_image_left_renders(self):
-        response = self._get()
-        self.assertContains(response, "image aligned to the")
-        self.assertContains(response, "Learn More")
-
-    def test_quote_image_right_renders(self):
-        response = self._get()
-        self.assertContains(response, "No CTA button on this one")
-
-    # --- hero block minimal ---
-
-    def test_hero_block_minimal_renders(self):
-        response = self._get()
-        self.assertContains(response, "Minimal Hero — Headline Only")
-
-    # --- donate block minimal ---
-
     def test_donate_block_minimal_renders(self):
         response = self._get()
         self.assertContains(response, "Donate (using site defaults)")
 
-    # --- section padding variants ---
-
-    def test_section_padding_sm_renders(self):
+    def test_donate_fundraiseup_renders(self):
         response = self._get()
-        self.assertContains(response, "section-light-sm")
+        self.assertContains(response, "Donate (Fundraise Up)")
 
-    def test_section_padding_lg_renders(self):
+    def test_signup_wagtail_forms_points_at_the_form_page(self):
+        """
+        The block renders its container wired to the generated FormPage.
+
+        The fields themselves are fetched client-side by signup JS, so the
+        server-rendered markup carries the form URL and a loading placeholder,
+        not the inputs.
+        """
         response = self._get()
-        self.assertContains(response, "section-light-lg")
+        self.assertContains(response, "Sign Up (Wagtail Forms)")
+        self.assertContains(response, 'data-form-url="/render-test/block-test-form/"')
+
+    def test_signup_action_network_renders(self):
+        response = self._get()
+        self.assertContains(response, "Sign Up (Action Network)")
+
+    def test_signup_action_network_success_message_renders(self):
+        response = self._get()
+        self.assertContains(response, "Thank you for signing up.")
+
+    def test_signup_actionkit_renders_every_background(self):
+        response = self._get()
+        html = response.content.decode()
+        for colour in ("white", "light-grey", "dark-grey", "navy", "red", "blue-gradient"):
+            self.assertIn(f"Sign Up (ActionKit, {colour})", html)
+
+    def test_signup_link_renders(self):
+        response = self._get()
+        self.assertContains(response, "Sign Up (Link)")

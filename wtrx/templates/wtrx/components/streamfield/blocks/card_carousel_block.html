@@ -24,12 +24,29 @@ the last card is fully visible, not cut off, so nothing there should be
 faded.
 
 No vertical padding on the root: this block is special-cased out of the
-shared `mx-auto max-w-5xl px-4 sm:px-6 lg:px-8` wrapper every other
+shared `mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8` wrapper every other
 non-"section" block gets from content_page.html/home_page.html (see the
 Width note below for why), so it doesn't inherit that wrapper's horizontal
-gutters either — it owns its own pl-4/6/8 directly. The 128px gap between
-body blocks comes from the page templates' space-y-32 on the block loop,
-not from padding here.
+gutters either — it owns its own pl-4/6/8 directly. The gap between body
+blocks comes from the page templates' space-y-* on the block loop, not
+from padding here.
+
+The arrow row's -mb-8 is a correction rather than styling: unlike every
+other block, this one ends in a 60px arrow row (the 44px buttons plus
+their mt-4) that is chrome, not content. The block loop's gap then starts
+below *that*, so the space under the last card read as 156px against the
+96px every neighbouring block gets. Pulling 32px back lands it at 124px
+— deliberately not the full 60px, since the buttons still need room
+beneath them.
+
+The negative margin goes on the arrow row, NOT on this root. Tailwind v4
+applies the loop's spacing as `margin-block-end` on the root, and the
+`:where()` in its selector contributes no specificity — so a `-mb-8` on
+the root does not *reduce* that gap, it replaces it outright (96px → -32px,
+dropping the next block on top of the arrows). On the arrow row it instead
+ends the block's own box 32px higher, letting the buttons overhang it, and
+the loop's gap is measured from there — so this stays correct on the home
+page's larger space-y-32 as well, which a hardcoded root margin would not.
 
 Equal card heights: the track's own flex row already stretches each
 [data-carousel-item] wrapper to match the tallest one (align-items'
@@ -71,9 +88,29 @@ capped well short of that edge by lg:w-[583px] (matching Figma's text
 column width), so no extra padding is needed there.
 {% endcomment %}
 <div class="wtr-card-carousel mx-auto flex max-w-[1500px] flex-col gap-8 pl-4 sm:pl-6 lg:flex-row lg:items-center lg:gap-12 lg:pl-8" data-carousel>
-    <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 lg:w-[583px] lg:shrink-0 lg:pr-0">
-        <h2 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl">{{ value.heading }}</h2>
-        <div class="prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl lg:text-2xl">
+    {% comment %}
+    lg:w-[520px], down from Figma's 583px. The description dropped from 24px
+    to the site's 20px body size (AGENTS.md pitfall #34), so the same copy
+    needs less measure and 583 left the column visibly loose against the
+    cards beside it.
+
+    520 is where the measurements land, not a round number: the longest real
+    copy on the site (canada's, 195 characters) holds at four lines all the
+    way down to 520 and gains a fifth at 490, so this takes back the slack
+    the smaller type created without costing a line anywhere. The 63px goes
+    to the cards column.
+
+    The 48px heading is the other constraint and it is the reason this
+    cannot go to Figma's number *and* be thinner: "Voices from the
+    Gathering" (/take-action/renew-our-power/) fits 583 by under 20px and
+    wraps to two lines at 563 or below. That wrap is accepted rather than
+    designed around — the column cannot be sized to keep an editor-authored
+    heading on one line in general, and a two-line 48px heading above
+    right-aligned copy reads fine.
+    {% endcomment %}
+    <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 lg:w-[520px] lg:shrink-0 lg:pr-0">
+        <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl">{{ value.heading }}</h2>
+        <div class="prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl">
             {{ value.content|richtext }}
         </div>
         {% if value.link_page or value.link_url %}
@@ -94,7 +131,7 @@ column width), so no extra padding is needed there.
             </div>
             <div class="wtr-card-carousel-fade pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-24 lg:w-32" data-carousel-fade aria-hidden="true"></div>
         </div>
-        <div class="mt-4 flex justify-end gap-3 pr-4 sm:pr-6 lg:pr-8">
+        <div class="mt-4 -mb-8 flex justify-end gap-3 pr-4 sm:pr-6 lg:pr-8">
             <button type="button" class="wtr-carousel-arrow" data-carousel-prev aria-label="{% trans 'Previous cards' %}">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                     <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>

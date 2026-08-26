@@ -5,16 +5,36 @@ Exactly 4 cards get a 2-col grid at lg+ (a balanced 2x2, matching Figma's
 an unbalanced trailing row of 1. Any other card count keeps the default
 3-col.
 
-Heading size/alignment matches the same 96px left-aligned display-heading
+Heading size/alignment matches the same left-aligned display-heading
 convention as CardCarouselBlock/ImageCardListBlock's own section headings
-(font-heading ... lg:text-8xl) — per Figma's "Areas of work" (text-[96px],
-left-aligned, not centered like PageCardsBlock's own smaller heading).
+(font-heading ... lg:text-5xl) — per Figma's "Areas of work", which is
+left-aligned, not centered. Figma draws this step at 96px (text-8xl); the
+whole non-hero ramp was brought down against a 20px body, so it is 48px
+here — see the type scale note in AGENTS.md.
+
+Width: special-cased in content_page.html/home_page.html/post_page.html
+(alongside page_cards/section/card_carousel/etc.) to skip the shared body
+column, and owns the same w-full-outer / max-w-inner pair PageCardsBlock
+uses — max-w-[1218px], Figma's card row width. The two blocks are the
+same thing visually (a row of cards under a display heading), so a
+CardGridBlock sitting above or below a PageCardsBlock has to line its
+card edges up with it. Before this it inherited the shared body column
+and rendered a 3-across grid inside 800px.
+
+As in page_cards_block.html, the 1218px cap has to be the ONLY
+max-w/padding pair on its own element, not stacked with the outer
+gutter's padding — otherwise the gutter subtracts from 1218 rather than
+just giving the row mobile-edge breathing room.
 {% endcomment %}
-{% if value.heading %}
-    <h2 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl mb-10">{{ value.heading }}</h2>
-{% endif %}
-<div class="wtr-card-grid grid gap-6 sm:grid-cols-2 {% if value.cards|length == 4 %}lg:grid-cols-2{% else %}lg:grid-cols-3{% endif %}">
-    {% for card in value.cards %}
-        {% include "wtrx/components/card.html" with card=card %}
-    {% endfor %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-[1218px]">
+        {% if value.heading %}
+            <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+        {% endif %}
+        <div class="wtr-card-grid grid gap-6 sm:grid-cols-2 {% if value.cards|length == 2 or value.cards|length == 4 %}lg:grid-cols-2{% else %}lg:grid-cols-3{% endif %}">
+            {% for card in value.cards %}
+                {% include "wtrx/components/card.html" with card=card %}
+            {% endfor %}
+        </div>
+    </div>
 </div>

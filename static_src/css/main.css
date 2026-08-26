@@ -4,6 +4,33 @@
 @plugin '@tailwindcss/typography';
 @plugin '@tailwindcss/forms';
 
+/* Keep the harvested block-preview data out of Tailwind's source scan.
+ *
+ * wtrx/previews/block_previews.json is captured from real page content by
+ * `manage.py harvest_block_previews`, and for SignupActionKitBlock what it
+ * captures includes `form_html` — raw markup fetched from ActionKit, carrying
+ * ActionKit's own class names. Tailwind v4 auto-detects sources across the
+ * project tree and scans that JSON as plain text, so any AK class name that
+ * happens to spell a real Tailwind utility gets *generated* into our bundle.
+ * The live form on the page carries the same class names, so the utility then
+ * applies to it.
+ *
+ * That is not hypothetical: AK puts `text-black` on <form id="action-form">
+ * and on #unknown_user. Scanning the JSON emitted `.text-black { color:
+ * var(--color-black) }`, which forced every otherwise-unstyled string inside
+ * the fetched form — "Sign the petition now:", the co-host paragraph, opt-in
+ * checkbox labels, consent radio labels, validation messages — to pure black
+ * on every panel fill, including the near-black dark grey one. It also beat
+ * .wtr-actionkit-embed-stacked's own `color`, since #action-form sits between
+ * that wrapper and the text.
+ *
+ * Nothing in this file's own output depends on the JSON: block previews render
+ * through the real templates, which Tailwind scans directly. The JSON holds
+ * field values and third-party markup, neither of which should ever decide
+ * what utilities exist. See .wtr-actionkit-embed's `color: inherit` guard for
+ * the second half of this defence. */
+@source not '../../wtrx/previews/block_previews.json';
+
 /* ============================================================
  * Border-radius convention
  * ============================================================
@@ -90,7 +117,7 @@ html {
 }
 
 @utility wtr-btn-lg {
-    padding: 1.5rem 2.25rem;
+    padding: 1rem 1.5rem;
     font-size: 1.5rem;
     border-width: 4px;
 }
@@ -150,6 +177,30 @@ html {
     display: none !important;
 }
 
+/* Let the panel decide the text colour, whatever classes AK's markup carries.
+ *
+ * Both variants below set a colour on their own wrapper and expect everything
+ * inside the fetched form to inherit it, so that one `.wtr-ak-on-{tone}` swap
+ * can re-colour all of AK's loose text at once. #action-form and #unknown_user
+ * sit between that wrapper and the text, and AK puts class names on both — so
+ * any one of them that collides with a utility in our own bundle silently
+ * breaks the whole inheritance chain for every string inside the form.
+ *
+ * That is what `text-black` did (see the @source rule at the top of this file
+ * for how AK's class names were reaching Tailwind's scanner in the first
+ * place). The @source fix removes today's collision at the root; this restores
+ * inheritance explicitly, so the next AK class name that happens to spell one
+ * of our utilities cannot do the same thing again. The id in the selector
+ * out-specifies any single-class utility.
+ *
+ * Only `color` is reset. AK's layout classes on these elements are already
+ * handled deliberately by each variant's own rules. */
+.wtr-actionkit-embed #action-form,
+.wtr-actionkit-embed #action-form .user-form,
+.wtr-actionkit-embed #action-form #unknown_user {
+    color: inherit;
+}
+
 /* ============================================================
  * ActionKit inline embed override — .wtr-actionkit-embed-inline
  * ============================================================
@@ -198,15 +249,27 @@ html {
  * ============================================================ */
 .wtr-actionkit-embed-inline #action-header,
 .wtr-actionkit-embed-inline #recent-actions,
-.wtr-actionkit-embed-inline #known_user {
+.wtr-actionkit-embed-inline #known_user,
+/* AK emits a bare <div id="t" class="p ..."> &nbsp; </div> spacer between
+ * the submit button and the privacy notice — vertical rhythm for its own
+ * stylesheet, which we don't load. Left visible it is caught by the
+ * order:2/flex-basis:100% catch-all below and becomes an empty 24px row
+ * inside the hero, pushing the fine print ~50px further down than Figma
+ * puts it. (Scoped to the inline variant deliberately: the stacked panel
+ * hasn't been re-checked against its own design yet.) */
+.wtr-actionkit-embed-inline #action-form > #t {
     display: none;
 }
 
+/* Figma's Signup Horizontal (node I1:560;2031:5529) puts 16px between the
+ * fields and the submit button, and 13px between that row and the privacy
+ * fine print below it — one wrapping flex row, two different gaps. */
 .wtr-actionkit-embed-inline #action-form {
     display: flex !important;
     flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.75rem;
+    align-items: flex-start;
+    column-gap: 1rem;
+    row-gap: 0.8125rem;
 }
 
 .wtr-actionkit-embed-inline #unknown_user,
@@ -217,6 +280,9 @@ html {
 .wtr-actionkit-embed-inline #action-form > .input-wrapper.input-submit {
     order: 1;
     flex: 0 0 auto;
+    /* AK ships .margin-bottom-normal on this wrapper; the row-gap above is
+     * what should be spacing it from the fine print underneath. */
+    margin: 0;
 }
 
 /* ...everything else (intro text fields, consent radios, privacy notice,
@@ -228,70 +294,213 @@ html {
     flex-basis: 100%;
 }
 
-/* flex-basis 8rem (not the more spacious 12rem it started at): the
- * standalone split panel's form column is only ~460px wide (half of the
- * card's inner width, split against the heading column) — with as few as
- * 2 fields, 12rem-per-field left no room at all for the button on the same
- * line (2*192px + gaps already exceeded 460px before the button's own
- * hypothetical width was even added in), so it always wrapped to its own
- * row regardless of the display:contents fix above (that fix only stops
- * the button from floating *when* it wraps — it doesn't create room for it
- * to avoid wrapping). 8rem keeps 2-3 short fields (email, zip, country)
- * plus the button fitting on one line even in that narrower column. */
+/* The bordered, filled box is the .input-text/.input-select *wrapper*, not
+ * the <input> — so each field's label sits inside the box above its own
+ * value, exactly as Figma draws the Email Address / Country fields, rather
+ * than floating above the box in the hero's own light text. (Same
+ * structure as the stacked variant further down, at the hero's larger
+ * type sizes.) The input itself is stripped to a transparent, borderless
+ * line inside that box.
+ *
+ * `flex: 1 1 0` — a *zero* basis, not Figma's literal 250px field width.
+ * Flex line-breaking measures against the basis, so `1 1 250px` made the
+ * row 250 + 250 + 145 + two 16px gaps = 677.4px against a 677px column and
+ * wrapped the submit button onto its own line by four tenths of a pixel —
+ * whereupon the two fields grew to 331px each to fill the line they had to
+ * themselves. With a zero basis the button is always inside the line, and
+ * the fields divide what's left of the row after it: at the hero's 677px
+ * that is (677 - 145 - 32) / 2 = 250px each, arriving at Figma's number as
+ * an outcome rather than asserting it and losing to a rounding error.
+ *
+ * min-width is what still allows a wrap, just far later — below roughly a
+ * 465px column the fields hit their floor and the button drops, which is
+ * the right behaviour at that width. (This was `1 1 8rem`, sized for the
+ * *standalone* panel's much narrower ~460px form column; that column is
+ * the stacked variant's now, and the hero is the inline variant's only
+ * remaining caller.) */
 .wtr-actionkit-embed-inline .input-text,
 .wtr-actionkit-embed-inline .input-select {
+    display: flex;
+    /* Containing block for the validation message, which hangs below the pill
+     * out of flow so an error never changes this row's height — see the
+     * .ak-err rules below. */
+    position: relative;
+    flex: 1 1 0;
+    min-width: 9rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.125rem;
+    min-height: 58px;
     margin: 0;
-    flex: 1 1 8rem;
+    padding: 0.625rem 1rem;
+    background-color: var(--color-neutral-50);
+    border: 1px solid var(--color-neutral-400);
+    border-radius: var(--radius-button);
 }
 
-.wtr-actionkit-embed-inline .ak-userfield-input,
+/* :not() on the type for the same reason as the stacked variant below —
+ * AK puts .ak-userfield-input on opt-in checkboxes and radios too, and a
+ * 100%-wide borderless checkbox is not a checkbox. */
+.wtr-actionkit-embed-inline .ak-userfield-input:not([type='checkbox']):not([type='radio']),
 .wtr-actionkit-embed-inline select {
     width: 100%;
-    padding: 0.625rem 1rem;
-    border: 1px solid var(--color-neutral-300);
-    border-radius: var(--radius-button);
-    background-color: var(--color-light);
+    padding: 0;
+    border: 0;
+    background-color: transparent;
     color: var(--color-dark);
     font-family: var(--font-body);
-    font-size: 0.875rem;
+    font-size: 1rem;
+    line-height: 1.25;
 }
 
+/* Figma's "outlined / default" submit: 58px tall to match the fields
+ * beside it, 24px side padding, 20px bold label at 0.3px tracking, and a
+ * 16px trailing arrow 8px after the text — hence the 3rem padding-right
+ * (24 + 16 + 8), which reserves room for the background-image arrow set in
+ * theme.css. */
 .wtr-actionkit-embed-inline button[type='submit'],
 .wtr-actionkit-embed-inline input[type='submit'] {
+    display: inline-flex;
     flex: 0 0 auto;
-    padding: 0.625rem 2.5rem 0.625rem 1.25rem;
+    align-items: center;
+    min-height: 58px;
+    padding: 1rem 3rem 1rem 1.5rem;
     font-family: var(--font-heading);
+    font-size: 1.25rem;
     font-weight: var(--font-weight-bold);
+    line-height: 1.125;
+    letter-spacing: 0.3px;
     color: var(--color-light);
     background-color: var(--color-primary);
     border: 2px solid transparent;
     border-radius: var(--radius-button);
     cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
 }
 
+.wtr-actionkit-embed-inline button[type='submit']:hover,
+.wtr-actionkit-embed-inline input[type='submit']:hover {
+    background-color: var(--color-primary-700);
+}
+
+/* 13px bold uppercase, sitting inside the field box on the box's own light
+ * fill — so --color-dark, not --color-light. Figma sets no letter-spacing
+ * here, so none is added. */
 .wtr-actionkit-embed-inline .input-text > label,
 .wtr-actionkit-embed-inline .input-select > label {
     display: block;
-    margin-bottom: 0.25rem;
+    margin: 0;
     font-family: var(--font-heading);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.1;
     text-transform: uppercase;
-    color: var(--color-light);
+    color: var(--color-dark);
 }
 
 /* Disclaimer/fine-print text below the form (terms of service, privacy
- * policy, unsubscribe notice). */
+ * policy, unsubscribe notice), at 14px/1.25 in --color-neutral-200
+ * (#eaeaea, its own token, not white at 80%). It reaches this line via the
+ * order:2 / flex-basis:100% rule above; max-width is what pulls it back
+ * off full width.
+ *
+ * 480px, not Figma's 435px, and the two numbers are measuring different
+ * strings: Figma's mock carries its own placeholder wording, while what
+ * actually renders is whatever copy the ActionKit form ships ("You'll
+ * receive emails about our campaigns and ways you can take action. You can
+ * unsubscribe at any time (...)"), which is longer. At 14px that real copy
+ * misses a two-line fit inside 435px by about 4px, breaking as 399 + 425 +
+ * a 40px orphan; 460px is the narrowest box that holds two lines, and 480
+ * leaves slack for the copy to gain a word without dropping to three.
+ *
+ * text-wrap: balance is what makes those two lines even rather than a long
+ * one over a short one — it settles at 443 + 424 and, usefully here, stays
+ * there for any width past the 460px threshold, so the exact max-width
+ * above is not load-bearing for evenness. Where balance is unsupported
+ * this degrades to a plain greedy wrap: still two lines, just less even. */
 .wtr-actionkit-embed-inline .general-privacy-notice {
-    font-size: 14px;
-    color: var(--color-light);
-    opacity: 0.8;
+    max-width: 480px;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    line-height: 1.25;
+    color: var(--color-neutral-200);
+    text-wrap: balance;
 }
 
 .wtr-actionkit-embed-inline .general-privacy-notice a {
     color: inherit;
     text-decoration: underline;
+}
+
+/* Validation errors — .ak-err / .ak-error
+ *
+ * ActionKit's client validation (actionkit.js, loaded at runtime from the
+ * client's AK instance) injects its message as a <ul class="ak-err"> *inside*
+ * the failing field's wrapper, and adds .ak-error to that field's <label> and
+ * <input>. Left alone the <ul> is unstyled default black body text in flow
+ * inside the 250px pill, where the message wraps to six lines: the email pill
+ * grows 58px -> 204px while the country pill and the submit button stay at 58px
+ * (align-items: flex-start), and the fine print below is pushed ~145px down.
+ * The row looks broken because one flex item silently quadrupled in height.
+ *
+ * Taking the <ul> out of flow is what keeps the row aligned — the pills and the
+ * button never change height at all. The field wrapper is the containing block
+ * (position: relative below), so the message hangs directly under its own field
+ * but is free to run the full width of the form rather than being boxed into
+ * one 216px column, which is the difference between one line and six.
+ *
+ * Notes on the two selectors, both verified against a live AK form rather than
+ * assumed:
+ *   - The error-state hook is `:has(.ak-error)`, NOT `:has(> ul.ak-err)`. When
+ *     the visitor corrects the field and resubmits, AK *keeps* the <ul> in the
+ *     DOM — emptied and set to `display: none` via an inline style — and only
+ *     removes the .ak-error class from the label and input. Keying off the <ul>
+ *     would leave the red border and the reserved space stuck on permanently
+ *     after the error had cleared.
+ *   - Out-of-flow means the message would otherwise print on top of the privacy
+ *     notice on the next flex line, so the erroring field reserves room for it
+ *     with margin-bottom. Only the failing field carries that margin; a flex
+ *     line is as tall as its tallest item, so that is enough to push the notice
+ *     down, and no rule has to know *which* field failed.
+ *
+ * The full-width message is safe from collisions because AK reports one field
+ * at a time — submitting with both the email and the country invalid still
+ * renders a single <ul class="ak-err">, under the first failing field.
+ *
+ * Colour: error-200 rather than the usual error-600, for the same reason the
+ * fine print above is neutral-200 — this sits on the hero's dark scrim, where
+ * the mid-scale reds go muddy. Bold, since the scrim is only 40-80% opaque over
+ * moving video and the backdrop behind any given line is not predictable. */
+.wtr-actionkit-embed-inline :is(.input-text, .input-select):has(.ak-error) {
+    border-color: var(--color-error-500);
+    /* 44px = the 6px offset below the pill + the message's own 35px (AK's
+     * stock wording is two lines at 14px across the form's 677px) + 3px, so
+     * the 13px row-gap below this line leaves ~12px of clearance before the
+     * privacy notice. This number is the one soft spot in the approach: it is
+     * sized to the message, and CSS has no way to reserve "however tall the
+     * out-of-flow element turned out to be". A message long enough to run to
+     * three lines — a wordier AK form, or a translation — would eat that
+     * clearance and eventually print over the notice. If that happens, the
+     * fix is not a bigger number here but moving the <ul> into a real
+     * full-width flex line of its own, which needs JS since it is nested two
+     * levels inside the field wrapper and cannot be reordered from CSS. */
+    margin-bottom: 2.75rem;
+}
+
+.wtr-actionkit-embed-inline ul.ak-err {
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    left: 0;
+    width: max-content;
+    max-width: 677px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.25;
+    color: var(--color-error-200);
 }
 
 /* ============================================================
@@ -362,7 +571,7 @@ html {
     margin: 0;
     font-family: var(--font-heading);
     font-size: 0.625rem;
-    font-weight: 800;
+    font-weight: var(--font-weight-bold);
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--color-dark);
@@ -383,20 +592,93 @@ html {
     font-size: 0.875rem;
 }
 
-/* ActionKit's fetched fragment ships inline <style> blocks that hide the
- * native checkbox/radio (position:absolute; opacity:0; height/width:0) and
- * expect its own drawn replacement in their place — a .checkmark span for
- * checkboxes, a .larger-radios-choice-label for radios. Its templates emit
- * neither inside .ak-userfield-checkbox-set / .ak-userfield-radio-set, so
- * on the `ppg` page those two opt-ins render as bold text with no control
- * visible and no checked state at all. (Its *privacy* radios are a
- * different markup path — .ak-privacy .input-radio-group — and do get a
- * drawn circle, so they are deliberately left alone here.) Undoing the
- * hide, and the 35px label indent that reserved space for the control that
- * never arrived, restores plain native controls.
+/* Validation errors.
  *
- * !important is required rather than merely nice: those AK rules are
- * .input-radio.ak-input-type-action input[type="radio"] and
+ * Unlike the inline variant — where the message has to be lifted out of flow
+ * or it quadruples the height of one cell in a single-row layout (see the
+ * .ak-err rules up there) — the stacked form is already a column of
+ * full-width fields, so a field growing to fit its own error is exactly the
+ * right behaviour and needs no positioning at all.
+ *
+ * Leaving the message *inside* the field box is also what makes this
+ * fill-independent: the box is the form's own light surface on every panel
+ * colour, so one dark red reads correctly against all six fills and no
+ * .wtr-ak-on-{tone} override is needed. The inline variant sits directly on
+ * the hero scrim and had to pick a light red for that reason.
+ *
+ * The error-state hook is .ak-error, not the presence of the <ul>: when the
+ * visitor corrects the field and resubmits, AK empties the <ul> and hides it
+ * with an inline style but leaves it in the DOM, and only drops .ak-error
+ * from the label and input. Keying off the <ul> would leave the red border
+ * on a field that is no longer in error. */
+.wtr-actionkit-embed-stacked :is(.input-text, .input-select):has(.ak-error) {
+    border-color: var(--color-error-500);
+}
+
+.wtr-actionkit-embed-stacked ul.ak-err {
+    margin: 0.375rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.3;
+    color: var(--color-error-700);
+}
+
+/* AK's form-level error list — server-side failures that belong to no single
+ * field, so unlike .ak-err above this one has no light box to sit on and does
+ * read against the panel fill. It follows the panel tone the same way the
+ * rest of the form's loose text does, with a red hairline and inherited text
+ * rather than red type that would be unreadable on the red fill. AK ships it
+ * hidden and unhides it inline, so this only ever shows when it has content. */
+.wtr-actionkit-embed-stacked #ak-errors {
+    margin: 0;
+    padding: 0.75rem;
+    list-style: none;
+    border: 1px solid var(--color-error-500);
+    border-radius: var(--radius-button);
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.3;
+}
+
+/* AK's bare `<div id="t">&nbsp;</div>` spacer — vertical rhythm for its own
+ * stylesheet, which we don't load. The inline variant already hides it; in
+ * this column it is an empty line plus a 1rem flex gap between the fields and
+ * the submit button. Same reasoning, same fix — the comment on the inline
+ * rule noted this variant had not been re-checked yet. */
+.wtr-actionkit-embed-stacked #action-form > #t {
+    display: none;
+}
+
+/* Opt-in checkbox / consent radio controls — native fallback ONLY.
+ *
+ * ActionKit's fetched fragment ships inline <style> blocks that hide the
+ * native control (position:absolute; opacity:0; height/width:0) and expect
+ * its own drawn replacement in their place — a `.checkmark` span for a
+ * checkbox, a `::before` circle on `.larger-radios-choice-label` for a
+ * radio. Whether the template actually emits that replacement varies by
+ * form, so this has to be conditional, not a blanket override:
+ *
+ *   - Replacement present (the `/canada` petition): AK's own drawn control
+ *     is fully working from the fragment's inline styles alone — the tick
+ *     appears on check, and the radio ring turns from grey to blue on
+ *     select. Un-hiding the native control on top of it renders *two*
+ *     controls side by side, and zeroing AK's 35px label indent (which
+ *     reserves the space its absolutely-positioned replacement sits in)
+ *     drops the label text on top of the drawn control.
+ *   - Replacement absent: the opt-in renders as bold text with no control
+ *     at all and no visible checked state, which is what the rules below
+ *     repair.
+ *
+ * `:not(:has(...))` is what tells the two apart, keyed on the replacement
+ * element itself. AK's privacy radios are a different markup path
+ * (.ak-privacy .input-radio-group) and always get a drawn circle, so they
+ * match neither selector and are left alone.
+ *
+ * !important is required rather than merely nice: the AK rules being undone
+ * are .input-radio.ak-input-type-action input[type="radio"] and
  * .input-checkbox.ak-input-type-action .ak-userfield-checkbox-set label —
  * the same specificity these selectors can reach, in a <style> block that
  * arrives inside the fetched fragment and therefore always later in source
@@ -404,8 +686,8 @@ html {
  * out-specifying it would mean hard-coding AK's own ak-input-type-* class
  * names into our selectors, which breaks the moment a page uses the
  * ak-input-type-custom variant AK's CSS also targets. */
-.wtr-actionkit-embed-stacked .ak-userfield-checkbox-set input[type='checkbox'],
-.wtr-actionkit-embed-stacked .ak-userfield-radio-set input[type='radio'] {
+.wtr-actionkit-embed-stacked .ak-userfield-checkbox-choice:not(:has(.checkmark)) input[type='checkbox'],
+.wtr-actionkit-embed-stacked .ak-userfield-radio-choice:not(:has(.larger-radios-choice-label)) input[type='radio'] {
     position: static !important;
     height: 0.9375rem !important;
     width: 0.9375rem !important;
@@ -414,8 +696,8 @@ html {
     accent-color: var(--color-primary);
 }
 
-.wtr-actionkit-embed-stacked .ak-userfield-checkbox-set label,
-.wtr-actionkit-embed-stacked .ak-userfield-radio-set label {
+.wtr-actionkit-embed-stacked label.ak-userfield-checkbox-choice:not(:has(.checkmark)),
+.wtr-actionkit-embed-stacked label.ak-userfield-radio-choice:not(:has(.larger-radios-choice-label)) {
     display: flex;
     align-items: flex-start;
     padding-left: 0 !important;
@@ -459,6 +741,99 @@ html {
     text-decoration: underline;
 }
 
+/* ------------------------------------------------------------
+ * Action progress bar — #progress
+ * ------------------------------------------------------------
+ * Petition/action pages (e.g. /take-action/our-own-power/) include a
+ * signature counter above the form. AK builds it from a
+ * <script type="text/ak-template" for="progress"> at runtime into:
+ *
+ *   #progress
+ *     p.hidden                    — the screen-reader announcement
+ *     #action-progress-current    — "29,610 actions so far"
+ *     #action-progress-bar        — the track
+ *       #action-progress-bar-inner  — the fill, width set inline as a %
+ *     #action-progress-goal       — "390 needed to get to 30,000"
+ *
+ * AK styles none of it (that lives in the site stylesheet we don't load),
+ * so out of the box the track and the fill both compute to zero height
+ * with no background: the numbers render and the bar itself is simply not
+ * there. Everything below is new, not an override.
+ *
+ * The fill's inline width is the only thing AK sets, so the track just
+ * needs a height, a fill colour and a radius to clip it to.
+ * ------------------------------------------------------------ */
+.wtr-actionkit-embed-stacked #progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0;
+}
+
+/* AK marks its progress announcement `hidden`, which our own bundle
+ * defines as display:none — that also takes it out of the accessibility
+ * tree, leaving the bar with no accessible text at all (it is a pair of
+ * bare divs). Visually hidden but still announced is what AK intends
+ * here. Scoped to #progress so it cannot touch the .hidden our own
+ * template toggles on the form container and thank-you box. */
+.wtr-actionkit-embed-stacked #progress p.hidden {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.wtr-actionkit-embed-stacked #action-progress-current,
+.wtr-actionkit-embed-stacked #action-progress-goal {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.3;
+}
+
+.wtr-actionkit-embed-stacked .action-progress-current-amount,
+.wtr-actionkit-embed-stacked .action-progress-needed-amount,
+.wtr-actionkit-embed-stacked .action-progress-total-amount {
+    font-weight: var(--font-weight-bold);
+}
+
+/* The track reads against the panel fill, so it takes a translucent white
+ * that works on the four dark fills and is inverted for the two light ones
+ * below — the same split every other piece of chrome here makes. Translucent
+ * rather than a fixed grey so it sits correctly on navy, red and dark grey
+ * without three separate values. */
+.wtr-actionkit-embed-stacked #action-progress-bar {
+    height: 0.625rem;
+    background-color: rgb(255 255 255 / 0.22);
+    border-radius: var(--radius-full, 9999px);
+    overflow: hidden;
+}
+
+.wtr-actionkit-embed-stacked #action-progress-bar-inner {
+    height: 100%;
+    background-color: var(--color-primary);
+    border-radius: inherit;
+}
+
+/* 350 Blue panel: the fill is --color-primary, which is the panel — the bar
+ * would read as empty at any percentage. Same --color-dark swap the submit
+ * button and the checkbox accent make on this fill. */
+.wtr-actionkit-embed-stacked.wtr-ak-on-primary #action-progress-bar-inner {
+    background-color: var(--color-dark);
+}
+
+/* Light panels: a translucent *white* track on white or light grey is no
+ * track at all, so it flips to translucent dark. The blue fill already
+ * reads on both, and is left alone. */
+.wtr-actionkit-embed-stacked.wtr-ak-on-light #action-progress-bar,
+.wtr-actionkit-embed-stacked.wtr-ak-on-white #action-progress-bar {
+    background-color: rgb(0 0 0 / 0.12);
+}
+
 /* Opt-in checkbox / consent radio fields. ActionKit wraps these in
  * .input-checkbox / .input-radio rather than the .input-text /
  * .input-select boxes styled above, and their labels are bare text next to
@@ -500,6 +875,17 @@ html {
     border: 1px solid rgb(255 255 255 / 0.25);
 }
 
+/* Dark grey panel, part two: the success message that replaces the form on
+ * submit is the same --color-dark box, and disappears into this fill for the
+ * same reason — worse than the fine print, since at that point it is the only
+ * thing left in the column and there is no form beside it to give it an edge.
+ * Same hairline. This class sits on the thank-you box itself, not on the
+ * embed wrapper (the box is the embed's sibling) — see _actionkit_form.html. */
+.wtr-signup-thank-you.wtr-ak-on-dark {
+    background-color: transparent;
+    border: 1px solid rgb(255 255 255 / 0.25);
+}
+
 /* 350 Blue panel: the submit button's --color-primary fill *is* the panel
  * fill, leaving a button that reads as bare white text. Dark is the same
  * swap feature_panel_block.html's pill makes against a fill it matches. */
@@ -508,30 +894,87 @@ html {
     background-color: var(--color-dark);
 }
 
-/* Light grey panel: the only fill the panel's own text inverts against
- * (see signup_actionkit_block.html), so the form's light-on-color text
- * inverts with it. The field boxes also go from --color-neutral-50 to
+/* 350 Blue panel, part two: the drawn checkbox/radio controls take their
+ * accent from --color-primary as well, so on this fill a ticked box is blue
+ * on blue and reads as empty. Same --color-dark swap as the button above, so
+ * the control and the button it sits over stay one colour. */
+.wtr-actionkit-embed-stacked.wtr-ak-on-primary .ak-userfield-checkbox-set input[type='checkbox'],
+.wtr-actionkit-embed-stacked.wtr-ak-on-primary .ak-userfield-radio-set input[type='radio'] {
+    accent-color: var(--color-dark);
+}
+
+/* The two light panels: both invert the form's light-on-color text along
+ * with the panel's own (see signup_actionkit_block.html), and they differ
+ * only in the field boxes — see SignupActionKitBlock.PANEL_TONES for why
+ * they are separate tones rather than one. */
+.wtr-actionkit-embed-stacked.wtr-ak-on-light,
+.wtr-actionkit-embed-stacked.wtr-ak-on-white {
+    color: var(--color-dark);
+}
+
+/* Light grey panel only: the field boxes go from --color-neutral-50 to
  * white — 50 against the panel's 200 is too close to read as a separate
- * surface, where against navy/red/dark it clearly does. */
+ * surface, where against navy/red/dark it clearly does. The white panel
+ * deliberately does *not* get this: there the boxes would become the panel
+ * colour exactly and dissolve into it, so they keep the neutral-50 default,
+ * which is what makes them a surface there. */
 .wtr-actionkit-embed-stacked.wtr-ak-on-light .input-text,
 .wtr-actionkit-embed-stacked.wtr-ak-on-light .input-select {
     background-color: var(--color-light);
 }
 
-.wtr-actionkit-embed-stacked.wtr-ak-on-light {
-    color: var(--color-dark);
+/* ============================================================
+ * Heading weights — h1/h2 Klima Heavy, h3-h6 Klima Bold
+ * ============================================================
+ * The whole heading scale in two rules. font-bold and font-semibold both
+ * mean Klima Bold (700) — see theme.css — so this is the only thing keeping
+ * the two top levels on Heavy (800).
+ *
+ * These are bare element selectors, with no class, deliberately. The
+ * headings that most need them have no class to hook: Tailwind Typography
+ * styles rich text headings as `:where(h1..h4)` and hardcodes the weights
+ * (800/700/600/600), so an h2 an editor writes would otherwise render a full
+ * step lighter than the identical heading typed into a block's heading
+ * field, and h3/h4 would land on Medium now that a 600 face exists. Pinning
+ * the element means one rule covers rich text and templates alike, and
+ * preflight — which resets h1-h6 to `font-weight: inherit`, i.e. body
+ * weight — no longer decides anything.
+ *
+ * These rules win over Tailwind's utilities, and NOT because of specificity:
+ * `h2` is 0,0,1 and `.font-bold` is 0,1,0, so on specificity the utility
+ * would take it. They win because main.css is unlayered while every Tailwind
+ * utility lives in `@layer utilities`, and unlayered normal declarations beat
+ * layered ones outright. The practical consequence: putting `font-medium`
+ * (or any weight utility) on a heading silently does nothing. That is why no
+ * template carries one any more — they would have been lies. To make one
+ * heading an exception, write an unlayered rule here rather than reaching
+ * for a utility in the template.
+ *
+ * `strong` is deliberately left alone. Preflight's `bolder` off a 500 parent
+ * computes to 700, so emphasis in running text lands on Bold by itself.
+ * ============================================================ */
+h1, h2 {
+    font-weight: var(--font-weight-heavy);
+}
+
+h3, h4, h5, h6 {
+    font-weight: var(--font-weight-bold);
 }
 
 /* ============================================================
  * Rich text block headings — .wtr-text-block
  * ============================================================
  * Used by text_block.html. Tailwind Typography sizes headings relative to
- * the prose body (h2 = 1.5em → ~36px here), but Figma sets a section
- * heading at 64px and a sub-heading at 40px regardless of the body size
- * around it — the same steps CardGridBlock, ImageTextBlock and the hero's
- * own heading fields use. Without this, the same heading rendered from a
- * rich text block came out visibly smaller than one typed into a block's
- * heading field.
+ * the prose body, but a section heading should be the same size regardless
+ * of the body size around it — and the same size as one typed into a
+ * block's own heading field. These steps therefore mirror the section
+ * heading (40px) and sub-heading (24px) used by CalloutBlock,
+ * ImageTextBlock etc. Without this, the same heading rendered from a rich
+ * text block came out visibly smaller than one typed into a heading field.
+ *
+ * Note: these are the post-rescale sizes. Figma specs 64/40 here; that
+ * read too large in the browser against a 20px body, so the whole
+ * non-hero ramp was brought down one notch (see AGENTS.md).
  *
  * The element selector (not `:where(h2)`) is deliberate: it outranks
  * Typography's 0,1,0 `:where(h2):not(...)` rule, which the equivalent
@@ -539,31 +982,104 @@ html {
  * ============================================================ */
 .wtr-text-block h2 {
     font-family: var(--font-heading);
-    font-size: var(--text-3xl);
+    font-size: var(--text-2xl);
     line-height: 1.2;
     margin-bottom: 0.5rem;
 }
 
 .wtr-text-block h3 {
     font-family: var(--font-heading);
+    font-size: var(--text-2xl);
     line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+
+/* Every h3 on the site is one step — 24px — whether it is typed into a
+ * block's heading field or written as a heading in rich text. Typography
+ * sizes prose headings in em off the container's body size, so the same
+ * h3 came out at 25px inside an accordion answer (a plain .prose container
+ * without .wtr-text-block) and 24px inside a text block. This pins the
+ * size for every prose container; .wtr-text-block above still supplies the
+ * tighter leading and margin for text blocks specifically.
+ *
+ * Unscoped `.prose` on purpose: any rich-text container is a content
+ * context, and its headings belong on the content ramp. Interface chrome
+ * that happens to use an h3 — the footer's column labels at text-sm — is
+ * never inside .prose, so it is untouched. */
+.prose h3 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+}
+
+/* h4 is the last heading level RICHTEXT_FEATURES_FULL offers. Typography
+ * sizes it at 1em of the prose body and would leave it identical to a bold
+ * paragraph; pin it to the body step explicitly so it stays predictable if
+ * the container's own text-* class changes. */
+.wtr-text-block h4 {
+    font-family: var(--font-heading);
+    font-size: var(--text-xl);
+    line-height: 1.3;
     margin-bottom: 0.5rem;
 }
 
 @media (width >= 40rem) {
     .wtr-text-block h2 {
-        font-size: var(--text-4xl);
+        font-size: var(--text-3xl);
     }
 }
 
 @media (width >= 64rem) {
     .wtr-text-block h2 {
-        font-size: var(--text-64);
-    }
-
-    .wtr-text-block h3 {
         font-size: var(--text-40);
     }
+}
+
+/* ============================================================
+ * Legacy content — .title4
+ * ============================================================
+ * Content imported from the old site marks its sub-headings as
+ * <p class="intro title4"> rather than a real <h3> (the /our-impact/
+ * timeline is the current caller, via raw_html blocks). This maps that
+ * class onto the same 24px step as a rich-text h3 above, so imported copy
+ * sits on the same ramp as anything typed into the CMS today.
+ *
+ * Deliberately unscoped, unlike the .wtr-text-block rules above: the
+ * legacy markup arrives inside raw_html blocks, which render outside
+ * .wtr-text-block entirely, so a scoped selector would never match.
+ *
+ * font-weight is spelled out because the class lands on a <p>, which
+ * Typography gives no heading weight of its own — 600 is the value
+ * Typography sets on a real h3, and resolves to Klima 800 through the
+ * weight overrides in theme.css, so the two render identically.
+ * ============================================================ */
+.title4 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+
+/* The same legacy content also contains real <h3> elements, either bare or
+ * carrying old site classes (`victories-header` on the /our-impact/
+ * victories panels). Because that markup arrives through raw_html blocks it
+ * sits outside .prose, so neither the `.prose h3` rule above nor Typography
+ * reaches it — and Tailwind's preflight resets every heading to
+ * `font-size: inherit`, so an unstyled legacy h3 rendered at the 16px body
+ * size rather than merely at a browser default. This puts it back on the
+ * 24px step with every other h3.
+ *
+ * `:not([class])` rather than a bare `h3` so the selector cannot reach the
+ * footer's column labels, which are 14px interface chrome and carry
+ * Tailwind utilities (a layered utility loses to an unlayered rule, so a
+ * bare `h3` here would silently override them). Add a legacy class name to
+ * this list if another import brings one in. */
+h3:not([class]),
+h3.victories-header {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    line-height: 1.2;
 }
 
 /* ============================================================
@@ -632,141 +1148,108 @@ html {
 }
 
 /* ============================================================
- * Callout color variants — .wtr-callout-{color}
+ * Background palette — .wtr-bg-{color}
  * ============================================================
- * Used by callout_block.html. Five choices from CalloutBlock.color;
- * light-grey is the only light background (matching text/button color
- * handled in the template, not here — see its comment). navy/red reuse
- * the two CalloutBlock-only tokens from theme.css (Figma hex values, not
- * part of the general brand ramp); dark-grey reuses --color-dark exactly
- * (not a separate token — this *is* 350's existing dark color, just also
- * offered as a callout background); light-grey reuses --color-neutral-200
- * (already labeled "Figma: gray callout" in theme.css, predating this
- * block). blue-gradient is a flat fill too — confirmed against Figma's own
- * layer stack (Image 20% / Blue / FFFFFF base, no gradient stop in there
- * at all) at #0F81E8, which is exactly --color-primary; what reads as a
- * gradient in the reference design is the faint "350" watermark
- * (CalloutBlock's own optional `image` field) sitting at 20% opacity over
- * this flat color, not an actual two-stop background gradient. The choice
- * key stays "blue-gradient" (only its label dropped "(gradient)") since
- * it's already the stored value in existing StreamField content — renaming
- * the key would need a data migration for no functional benefit.
+ * The one fill set behind every block that offers a background choice:
+ * SectionBlock, CalloutBlock, FeaturePanelBlock, the hero's "banner"
+ * variant and SignupActionKitBlock. Keys are BACKGROUND_COLOR_CHOICES in
+ * wtrx/blocks/__init__.py, and templates build the class name through the
+ * `background_key` filter so a pre-palette stored value ("light", "dark",
+ * "muted", ...) still lands on a real rule here.
+ *
+ * These were three parallel class sets — .wtr-callout-{color},
+ * .wtr-hero-banner-{color}, .wtr-signup-bg-{color} — each defining the same
+ * five fills against the same tokens, and each with its own key spelling
+ * (signup's dark grey was keyed `dark`, the other two `dark-grey`). They
+ * are one set now: the components differ in layout, not in palette, and a
+ * shared palette that lives in three places is a palette that drifts.
+ *
+ * What each token is:
+ *   white         --color-light. The plain page background; what a Section
+ *                 with no colour looks like, and previously Section's
+ *                 "light" and FeaturePanel's "light".
+ *   light-grey    --color-neutral-200, already labelled "Figma: gray
+ *                 callout" in theme.css and predating the callout block.
+ *   dark-grey     --color-dark exactly — this *is* 350's dark colour, also
+ *                 offered as a fill rather than given a second token.
+ *   navy          --color-callout-navy, an alias of the --color-navy brand
+ *                 token so the fill and the nav can never drift apart.
+ *   red           --color-callout-red, a Figma callout hex not otherwise
+ *                 part of the brand ramp.
+ *   blue-gradient A flat fill despite the key, at --color-primary
+ *                 (#0F81E8) — confirmed against Figma's own layer stack
+ *                 (Image 20% / Blue / FFFFFF base, no gradient stop in
+ *                 there at all). What reads as a gradient in the reference
+ *                 design is the faint "350" watermark — CalloutBlock's own
+ *                 optional `image` field at 20% opacity over this flat
+ *                 colour — not a two-stop background gradient. The key
+ *                 keeps its name because it is already the stored value in
+ *                 existing StreamField content.
+ *
+ * white and light-grey are the two fills light enough to need dark text; a
+ * template asks `background_is_light` rather than testing keys here — see
+ * LIGHT_BACKGROUND_COLORS.
  * ============================================================ */
-.wtr-callout-navy {
-    background-color: var(--color-callout-navy);
+.wtr-bg-white {
+    background-color: var(--color-light);
 }
 
-.wtr-callout-red {
-    background-color: var(--color-callout-red);
-}
-
-.wtr-callout-dark-grey {
-    background-color: var(--color-dark);
-}
-
-.wtr-callout-light-grey {
+.wtr-bg-light-grey {
     background-color: var(--color-neutral-200);
 }
 
-.wtr-callout-blue-gradient {
-    background-color: var(--color-primary);
-}
-
-/* Background image: a subtle texture/watermark behind the text, not a
- * full photo — see callout_block.html's comment. Sits behind the
- * `relative` text block purely via DOM order (it's the first child), so
- * no z-index is needed on either side. */
-.wtr-callout-bg-image {
-    opacity: 0.1;
-    pointer-events: none;
-}
-
-/* ============================================================
- * Hero banner color variants — .wtr-hero-banner-{color}
- * ============================================================
- * Used by hero.html's "banner" variant (HeroMixin.hero_banner_color /
- * HeroBlock.banner_color). Same 5 choices, same tokens, as
- * .wtr-callout-{color} above — kept as separate classes rather than
- * reused directly since the hero banner is a different component; see
- * that block's comment for what each token is and why.
- * ============================================================ */
-.wtr-hero-banner-navy {
-    background-color: var(--color-callout-navy);
-}
-
-.wtr-hero-banner-red {
-    background-color: var(--color-callout-red);
-}
-
-.wtr-hero-banner-dark-grey {
+.wtr-bg-dark-grey {
     background-color: var(--color-dark);
 }
 
-.wtr-hero-banner-light-grey {
-    background-color: var(--color-neutral-200);
+.wtr-bg-navy {
+    background-color: var(--color-callout-navy);
 }
 
-.wtr-hero-banner-blue-gradient {
+.wtr-bg-red {
+    background-color: var(--color-callout-red);
+}
+
+.wtr-bg-blue-gradient {
     background-color: var(--color-primary);
 }
 
-/* Blends the color panel into the image/video beside it — a fade from
- * that same color (opaque) to transparent, layered over the media's left
- * edge, one class per color so the seam always matches the panel it's
- * attached to. */
-.wtr-hero-banner-fade-navy {
-    background: linear-gradient(to right, var(--color-callout-navy), transparent);
+/* Blends a colour panel into the image/video beside it — a fade from that
+ * same fill (opaque) to transparent, layered over the media's left edge,
+ * one class per colour so the seam always matches the panel it is attached
+ * to. Used only by hero.html's "banner" variant; the fills above are shared
+ * by every block, this gradient is not. */
+.wtr-bg-fade-white {
+    background: linear-gradient(to right, var(--color-light), transparent);
 }
 
-.wtr-hero-banner-fade-red {
-    background: linear-gradient(to right, var(--color-callout-red), transparent);
-}
-
-.wtr-hero-banner-fade-dark-grey {
-    background: linear-gradient(to right, var(--color-dark), transparent);
-}
-
-.wtr-hero-banner-fade-light-grey {
+.wtr-bg-fade-light-grey {
     background: linear-gradient(to right, var(--color-neutral-200), transparent);
 }
 
-.wtr-hero-banner-fade-blue-gradient {
+.wtr-bg-fade-dark-grey {
+    background: linear-gradient(to right, var(--color-dark), transparent);
+}
+
+.wtr-bg-fade-navy {
+    background: linear-gradient(to right, var(--color-callout-navy), transparent);
+}
+
+.wtr-bg-fade-red {
+    background: linear-gradient(to right, var(--color-callout-red), transparent);
+}
+
+.wtr-bg-fade-blue-gradient {
     background: linear-gradient(to right, var(--color-primary), transparent);
 }
 
-/* ============================================================
- * Signup panel color variants — .wtr-signup-bg-{color}
- * ============================================================
- * Used by signup_actionkit_block.html's standalone panel
- * (SignupActionKitBlock.background). Same five fills, same tokens, as
- * .wtr-callout-{color} and .wtr-hero-banner-{color} above — a third class
- * set for the same reason the second one exists: these are three separate
- * components that happen to share a palette, not one component reused.
- *
- * The dark grey fill is keyed `dark`, not `dark-grey`, because that is the
- * value already stored in existing StreamField content from back when this
- * block offered only Dark and Red — see SIGNUP_BACKGROUND_CHOICES for why
- * the key was kept rather than migrated. It is the same --color-dark the
- * other two class sets' `dark-grey` resolves to.
- * ============================================================ */
-.wtr-signup-bg-navy {
-    background-color: var(--color-callout-navy);
-}
-
-.wtr-signup-bg-red {
-    background-color: var(--color-callout-red);
-}
-
-.wtr-signup-bg-dark {
-    background-color: var(--color-dark);
-}
-
-.wtr-signup-bg-light-grey {
-    background-color: var(--color-neutral-200);
-}
-
-.wtr-signup-bg-blue-gradient {
-    background-color: var(--color-primary);
+/* Callout background image: a subtle texture/watermark behind the text, not
+ * a full photo — see callout_block.html's comment. Sits behind the
+ * `relative` text block purely via DOM order (it's the first child), so no
+ * z-index is needed on either side. */
+.wtr-callout-bg-image {
+    opacity: 0.1;
+    pointer-events: none;
 }
 
 /* ============================================================
@@ -805,27 +1288,20 @@ html {
     transition: opacity 0.2s ease-in-out;
 }
 
-/* Card description/headline text size + line-height, scoped to carousel
- * cards only — card.html (its .wtr-card p / h3) is shared with the
- * standalone CardBlock and CardGridBlock, which keep their own default
- * text-sm / text-lg (and default line-height); this doesn't touch that
- * shared template. 1024px matches Tailwind's lg: breakpoint, used the
- * same way elsewhere in this block (e.g. the section heading's
- * lg:text-8xl). */
-.wtr-card-carousel-track .wtr-card p {
-    font-size: 20px;
-    line-height: 1;
-}
-
+/* Tighter line-height on carousel cards, scoped to them only — the
+ * shared card.html is also used by CardBlock and CardGridBlock, which
+ * keep the default leading.
+ *
+ * This used to set font-size here too (24px, 32px at lg for h3; 20px for
+ * p), from when card.html's own defaults were text-lg/text-sm. Both are
+ * now redundant and were removed rather than left to drift: card.html
+ * carries the shared subheading step (text-2xl) on its h3, and
+ * card_carousel_block.html already passes description_size="text-xl" for
+ * the 20px paragraph. The 32px h3 was the one place a card heading
+ * disagreed with every other card on the site. */
+.wtr-card-carousel-track .wtr-card p,
 .wtr-card-carousel-track .wtr-card h3 {
-    font-size: 24px;
-    line-height: 1;
-}
-
-@media (min-width: 1024px) {
-    .wtr-card-carousel-track .wtr-card h3 {
-        font-size: 32px;
-    }
+    line-height: 1.25;
 }
 
 .wtr-carousel-arrow {
@@ -855,28 +1331,36 @@ html {
  * Hero background-video pause/play toggle — .wtr-hero-video-toggle
  * ============================================================
  *
- * A pill sitting over the video itself, so it needs its own contrast
+ * A chip sitting over the video itself, so it needs its own contrast
  * (translucent dark fill + blur) independent of the hero's text scrim,
  * which fades out toward the top-right corner where this button sits.
+ *
+ * Sized to Figma's "Pause Animations" chip (node I1:560;2031:5530): a
+ * 158x40 box 24px in from the hero's top-right corner, 8px radius (not a
+ * full pill), rgba(0,0,0,0.2) fill, 12px gap, 24px icon, 16px regular
+ * label. The 4px backdrop blur is kept on top of Figma's flat 20% fill —
+ * it costs nothing visually against a still export and is what keeps the
+ * white label legible when a bright frame of the video passes under it.
  * ============================================================ */
 .wtr-hero-video-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     padding: 0.5rem 1rem;
-    border-radius: 9999px;
+    border-radius: var(--radius-button);
     border: none;
-    background-color: rgb(0 0 0 / 45%);
+    background-color: rgb(0 0 0 / 20%);
     backdrop-filter: blur(4px);
     color: var(--color-light);
     font-family: var(--font-heading);
-    font-size: 0.8125rem;
-    font-weight: var(--font-weight-bold);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.2;
     cursor: pointer;
     transition: background-color 0.15s ease-in-out;
 }
 
 .wtr-hero-video-toggle:hover {
-    background-color: rgb(0 0 0 / 65%);
+    background-color: rgb(0 0 0 / 40%);
 }
 

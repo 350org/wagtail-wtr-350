@@ -6,12 +6,14 @@ public children and converts each to the same card dict shape
 components/post_card.html expects via page_as_card() (see index_page.html
 for the other place that conversion is used). "date" is the one field
 page_as_card() doesn't already provide, added on top by get_context() from
-first_published_at — there's no dedicated blog/post date field anywhere in
-this project.
+the child's own published_at where it has one (Post), else Wagtail's
+first_published_at — and the cards are ordered by that same date, via the
+index page's get_listing_queryset() when it defines one.
 
 Per Figma's "Latest Updates" component (Frame 49) — heading/subheading/
-cards/button all share a uniform 21px gap; heading is the same 96px
-lg:text-8xl step already used for card_carousel_block.html's heading.
+cards/button all share a uniform 21px gap; heading is the same 48px
+lg:text-5xl display step already used for card_carousel_block.html's
+heading (96px in Figma — see the type scale note in AGENTS.md).
 
 Width: special-cased in content_page.html/home_page.html/post_page.html
 (alongside section/card_carousel/etc.) to skip the shared max-w-5xl
@@ -25,10 +27,10 @@ just providing mobile-edge breathing room around it).
     <div class="mx-auto max-w-[1218px]">
         <div class="mx-auto flex max-w-3xl flex-col items-center gap-[21px] text-center">
             {% if value.heading %}
-                <h2 class="font-heading text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl">{{ value.heading }}</h2>
+                <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl">{{ value.heading }}</h2>
             {% endif %}
             {% if value.subheading %}
-                <div class="prose prose-neutral max-w-[628px] text-lg text-dark sm:text-xl lg:text-36">
+                <div class="prose prose-neutral max-w-[628px] text-lg text-dark sm:text-xl">
                     {{ value.subheading|richtext }}
                 </div>
             {% endif %}

@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags wagtailimages_tags %}
+{% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 {% comment %}
 Filled, rounded panel: image in one column, a text stack (optional eyebrow
 pill, H2, optional richtext body, optional CTA button with trailing arrow)
@@ -26,35 +26,44 @@ body blocks comes from the page templates' space-y-32 on the block loop.
 This div's px-4/6/8 is horizontal gutters only; the panel's own p-6/10/16
 is its internal breathing room (64px at lg, per Figma).
 
-Heading size: lg:text-5xl (48px) for both backgrounds, matching Figma's
-dark panel exactly and image_text_block.html's heading step. Figma draws
-the light panel's heading at 40px, but sizing type off the background
-choice would conflate two unrelated concerns — background controls color
-inversion only.
+Heading size: lg:text-36 (36px) for both backgrounds — one step above
+image_text_block.html's section heading, mirroring the gap Figma draws
+between them (48px vs 64px there). Figma sizes the light panel's heading
+smaller than the dark one, but sizing type off the background choice would
+conflate two unrelated concerns — background controls color inversion
+only. See the type scale note in AGENTS.md.
 
-Dark variant inverts three things together, all keyed off the same
-value.background check rather than a single wrapper class: the pill
-(dark-on-light becomes light-on-dark), the prose color, and the button
-style (filled primary becomes outline-light). Repeating the check is the
-same approach callout_block.html takes, for the same reason — there is no
-one element whose class alone can flip all three.
+Background comes from the shared palette (main.css's .wtr-bg-{color}),
+the same six fills the section, callout, hero banner and signup panel
+offer — this block used to have a two-entry Light/Dark list of its own.
+A dark fill inverts three things together: the pill (dark-on-light becomes
+light-on-dark), the prose color, and the button style (filled primary
+becomes outline-light). That is one `background_is_light` question held in
+`on_light` and read in four places, rather than a wrapper class, because
+there is no one element here whose class alone can flip all of them.
+
+The panel's border is tied to the fill rather than the tone: the neutral-50
+card only reads as a card against the white page because of its
+neutral-200 outline, whereas a filled panel (light grey included) is its
+own shape and needs none.
 {% endcomment %}
 <div class="w-full px-4 sm:px-6 lg:px-8">
+    {% with bg=value.background|background_key on_light=value.background|background_is_light %}
     <div class="wtr-feature-panel mx-auto max-w-7xl overflow-hidden rounded-lg p-6 sm:p-10 lg:p-16
-                {% if value.background == 'dark' %}bg-dark{% else %}border-2 border-neutral-200 bg-neutral-50{% endif %}">
+                {% if bg == 'white' %}border-2 border-neutral-200 bg-neutral-50{% else %}wtr-bg-{{ bg }}{% endif %}">
         <div class="grid grid-cols-1 items-center gap-8 md:grid-cols-2 lg:gap-16">
             {% image value.image fill-900x675 as img %}
-            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
                  class="aspect-[4/3] w-full rounded-lg object-cover {% if value.alignment == 'image-right' %}md:order-2{% endif %}"
                  loading="lazy">
-            <div class="{% if value.background == 'dark' %}text-light{% else %}text-dark{% endif %}">
+            <div class="{% if on_light %}text-dark{% else %}text-light{% endif %}">
                 {% if value.eyebrow %}
-                    <p class="font-heading mb-4 inline-block rounded-full border px-6 py-3 text-base font-bold tracking-[0.3px] sm:text-lg lg:text-2xl
-                              {% if value.background == 'dark' %}border-dark/20 bg-light text-dark{% else %}border-light/20 bg-dark text-light{% endif %}">
+                    <p class="font-heading mb-4 inline-block rounded-full border px-6 py-3 text-lg font-bold tracking-[0.3px]
+                              {% if on_light %}border-light/20 bg-dark text-light{% else %}border-dark/20 bg-light text-dark{% endif %}">
                         {{ value.eyebrow }}
                     </p>
                 {% endif %}
-                <h2 class="font-heading text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+                <h2 class="font-heading text-2xl tracking-tight sm:text-3xl lg:text-36">
                     {{ value.heading }}
                 </h2>
                 {% if value.text %}
@@ -65,7 +74,7 @@ one element whose class alone can flip all three.
                     applies for the same reason.
                     {% endcomment %}
                     <div class="prose mt-2 max-w-none text-lg sm:text-xl
-                                {% if value.background == 'dark' %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% else %}prose-neutral{% endif %}">
+                                {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
                         {{ value.text|richtext }}
                     </div>
                 {% endif %}
@@ -95,7 +104,7 @@ one element whose class alone can flip all three.
                         <a href="{% if value.link_page %}{{ value.link_page.url }}{% elif value.link_url %}{{ value.link_url }}{% else %}#{{ value.anchor }}{% endif %}"
                            {% if value.link_url and not value.link_page %}rel="noopener noreferrer"{% endif %}
                            class="wtr-btn wtr-btn-lg inline-flex max-w-full items-center gap-2 whitespace-normal
-                                  {% if value.background == 'dark' %}wtr-btn-outline-light hover:bg-white/10{% else %}hover:bg-primary-500{% endif %}">
+                                  {% if on_light %}hover:bg-primary-500{% else %}wtr-btn-outline-light hover:bg-white/10{% endif %}">
                             {{ value.link_text }}
                             <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
                                 <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -106,4 +115,5 @@ one element whose class alone can flip all three.
             </div>
         </div>
     </div>
+    {% endwith %}
 </div>

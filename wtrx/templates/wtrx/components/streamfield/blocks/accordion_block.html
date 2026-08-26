@@ -18,6 +18,15 @@ fight the card fill.
         <div class="accordion-item overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50">
             <button
                 type="button"
+                {% comment %}
+                py-6 unconditionally: the title keeps 24px above and below it
+                whether the item is open or shut. The answer panel below owns
+                its own matching 24px, so an expanded item reads as two
+                separately padded regions (48px between title and answer)
+                rather than one shared gap — an earlier version had the
+                button drop to pb-0 while expanded to make that 24px, which
+                left the title flush against the answer.
+                {% endcomment %}
                 class="flex w-full items-center justify-between gap-4 px-8 py-6 text-left font-body text-lg leading-[1.429] text-dark transition-colors hover:bg-neutral-200/50 sm:text-xl"
                 aria-expanded="false"
                 data-accordion-toggle
@@ -27,7 +36,24 @@ fight the card fill.
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <div class="hidden px-8 pb-6 prose prose-neutral max-w-none" data-accordion-content>
+            {% comment %}
+            The answer's inner spacing is this panel's own pt-6/pb-6, and
+            bg-white separates it from the card's neutral-50 fill so the two
+            padded regions read as distinct. That balance holds only while
+            prose's
+            `> :first-child { margin-top: 0 }` / `> :last-child
+            { margin-bottom: 0 }` resets actually bite. They are direct-child
+            rules, so a rich-text answer that opens or closes with a list
+            leaks its first/last <li>'s own 0.5em margin past the reset and
+            the answer sits ~7px lower in its card than it sits high — the
+            visible symptom on /take-action/renew-our-power/, whose answers
+            all end in a <ul>. The two arbitrary variants below extend the
+            same reset one level down, to the first/last grandchild, which is
+            as deep as rich text nests (li in ul/ol, p in blockquote).
+            {% endcomment %}
+            <div class="hidden bg-white px-8 pt-6 pb-6 prose prose-neutral max-w-none text-lg sm:text-xl
+                        [&>:first-child>:first-child]:mt-0 [&>:last-child>:last-child]:mb-0"
+                 data-accordion-content>
                 {% include_block item.content %}
             </div>
         </div>

@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags wagtailimages_tags %}
+{% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 {% comment %}
     This block's own `compact` (below) is only ever True when rendered as a
     HeroBlock.cta choice (see components/hero.html) — it picks the slim
@@ -23,12 +23,15 @@
     See main.css's .wtr-actionkit-embed-inline / -stacked rules.
 {% endcomment %}
 {% if compact %}
-    <div class="wtr-signup wtr-signup-actionkit wtr-signup-inline" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+    {% comment %}flex gap-4 rather than mt-* on each child: with no heading and
+       no description (the hero's usual case) there is then nothing between the
+       hero's own 20px gap and the form — see _actionkit_form.html.{% endcomment %}
+    <div class="wtr-signup wtr-signup-actionkit wtr-signup-inline flex flex-col gap-4" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
         {% if value.heading %}
-            <h2 class="font-heading text-xl font-bold text-light">{{ value.heading }}</h2>
+            <h2 class="font-heading text-xl text-light">{{ value.heading }}</h2>
         {% endif %}
         {% if value.description %}
-            <div class="prose prose-invert prose-sm mt-4 max-w-none">
+            <div class="prose prose-invert prose-sm max-w-none">
                 {{ value.description|richtext }}
             </div>
         {% endif %}
@@ -45,29 +48,31 @@
     vertical padding on the w-full-outer wrapper — the 128px gap between
     body blocks comes from the page templates' space-y-32 on the block loop.
 
-    background offers the same five colors as the page hero banner and
-    CalloutBlock — see SIGNUP_BACKGROUND_CHOICES and main.css's
-    .wtr-signup-bg-{color} classes, which reuse the hero's own tokens.
-    Three things branch off it, each check written out separately rather
-    than computed once, the same way callout_block.html and
-    feature_panel_block.html do it (there is no single element whose class
-    can flip all of them):
+    background draws from the shared palette — BACKGROUND_COLOR_CHOICES
+    and main.css's .wtr-bg-{color} classes, the same six fills the section,
+    callout, feature panel and hero banner offer. Three things branch off
+    it. There is no single element whose class can flip all of them, so
+    each is written out separately, the same way callout_block.html and
+    feature_panel_block.html do it — but the colour question itself is
+    asked once and held in `on_light`/`bg`:
 
-      - the panel text and prose invert on light-grey, the one fill light
-        enough to need dark text;
-      - the eyebrow pill inverts on dark grey, the one fill the pill's own
-        --color-dark background would otherwise vanish into;
+      - the panel text and prose invert on the palette's light fills
+        (white and light grey), which need dark text;
+      - the eyebrow pill inverts on dark grey specifically — not on every
+        dark fill — since that is the one the pill's own --color-dark
+        background would otherwise vanish into;
       - the fetched ActionKit form's chrome reacts via a .wtr-ak-{tone}
         modifier class, computed in SignupActionKitBlock.PANEL_TONES and
         applied by _actionkit_form.html.
     {% endcomment %}
+    {% with bg=value.background|background_key on_light=value.background|background_is_light %}
     <div class="w-full px-4 sm:px-6 lg:px-8">
-        <div class="wtr-signup wtr-signup-actionkit wtr-signup-bg-{{ value.background }} mx-auto max-w-[1426px] overflow-hidden rounded-lg"
+        <div class="wtr-signup wtr-signup-actionkit wtr-bg-{{ bg }} mx-auto max-w-[1426px] overflow-hidden rounded-lg"
              {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
             {% if value.image %}
                 <div class="relative">
                     {% image value.image fill-1600x500 as img %}
-                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
                          class="h-64 w-full object-cover sm:h-80" loading="lazy">
                     {% if value.image_caption %}
                         <div class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
@@ -77,15 +82,21 @@
                 </div>
             {% endif %}
             {% comment %}
-            The two columns are bottom-aligned (lg:items-end) and sized to
-            Figma exactly — 800px of copy, a 128px gutter, a 370px form that
-            never grows or shrinks. A plain 2-col grid split them 50/50 and
-            centred them vertically, which stretched the form to ~460px and
-            left the copy's last bullet floating well above the panel floor.
+            The two columns are centred against each other (lg:items-center)
+            and sized to Figma exactly — 800px of copy, a 128px gutter, a
+            370px form that never grows or shrinks.
+
+            items-center, not items-stretch: the alignment must not make the
+            form grow to the copy column's height. That is the distinction
+            this row has always turned on — a plain 2-col grid split them
+            50/50 and stretched the form to ~460px, which is what the flex
+            row replaced. Any of start/center/end keeps the form at its
+            natural height; only stretch breaks it. This was lg:items-end
+            (both pinned to the panel floor) and then briefly lg:items-start.
             {% endcomment %}
-            <div class="flex flex-col gap-10 p-6 sm:p-10 lg:flex-row lg:items-end lg:justify-center lg:gap-32 lg:p-16">
+            <div class="flex flex-col gap-10 p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-center lg:gap-32 lg:p-16">
                 <div class="flex flex-col items-start gap-8 lg:max-w-[800px] lg:flex-1
-                            {% if value.background == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
+                            {% if on_light %}text-dark{% else %}text-light{% endif %}">
                     {% if value.eyebrow %}
                         {% comment %}
                         Same dark pill as feature_panel_block.html's eyebrow, at Figma's
@@ -95,22 +106,25 @@
                         feature_panel_block.html's pill does on its own dark background.
                         {% endcomment %}
                         <p class="wtr-signup-eyebrow font-heading inline-block rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
-                                  {% if value.background == 'dark' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
+                                  {% if bg == 'dark-grey' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
                             {{ value.eyebrow }}
                         </p>
                     {% endif %}
                     {% if value.heading %}
-                        <h2 class="font-heading text-3xl font-bold leading-[1.2] tracking-tight sm:text-4xl lg:text-64">{{ value.heading }}</h2>
+                        <h2 class="font-heading text-2xl leading-[1.2] tracking-tight sm:text-3xl lg:text-40">{{ value.heading }}</h2>
                     {% endif %}
                     {% if value.description %}
                         {% comment %}
                         [--tw-prose-invert-body:var(--color-light)] overrides Typography's
                         default prose-invert body color (a muted ~87%-lightness gray) to
                         pure white — same fix callout_block.html applies, for the same
-                        reason. Figma sets this copy at 24px/1.2.
+                        reason. Figma draws this copy at 24px, but it renders at the
+                        site's 20px body size instead — see AGENTS.md pitfall #34,
+                        which took the whole non-hero ramp down a notch against a
+                        20px paragraph.
                         {% endcomment %}
-                        <div class="prose max-w-none text-lg leading-[1.2] sm:text-xl lg:text-2xl
-                                    {% if value.background == 'light-grey' %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                        <div class="prose max-w-none text-lg leading-[1.2] sm:text-xl
+                                    {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
                             {{ value.description|richtext }}
                         </div>
                     {% endif %}
@@ -121,4 +135,5 @@
             </div>
         </div>
     </div>
+    {% endwith %}
 {% endif %}

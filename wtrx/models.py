@@ -25,7 +25,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail_ai.panels import AIDescriptionFieldPanel, AITitleFieldPanel
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
-from .blocks import CALLOUT_COLOR_CHOICES, HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
+from .blocks import BACKGROUND_COLOR_CHOICES, HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
 from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
@@ -239,7 +239,7 @@ class HeroMixin(models.Model):
     )
     hero_banner_color = models.CharField(
         max_length=20,
-        choices=CALLOUT_COLOR_CHOICES,
+        choices=BACKGROUND_COLOR_CHOICES,
         default="navy",
         verbose_name=_("hero banner color"),
         help_text=_(
@@ -366,7 +366,7 @@ class BannerHeroMixin(models.Model):
     )
     hero_banner_color = models.CharField(
         max_length=20,
-        choices=CALLOUT_COLOR_CHOICES,
+        choices=BACKGROUND_COLOR_CHOICES,
         default="navy",
         verbose_name=_("banner color"),
     )
@@ -954,11 +954,24 @@ class Blogs(BasePage, HeroMixin):
             return self.related_intro
         return strip_tags(self.hero_copy or "").strip()
 
+    def get_listing_queryset(self):
+        """
+        This page's live/public posts, newest first by the editor-controlled
+        published_at (not Wagtail's own first_published_at — see
+        PublishedDateMixin).
+
+        A method rather than an inline query so PageCardsBlock can list the
+        same posts in the same order this page's own listing uses; a card
+        row on the home page and the index it links to must never disagree
+        about which posts are the most recent.
+        """
+        return Post.objects.child_of(self).live().public().order_by("-published_at")
+
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
         ctx["hero"] = self.get_hero_context()
 
-        posts_qs = Post.objects.child_of(self).live().public().order_by("-published_at")
+        posts_qs = self.get_listing_queryset()
 
         # Scoped to categories actually used by this page's own posts (not
         # every BlogCategory site-wide) so the filter row disappears on its

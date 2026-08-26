@@ -37,6 +37,20 @@ hood, which forces any auto margin to resolve to 0 before max-width
 clamps it (CSS2.1 10.3.3's over-constrained-auto-margins rule). Flexbox's
 own alignment algorithm doesn't have that gotcha.
 {% endcomment %}
+{% comment %}
+Width matches image_block.html exactly — max-w-[1500px] with the shared
+px-4 sm:px-6 lg:px-8 gutter — and "quote" is in the page templates'
+full-bleed list so this block owns its own width rather than inheriting
+the body column's max-w-5xl. The two blocks are frequently stacked and
+both are a single full-width piece of media, so a quote at 1024px against
+an image at 1500px read as a mistake.
+
+Note this caps the *outer* wrapper. The image inside is still sm:w-4/5 of
+that, and the text overlay still spills into the remaining ~20% gutter —
+the proportions of the composition are unchanged, it is just measured
+against a wider container now.
+{% endcomment %}
+<div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
 <div class="wtr-quote relative">
     <div class="w-full overflow-hidden rounded-lg sm:w-4/5 {% if value.alignment == 'image-right' %}sm:ml-auto{% else %}sm:mr-auto{% endif %}">
         {% if value.media_file %}
@@ -46,7 +60,7 @@ own alignment algorithm doesn't have that gotcha.
             </video>
         {% elif value.image %}
             {% image value.image fill-1600x900 as img %}
-            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}" class="aspect-video w-full object-cover" loading="lazy">
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}" class="aspect-video w-full object-cover" loading="lazy">
         {% endif %}
     </div>
     <div class="absolute inset-x-4 bottom-4 flex flex-col sm:inset-x-8 sm:bottom-8
@@ -61,4 +75,5 @@ own alignment algorithm doesn't have that gotcha.
             </div>
         {% endif %}
     </div>
+</div>
 </div>

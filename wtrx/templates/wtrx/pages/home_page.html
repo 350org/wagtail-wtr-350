@@ -17,7 +17,7 @@ room, not inter-block spacing, so it's left alone and stacks on top of
 {% block content %}
 <div class="space-y-32">
 {% for block in page.body %}
-    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "signup_actionkit" or block.block_type == "image" or block.block_type == "page_cards" %}
+    {% if block.block_type == "section" or block.block_type == "card_grid" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "signup_actionkit" or block.block_type == "image" or block.block_type == "hero" or block.block_type == "quote" or block.block_type == "page_cards" %}
         {% include_block block %}
     {% else %}
         <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">

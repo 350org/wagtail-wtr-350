@@ -40,12 +40,38 @@
             }
         </script>
     {% endif %}
-    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% if panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}{% endif %} mt-8" data-form-container>
+    {% comment %}
+    Neither variant carries a top margin. The inline one is the hero CTA,
+    and the hero already sets the gap between its headline and this widget
+    (20px, per Figma's Content frame) on the wrapper it renders around the
+    block; stacking another 32px inside pushed the form to 52px below the
+    headline, and the compact wrapper's own flex gap-4 is what spaces it
+    from an optional heading/description above it.
+
+    The stacked one used to carry mt-8, which was always dead space: its
+    only caller is signup_actionkit_block.html's standalone panel, where
+    this embed is the sole child of its own column and has nothing above it
+    to be spaced from. All it did was push the form 32px below the panel's
+    own p-16, which reads as a gap at the top of the panel — most visible
+    when the form is short (the home page's two-field form) and the copy
+    column beside it is shorter still.
+    {% endcomment %}
+    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% if panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}{% endif %}" data-form-container>
         {{ form_html|safe }}
     </div>
     {% if success_message %}
         <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
-        <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
+        {% comment %}
+        The tone modifier rides along here as well as on the embed above,
+        because this box replaces the form on success and so has to survive
+        the same panel fills. Its bg-dark is --color-dark, which *is* the
+        dark grey panel — without the modifier a successful signup on that
+        fill swaps the form for a box that cannot be seen at all. Only the
+        stacked panel needs it: the hero's compact rendering sits on the
+        hero's own scrim, which this block's background field has no say
+        over. See main.css for the rule.
+        {% endcomment %}
+        <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50{% if stacked and panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}"
              data-thank-you>
             {% include_block success_message %}
         </div>

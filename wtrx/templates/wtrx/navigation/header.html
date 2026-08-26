@@ -1,14 +1,31 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 {% resolved_navigation as nav %}
 {% comment %}
-nav_active_link — the active-page indicator from Figma's nav (node 1:965): a
-text-decoration underline in brand blue, 4px below the baseline. Thickness is
-0.3em — deliberately double Figma's 15%, which read too fine in the browser.
+nav_active_link — the active-page indicator from Figma's nav (node 1:965):
+Klima Bold plus a text-decoration underline in brand blue, 4px below the
+baseline. Thickness is 0.3em — deliberately double Figma's 15%, which read too
+fine in the browser.
+
+The weight is half the indicator, not decoration. nav_link_weight is the resting
+state and nav_active_link the active one, and they are mutually exclusive — each
+link takes one or the other, never both, so there is no same-family utility
+collision to resolve by source order.
+
+Resting is font-medium (Klima Medium, 600). Plain Regular read too thin at
+text-base uppercase with 1px tracking; Medium holds the line without making the
+nav bold. Active steps to font-semibold (Klima Bold, 700) rather than Heavy —
+off a Medium baseline Bold is already unmistakable, and Heavy beside a 0.3em
+underline shouts twice. The submenu <button> carries font-medium directly, since
+its active state lives on the inner <span> around the label.
+
+font-semibold is Klima Bold (700) here, not 600 — theme.css remaps the token so
+the two bold utilities address the two bold faces. font-bold would be Heavy.
+
 Held in one variable so all three nav renderings (desktop bar, collapsed
 desktop dropdown, mobile panel) can't drift apart. Tailwind's scanner reads
 class names as plain text, so the literal here is enough for JIT.
 {% endcomment %}
-{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings nav_active_link="underline decoration-primary-600 decoration-[0.3em] underline-offset-4" %}
+{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings nav_link_weight="font-medium" nav_active_link="font-semibold underline decoration-primary-600 decoration-[0.3em] underline-offset-4" %}
 {% comment %}
 transparent_header is set in context by HomePage.get_context() when use_transparent_header is True.
 When transparent: header is position:absolute over the hero, bg is transparent, text switches to light,
@@ -41,14 +58,14 @@ and the dark_logo variant is used if available.
                     <img src="{{ logo_img.url }}"
                          width="{{ logo_img.width }}"
                          height="{{ logo_img.height }}"
-                         alt="{{ current_site.site_name }}"
+                         alt="{{ logo_img.image.description|default:current_site.site_name }}"
                          class="wtr-logo h-10 w-auto object-contain transition group-hover:brightness-125">
                 {% elif branding.logo %}
                     {% image branding.logo max-160x60 as logo_img %}
                     <img src="{{ logo_img.url }}"
                          width="{{ logo_img.width }}"
                          height="{{ logo_img.height }}"
-                         alt="{{ current_site.site_name }}"
+                         alt="{{ logo_img.image.description|default:current_site.site_name }}"
                          class="wtr-logo h-10 w-auto object-contain transition {% if transparent_header %}group-hover:brightness-125{% else %}group-hover:brightness-[0.55]{% endif %}">
                 {% else %}
                     <span class="font-heading font-bold text-xl {% if transparent_header %}text-light{% else %}text-dark{% endif %}">{{ current_site.site_name }}</span>
@@ -61,7 +78,21 @@ and the dark_logo variant is used if available.
                 navy hero. Hover is driven by "group" on the lockup anchor.
                 {% endcomment %}
                 {% if nav.regional_label %}
-                    <span class="wtr-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white transition-colors {% if transparent_header %}group-hover:bg-primary-400{% else %}group-hover:bg-navy{% endif %}">{{ nav.regional_label }}</span>
+                    {% comment %}
+                    h-10 matches .wtr-logo's own h-10 exactly, so the badge is
+                    the full height of the logo beside it rather than a small
+                    chip floating against its middle. It is a literal h-10 and
+                    not self-stretch: the lockup anchor is items-center, so a
+                    stretched child would size to the anchor's content box,
+                    which is the logo's height only by coincidence and would
+                    drift the moment anything taller joined the lockup.
+
+                    leading-none because the badge is a fixed-height flex box
+                    that centres its own text — the previous leading-[18px]
+                    was sized for an auto-height chip and now only fights that
+                    centring.
+                    {% endcomment %}
+                    <span class="wtr-regional-label inline-flex h-10 items-center justify-center rounded bg-primary-600 px-3 font-heading text-base font-semibold uppercase leading-none tracking-[1px] text-white transition-colors {% if transparent_header %}group-hover:bg-primary-400{% else %}group-hover:bg-navy{% endif %}">{{ nav.regional_label }}</span>
                 {% endif %}
             </a>
 
@@ -75,18 +106,18 @@ and the dark_logo variant is used if available.
                         {% nav_item_is_active item as is_active %}
                         {% if item.block_type == "internal" and item.value.page %}
                             <a href="{% pageurl item.value.page %}"
-                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "external" %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
-                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "anchor" %}
                             <a href="#{{ item.value.anchor }}"
-                               class="px-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "submenu" %}
@@ -97,9 +128,9 @@ and the dark_logo variant is used if available.
                             {% endcomment %}
                             <div class="relative group">
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-semibold uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} transition-colors"
+                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-medium uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} transition-colors"
                                         aria-haspopup="true">
-                                    <span class="{% if is_active %}{{ nav_active_link }}{% endif %}">{{ item.value.text }}</span>
+                                    <span class="{% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">{{ item.value.text }}</span>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
@@ -252,23 +283,23 @@ and the dark_logo variant is used if available.
                                 {% nav_item_is_active item as is_active %}
                                 {% if item.block_type == "internal" and item.value.page %}
                                     <a href="{% pageurl item.value.page %}"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                                       class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "external" %}
                                     <a href="{{ item.value.url }}"
                                        rel="noopener noreferrer"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                                       class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "anchor" %}
                                     <a href="#{{ item.value.anchor }}"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                                       class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "submenu" %}
                                     {% comment %}In the collapsed vertical menu a dropdown becomes a labelled, indented sub-group.{% endcomment %}
-                                    <p class="pt-2 pb-1 text-xs font-bold uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %}">
+                                    <p class="pt-2 pb-1 text-xs uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">
                                         {{ item.value.text }}
                                     </p>
                                     <div class="pr-3 space-y-1">
@@ -335,23 +366,23 @@ and the dark_logo variant is used if available.
                     {% nav_item_is_active item as is_active %}
                     {% if item.block_type == "internal" and item.value.page %}
                         <a href="{% pageurl item.value.page %}"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                           class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                             {{ item.value.text }}
                         </a>
                     {% elif item.block_type == "external" %}
                         <a href="{{ item.value.url }}"
                            rel="noopener noreferrer"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                           class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                             {{ item.value.text }}
                         </a>
                     {% elif item.block_type == "anchor" %}
                         <a href="#{{ item.value.anchor }}"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %} transition-colors">
+                           class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                             {{ item.value.text }}
                         </a>
                     {% elif item.block_type == "submenu" %}
                         {% comment %}In the mobile panel a dropdown becomes a labelled, indented sub-group.{% endcomment %}
-                        <p class="pt-2 pb-1 text-xs font-bold uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% endif %}">
+                        <p class="pt-2 pb-1 text-xs uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">
                             {{ item.value.text }}
                         </p>
                         <div class="pr-3 space-y-1">

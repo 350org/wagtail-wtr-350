@@ -30,7 +30,9 @@ from wagtail.blocks import RichTextBlock
 from wagtail.models import Page
 
 from wtrx.blocks import (
-    CALLOUT_COLOR_CHOICES,
+    BACKGROUND_COLOR_CHOICES,
+    LEGACY_BACKGROUND_VALUES,
+    LIGHT_BACKGROUND_COLORS,
     BodyStreamBlock,
     ButtonBlock,
     CalloutBlock,
@@ -54,9 +56,11 @@ from wtrx.blocks import (
     SuccessMessageBlock,
     VideoBlock,
     _validate_at_most_one_link,
+    background_is_light,
     parse_action_network_url,
+    resolve_background,
 )
-from wtrx.models import ContentPage, HomePage, IndexPage
+from wtrx.models import Blogs, ContentPage, HomePage, IndexPage, Post
 
 
 class TestButtonBlockValidation(SimpleTestCase):
@@ -455,52 +459,57 @@ class TestSignupActionKitBlockPanelFields(SimpleTestCase):
         block = SignupActionKitBlock()
         self.assertFalse(block.child_blocks["eyebrow"].required)
 
-    def test_background_defaults_to_dark(self):
+    def test_background_defaults_to_dark_grey(self):
         block = SignupActionKitBlock()
-        self.assertEqual(block.child_blocks["background"].get_default(), "dark")
-
-    def test_background_choices(self):
-        block = SignupActionKitBlock()
-        choices = {
-            value for value, _label in block.child_blocks["background"].field.choices
-        }
-        self.assertEqual(
-            choices, {"navy", "red", "dark", "blue-gradient", "light-grey"}
-        )
-
-    def test_background_offers_the_same_fills_as_the_hero_banner(self):
-        """
-        The panel's fills are CalloutBlock's/the hero banner's five colors,
-        except that dark grey keeps the legacy "dark" key this block already
-        stores rather than adopting "dark-grey" — see
-        SIGNUP_BACKGROUND_CHOICES. Both name the same --color-dark fill, so
-        the two sets should agree once that one rename is applied.
-        """
-        block = SignupActionKitBlock()
-        choices = {
-            value for value, _label in block.child_blocks["background"].field.choices
-        }
-        callout_colors = {value for value, _label in CALLOUT_COLOR_CHOICES}
-        self.assertEqual(
-            (choices - {"dark"}) | {"dark-grey"},
-            callout_colors,
-        )
+        self.assertEqual(block.child_blocks["background"].get_default(), "dark-grey")
 
     def test_panel_tones_cover_only_the_colliding_fills(self):
         """
         Navy and red take no tone modifier: the stacked form's default
         chrome (blue submit button, dark fine-print box, light text) already
-        reads against them. The other three each collide with one piece of
-        it — see SignupActionKitBlock.PANEL_TONES.
+        reads against them. The rest each collide with one piece of it —
+        see SignupActionKitBlock.PANEL_TONES.
+
+        The two light fills take *separate* tones despite sharing the text
+        inversion, because the field boxes have to move opposite ways: on
+        light grey they lift to white to stay a distinct surface, and on
+        white that same lift would dissolve them into the panel.
         """
         self.assertEqual(
             SignupActionKitBlock.PANEL_TONES,
             {
-                "dark": "on-dark",
+                "dark-grey": "on-dark",
                 "blue-gradient": "on-primary",
                 "light-grey": "on-light",
+                "white": "on-white",
             },
         )
+
+    def test_white_and_light_grey_take_different_tones(self):
+        """
+        Guards the distinction above specifically: collapsing these back to
+        one tone is what made the field boxes invisible on a white panel.
+        """
+        block = SignupActionKitBlock()
+        white = block.get_context({"short_form_id": "ppg", "background": "white"}, parent_context={})
+        light = block.get_context({"short_form_id": "ppg", "background": "light-grey"}, parent_context={})
+        self.assertEqual(white["panel_tone"], "on-white")
+        self.assertEqual(light["panel_tone"], "on-light")
+        self.assertNotEqual(white["panel_tone"], light["panel_tone"])
+
+    def test_every_palette_background_resolves_to_a_defined_tone_or_none(self):
+        """
+        A tone that is not one of the four .wtr-ak-on-* rules in main.css
+        would emit a class matching nothing, silently leaving the form's
+        chrome in its default state on a fill that collides with it.
+        """
+        known_tones = {"on-dark", "on-primary", "on-light", "on-white"}
+        block = SignupActionKitBlock()
+        for key, _label in BACKGROUND_COLOR_CHOICES:
+            tone = block.get_context(
+                {"short_form_id": "ppg", "background": key}, parent_context={}
+            )["panel_tone"]
+            self.assertIn(tone, known_tones | {""}, f"{key} produced an unknown tone {tone!r}")
 
     def test_get_context_passes_the_panel_tone_for_the_background(self):
         block = SignupActionKitBlock()
@@ -511,6 +520,16 @@ class TestSignupActionKitBlockPanelFields(SimpleTestCase):
         block = SignupActionKitBlock()
         value = {"short_form_id": "ppg", "background": "red"}
         self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "")
+
+    def test_get_context_resolves_the_legacy_dark_key_to_a_tone(self):
+        """
+        A panel saved before the palette merge still stores "dark". It has to
+        reach the same on-dark chrome as "dark-grey" does, not fall through
+        to no modifier at all — see resolve_background().
+        """
+        block = SignupActionKitBlock()
+        value = {"short_form_id": "ppg", "background": "dark"}
+        self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "on-dark")
 
 
 class TestSectionBlockStructure(SimpleTestCase):
@@ -710,14 +729,14 @@ class TestFeaturePanelBlockFields(SimpleTestCase):
         block = FeaturePanelBlock()
         self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
 
-    def test_background_choices(self):
+    def test_background_defaults_to_white(self):
+        """
+        The fills themselves are asserted once, against every block that has
+        them, in TestSharedBackgroundPalette — only the per-block default is
+        this block's own business.
+        """
         block = FeaturePanelBlock()
-        choices = dict(block.declared_blocks["background"].field.choices)
-        self.assertEqual(set(choices.keys()), {"light", "dark"})
-
-    def test_background_defaults_to_light(self):
-        block = FeaturePanelBlock()
-        self.assertEqual(block.declared_blocks["background"].meta.default, "light")
+        self.assertEqual(block.declared_blocks["background"].meta.default, "white")
 
 
 class TestCardCarouselBlockFields(SimpleTestCase):
@@ -811,13 +830,14 @@ class TestCalloutBlockFields(SimpleTestCase):
         block = CalloutBlock()
         self.assertEqual(block.declared_blocks["color"].meta.default, "navy")
 
-    def test_color_choices(self):
+    def test_color_defaults_to_navy(self):
+        """
+        The fills themselves are asserted once, against every block that has
+        them, in TestSharedBackgroundPalette — only the per-block default is
+        this block's own business.
+        """
         block = CalloutBlock()
-        choices = dict(block.declared_blocks["color"].field.choices)
-        self.assertEqual(
-            set(choices.keys()),
-            {"navy", "red", "dark-grey", "blue-gradient", "light-grey"},
-        )
+        self.assertEqual(block.declared_blocks["color"].meta.default, "navy")
 
 
 class TestDonateFundraiseUpBlockFields(SimpleTestCase):
@@ -904,6 +924,61 @@ class TestPageCardsBlockGetContext(TestCase):
         block = PageCardsBlock()
         context = block.get_context({"index_page": None})
         self.assertEqual(context["cards"], [])
+
+
+class TestPageCardsBlockBlogsOrdering(TestCase):
+    """
+    Pointed at a Blogs page (blog posts / press releases), the block must
+    order by the editor-controlled published_at — the date the cards
+    themselves show, and the order the Blogs listing uses — not by
+    Wagtail's first_published_at, which imported posts don't carry
+    meaningfully.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-pcb-blogs")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-pcb-blogs")
+        home.add_child(instance=cls.blogs)
+
+        now = timezone.now()
+        # published_at deliberately runs opposite to first_published_at, so
+        # a result ordered by the wrong field is unambiguous.
+        for i, title in enumerate(["Oldest", "Middle", "Newest", "Ancient"]):
+            post = Post(
+                title=title,
+                slug=f"post-pcb-blogs-{i}",
+                published_at=now - timedelta(days=[30, 20, 1, 400][i]),
+            )
+            cls.blogs.add_child(instance=post)
+            post.first_published_at = now - timedelta(days=i)
+            post.save()
+
+    def test_orders_by_published_at(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs})
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Newest", "Middle", "Oldest"])
+
+    def test_card_date_is_published_at(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs})
+        newest = Post.objects.get(slug="post-pcb-blogs-2")
+        self.assertEqual(context["cards"][0]["date"], newest.published_at)
+
+    def test_excludes_non_live_posts(self):
+        draft = Post(
+            title="Draft",
+            slug="post-pcb-blogs-draft",
+            live=False,
+            published_at=timezone.now(),
+        )
+        self.blogs.add_child(instance=draft)
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs})
+        self.assertNotIn("Draft", [card["heading"] for card in context["cards"]])
 
 
 class TestSectionContentBlockExtensibility(SimpleTestCase):
@@ -1217,3 +1292,99 @@ class TestSuccessMessageBlock(SimpleTestCase):
         )
         self.assertTrue(results[0])
         self.assertFalse(results[1])
+
+
+class TestSharedBackgroundPalette(SimpleTestCase):
+    """
+    Every block with a background choice offers the same fills. Before the
+    palette was unified each carried its own list, so the same visual
+    decision was made from a different vocabulary depending on which block
+    an editor was standing in — see BACKGROUND_COLOR_CHOICES.
+    """
+
+    # (block class, name of its background field). CalloutBlock and
+    # HeroBlock call theirs "color"/"banner_color" rather than "background";
+    # the field name is per-block, the choices are not.
+    BACKGROUND_FIELDS = [
+        (SectionBlock, "background"),
+        (CalloutBlock, "color"),
+        (FeaturePanelBlock, "background"),
+        (HeroBlock, "banner_color"),
+        (SignupActionKitBlock, "background"),
+    ]
+
+    def test_every_background_field_offers_the_whole_palette(self):
+        expected = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        for block_class, field_name in self.BACKGROUND_FIELDS:
+            with self.subTest(block=block_class.__name__):
+                block = block_class()
+                choices = {
+                    value
+                    for value, _label in block.child_blocks[field_name].field.choices
+                }
+                self.assertEqual(choices, expected)
+
+    def test_every_default_is_a_palette_key(self):
+        """
+        Defaults are allowed to differ per block — a section defaults to the
+        plain page background, a hero banner to navy — but every one of them
+        has to name a fill that actually exists.
+        """
+        keys = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        for block_class, field_name in self.BACKGROUND_FIELDS:
+            with self.subTest(block=block_class.__name__):
+                block = block_class()
+                self.assertIn(block.child_blocks[field_name].get_default(), keys)
+
+    def test_legacy_values_map_onto_real_palette_keys(self):
+        keys = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        self.assertTrue(set(LEGACY_BACKGROUND_VALUES.values()) <= keys)
+        # A legacy key must not also be a live one, or resolution would
+        # silently rewrite a value an editor deliberately chose.
+        self.assertFalse(set(LEGACY_BACKGROUND_VALUES) & keys)
+
+    def test_light_fills_are_palette_keys(self):
+        keys = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        self.assertTrue(LIGHT_BACKGROUND_COLORS <= keys)
+
+
+class TestBackgroundResolution(SimpleTestCase):
+    """
+    resolve_background() / background_is_light() — the render-path fallback
+    that keeps pre-palette values working. Migration 0040 rewrites the ones
+    stored on live pages, but reverting to an old page revision republishes
+    that revision's JSON verbatim, so legacy keys can always come back.
+    """
+
+    def test_canonical_values_pass_through(self):
+        for value, _label in BACKGROUND_COLOR_CHOICES:
+            with self.subTest(value=value):
+                self.assertEqual(resolve_background(value), value)
+
+    def test_legacy_values_are_translated(self):
+        self.assertEqual(resolve_background("light"), "white")
+        self.assertEqual(resolve_background("dark"), "dark-grey")
+        self.assertEqual(resolve_background("muted"), "light-grey")
+        self.assertEqual(resolve_background("primary"), "blue-gradient")
+        self.assertEqual(resolve_background("secondary"), "navy")
+
+    def test_unknown_values_fall_back_rather_than_emitting_a_dead_class(self):
+        """
+        An unrecognised key must not reach the template: `.wtr-bg-<junk>`
+        matches no rule, leaving a transparent panel with light text on it.
+        """
+        self.assertEqual(resolve_background("chartreuse"), "white")
+        self.assertEqual(resolve_background(None), "white")
+        self.assertEqual(resolve_background("chartreuse", default="navy"), "navy")
+
+    def test_light_fills_are_the_ones_needing_dark_text(self):
+        self.assertTrue(background_is_light("white"))
+        self.assertTrue(background_is_light("light-grey"))
+        for value in ("dark-grey", "navy", "red", "blue-gradient"):
+            with self.subTest(value=value):
+                self.assertFalse(background_is_light(value))
+
+    def test_legacy_light_values_are_light(self):
+        self.assertTrue(background_is_light("light"))
+        self.assertTrue(background_is_light("muted"))
+        self.assertFalse(background_is_light("dark"))
