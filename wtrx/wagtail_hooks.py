@@ -211,3 +211,60 @@ def register_blog_menu_item():
         icon_name="doc-empty",
         order=150,
     )
+
+
+# ---------------------------------------------------------------------------
+# Press releases admin-menu shortcut
+# ---------------------------------------------------------------------------
+#
+# Same pattern as the Blog shortcut above, pointing at
+# AdminMenuSettings.press_releases_index_page instead.
+# ---------------------------------------------------------------------------
+
+
+def _get_press_releases_index_page(request):
+    # Import here to avoid import-time DB access
+    from wagtail.models import Site
+
+    from wtrx.site_settings import AdminMenuSettings
+
+    try:
+        admin_settings = AdminMenuSettings.for_request(request)
+    except (AdminMenuSettings.DoesNotExist, Site.DoesNotExist):
+        return None
+
+    page = admin_settings.press_releases_index_page
+    if page is None or not page.live:
+        return None
+    return page
+
+
+class PressReleasesMenuItem(MenuItem):
+    def is_shown(self, request):
+        return _get_press_releases_index_page(request) is not None
+
+    def render_component(self, request):
+        # Recompute rather than reuse a cached URL: menu item instances are
+        # shared across requests, so the target page must be resolved fresh
+        # each time rather than stashed on self.
+        page = _get_press_releases_index_page(request)
+        url = reverse("wagtailadmin_explore", args=[page.id])
+        return LinkMenuItemComponent(
+            self.name,
+            self.label,
+            url,
+            icon_name=self.icon_name,
+            classname=self.classname,
+            attrs=self.attrs,
+        )
+
+
+@hooks.register("register_admin_menu_item")
+def register_press_releases_menu_item():
+    return PressReleasesMenuItem(
+        _("Press releases"),
+        "#",
+        name="press-releases",
+        icon_name="clipboard-list",
+        order=151,
+    )

@@ -323,3 +323,27 @@ def organization_structured_data(context):
 
     json_str = json.dumps(data, cls=DjangoJSONEncoder).translate(_json_script_escapes)
     return mark_safe(f'<script type="application/ld+json">{json_str}</script>')
+
+
+@register.filter
+def absolute_uri(url, request):
+    """
+    Resolve `url` to an absolute URL against `request`.
+
+    Needed because Django template syntax can't pass an argument to
+    `request.build_absolute_uri` (`{{ request.build_absolute_uri }}` calls
+    it with zero args, returning the *current page's* URL, not the given
+    one). Calling it properly, as here, handles both storage backends
+    correctly: a relative path (local filesystem storage, e.g.
+    "/media/images/foo.jpg") resolves against the request's own scheme and
+    host; a URL that's already absolute (S3/CDN-backed storage in
+    production) is returned unchanged rather than getting a second
+    scheme+host prepended in front of it.
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        <meta property="og:image" content="{{ og_img.url|absolute_uri:request }}" />
+    """
+    if not url:
+        return url
+    return request.build_absolute_uri(url)

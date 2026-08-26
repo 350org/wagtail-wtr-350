@@ -748,9 +748,23 @@ class AdminMenuSettings(BaseSiteSetting):
             "the shortcut."
         ),
     )
+    press_releases_index_page = models.ForeignKey(
+        "wagtailcore.Page",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("press releases index page"),
+        help_text=_(
+            "The page that lists your press releases. When set, a 'Press "
+            "releases' shortcut appears in the admin sidebar linking to it. "
+            "Leave blank to hide the shortcut."
+        ),
+    )
 
     panels = [
         FieldPanel("blog_index_page"),
+        FieldPanel("press_releases_index_page"),
     ]
 
     class Meta:

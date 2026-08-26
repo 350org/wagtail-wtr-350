@@ -4,11 +4,11 @@ Tests for custom template tags in wtrx_tags.py.
 
 from unittest.mock import MagicMock
 
-from django.test import SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from wagtail.models import Page
 
 from wtrx.site_settings import NavigationSettings
-from wtrx.templatetags.wtrx_tags import nav_item_is_active, page_as_card
+from wtrx.templatetags.wtrx_tags import absolute_uri, nav_item_is_active, page_as_card
 
 
 class TestPageAsCard(SimpleTestCase):
@@ -163,3 +163,40 @@ class TestNavItemIsActive(TestCase):
     def test_no_current_page_is_never_active(self):
         """Views without a `page` in context (search, 404) underline nothing."""
         self.assertFalse(nav_item_is_active({}, self.internal))
+
+
+class TestAbsoluteUri(SimpleTestCase):
+    """
+    Regression coverage for the wagtail.350.org bug: og:image/twitter:image
+    used to be built from {{ request.build_absolute_uri }}{{ og_img.url }}
+    (see base.html history), which is wrong for BOTH storage backends in
+    different ways — local filesystem storage (relative "/media/..." URLs)
+    got the current page's own path prepended instead of the site root, and
+    S3-backed production storage (already-absolute
+    "https://s3.amazonaws.com/..." URLs) got a second scheme+host prepended
+    in front of the whole absolute URL. The `absolute_uri` filter calls
+    request.build_absolute_uri(url) properly, as a real argument, which
+    Django already handles correctly for both cases.
+    """
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_relative_path_resolves_against_site_root_not_current_page(self):
+        # Deliberately on a nested path, not "/", so a bug that leaks the
+        # current page's path into the result would be caught here.
+        request = self.factory.get("/canada/")
+        self.assertEqual(
+            absolute_uri("/media/images/foo.jpg", request),
+            "http://testserver/media/images/foo.jpg",
+        )
+
+    def test_already_absolute_url_is_returned_unchanged(self):
+        request = self.factory.get("/canada/")
+        s3_url = "https://s3.amazonaws.com/bucket/media/images/foo.jpg"
+        self.assertEqual(absolute_uri(s3_url, request), s3_url)
+
+    def test_blank_url_passes_through(self):
+        request = self.factory.get("/")
+        self.assertEqual(absolute_uri("", request), "")
+        self.assertIsNone(absolute_uri(None, request))
