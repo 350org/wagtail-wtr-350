@@ -276,7 +276,7 @@ WTRX_ACTIONKIT_API_PASSWORD = os.environ.get("WTRX_ACTIONKIT_API_PASSWORD", "")
 # dev.py blanks it so the external CDN script does not load in local development.
 # Requires a Cloudflare Worker to inject the visitor country.
 WTRX_USERCENTRICS_SETTINGS_ID = os.environ.get(
-    "WTRX_USERCENTRICS_SETTINGS_ID", "AcMHYQUX2Y80Au"
+    "WTRX_USERCENTRICS_SETTINGS_ID", "AelB3mtRNvAY5D"
 )
 WTRX_USERCENTRICS_VERSION = os.environ.get("WTRX_USERCENTRICS_VERSION", "1.1.4")
 # Visitor country used to decide whether to show the consent banner. Defaults to
