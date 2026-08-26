@@ -97,6 +97,42 @@ _DROP_ENTIRELY = {"script", "style", "noscript", "iframe", "form", "svg", "butto
 
 _TAG_FACTORY = BeautifulSoup("", "html.parser")
 
+_CF_EMAIL_PROTECTION_PREFIX = "/cdn-cgi/l/email-protection"
+
+
+def _decode_cf_email(cfemail_hex):
+    """Reverse Cloudflare's "Email Address Obfuscation" single-byte XOR encoding."""
+    key = int(cfemail_hex[:2], 16)
+    return "".join(
+        chr(int(cfemail_hex[i : i + 2], 16) ^ key) for i in range(2, len(cfemail_hex), 2)
+    )
+
+
+def _unmask_cf_emails(soup):
+    """
+    Replace Cloudflare's email-obfuscation markup with the real address, in place.
+
+    Cloudflare's edge rewrites any visible ``mailto:`` link into
+    ``<a href="/cdn-cgi/l/email-protection#hexhash">`` wrapping
+    ``<span class="__cf_email__" data-cfemail="hexhash">[email&nbsp;protected]</span>``,
+    and only restores the real address client-side via injected JS that
+    never runs for a plain ``requests`` fetch — so without this, an
+    imported body carries the literal "[email protected]" placeholder and a
+    dead link instead of the address.
+    """
+    for span in soup.find_all("span", class_="__cf_email__"):
+        cfemail = span.get("data-cfemail")
+        if not cfemail:
+            continue
+        try:
+            email = _decode_cf_email(cfemail)
+        except ValueError:
+            continue
+        anchor = span.find_parent("a")
+        if anchor is not None and anchor.get("href", "").startswith(_CF_EMAIL_PROTECTION_PREFIX):
+            anchor["href"] = f"mailto:{email}"
+        span.replace_with(NavigableString(email))
+
 
 def _build_clean(node):
     """
@@ -260,6 +296,31 @@ def _process_nodes(nodes, blocks, pending, session, stdout, dry_run=False):
                 blocks.append(block)
             continue
 
+        if name == "a":
+            # A link reached directly here (rather than via _build_clean, which
+            # handles ordinary in-paragraph links) is a standalone CTA -- e.g. a
+            # WordPress "Take Action" button, typically wrapped in table/div
+            # cruft for email-client compatibility that gets unwrapped away by
+            # the generic fallback below. Import it as a proper button block
+            # instead of losing the link, so long as it has both a target and
+            # visible text (an image-only link falls through to the fallback
+            # below, which preserves the existing bare-image behavior).
+            href = node.get("href")
+            text = node.get_text(strip=True)
+            if href and text:
+                flush()
+                blocks.append(
+                    {
+                        "type": "button",
+                        "value": {
+                            "text": text,
+                            "link_url": href,
+                            "style": "primary",
+                        },
+                    }
+                )
+                continue
+
         if name in _BLOCK_TAG_MAP:
             imgs = node.find_all("img")
             if imgs and not node.get_text(strip=True):
@@ -286,6 +347,7 @@ def _process_nodes(nodes, blocks, pending, session, stdout, dry_run=False):
 
 def convert_body(content_html, session, stdout, dry_run=False):
     fragment = BeautifulSoup(content_html or "", "html.parser")
+    _unmask_cf_emails(fragment)
     blocks = []
     pending = []
     _process_nodes(list(fragment.children), blocks, pending, session, stdout, dry_run=dry_run)

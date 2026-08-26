@@ -20,7 +20,11 @@ Field mapping:
     WP categories (subset)   -> Post.categories (see CATEGORY_SLUG_MAP)
     WP author name           -> Post.author_name (Post.author, the FK to a
                                  site login user, is left blank — imported posts
-                                 aren't written by staff accounts)
+                                 aren't written by staff accounts). The live
+                                 page's <span class="post-author"> byline is
+                                 preferred over the REST API's embedded author,
+                                 since guest-contributor posts show a byline
+                                 there that differs from the API's WP user.
 
 CATEGORY_SLUG_MAP is a deliberately narrow allowlist: only WordPress category
 slugs listed here are mapped onto wtrx.BlogCategory. Anything else is ignored,
@@ -31,6 +35,7 @@ import html
 from datetime import timezone as dt_timezone
 
 import requests
+from bs4 import BeautifulSoup
 from django.core.management.base import BaseCommand
 from django.utils import timezone as dj_timezone
 from django.utils.dateparse import parse_datetime
@@ -73,12 +78,39 @@ def _category_names(post):
     return names
 
 
-def _author_name(post):
+def _author_name(post, session):
+    """
+    Resolve the byline to display for a post.
+
+    The REST API's embedded author is whichever WP user account is logged
+    in as the post's author — often a shared staff/editor login — while a
+    guest contributor's byline (rendered by a plugin as
+    ``<span class="post-author">`` on the live page, e.g. "Camilo Sánchez"
+    on a post whose WP author is a comms account) exists only in the
+    rendered page, not the API. Scrape the live page for the true displayed
+    byline so guest bylines import correctly, falling back to the API's
+    embedded name if the page fetch fails or has no visible byline (this
+    also covers ordinary, non-guest posts, where both sources agree).
+    """
     embedded_authors = post.get("_embedded", {}).get("author") or []
-    if not embedded_authors:
-        return ""
-    name = embedded_authors[0].get("name") or ""
-    return html.unescape(name)
+    fallback = html.unescape(embedded_authors[0].get("name") or "") if embedded_authors else ""
+
+    link = post.get("link")
+    if not link:
+        return fallback
+    try:
+        resp = session.get(link, timeout=30)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException:
+        return fallback
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    span = soup.find("span", class_="post-author")
+    if span:
+        text = html.unescape(span.get_text(strip=True))
+        if text:
+            return text
+    return fallback
 
 
 def _featured_image_url(post):
@@ -192,7 +224,7 @@ class Command(BaseCommand):
             published_at = _parse_published_at(post)
             categories = get_categories(_category_names(post))
             body = convert_body(post["content"]["rendered"], session, self.stdout, dry_run=dry_run)
-            author_name = _author_name(post)
+            author_name = _author_name(post, session)
 
             hero_image = None
             featured_url = _featured_image_url(post)
