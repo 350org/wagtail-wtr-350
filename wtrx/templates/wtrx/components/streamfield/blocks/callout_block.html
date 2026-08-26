@@ -1,9 +1,9 @@
-{% load i18n wagtailcore_tags wagtailimages_tags %}
+{% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 {% comment %}
 Solid-color card: optional heading (H2), optional subheading (H3), optional
 paragraph, optional CTA button, on a background chosen via value.color —
-see CalloutBlock's docstring and main.css's .wtr-callout-{color} classes
-for the five choices.
+one of the shared palette in main.css's .wtr-bg-{color} classes, the same
+set the section, feature panel, hero banner and signup panel offer.
 
 Full-bleed-ish width: special-cased in content_page.html/home_page.html
 (alongside section/card_carousel/donate_fundraiseup) to skip the shared
@@ -18,14 +18,13 @@ body blocks comes from home_page.html/content_page.html's space-y-32 on
 the block loop, not from here. This div's px-4/6/8 is horizontal gutters
 only.
 
-Text/button color: light-grey is the only one of the five colors light
-enough to need dark text/button instead of light — the
-value.color == 'light-grey' check below is repeated for text and for the
-button's style param rather than computed once, matching how alignment
-checks are written elsewhere in this app's block templates (e.g.
-quote_block.html), not because it's more code, but because there's no
-single "wrapper element" here whose class alone flips both at once (the
-button is a separate include with its own style param).
+Text/button color: white and light-grey are the palette's two light
+fills, needing dark text and a dark-outline button instead of light. That
+question is asked once via the `background_is_light` filter and held in
+`on_light` for the whole card — there is no single wrapper element here
+whose class alone flips both the prose and the button (the button is a
+separate include with its own style param), so the variable is read in
+three places, but the colour keys behind it are named only once.
 
 Background image: optional, absolutely positioned behind the text
 (z-index via stacking order — it's a plain z-0 sibling before the
@@ -35,18 +34,19 @@ per the reference design (a giant faint "350" numeral), not a full photo
 background; object-cover so it fills the card regardless of the card's
 own aspect ratio, which the image's own is unlikely to match.
 {% endcomment %}
+{% with on_light=value.color|background_is_light %}
 <div class="w-full px-4 sm:px-6 lg:px-8">
-    <div class="wtr-callout wtr-callout-{{ value.color }} relative mx-auto max-w-[932px] overflow-hidden rounded-lg px-6 py-10 sm:px-10 sm:py-14">
+    <div class="wtr-callout wtr-bg-{{ value.color|background_key }} relative mx-auto max-w-[932px] overflow-hidden rounded-lg px-6 py-10 sm:px-10 sm:py-14">
         {% if value.image %}
             {% image value.image fill-1600x900 as bg_img %}
             <img src="{{ bg_img.url }}" alt="" class="wtr-callout-bg-image absolute inset-0 h-full w-full object-cover" aria-hidden="true">
         {% endif %}
-        <div class="relative max-w-[804px] {% if value.color == 'light-grey' %}text-dark{% else %}text-light{% endif %}">
+        <div class="relative max-w-[804px] {% if on_light %}text-dark{% else %}text-light{% endif %}">
             {% if value.heading %}
-                <h2 class="font-heading text-3xl font-bold sm:text-4xl lg:text-64">{{ value.heading }}</h2>
+                <h2 class="font-heading text-2xl sm:text-3xl lg:text-40">{{ value.heading }}</h2>
             {% endif %}
             {% if value.subheading %}
-                <h3 class="font-heading mt-2 text-lg font-semibold sm:text-xl">{{ value.subheading }}</h3>
+                <h3 class="font-heading mt-2 text-2xl">{{ value.subheading }}</h3>
             {% endif %}
             {% if value.content %}
                 {% comment %}
@@ -56,13 +56,13 @@ own aspect ratio, which the image's own is unlikely to match.
                 already default to white in prose-invert, only body text doesn't.
                 {% endcomment %}
                 <div class="prose mt-4 max-w-none text-lg leading-[1.35] sm:text-xl lg:text-2xl
-                            {% if value.color == 'light-grey' %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                            {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
                     {{ value.content|richtext }}
                 </div>
             {% endif %}
             {% if value.link_text %}
                 <div class="mt-6">
-                    {% if value.color == "light-grey" %}
+                    {% if on_light %}
                         {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline" size="lg" %}
                     {% else %}
                         {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline-light" size="lg" %}
@@ -72,3 +72,4 @@ own aspect ratio, which the image's own is unlikely to match.
         </div>
     </div>
 </div>
+{% endwith %}

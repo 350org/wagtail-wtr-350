@@ -37,25 +37,74 @@
  */
 
 /* ------------------------------------------------------------
- * Klima Web font — self-hosted, CloudFront-delivered by 350.org.
- * One family, two weights: 500 (regular/body) and 800 (bold/headings).
- * woff2 + truetype only — the eot/svg formats from the original snippet
- * are dead weight today (IE<11 and iOS<4.2 respectively).
+ * Klima Web font — served from this app, not 350.org's CloudFront.
+ * Source files live in static_src/fonts/klima/ and are copied to
+ * static_compiled/fonts/klima/ by `make build-fonts`. The url()s below
+ * are relative to the compiled stylesheet (static_compiled/css/main.css),
+ * so collectstatic's ManifestStaticFilesStorage rewrites them to the
+ * hashed filenames in production without any extra configuration.
+ *
+ * Four weights, and the gaps between them are the point:
+ *
+ *   500  Klima Regular  body copy
+ *   600  Klima Medium   nav, pagination, small UI (font-medium)
+ *   700  Klima Bold     h3-h6, buttons, labels, <strong>/<b> in running text
+ *   800  Klima Heavy    h1 and h2, and nothing else
+ *
+ * 700 is not an arbitrary slot. Preflight styles `b, strong` as
+ * `font-weight: bolder`, and per CSS Fonts 4 `bolder` off a 500 parent
+ * computes to exactly 700 — so emphasis in body copy lands on Bold with no
+ * rule of our own. Before Bold existed that fell through to 800, which is
+ * why emphasised words in a paragraph used to read as heavily as the
+ * headline above them.
+ *
+ * Installing 600 has a knock-on worth knowing: Tailwind Typography hardcodes
+ * `prose strong` at 600 and `prose h3`/`h4` at 600 too. Those used to
+ * font-match upward to whatever bold face existed; now they match 600
+ * exactly and land on Medium. main.css pins all four heading levels and
+ * leaves `strong` to preflight's `bolder`, so neither ends up on Medium by
+ * accident — see the heading-weight rule there before changing this.
+ *
+ * woff2 + woff only — eot/svg are dead weight today (IE<11 and iOS<4.2
+ * respectively) and ttf is ~2x the size of woff for no added reach.
+ * The upstream kit also ships ultralight/light/medium/ultra and a full
+ * italic set; add an @font-face here (and copy the file) if a design ever
+ * needs one.
  * ------------------------------------------------------------ */
 @font-face {
   font-family: 'KlimaWeb';
   font-style: normal;
   font-weight: 500;
-  src: url('https://dbqvwi2zcv14h.cloudfront.net/fonts/klima/klima-regular-web.woff2') format('woff2'),
-       url('https://dbqvwi2zcv14h.cloudfront.net/fonts/klima/klima-regular-web.ttf') format('truetype');
+  font-display: swap;
+  src: url('../fonts/klima/klima-regular-web.woff2') format('woff2'),
+       url('../fonts/klima/klima-regular-web.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'KlimaWeb';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/klima/klima-medium-web.woff2') format('woff2'),
+       url('../fonts/klima/klima-medium-web.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'KlimaWeb';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/klima/klima-bold-web.woff2') format('woff2'),
+       url('../fonts/klima/klima-bold-web.woff') format('woff');
 }
 
 @font-face {
   font-family: 'KlimaWeb';
   font-style: normal;
   font-weight: 800;
-  src: url('https://dbqvwi2zcv14h.cloudfront.net/fonts/klima/klima-bold-web.woff2') format('woff2'),
-       url('https://dbqvwi2zcv14h.cloudfront.net/fonts/klima/klima-bold-web.ttf') format('truetype');
+  font-display: swap;
+  src: url('../fonts/klima/klima-heavy-web.woff2') format('woff2'),
+       url('../fonts/klima/klima-heavy-web.woff') format('woff');
 }
 
 /* ------------------------------------------------------------
@@ -93,18 +142,30 @@
   --color-primary-900: #10487a;
   --color-primary-950: #0d304f;
 
-  /* Secondary brand color — violet */
-  --color-secondary-50:  #f5f3ff;
-  --color-secondary-100: #ede9fe;
-  --color-secondary-200: #ddd6fe;
-  --color-secondary-300: #c4b5fd;
-  --color-secondary-400: #a78bfa;
-  --color-secondary-500: #8b5cf6;
-  --color-secondary-600: #7c3aed;
-  --color-secondary-700: #6d28d9;
-  --color-secondary-800: #5b21b6;
-  --color-secondary-900: #4c1d95;
-  --color-secondary-950: #2e1065;
+  /* Secondary brand color — 350's dark navy. This was a violet ramp
+   * inherited from the WTR starter palette, which put a purple button on
+   * a site with no purple anywhere else in it; the secondary button is now
+   * the darker sibling of the primary blue, which is what the brand
+   * actually has. The 600 step *is* --color-navy rather than a copy of its
+   * hex, so the secondary button, the nav's hover/active state and the
+   * CalloutBlock navy swatch can never drift apart. The rest of the ramp is
+   * that same hue (208.6deg) walked up and down in lightness.
+   *
+   * Because navy shares the primary's hue family, the light end of this
+   * ramp (300/400) reads close to the primary ramp — deliberate. Secondary
+   * is used at 600/700 (wtr-btn-secondary and its hover); the pale steps
+   * exist for completeness, not as a second accent. */
+  --color-secondary-50:  #eaf4fd;
+  --color-secondary-100: #cbe3f9;
+  --color-secondary-200: #9cc8ef;
+  --color-secondary-300: #61a5e3;
+  --color-secondary-400: #1b7ed8;
+  --color-secondary-500: #095ca7;
+  --color-secondary-600: var(--color-navy);
+  --color-secondary-700: #023767;
+  --color-secondary-800: #022c52;
+  --color-secondary-900: #022340;
+  --color-secondary-950: #02172b;
 
   /* Accent color — orange */
   --color-accent-50:  #fff7ed;
@@ -177,16 +238,38 @@
    * per Figma's "Sign Up" button (Hero Video - Condensed Signup). */
   --icon-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
-  /* KlimaWeb only ships 500/800 — override both weight tokens so
-   * font-bold and font-semibold (600, no matching font file) resolve to
-   * the same actually-available bold weight instead of silently
-   * rendering as 500. */
-  --font-weight-semibold: 800;
-  --font-weight-bold: 800;
+  /* Klima Heavy is reserved for h1 and h2. Everything else that is bolder
+   * than body copy — h3-h6, buttons, pills, form labels, table headers, card
+   * titles, the active nav item, <strong>/<b> in running text — is Klima
+   * Bold. So both bold utilities point at Bold, and Heavy is not reachable
+   * through a utility at all:
+   *
+   *   font-medium    ->  600  Klima Medium  (Tailwind default is 500)
+   *   font-semibold  ->  700  Klima Bold
+   *   font-bold      ->  700  Klima Bold
+   *   font-heavy     ->  800  Klima Heavy   (generated from the token below)
+   *
+   * h1/h2 do not use font-heavy either. They get Heavy from a bare element
+   * rule in main.css, so the rule holds for every h1/h2 on the site including
+   * the ones rich text generates, where there is no class to put a utility
+   * on. Adding font-bold to a heading therefore does nothing — which is why
+   * none of them carry it any more. Reach for font-heavy only if some
+   * non-heading element ever needs Heavy; nothing does today. */
+  --font-weight-medium: 600;
+  --font-weight-semibold: 700;
+  --font-weight-bold: 700;
+  --font-weight-heavy: 800;
 
   /* Type-scale steps this site needs beyond Tailwind's default ramp
    * (falls between 3xl/4xl and 6xl/7xl respectively; 36/40 fall between
-   * 4xl/5xl). */
+   * 4xl/5xl; 28 falls between 2xl/3xl).
+   *
+   * --text-64 has no remaining callers: section headings that used to
+   * reach 64px top out at --text-40, and the banner hero headline that was
+   * its last user is now 48px (text-5xl). It is kept as a scale step forks
+   * may reach for. The 96px (text-8xl) display step is used only by the
+   * home page's "full" hero — see the type scale note in AGENTS.md. */
+  --text-28: 1.75rem;
   --text-32: 2rem;
   --text-36: 2.25rem;
   --text-40: 2.5rem;
@@ -210,7 +293,10 @@
 .wtr-actionkit-embed-inline input[type='submit'] {
   background-image: var(--icon-arrow-right);
   background-repeat: no-repeat;
-  background-position: right 1rem center;
+  /* 24px in from the button's right edge — Figma's px-[24px] applies to the
+   * arrow, not just the label; main.css reserves the matching 3rem of
+   * padding-right (24 + the 16px glyph + the 8px gap before it). */
+  background-position: right 1.5rem center;
 }
 
 /* ------------------------------------------------------------

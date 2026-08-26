@@ -75,39 +75,60 @@ QUOTE_ALIGNMENT_CHOICES = [
     ("image-right", _("Image right")),
 ]
 
-CALLOUT_COLOR_CHOICES = [
+# ---------------------------------------------------------------------------
+# Background palette
+# ---------------------------------------------------------------------------
+#
+# One palette, offered identically by every block that has a background
+# choice: SectionBlock, CalloutBlock, FeaturePanelBlock, HeroBlock /
+# HeroMixin's banner variant, and SignupActionKitBlock. Each of those used to
+# carry its own list — Section offered light/dark/primary/secondary/muted,
+# the feature panel only light/dark, signup spelled dark grey "dark" — so
+# the same visual decision was made from a different vocabulary depending on
+# which block an editor happened to be standing in. There is one list now,
+# and a block that grows a background field should reuse it rather than
+# define a sixth.
+#
+# The colors are Figma's callout/hero swatches plus White, which the old
+# Section list called "light" and which a section sitting on the page
+# background still needs. See main.css's .wtr-bg-{color} classes for the
+# token behind each key.
+BACKGROUND_COLOR_CHOICES = [
+    ("white", _("White")),
+    ("light-grey", _("Light grey")),
+    ("dark-grey", _("Dark grey")),
     ("navy", _("Navy")),
     ("red", _("Red")),
-    ("dark-grey", _("Dark grey")),
     ("blue-gradient", _("350 Blue")),
-    ("light-grey", _("Light grey")),
 ]
 
-# The one CalloutBlock color light enough to need dark text/buttons instead
-# of light — see CalloutBlock's docstring and main.css's .wtr-callout-*
-# rules, both of which branch on this same set.
-CALLOUT_ON_LIGHT_COLORS = {"light-grey"}
+BACKGROUND_COLOR_KEYS = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+
+# The fills light enough to need dark text, a dark-outline button and an
+# inverted eyebrow pill; every other color in the palette is dark enough for
+# light (white) text. Block templates branch on this one set via the
+# `background_is_light` filter instead of testing color keys inline, so
+# adding a light color to the palette never means hunting down a scattered
+# `== 'light-grey'` check in five templates.
+LIGHT_BACKGROUND_COLORS = {"white", "light-grey"}
+
+# Keys that predate the shared palette and may still be sitting in
+# StreamField content. A data migration rewrites the ones it can reach, but a
+# legacy value can also arrive from an old page revision (Wagtail stores each
+# revision as its own JSON blob, and reverting to one re-publishes that JSON
+# verbatim), so resolution stays in the render path permanently rather than
+# being a one-shot fixup.
+LEGACY_BACKGROUND_VALUES = {
+    "light": "white",            # SectionBlock, FeaturePanelBlock
+    "dark": "dark-grey",         # SectionBlock, FeaturePanelBlock, SignupActionKitBlock
+    "muted": "light-grey",       # SectionBlock
+    "primary": "blue-gradient",  # SectionBlock
+    "secondary": "navy",         # SectionBlock
+}
 
 FEATURE_PANEL_ALIGNMENT_CHOICES = [
     ("image-left", _("Image left")),
     ("image-right", _("Image right")),
-]
-
-# Deliberately only two: the panel is a filled card, so its background has
-# to be either dark enough for light text or light enough for dark text.
-# The eyebrow pill, body prose and CTA button all invert together off this
-# one choice — see feature_panel_block.html.
-FEATURE_PANEL_BACKGROUND_CHOICES = [
-    ("light", _("Light")),
-    ("dark", _("Dark")),
-]
-
-SECTION_BACKGROUND_CHOICES = [
-    ("light", _("Light")),
-    ("dark", _("Dark")),
-    ("primary", _("Primary")),
-    ("secondary", _("Secondary")),
-    ("muted", _("Muted")),
 ]
 
 SECTION_PADDING_CHOICES = [
@@ -129,29 +150,6 @@ SECTION_WIDTH_CHOICES = [
     ("wide", _("Wide (1266px)")),
 ]
 
-# The ActionKit signup panel's fill — the same five colors the hero banner
-# and CalloutBlock offer (CALLOUT_COLOR_CHOICES), so a signup panel can sit
-# in the same palette as the page it's on. Unlike
-# FEATURE_PANEL_BACKGROUND_CHOICES this is not just a fill choice: light-grey
-# is light enough that the panel text, eyebrow pill and form chrome all
-# invert off it, exactly as they do in callout_block.html.
-#
-# The dark-grey entry keeps the legacy key "dark" rather than adopting
-# CALLOUT_COLOR_CHOICES' "dark-grey", since "dark" is already the stored
-# value (and the default) in existing StreamField content — the same
-# reasoning that kept CalloutBlock's "blue-gradient" key. Both keys name the
-# same --color-dark fill; only the label was brought in line with the hero's.
-SIGNUP_BACKGROUND_CHOICES = [
-    ("navy", _("Navy")),
-    ("red", _("Red")),
-    ("dark", _("Dark grey")),
-    ("blue-gradient", _("350 Blue")),
-    ("light-grey", _("Light grey")),
-]
-
-# The one SIGNUP_BACKGROUND_CHOICES fill light enough to need dark text and
-# an inverted eyebrow pill — mirrors CALLOUT_ON_LIGHT_COLORS above.
-SIGNUP_ON_LIGHT_BACKGROUNDS = {"light-grey"}
 
 HERO_LAYOUT_CHOICES = [
     ("centered", _("Centered")),
@@ -167,6 +165,25 @@ ACTION_NETWORK_URL_TYPES = {
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+
+def resolve_background(value, default="white"):
+    """
+    Map a stored background key onto its BACKGROUND_COLOR_CHOICES key.
+
+    Translates the pre-palette keys listed in LEGACY_BACKGROUND_VALUES, and
+    falls back to `default` for anything unrecognised — a background is
+    decorative, so an unreadable value should render the plain fill rather
+    than emit a `.wtr-bg-` class that matches no rule and leaves the panel
+    transparent with light text on it.
+    """
+    key = LEGACY_BACKGROUND_VALUES.get(value, value)
+    return key if key in BACKGROUND_COLOR_KEYS else default
+
+
+def background_is_light(value):
+    """True when `value` names a fill that needs dark text rather than light."""
+    return resolve_background(value) in LIGHT_BACKGROUND_COLORS
 
 
 def parse_action_network_url(url):
@@ -534,7 +551,9 @@ class ImageBlock(ContentPreviewMixin, StructBlock):
     """
     An image with optional alt text override and caption.
 
-    The image's built-in title is used as a fallback when alt_text is blank.
+    When alt_text is blank the rendition's own alt is used, which is the
+    image's description falling back to its title (Wagtail's
+    ``default_alt_text``) — never the raw filename if a description is set.
     Decorated with wagtail-ai's ai_image_block() (default field names match:
     "image"/"alt_text") to add a "generate alt text from image" button in
     the admin.
@@ -545,7 +564,8 @@ class ImageBlock(ContentPreviewMixin, StructBlock):
         required=False,
         label=_("Alt text"),
         help_text=_(
-            "Overrides the image title for screen readers. Leave blank to use the image title."
+            "Overrides the image description for screen readers. "
+            "Leave blank to use the description set on the image itself."
         ),
     )
     caption = CharBlock(
@@ -1114,10 +1134,13 @@ class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
         help_text=_("Which side of the panel the image sits on."),
     )
     background = ChoiceBlock(
-        choices=FEATURE_PANEL_BACKGROUND_CHOICES,
-        default="light",
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="white",
         label=_("Background"),
-        help_text=_("Panel fill. Dark inverts the text, pill and button colors."),
+        help_text=_(
+            "Panel fill. The dark colors invert the text, pill and button "
+            "colors; White and Light grey keep them dark."
+        ),
     )
     link_text = CharBlock(
         required=False,
@@ -1224,11 +1247,19 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
     index_page.html uses, so this always reflects whatever's actually
     published there.
 
-    Ordering is always by first_published_at (present on every Page, so
-    this stays a single query regardless of index_page's child page type
-    mix) — but the date shown on each card prefers published_at when the
-    child has one (Post), since that's the editor-controlled display date
-    for that type, over Wagtail's own non-editable first_published_at.
+    Ordering follows whatever the chosen index page itself uses for its
+    listing. A Blogs page (blog posts and press releases) exposes that as
+    get_listing_queryset(), ordering by the editor-controlled published_at
+    — the same date the cards display — so a "Latest updates" row can't
+    disagree with the index it links to about which posts are newest. This
+    matters because Wagtail only sets first_published_at when a page is
+    published through the admin, so imported posts all carry NULL or an
+    import-time value there (see the backfill_first_published command).
+
+    A generic IndexPage has no such method and may mix child page types, so
+    it falls back to first_published_at, which every Page has — keeping
+    that case a single query. The date shown on each card still prefers
+    published_at whenever the child has one.
     """
 
     heading = CharBlock(
@@ -1264,13 +1295,18 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
         index_page = value.get("index_page")
         cards = []
         if index_page is not None:
-            children = (
-                index_page.specific.get_children()
-                .live()
-                .public()
-                .specific()
-                .order_by("-first_published_at")[:3]
-            )
+            specific_index = index_page.specific
+            listing = getattr(specific_index, "get_listing_queryset", None)
+            if listing is not None:
+                children = listing()[:3]
+            else:
+                children = (
+                    specific_index.get_children()
+                    .live()
+                    .public()
+                    .specific()
+                    .order_by("-first_published_at")[:3]
+                )
             for child in children:
                 card = page_as_card(child)
                 card["date"] = getattr(child, "published_at", None) or child.first_published_at
@@ -1420,10 +1456,10 @@ class CalloutBlock(ContentPreviewMixin, StructBlock):
 
     Text/button color (light vs dark) is derived from the chosen color, not
     independently editable — navy/red/dark-grey/blue-gradient are all dark
-    enough to need light (white) text and a light-outline button; light-grey
-    is the one light background, needing dark text and a dark-outline
-    button. See CALLOUT_ON_LIGHT_COLORS below and main.css's
-    .wtr-callout-{color} classes for that pairing.
+    enough to need light (white) text and a light-outline button; white and
+    light-grey need dark text and a dark-outline button. See
+    LIGHT_BACKGROUND_COLORS and main.css's .wtr-bg-{color} classes for that
+    pairing.
     """
 
     heading = CharBlock(
@@ -1457,7 +1493,7 @@ class CalloutBlock(ContentPreviewMixin, StructBlock):
         help_text=_("External link. Set either this or Link page, not both."),
     )
     color = ChoiceBlock(
-        choices=CALLOUT_COLOR_CHOICES,
+        choices=BACKGROUND_COLOR_CHOICES,
         default="navy",
         label=_("Color"),
     )
@@ -1861,14 +1897,30 @@ class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
     # a blue submit button and a --color-dark fine-print box — only reads
     # correctly against a panel that is neither of those colors, which is
     # navy and red; those two are deliberately absent here and take no
-    # modifier. The other three each collide with one piece of that chrome:
-    # "dark" hides the fine-print box, "blue-gradient" hides the submit
-    # button, and "light-grey" is the one fill that inverts the panel's own
-    # text, so the form's light-on-color labels have to invert with it.
+    # modifier. The rest each collide with one piece of that chrome:
+    # "dark-grey" hides the fine-print box, "blue-gradient" hides the submit
+    # button and the checkbox/radio accent, and the two light fills invert the
+    # panel's own text, so the form's light-on-color labels have to invert
+    # with them.
+    #
+    # The two light fills get *separate* tones even though they share that
+    # text inversion, because the field boxes have to move in opposite
+    # directions to stay legible as a distinct surface. Their default fill is
+    # --color-neutral-50, which reads against light grey's --color-neutral-200
+    # only barely, so "on-light" lifts the boxes to pure white — but the white
+    # panel *is* pure white, where that same rule would erase the boxes into
+    # the panel and leave only their hairline border. "on-white" therefore
+    # keeps the neutral-50 default and takes the text inversion alone.
+    #
+    # Keys are canonical BACKGROUND_COLOR_CHOICES keys — the lookup below
+    # runs the stored value through resolve_background() first, so a panel
+    # still holding the pre-palette "dark" key gets the "on-dark" chrome
+    # rather than silently falling through to no modifier at all.
     PANEL_TONES = {
-        "dark": "on-dark",
+        "dark-grey": "on-dark",
         "blue-gradient": "on-primary",
         "light-grey": "on-light",
+        "white": "on-white",
     }
 
     eyebrow = CharBlock(
@@ -1891,12 +1943,12 @@ class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
         help_text=_("Optional supporting text below the heading."),
     )
     background = ChoiceBlock(
-        choices=SIGNUP_BACKGROUND_CHOICES,
-        default="dark",
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="dark-grey",
         label=_("Background"),
         help_text=_(
-            "Panel fill behind the heading, copy and form. Same five colors "
-            "as the page hero banner and callout blocks."
+            "Panel fill behind the heading, copy and form. The same palette "
+            "as the page hero banner, callout and section blocks."
         ),
     )
     image = ImageChooserBlock(
@@ -2008,7 +2060,9 @@ class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
         ctx["form_html"] = form_html
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
         ctx["success_message"] = value.get("success_message")
-        ctx["panel_tone"] = self.PANEL_TONES.get(value.get("background"), "")
+        ctx["panel_tone"] = self.PANEL_TONES.get(
+            resolve_background(value.get("background"), default="dark-grey"), ""
+        )
         return ctx
 
     class Meta:
@@ -2172,7 +2226,7 @@ class HeroBlock(StructBlock):
         label=_("Image"),
     )
     banner_color = ChoiceBlock(
-        choices=CALLOUT_COLOR_CHOICES,
+        choices=BACKGROUND_COLOR_CHOICES,
         default="navy",
         label=_("Color"),
     )
@@ -2190,6 +2244,12 @@ class HeroBlock(StructBlock):
             "layout": None,  # banner variant ignores layout; key kept for template contract
             "banner_color": value.get("banner_color"),
             "cta": [],  # banner variant never renders a cta; key kept for template contract
+            # Mid-page HeroBlock, not a page-level HeroMixin hero. Only the
+            # gutter differs: in the body this block sits in a stack with
+            # image/image_text/callout and has to line its edges up with
+            # them, while the page-level hero keeps Figma's flat 16px
+            # wrapper. See components/hero.html.
+            "in_body": True,
         }
         return ctx
 
@@ -2264,9 +2324,13 @@ class SectionBlock(ContentPreviewMixin, StructBlock):
 
     content = SectionContentBlock()
     background = ChoiceBlock(
-        choices=SECTION_BACKGROUND_CHOICES,
-        default="light",
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="white",
         label=_("Background"),
+        help_text=_(
+            "Full-bleed fill behind the whole section. The dark colors "
+            "invert the text inside it."
+        ),
     )
     padding = ChoiceBlock(
         choices=SECTION_PADDING_CHOICES,

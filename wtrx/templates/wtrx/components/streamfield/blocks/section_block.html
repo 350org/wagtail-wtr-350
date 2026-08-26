@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags %}
+{% load i18n wagtailcore_tags wtrx_tags %}
 {% comment %}
 value.width sets the inner content column's measure — see
 SECTION_WIDTH_CHOICES for why the section owns this rather than each child
@@ -10,19 +10,34 @@ The heading of a section and everything under it share this one column, so
 a narrow accordion inside a default-width section would sit ~176px right of
 the heading above it — which is exactly what "Get the full picture." looked
 like before this field existed.
+
+The fill comes from the shared background palette (.wtr-bg-{color} in
+main.css), the same one the callout, feature panel, hero banner and signup
+panel draw from. The fill is an inset rounded panel, not a full-bleed band:
+the outer wrapper is `max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8` — the
+exact class combination image_block.html and the nav (header.html) use — so
+a section's coloured edge lines up with an ImageBlock's photo edge above or
+below it, and it carries the same rounded-lg. It used to have its own
+five-entry list
+(light/dark/primary/secondary/muted) built out of raw Tailwind colour
+utilities; `background_key` maps those old stored values onto the palette's
+keys so content saved before the merge still renders.
+
+data-bg carries the resolved colour and data-bg-tone the light/dark
+question, so a child block that needs to invert (text_block.html's prose)
+asks the tone once instead of naming every dark colour in the palette.
 {% endcomment %}
+{% with bg=value.background|background_key on_light=value.background|background_is_light %}
+<div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
 <section
-    class="wtr-section w-full
-           {% if value.background == 'dark' %}bg-dark text-light
-           {% elif value.background == 'primary' %}bg-primary-700 text-light
-           {% elif value.background == 'secondary' %}bg-secondary-600 text-light
-           {% elif value.background == 'muted' %}bg-neutral-100 text-neutral-800
-           {% else %}bg-light text-dark{% endif %}
+    class="wtr-section w-full overflow-hidden rounded-lg wtr-bg-{{ bg }}
+           {% if on_light %}text-dark{% else %}text-light{% endif %}
            {% if value.padding == 'sm' %}py-8
            {% elif value.padding == 'lg' %}py-24
            {% else %}py-16{% endif %}"
     {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}
-    data-bg="{{ value.background }}"
+    data-bg="{{ bg }}"
+    data-bg-tone="{% if on_light %}light{% else %}dark{% endif %}"
 >
     {% comment %}
     The max-w values are border-box (Tailwind's preflight sets box-sizing
@@ -41,3 +56,5 @@ like before this field existed.
         {% endfor %}
     </div>
 </section>
+</div>
+{% endwith %}

@@ -218,7 +218,7 @@ Custom `clean()` enforces exactly one link field.
 | Field | Type | Required |
 |---|---|---|
 | content | StreamBlock (all blocks except SectionBlock) | **Yes** |
-| background | ChoiceBlock (light/dark/primary/muted) | No, default: light |
+| background | ChoiceBlock (BACKGROUND_COLOR_CHOICES) | No, default: white |
 | padding | ChoiceBlock (sm/md/lg) | No, default: md |
 | anchor_id | CharBlock | No |
 
@@ -723,7 +723,7 @@ processes utilities:
   --color-primary-600: #0284c7;
   /* ... full scale 50–950 ... */
 
-  --color-secondary-600: #7c3aed;
+  --color-secondary-600: var(--color-navy);
   /* ... */
 
   --color-accent-500: #f97316;
@@ -949,17 +949,30 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   when block-level `override_amounts` is empty
 - [x] `IntegrationSettings.donation_suggested_amounts_list` property for template iteration
 - [x] Tests for constants, wagtail_hooks, setup_site command, site_settings
-- [x] `management/commands/create_test_page.py` -- creates a `ContentPage` with
-  every block type and every field permutation populated (ImageBlock, CardBlock,
-  PersonCardBlock, CalloutBlock with both alignments, ButtonBlock in all 3 styles,
-  QuoteBlock with/without attribution, HeroBlock full/minimal, DonateBlock
-  with/without overrides, SectionBlock with all 4 backgrounds and sm/md/lg padding);
-  loads a real JPEG from `fixtures/placeholder.jpg` for all image-bearing blocks
-- [x] `fixtures/placeholder.jpg` -- committed 1200×800 JPEG placeholder image
-  (indigo background, white label text) used by `create_test_page` for visual QA
-- [x] `wtrx/tests/test_create_test_page.py` -- automated rendering tests: command
-  creates the page, HTTP GET returns 200, each block type and variant produces
-  expected output (43 tests total)
+- [x] `management/commands/create_test_page.py` -- creates a `ContentPage`
+  exercising every block type registered in `BodyStreamBlock`, in every
+  meaningful configuration: both `ImageBlock` variants, `CardBlock` full and
+  minimal, `CardGridBlock` at 3 and 4 cards (the 2x2 special case),
+  `PersonCardBlock` full and minimal, `ButtonBlock` in all 3 styles plus an
+  anchor link, `QuoteBlock` in both alignments, `FeaturePanelBlock` in both
+  alignments across 3 fills, `CalloutBlock` / `HeroBlock` / `SignupActionKitBlock`
+  once per colour in `BACKGROUND_COLOR_CHOICES`, `DonateBlock` with and without
+  overrides, the Action Network and ActionKit signups with and without a custom
+  success message, and `SectionBlock` across every background, every padding and
+  every content width. Opens with a typography reference (h1-h6 heading ramp,
+  the full `--text-*` size ramp, and a rich text sample covering every
+  `RICHTEXT_FEATURES_FULL` feature). Generates its own `IndexPage` (3 children)
+  and `FormPage` (2 fields) as children so `PageCardsBlock` and
+  `SignupWagtailFormsBlock` have real targets. Loads a real image from
+  `fixtures/placeholder.png` for all image-bearing blocks
+- [x] `fixtures/placeholder.png` -- committed placeholder image used by
+  `create_test_page` for visual QA
+- [x] `wtrx/tests/test_create_test_page.py` -- automated tests: command
+  behaviour (slug, `--force`, DEBUG guard, missing site), block-coverage
+  enforcement (every registered block and every palette colour is exercised;
+  supporting pages created; `first_published_at` set on index children), and
+  rendering (HTTP GET returns 200, the typography reference covers h1-h6, and
+  each block type and variant produces expected output) -- 57 tests total
 - [x] `video_block.html` -- fixed missing `{% load wagtailembeds_tags %}` (caused
   `TemplateSyntaxError: Invalid block tag 'embed'`)
 - [x] `video_block.html` -- fixed YouTube iframe size: added Tailwind arbitrary
@@ -1229,8 +1242,27 @@ HTML level (existing) and at the pixel level (visual regression).
   definitions.
 - Convention: when a new block is added to `BodyStreamBlock`, a corresponding
   `_<block_name>_block()` factory function must be added to `create_test_page.py`
-  and the block appended to `_FLAT_BLOCKS`. A test in `test_create_test_page.py`
+  and referenced from `_content_blocks()` (or `_section_blocks()` for anything
+  worth exercising inside a `SectionBlock`). A test in `test_create_test_page.py`
   must assert that the block's key content string appears in the rendered response.
+- Enforcement, not just convention: `TestCreateTestPageCoverage` asserts that
+  every block name registered in `BodyStreamBlock` appears in the generated
+  page, and that every colour in `BACKGROUND_COLOR_CHOICES` is exercised as a
+  section background, a callout colour, a hero banner colour and an ActionKit
+  signup background. Adding a block or a palette entry without updating the
+  command fails the suite. The command itself also raises a `CommandError` if
+  `BACKGROUND_COLOR_CHOICES` no longer matches its own `_BACKGROUND_KEYS`, and
+  prints a coverage line (`25/25 block types covered`) on every run.
+- The page opens with a typography reference before any block: the full heading
+  ramp (h1-h6) rendered inside the real `.wtr-text-block prose` container, the
+  complete `--text-*` size ramp labelled with the utility and pixel size that
+  produces each step, and a rich text sample using every feature
+  `RICHTEXT_FEATURES_FULL` offers. h1/h5/h6 are not reachable from the editor
+  and are shown for comparison only.
+- Blocks needing a real page to point at (`PageCardsBlock` needs an index page,
+  `SignupWagtailFormsBlock` needs a `FormPage`) get one generated as a child of
+  the test page, so the fixture is self-contained and `--force` cleans up the
+  whole tree in one delete.
 - CI gate: `make test` already covers `test_create_test_page.py`. This ensures
   the test page renders without errors on every push.
 

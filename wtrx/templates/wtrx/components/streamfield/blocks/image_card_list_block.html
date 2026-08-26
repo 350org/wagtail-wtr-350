@@ -29,21 +29,21 @@ page templates' space-y-32 on the block loop.
 {% endcomment %}
 <div class="wtr-image-card-list w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-7xl">
-        <h2 class="font-heading text-center text-4xl font-bold tracking-tight text-dark sm:text-5xl lg:text-8xl">
+        <h2 class="font-heading text-center text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl">
             {{ value.heading }}
         </h2>
         <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-8">
             <div>
                 <div class="md:sticky md:top-0">
                     {% image value.image fill-1200x1200 as img %}
-                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
                          class="aspect-square w-full rounded-lg object-cover" loading="lazy">
                 </div>
             </div>
             <div class="flex flex-col gap-4">
                 {% for card in value.cards %}
                     <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-6">
-                        <h3 class="font-heading text-lg font-bold text-dark">{{ card.heading }}</h3>
+                        <h3 class="font-heading text-2xl font-bold text-dark">{{ card.heading }}</h3>
                         <p class="mt-2 text-sm text-neutral-700 sm:text-base">{{ card.description }}</p>
                     </div>
                 {% endfor %}

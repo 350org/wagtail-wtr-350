@@ -14,8 +14,9 @@ fill half the row is exactly the wrong treatment. `contain` also means a
 graphic with a different aspect ratio than 378x299 letterboxes inside the
 box rather than distorting.
 
-Type scale is Figma's: 64px heading (lg:text-64), 24px body, 32px between
-them, 1.2 leading on both.
+Type scale follows Figma's proportions one notch down: 40px heading
+(lg:text-40, 64px in Figma), 24px body, 32px between them, 1.2 leading on
+both. See the type scale note in AGENTS.md.
 
 Full-bleed-ish width: same w-full-outer / max-w-inner two-tier pattern as
 callout_block.html/image_card_list_block.html — see callout_block.html's
@@ -26,17 +27,17 @@ comes from the page templates' space-y-32 on the block loop.
 <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto flex max-w-[1186px] flex-col gap-8 md:flex-row md:items-start md:justify-center lg:gap-32">
         {% image value.image max-756x598 as img %}
-        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
              class="h-[299px] w-full shrink-0 object-contain md:w-[378px]" loading="lazy">
         <div class="flex min-w-0 flex-1 flex-col gap-8">
-            <h2 class="font-heading text-3xl font-bold leading-[1.2] tracking-tight text-dark sm:text-4xl lg:text-64">
+            <h2 class="font-heading text-2xl leading-[1.2] tracking-tight text-dark sm:text-3xl lg:text-40">
                 {{ value.heading }}
             </h2>
             {% comment %}
             prose's own vertical rhythm is deliberately not used for the gap
             above the heading — the flex gap-8 above owns that 32px, per Figma.
             {% endcomment %}
-            <div class="prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl lg:text-2xl">
+            <div class="prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl">
                 {{ value.text|richtext }}
             </div>
         </div>

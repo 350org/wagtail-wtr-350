@@ -117,7 +117,8 @@ make watch                   # Watch mode, standalone (rebuilds CSS on change)
 `static_compiled/` is **gitignored** — build output is never committed. Run
 `make build` after cloning to generate it locally. In production, the Docker
 Stage 1 build generates it automatically. Font source files live in
-`static_src/fonts/` (upstream has none; forks add their own).
+`static_src/fonts/` (upstream has none; forks add their own). This fork
+self-hosts Klima from `static_src/fonts/klima/` — see rule #37.
 Static UI images (textures, illustrations, icons) live in `static_src/images/`
 and are copied verbatim to `static_compiled/images/` by `make build-images`
 (called automatically by `make build`).
@@ -125,6 +126,58 @@ and are copied verbatim to `static_compiled/images/` by `make build-images`
 JavaScript source lives in `static_src/javascript/` and is copied verbatim to
 `static_compiled/js/` during `make build`. JS uses ES module syntax and is loaded
 via `<script type="module">` in `base.html`. No bundler is needed.
+
+### Visual checks (Playwright)
+
+Playwright **is installed and works headless in this environment** — including
+inside agent sandboxes. Do not conclude it is unavailable: it is easy to miss
+because it is installed in *user* site-packages, not in `.venv`, and its
+Chromium is not on `PATH`.
+
+```bash
+python3 -c "import playwright; print(playwright.__file__)"  # ~/.local/lib/python3.14/...
+ls ~/.cache/ms-playwright                                    # chromium-*, ffmpeg-*
+```
+
+`which chromium` finds nothing and `.venv/bin/python -c "import playwright"`
+fails — neither means it is missing. Always use bare `python3`, never the venv
+interpreter, for Playwright scripts.
+
+Recipe for a screenshot of one component against its Figma node:
+
+```bash
+# 1. Serve on a port that won't collide with a dev server you already have up.
+source .venv/bin/activate && set -a && source .env && set +a
+python manage.py runserver 8021 --noreload &
+
+# 2. Shoot. Bare python3 — Playwright is not in the venv.
+python3 - <<'EOF'
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    b = p.chromium.launch()
+    pg = b.new_page(viewport={"width": 1512, "height": 889})
+    pg.goto("http://127.0.0.1:8021/", wait_until="networkidle", timeout=60000)
+    pg.wait_for_timeout(1500)                    # let fetched embeds settle
+    pg.locator(".wtr-hero").screenshot(path="/tmp/hero.png")
+    b.close()
+EOF
+```
+
+1512px wide is Figma's frame width, so a screenshot at that viewport can be
+compared to a Figma node render pixel-for-pixel. `locator(sel).screenshot()`
+clips to one component, which is far easier to compare than a full page.
+
+**Measure, don't eyeball, when a layout is off.** `page.evaluate()` over
+`getComputedStyle` + `getBoundingClientRect` gives exact widths, gaps and flex
+bases, and is the only practical way to debug the fetched ActionKit markup —
+whose real dimensions are knowable no other way, since the HTML comes from a
+third party at request time. A worked example: the hero signup row wrapped its
+submit button because the flex line measured 677.4px against a 677px column, a
+0.4px overflow that no amount of reading the template would have revealed, and
+which was invisible in the rendered HTML.
+
+Reviewing a Figma alignment change without a screenshot is not a review — the
+markup can be exactly right and the result still wrong.
 
 ### Docker
 
@@ -267,8 +320,25 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
        "link_text": str | None,      # CTA button label
        "link_page": Page | None,     # CTA internal page link
        "link_url": str | None,       # CTA external URL
+       "in_body": bool,              # True only for a mid-page HeroBlock (see below)
    }
    ```
+
+   **`in_body` picks the gutter, and only the gutter.** A page-level hero
+   keeps Figma's flat 16px wrapper; a mid-page `HeroBlock` takes the
+   `px-4 sm:px-6 lg:px-8` every other full-bleed body block uses, because
+   in the body it stacks with image/image_text/callout/card_grid and a
+   16px gutter against their 32px one reads as misalignment rather than as
+   a deliberate full-bleed. `HeroBlock.get_context()` is the only place
+   that sets it; `HeroMixin` pages leave it unset (falsy).
+
+   **`hero` and `quote` must both stay in the page templates' full-bleed
+   block-type list** (`content_page.html`, `home_page.html`,
+   `post_page.html`). Both own a `max-w-[1500px]` wrapper matching
+   `image_block.html`, and that cap is unreachable while the block is
+   still inside the shared `max-w-5xl` body column — a HeroBlock or
+   QuoteBlock dropped from that list silently renders 1024px wide next to
+   a 1500px image block, with no error to notice.
    For `HeroBlock`: `content` is a `RichTextBlock`, so `copy_is_block=False`.
    `video` is always `None` for HeroBlock (StreamField hero does not support video).
    For `HeroMixin` pages: `hero_copy` is a `RichTextField`, so
@@ -432,6 +502,26 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
   `{ "success": false, "errors": {...} }`. Handle network errors client-side.
 
 ## Testing
+
+**When to run the suite.** Don't re-run `python manage.py test wtrx
+wagtail_wtr` after every individual edit — it takes ~16s plus database
+setup, and most changes in this repo are templates and CSS that no test
+touches. Run it once as a final check before handing work back for review,
+and any time a change actually plausibly affects Python behaviour (models,
+blocks, migrations, template tags, views, settings). CI is the other
+backstop; a green local run at the end of a session is enough. For a
+targeted change, a single module (`python manage.py test
+wtrx.tests.test_blocks`) is a better mid-session check than the whole suite.
+
+Two practical notes for agents:
+
+- The dev server started with `--noreload` caches templates, so a template
+  edit is invisible to a running server. Restart it before screenshotting
+  or measuring, or the change appears to have had no effect.
+- Never `pkill -f "manage.py runserver"`. Other sessions — and the user's
+  own `make dev` — match that pattern too. Kill your own server by the PID
+  you captured when you started it, and use a port you picked yourself.
+  Concurrent test runs also collide on the single `test_wtr350` database.
 
 - Tests live in each app's `tests/` directory (e.g., `wtrx/tests/`).
 - Test paths use the `wtrx` prefix: `wtrx.tests.test_blocks`.
@@ -718,7 +808,11 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     for a standalone regional fork. The badge markup lives inside the logo
     anchor in `header.html` (`wtr-regional-label`) and needs no
     `transparent_header` variant — a solid `bg-primary-600` fill reads on both
-    light and dark hero backgrounds.
+    light and dark hero backgrounds. It is sized `h-10` to match
+    `.wtr-logo`'s own `h-10` exactly, so it stands the full height of the
+    logo beside it; that is a literal height rather than `self-stretch`,
+    because the lockup anchor is `items-center` and a stretched child would
+    size to whatever the tallest thing in the lockup happens to be.
 
 28. **Nav interaction states — navy hover, blue active underline**: Both come
     from Figma's nav (node 1:965) and are applied in
@@ -747,6 +841,17 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
       alias for it, so the CalloutBlock swatch and the nav can never drift.
       Use `navy` (`text-navy`, `bg-navy`); reach for `callout-navy` only in
       CalloutBlock's own styles.
+    - **The nav has its own resting weight, and it is not bold**: nav links
+      and the mobile panel's group labels render in Klima Medium (600) via
+      `nav_link_weight`, and the active item steps to Bold (700) as part of
+      `nav_active_link`. The two are mutually exclusive —
+      `{% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}` —
+      so a link never carries two `font-*` utilities from the same family and
+      there is no source-order collision to reason about. Plain Regular was
+      tried first and read too thin at `text-base` uppercase with 1px
+      tracking; Heavy on the active item shouts twice next to a 0.3em
+      underline. The submenu `<button>` carries `font-medium` directly,
+      because its active state lives on the inner `<span>` around the label.
     - **Active state is a `text-decoration`, not a border**: the
       `nav_active_link` string on `header.html`'s outer `{% with %}` —
       `underline decoration-primary-600 decoration-[0.3em]
@@ -831,12 +936,25 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     `import_350_press_releases`) is live with the field NULL. Anything ordering
     by it is then sorting mostly-NULL data — and PostgreSQL sorts NULLs
     **first** under `DESC`, so genuinely recent pages sink beneath every
-    imported one. `PageCardsBlock` ("3 most recently published") is the visible
-    casualty. Both importers now set it from the source publication date on
-    create, and fill it in on update only when it is missing (a page published
-    through the admin since the last import has a real value that must not be
-    clobbered). `python manage.py backfill_first_published` repairs content
-    imported before this was in place.
+    imported one. `PageCardsBlock` ("3 most recently published") was the
+    visible casualty. Both importers now set it from the source publication
+    date on create, and fill it in on update only when it is missing (a page
+    published through the admin since the last import has a real value that
+    must not be clobbered). `python manage.py backfill_first_published`
+    repairs content imported before this was in place.
+
+    **A listing's order comes from the index page, not from the block.**
+    `PageCardsBlock.get_context()` calls `get_listing_queryset()` on the
+    chosen index page when it defines one — `Blogs` does, ordering by the
+    editor-controlled `published_at`, the same date the cards display and
+    the same order `blogs_page.html` paginates. So a "Latest updates" row
+    and the index it links to can never disagree about which posts are
+    newest, and posts are ordered by the date an editor set rather than by
+    when a script happened to create them. A generic `IndexPage` has no
+    such method and may mix child page types, so it still falls back to
+    `first_published_at` — every `Page` has it, which keeps that case one
+    query. Give any future listing page type its own
+    `get_listing_queryset()` rather than teaching the block about it.
 
 33. **`WTRX_GOOGLE_SSO_ONLY` hides the login form, it doesn't disable password
     auth**: Setting this env var to hide the username/password fields (see
@@ -851,6 +969,429 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     regardless of the env var — never let a site end up with the password
     form hidden and Google not actually configured, which would lock
     everyone out.
+
+34. **The non-hero type scale sits one notch below Figma — don't "fix" it
+    back**: Figma's type scale was matched 1:1 during the alignment pass and
+    read visibly too large in the browser, especially against body copy that
+    was still at Tailwind's 16px default. Body paragraph text is now **20px**
+    (`text-lg sm:text-xl` on every prose container, `sm:` and up), and every
+    heading step outside the hero came down one notch to sit correctly
+    against it:
+
+    | Role | Figma / before | Now (`lg:`) |
+    |---|---|---|
+    | H2 display (CardGrid, CardCarousel, PageCards, ImageCardList, related posts) | 96 `text-8xl` | 48 `text-5xl` |
+    | H2 section (Callout, ImageText, DonateFundraiseUp, SignupActionKit) | 64 `text-64` | 40 `text-40` |
+    | H2 feature panel | 48 `text-5xl` | 36 `text-36` |
+    | H2 minor (signup/donate block headings) | 30 `text-3xl` | 28 `text-28` |
+    | Card `h3` (card, post card, person card, image card list) | 18–24 | 24 `text-2xl` |
+    | Rich text `h2` / `h3` / `h4` (`.wtr-text-block`, main.css) | 64 / 40 / — | 40 / 24 / 20 |
+    | Lead copy (PageCards, related posts) | 36 `text-36` | 20 `text-xl` |
+    | Block description copy (Callout, SignupActionKit, DonateFundraiseUp, ImageText, CardCarousel) | 24 `text-2xl` | 20 `text-xl` |
+    | Body paragraph | 16 (inherited) | 20 `text-xl` |
+    | CalloutBlock body copy | 16 (inherited) | 24 `lg:text-2xl` |
+
+    **CalloutBlock's body copy is the one paragraph that stays at 24px**
+    (`text-lg leading-[1.35] sm:text-xl lg:text-2xl`). It was dropped to the
+    20px body size with everything else and then put back deliberately: a
+    callout is a short pull-quote-ish interruption in the page, not running
+    text, and at 20px it stopped reading as emphasis against the body copy
+    around it. Its `h3` subheading is also 24px, so heading and copy match on
+    size there — the hierarchy is carried by weight instead (Bold 700 vs
+    Regular), which is enough at that length. Do not "fix" the copy back down
+    to `text-xl` for consistency with the other blocks.
+
+    The block-description row is a later correction to this same pass:
+    those three blocks kept a 24px `lg:text-2xl` lead-copy size while
+    every other block's supporting paragraph (SignupLink, SignupActionNetwork,
+    SignupWagtailForms, Donate) was already at the 20px body size, so the
+    same kind of copy rendered at two different sizes depending on which
+    block an editor reached for. Every block's supporting paragraph now
+    matches `.wtr-text-block`'s, and so does the PageCards / related-posts
+    lead (those two share one treatment and were moved together — changing
+    only one would have split a pair the design draws identically).
+
+    **What is deliberately still above 20px, and must stay there:** hero
+    copy (`.wtr-hero-copy`, 28px on the banner and `lg:text-32` on the
+    full variant — the hero is excluded from this whole rescale, see
+    above), the quote highlight (`.wtr-quote-highlight`, 48px with its own
+    `clamp()` in main.css), and the eyebrow pills on SignupActionKit and
+    FeaturePanel (24px, Figma's pill size — these are `<p>` elements but
+    they are labels, not copy). A sweep for "paragraphs over 20px" will
+    surface all four; none of them is a bug.
+    | Utility H1 (404, search, no-CMS-access) | 36 / 30 | 32 `text-32` |
+
+    **Only the home page hero keeps Figma's original display size** —
+    `text-4xl sm:text-5xl lg:text-8xl` (96px) on the `full` variant, which
+    `HomePage` alone uses (`HeroMixin.hero_variant` is `banner` for every
+    other page type). The `banner` hero headline every other page gets is
+    **48px** (`lg:text-5xl`), down from Figma's 64px, with Post's compact
+    variant smaller still at `lg:text-40`; hero copy is `lg:text-28` at
+    1.25 leading (`leading-[1.25]` sits on the copy container, not the
+    paragraphs — Typography puts its 1.75 line-height on the `.prose` root,
+    so a utility on that same element ties on specificity and wins on
+    source order). That
+    leaves `--text-64` with no callers at all — it stays defined as a scale
+    step but nothing should reach for it. Do not "restore Figma fidelity"
+    on the rest of the ramp without re-checking it against the 20px body.
+
+    Because `text-8xl` was shared between the hero and the blocks, this
+    rescale had to be done as per-template class edits, not by redefining
+    `--text-*` tokens in `theme.css` — a token change would have dragged
+    the home page hero down with everything else.
+
+    **Card rows share one width and one fill**: `CardGridBlock` and
+    `PageCardsBlock` both render `max-w-[1218px]` (Figma's card row) inside
+    a `w-full px-4 sm:px-6 lg:px-8` outer, and both are special-cased out of
+    the page templates' shared body column — they are the same thing
+    visually, so their card edges have to line up when one sits above the
+    other. `CardGridBlock` used to inherit the body column and render three
+    cards across 800px. The cap must be the only max-w/padding pair on its
+    element; stacking it inside another gutter subtracts from 1218.
+
+    `components/card.html` and `components/post_card.html` are two card
+    *shapes* (the "Areas of work" card and the arrow card) but one family:
+    both fill `bg-neutral-50`. `post_card.html` was `bg-light` (white),
+    which made a Blogs index or a PageCardsBlock read as a different
+    component rather than a different layout of the same one. Its 2px
+    border stays — that is shape, not fill.
+
+    **Every `h3` on the site is one step, and that step is 24px**
+    (`text-2xl`) — flat, with no `lg:` bump. `card.html`,
+    `post_card.html`, `person_card.html`, `image_card_list_block.html` and
+    `CalloutBlock`'s `subheading` all carry `text-2xl` in the template;
+    rich-text `h3` gets it from `.wtr-text-block h3` in `main.css`, legacy
+    imported markup from `.title4`, and every other prose container — the
+    accordion answer is the one that matters — from the unscoped
+    `.prose h3` rule beside it. These previously disagreed four ways: 24px
+    stepping to 28px at `lg:` on cards and rich text, a flat 20px on the
+    callout subheading, and an em-derived 25px inside accordion answers,
+    because that panel is a plain `.prose` container carrying no
+    `.wtr-text-block`. Do not reintroduce a per-block card-heading size or
+    a responsive bump.
+
+    `.prose h3` is deliberately unscoped: any rich-text container is a
+    content context and its headings belong on the content ramp. The one
+    `h3` that stays off the step is the footer's column labels (`text-sm`
+    uppercase) — that is interface chrome, not content, and it is never
+    inside `.prose`, so the rule cannot reach it.
+
+    The carousel's own former override is gone:
+    `.wtr-card-carousel-track .wtr-card h3` sets `line-height` only,
+    because the shared template already carries the size. It used to set
+    32px — the one place a card heading disagreed with every other card.
+
+    **Legacy imported markup**: content brought over from the old site marks
+    sub-headings as `<p class="intro title4">` instead of a real `h3`. The
+    unscoped `.title4` rule in `main.css` maps that onto the same step as a
+    rich-text `h3` (24px). It cannot be scoped under
+    `.wtr-text-block` — the legacy markup arrives in `raw_html` blocks,
+    which render outside it.
+
+    **Inter-block spacing follows the same split**: the body-block loop is
+    `space-y-24` (96px) on `content_page.html`, `post_page.html` and
+    `index_page.html`, and stays `space-y-32` (128px) on `home_page.html`
+    alone. Those three also share one **800px body column**
+    (`max-w-[800px]`, was `max-w-5xl`/1024px on content and index pages) —
+    Figma's Post body measure, now used by every document-style page;
+    `home_page.html` keeps `max-w-5xl`.
+
+    `CardCarouselBlock` is the one block that corrects against that loop:
+    it ends in a 60px arrow row (44px buttons plus `mt-4`) that is chrome
+    rather than content, so the loop's gap started below the arrows and the
+    space under the last card measured 156px against every neighbour's 96px.
+    A `-mb-8` on the **arrow row** shortens the block's own box and lets the
+    buttons overhang it, landing the gap at 124px. It must not go on the
+    block root: Tailwind v4 applies the loop's spacing as `margin-block-end`
+    on that root through a zero-specificity `:where()` selector, so a root
+    `-mb-8` *replaces* the gap rather than reducing it (96px becomes -32px,
+    dropping the next block on top of the arrows) — and a hardcoded
+    positive value there would break on the home page's larger
+    `space-y-32`. Block templates carry horizontal gutters only and no vertical
+    padding, so that loop is the single source of the gap — `SectionBlock`'s
+    own `padding` field is internal breathing room and stacks on top of it
+    rather than replacing it.
+
+    `text-sm` (14px) chrome — nav links, footer links, form labels,
+    pagination, pills, captions — was **not** touched. It is nearly all
+    interface, not content, and scaling it up would have enlarged the header
+    and footer, which is the opposite of what this pass was for.
+
+35. **One background palette, shared by every block that has one**:
+    `BACKGROUND_COLOR_CHOICES` in `wtrx/blocks/__init__.py` is the only
+    background list. `SectionBlock`, `CalloutBlock`, `FeaturePanelBlock`,
+    `HeroBlock`/`HeroMixin`'s banner and `SignupActionKitBlock` all draw from
+    it; a new block with a background field reuses it rather than declaring a
+    sixth. The field *name* still varies per block (`background`, `color`,
+    `banner_color`) — only the choices are shared.
+    - The fills live in **one** CSS class set, `.wtr-bg-{color}` in
+      `main.css`, plus `.wtr-bg-fade-{color}` for the hero banner's
+      panel→media gradient. These were three parallel sets
+      (`.wtr-callout-*`, `.wtr-hero-banner-*`, `.wtr-signup-bg-*`) defining
+      the same fills against the same tokens, with `signup` spelling dark
+      grey `dark` where the others said `dark-grey`. Do not re-split them
+      per component — a shared palette living in three files is a palette
+      that drifts.
+    - **Never interpolate a stored background value straight into a class
+      name.** Templates go through the `background_key` filter
+      (`wtr-bg-{{ value.background|background_key }}`), which runs
+      `resolve_background()`. That maps the pre-palette keys in
+      `LEGACY_BACKGROUND_VALUES` (`light`→`white`, `dark`→`dark-grey`,
+      `muted`→`light-grey`, `primary`→`blue-gradient`, `secondary`→`navy`)
+      and falls back to `white` for anything unrecognised — an unmapped key
+      would emit a `.wtr-bg-<junk>` class matching no rule, leaving a
+      transparent panel with light text on it.
+    - Migration `0040_unify_block_background_values` rewrote the legacy keys
+      on live pages **and on their revisions**, but `resolve_background()` is
+      not a one-shot fixup to delete afterwards: Wagtail stores every
+      revision as its own JSON blob and reverting to one republishes that
+      JSON verbatim, so a legacy key can reappear at any time.
+    - **Light vs dark text is `background_is_light`, not a colour check.**
+      `LIGHT_BACKGROUND_COLORS` is `{white, light-grey}` — the two fills
+      needing dark text, a dark-outline button and an inverted eyebrow pill.
+      Each template asks once, holds the answer in `on_light` via
+      `{% with %}`, and branches on that. Do not write
+      `{% if value.background == 'light-grey' %}` — adding a light fill to
+      the palette would then mean hunting the check down in five templates.
+      The one deliberate exception is `signup_actionkit_block.html`'s eyebrow
+      pill, which tests `bg == 'dark-grey'` specifically: that is not a
+      light/dark question but a collision with the pill's own
+      `--color-dark` background.
+    - `SectionBlock` renders the fill as an inset rounded panel — not
+      full-bleed — and publishes both `data-bg` (the resolved colour) and
+      `data-bg-tone` (`light`/`dark`) on the `<section>`. Its outer wrapper
+      is `max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8` with `rounded-lg` on
+      the `<section>` itself, deliberately the same container and radius
+      `image_block.html` uses (which in turn matches the nav's own container
+      in `header.html`), so a section's coloured edge lines up with an
+      ImageBlock's photo edge. Changing one of those three means changing
+      all three. Child blocks that need to invert use the tone —
+      `text_block.html`'s `in-data-[bg-tone=dark]:prose-invert` — so adding
+      a dark colour to the palette does not mean adding a fourth
+      `in-data-[bg=...]` variant to every child.
+    - `FeaturePanelBlock` treats `white` specially: it renders
+      `bg-neutral-50` with a `border-neutral-200` outline rather than
+      `.wtr-bg-white`, because a white panel on a white page only reads as a
+      panel because of that outline. Every other fill is its own shape and
+      takes none.
+
+36. **`--color-secondary-*` is navy, and `-600` *is* `--color-navy`**: the
+    secondary ramp was a violet inherited from the WTR starter palette,
+    which put a purple `wtr-btn-secondary` on a site with no purple in it.
+    It is now the brand navy — and `--color-secondary-600` is written as
+    `var(--color-navy)` rather than a copy of `#024582`, so the secondary
+    button, the nav's hover/active state (pitfall #28) and the CalloutBlock
+    navy swatch cannot drift apart. The rest of the ramp walks that same
+    hue (208.6°) up and down in lightness, which means its light end
+    (300/400) reads close to the primary ramp. That is expected: secondary
+    is used at 600/700 and is a darker sibling of the primary blue, not a
+    second accent. The named theme presets (`[data-theme="grassroots"]`
+    etc.) keep their own secondary ramps and were not touched.
+
+37. **Klima is self-hosted from `static_src/fonts/klima/`, not CloudFront**:
+    the two `@font-face` blocks at the top of `theme.css` used to point at
+    350.org's CloudFront bucket (`dbqvwi2zcv14h.cloudfront.net`), which made
+    the site's core typeface a third-party runtime dependency the app could
+    not fix if it moved or went away. The files now ship in the repo and the
+    `src` url()s are **relative** (`../fonts/klima/…`), resolved from the
+    compiled stylesheet at `static_compiled/css/main.css`.
+    - The relative form is load-bearing in production. `production.py` uses
+      `CompressedManifestStaticFilesStorage`, which rewrites relative url()s
+      inside CSS to the hashed filenames at `collectstatic` time and **hard-
+      errors on a reference it cannot resolve**. An absolute `/static/…` path
+      would be left un-rewritten and would 404 against the hashed files; a
+      `{% static %}` tag is not an option because `theme.css` is a plain CSS
+      file processed by the Tailwind CLI, not a Django template.
+    - The font is therefore only present after `make build-fonts` (part of
+      `make build`) has copied `static_src/fonts/` into the gitignored
+      `static_compiled/fonts/`. A `collectstatic` on a tree that was never
+      built fails at the `@font-face` line, not with a missing-font warning.
+    - **Four faces, and the weight scale is a design rule, not a default.**
+
+      | Weight | Face | Reached by |
+      |---|---|---|
+      | 500 | Regular | body copy (inherited 400 font-matches up to it) |
+      | 600 | Medium  | `font-medium` — nav, pagination, small UI |
+      | 700 | Bold    | `font-semibold`, `font-bold`, h3–h6, `<strong>`/`<b>` |
+      | 800 | Heavy   | h1 and h2 — nothing else |
+
+      Three of those mappings are **remapped tokens in `@theme`** and will
+      surprise anyone who assumes Tailwind's defaults: `font-medium` is 600
+      (not 500), and `font-semibold` and `font-bold` **both** mean 700, so
+      there is no utility that reaches Heavy. `font-heavy` exists (from
+      `--font-weight-heavy`) but nothing uses it — h1/h2 get Heavy from an
+      element rule instead, see the next bullet.
+
+      The upstream Klima kit also ships ultralight/light/ultra and a full
+      italic set; adding one means copying the file into
+      `static_src/fonts/klima/` *and* adding an `@font-face`. Until an italic
+      face is added, `<em>` in rich text is a synthesised oblique.
+    - **Heading weights come from bare element rules in `main.css`**
+      (`h1, h2` → Heavy; `h3, h4, h5, h6` → Bold), and those rules **beat
+      Tailwind utilities** — not on specificity (`h2` is 0,0,1 and
+      `.font-bold` is 0,1,0, so the utility should win) but because
+      `main.css` is unlayered while utilities live in `@layer utilities`, and
+      unlayered normal declarations beat layered ones outright. Consequences:
+      - Putting any weight utility on a heading **silently does nothing**.
+        That is why no template carries one on an h1/h2 any more — they were
+        lies. To make a heading an exception, add an unlayered rule in
+        `main.css`; a utility in the template will not work.
+      - The element rules are what keep **rich text** headings in step with
+        headings typed into a block's heading field. Tailwind Typography
+        hardcodes `prose` heading weights (h1 800, h2 700, h3/h4 600) rather
+        than reading `--font-weight-*`, so without them an editor's `h2`
+        renders a step lighter than the identical heading in a heading field,
+        and h3/h4 land on **Medium** now that a 600 face exists.
+      - `strong` is deliberately *not* pinned. Preflight styles `b, strong`
+        as `font-weight: bolder`, which per CSS Fonts 4 computes to exactly
+        700 off a 500 parent, so emphasis in running text lands on Bold by
+        itself. Adding a 600 face made Typography's `prose strong: 600` an
+        exact match for Medium — it is only the `bolder` rule that keeps
+        emphasis on Bold, so check this before touching either.
+      - Adding a face changes what existing weights resolve to. Every
+        hardcoded numeric weight in Typography (and any `font-weight: 600` in
+        third-party CSS) re-matches against the new set, which is how
+        installing Medium silently moved rich-text h3/h4. Re-measure the
+        scale in the browser after adding one; `getComputedStyle` reports the
+        *requested* weight, so confirm which face actually loaded via
+        `document.fonts`.
+    - `woff2` + `woff` only. `eot`/`svg` from the vendor kit are dead weight
+      (IE<11, iOS<4.2) and `ttf` is ~2.3x the size of `woff` for no added
+      reach. `font-display: swap` is set so a slow font fetch shows fallback
+      text rather than blank headings.
+
+38. **Alt text is Wagtail's `Rendition.alt`, not `image.title`**: Wagtail's
+    `title` is pre-filled from the uploaded filename, so `alt="{{
+    value.image.title }}"` published `dsc_0042.jpg` to a screen reader even
+    when an editor had written a real description. Every content `<img>` now
+    reads the **rendition's** `alt` — `{% image value.image ... as img %}`
+    then `alt="{{ img.alt }}"` — which is Wagtail's own chain: contextual alt
+    text (ImageBlock only) → `default_alt_text` (description, falling back to
+    title). Note `alt` lives on the *rendition*, not the image: `{{
+    some_image.alt }}` silently renders empty, and so did the old
+    `og:image:alt` (`meta_img` there is the `Image`, not `og_img`).
+    - **A filename still showing up in alt means that image has no
+      description — it is a content fix, not a template bug.** Wagtail's
+      title fallback is deliberately kept as-is. A filter that detects a
+      filename-derived title (compare it to the stored file's stem) and
+      suppresses it was built and then removed on request: the templates
+      follow stock Wagtail behaviour, and the answer for a bare-filename alt
+      is to fill in the image's description in
+      `/admin/images/<id>/` — where wagtail-ai's wand button can generate one
+      (pitfall #11).
+    - `ImageBlock.alt_text` still wins when set (`{{ value.alt_text|default:img.alt }}`).
+    - Where an `<img>` has a meaningful non-image fallback — the person
+      card's name, the header/footer logo's site name — the template asks for
+      `description` explicitly and keeps that fallback:
+      `{{ logo_img.image.description|default:current_site.site_name }}`. Do
+      not "simplify" those to `img.alt`; it would put the filename ahead of
+      the person's name.
+    - The hero's photo is decorative (`alt="" role="presentation"`) **only
+      while it has no description**. Writing one promotes it to content and
+      drops `role="presentation"` — an element cannot be both presentational
+      and carry alt text. Genuinely decorative art (the callout's background
+      wash, the card icon) stays `alt=""` unconditionally.
+    - `wtrx/tests/test_image_alt.py` pins all of this; a new image-rendering
+      template belongs in that test.
+
+39. **Tailwind scans every file in the tree — including harvested
+    third-party markup**: Tailwind v4 auto-detects sources across the whole
+    project and reads them as plain text, so any file containing a string
+    that spells a utility causes that utility to be **generated**. That is
+    normally what you want. It stops being what you want when the file holds
+    somebody else's HTML.
+    - `wtrx/previews/block_previews.json` is harvested from real page content
+      by `manage.py harvest_block_previews` (pitfall #30), and for
+      `SignupActionKitBlock` what it captures includes `form_html` — markup
+      fetched from ActionKit, carrying ActionKit's class names. AK puts
+      `text-black` on `<form id="action-form">` and on `#unknown_user`.
+      Scanning the JSON emitted a real `.text-black { color:
+      var(--color-black) }` into our bundle, and the *live* fetched form
+      carries the same class — so every otherwise-unstyled string inside it
+      ("Sign the petition now:", the co-host paragraph, opt-in checkbox
+      labels, consent radio labels, validation messages) rendered pure black
+      on every panel fill, including the near-black dark grey one. Most
+      visible on `/canada`, whose petition form has the fullest chrome.
+    - `main.css` now carries `@source not
+      '../../wtrx/previews/block_previews.json';`. Excluding it removed
+      exactly one utility (`.text-black`) and nothing else: block previews
+      render through the real templates, which Tailwind scans directly, so
+      the JSON never legitimately contributes a class name. **Re-harvesting
+      previews cannot reintroduce the bug, but a new harvest of a different
+      block could put different foreign markup somewhere else** — the rule to
+      keep is that scraped or fetched third-party HTML must never sit in
+      Tailwind's source path.
+    - The second half of the defence is in CSS:
+      `.wtr-actionkit-embed #action-form` (and `.user-form` / `#unknown_user`)
+      set `color: inherit`. Both AK embed variants colour their own wrapper
+      and expect the fetched form to inherit it, which is what makes one
+      `.wtr-ak-on-{tone}` swap re-colour all of AK's loose text at once —
+      but `#action-form` sits between wrapper and text, so a single colliding
+      class on it breaks that chain for everything inside. The id
+      out-specifies any one-class utility, so this holds even if another AK
+      class name collides later.
+    - **Symptom to recognise:** text inside a fetched third-party embed that
+      ignores the wrapper's `color` and computes to something no rule in this
+      repo sets. `CSS.getMatchedStylesForNode` over CDP names the rule
+      immediately; walking `document.styleSheets` in page JS does not, since
+      Tailwind's output nests utilities inside `@layer`.
+
+40. **The AK signup panel's chrome has to be checked in every *state*, not
+    just on every fill**: the six `BACKGROUND_COLOR_CHOICES` fills are only
+    half the matrix. The short two-field form on the home page renders
+    correctly on all six while the full petition form on `/canada` does not,
+    because the failures live in chrome the short form never shows.
+    - `SignupActionKitBlock.PANEL_TONES` maps a fill to a
+      `.wtr-ak-on-{tone}` modifier; navy and red are deliberately absent and
+      take the default chrome. **White and light grey take different tones
+      (`on-white` / `on-light`) even though both invert the panel text**,
+      because the field boxes must move in opposite directions: on light grey
+      they lift from `neutral-50` to white to stay a distinct surface, and on
+      white that same lift dissolves them into the panel. Collapsing them
+      back to one tone is a regression `test_white_and_light_grey_take_different_tones`
+      exists to catch.
+    - The tone class rides on the **thank-you box** as well as the embed
+      wrapper (`_actionkit_form.html`), because that box replaces the form on
+      success and its `bg-dark` *is* the dark grey panel — without it a
+      successful signup on that fill swaps the form for something invisible.
+      It is gated on `stacked`: the hero's compact rendering sits on the
+      hero's own scrim, which the block's `background` field does not control.
+    - Validation errors are styled **differently in the two variants on
+      purpose**. Stacked keeps AK's `<ul class="ak-err">` in flow inside the
+      light field box, which makes it fill-independent — one dark red reads
+      against all six panels because the box is the form's own light surface.
+      Inline (hero) cannot: it is a single row, so an in-flow message
+      quadruples one cell's height, and it sits on the dark hero scrim, so it
+      needs a light red. See pitfall #41.
+    - Contrast-audit the panel by walking every leaf node in `#action-form`
+      and comparing computed `color` against the nearest opaque ancestor
+      background. What that leaves is white-on-red (3.74:1) and
+      white-on-primary (3.94:1) — the palette's own inherent ratios, shared
+      with the panel heading beside them, not AK-specific bugs. Do not
+      "fix" the form's text on those fills alone; it would then disagree with
+      the copy column it sits next to.
+
+41. **ActionKit clears a validation error by emptying the `<ul>`, not
+    removing it**: when the visitor corrects a field and resubmits, AK leaves
+    `<ul class="ak-err">` in the DOM with `style="display: none"` and empty
+    text, and only drops the `.ak-error` class from that field's `<label>`
+    and `<input>`. So the error-state hook must be `:has(.ak-error)`, never
+    `:has(> ul.ak-err)` — the latter leaves the red border (and, in the
+    inline variant, the reserved space beneath the field) stuck on a field
+    that is no longer in error. Both variants in `main.css` key off
+    `.ak-error` for this reason.
+    - AK also reports **one field at a time**: submitting with two fields
+      invalid still renders a single `ul.ak-err`, under the first failure.
+      That is what lets the inline variant's out-of-flow message span the
+      full form width without risking a collision with a second one.
+    - The inline variant reserves space for its out-of-flow message with a
+      fixed `margin-bottom` on the erroring field. That number is sized to
+      AK's stock two-line message; CSS cannot reserve "however tall the
+      out-of-flow element turned out to be". A three-line message — a
+      wordier form, or a translation — would eat the clearance above the
+      privacy notice, and the fix then is to move the `<ul>` into a real
+      full-width flex line with JS, not a bigger number. It cannot be
+      reordered from CSS: it is nested two levels inside the field wrapper.
 
 ## Git Conventions
 

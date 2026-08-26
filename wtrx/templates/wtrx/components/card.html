@@ -9,12 +9,12 @@ cards' body copy is sized larger per Figma's "Our work in action" cards.
     {% if card.image %}
         {% image card.image fill-640x360 as img %}
         <div class="aspect-video overflow-hidden">
-            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ card.image.title }}" class="h-full w-full object-cover" loading="lazy">
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}" class="h-full w-full object-cover" loading="lazy">
         </div>
     {% endif %}
     <div class="flex flex-1 flex-col p-5">
         {% if card.tag %}
-            <span class="mb-2 inline-block w-fit rounded-full bg-neutral-200 px-3 py-1 font-heading text-xs font-semibold text-dark">
+            <span class="mb-2 inline-block w-fit rounded-full bg-neutral-200 px-3 py-1 font-heading text-sm font-semibold text-dark">
                 {{ card.tag }}
             </span>
         {% endif %}

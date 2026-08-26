@@ -33,7 +33,7 @@
         {% if value.image %}
             <div class="relative">
                 {% image value.image fill-1200x1200 as img %}
-                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}"
+                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
                      class="h-64 w-full object-cover md:h-full" loading="lazy">
                 {% if value.image_caption %}
                     <div class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
@@ -45,10 +45,10 @@
         <div class="flex flex-col items-center justify-center bg-dark px-6 py-12 text-light sm:px-10 sm:py-16">
             <div class="w-full max-w-lg">
                 {% if value.heading %}
-                    <h2 class="font-heading text-3xl font-bold sm:text-4xl lg:text-64">{{ value.heading }}</h2>
+                    <h2 class="font-heading text-2xl sm:text-3xl lg:text-40">{{ value.heading }}</h2>
                 {% endif %}
                 {% if value.description %}
-                    <div class="prose prose-invert mt-4 max-w-none text-lg sm:text-xl lg:text-2xl">
+                    <div class="prose prose-invert mt-4 max-w-none text-lg sm:text-xl">
                         {{ value.description|richtext }}
                     </div>
                 {% endif %}

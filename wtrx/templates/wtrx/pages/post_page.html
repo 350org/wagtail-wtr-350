@@ -16,9 +16,9 @@ Body column is 800px (not the usual max-w-5xl 1024px every other page
 uses) per Figma's Post body text frame width.
 {% endcomment %}
 {% block content %}
-<div class="space-y-32">
+<div class="space-y-24">
 {% for block in page.body %}
-    {% if block.block_type == "section" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "image" or block.block_type == "page_cards" %}
+    {% if block.block_type == "section" or block.block_type == "card_grid" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "image" or block.block_type == "hero" or block.block_type == "quote" or block.block_type == "page_cards" %}
         {% include_block block %}
     {% else %}
         <div class="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8">
@@ -41,11 +41,11 @@ Post.get_context() and Blogs.post_label / Blogs.get_related_intro().
     <div class="mx-auto max-w-[1346px]">
         <div class="wtr-related-posts flex flex-col items-center gap-8 rounded-2xl bg-dark px-8 py-12 text-center sm:px-16 sm:py-16">
             <div class="mx-auto flex max-w-3xl flex-col items-center gap-[21px]">
-                <h2 class="font-heading text-4xl font-bold tracking-tight text-light sm:text-5xl lg:text-8xl">
+                <h2 class="font-heading text-3xl tracking-tight text-light sm:text-4xl lg:text-5xl">
                     {{ related_heading }}
                 </h2>
                 {% if related_intro %}
-                    <p class="max-w-[628px] text-lg text-light sm:text-xl lg:text-36">
+                    <p class="max-w-[628px] text-lg text-light sm:text-xl">
                         {{ related_intro }}
                     </p>
                 {% endif %}

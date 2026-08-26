@@ -1,9 +1,9 @@
 {% load i18n wagtailcore_tags %}
 <div class="wtr-signup rounded-lg bg-neutral-50 px-6 py-10 text-center"{% if value.anchor_id %} id="{{ value.anchor_id }}"{% endif %}>
     <div class="mx-auto max-w-2xl">
-        {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-dark md:text-3xl">{{ value.heading }}</h2>{% endif %}
+        {% if value.heading %}<h2 class="font-heading text-2xl text-dark md:text-28">{{ value.heading }}</h2>{% endif %}
         {% if value.description %}
-            <div class="prose prose-neutral mt-4 max-w-none">
+            <div class="prose prose-neutral mt-4 max-w-none text-lg sm:text-xl">
                 {{ value.description|richtext }}
             </div>
         {% endif %}

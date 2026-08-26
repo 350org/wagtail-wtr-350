@@ -6,6 +6,7 @@ from django.utils.html import _json_script_escapes, format_html
 from django.utils.safestring import mark_safe
 from wagtail.models import Site
 
+from wtrx.blocks import background_is_light as _background_is_light, resolve_background
 from wtrx.site_settings import (
     SOCIAL_PLATFORM_CHOICES,
     BrandingSEOSettings,
@@ -31,6 +32,44 @@ register = template.Library()
 #   settings.wtrx.BrandingSEOSettings.site_description
 #
 # Add project-specific template tags below.
+
+
+# ---------------------------------------------------------------------------
+# Background palette helpers
+# ---------------------------------------------------------------------------
+
+
+@register.filter
+def background_key(value):
+    """
+    Normalise a stored background value to its canonical palette key.
+
+    Every block with a background choice draws its fill from one shared
+    palette (BACKGROUND_COLOR_CHOICES) and renders it as a
+    `.wtr-bg-{key}` class. Content saved before the palette was unified —
+    and any page revision reverted to from before it — can still hold a
+    per-block legacy key ("light", "dark", "muted", ...), so the class name
+    is always built through this filter rather than interpolating the raw
+    value:
+
+        <div class="wtr-bg-{{ value.background|background_key }}">
+    """
+    return resolve_background(value)
+
+
+@register.filter
+def background_is_light(value):
+    """
+    True when a background needs dark text, a dark-outline button and an
+    inverted eyebrow pill instead of the light-on-color default.
+
+    Templates branch on this rather than testing colour keys inline, so
+    adding a light fill to the palette does not mean hunting down a
+    scattered `== 'light-grey'` check across five block templates:
+
+        {% if value.background|background_is_light %}text-dark{% else %}text-light{% endif %}
+    """
+    return _background_is_light(value)
 
 
 # ---------------------------------------------------------------------------
