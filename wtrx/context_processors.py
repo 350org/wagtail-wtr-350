@@ -8,8 +8,11 @@ def usercentrics(request):
     Expose the Usercentrics consent-management config to every template.
 
     ``usercentrics_settings_id`` empty → the consent snippet is not rendered
-    (used to disable it in local development). See wtrx/templates/wtrx/includes/
-    usercentrics_head.html.
+    (used to disable it in local development). ``usercentrics_country`` is a
+    manual override for local/QA testing of a specific country — when blank
+    (the production default), usercentrics_head.html instead resolves the
+    visitor's real country client-side via Cloudflare's /cdn-cgi/trace edge
+    endpoint. See wtrx/templates/wtrx/includes/usercentrics_head.html.
     """
     return {
         "usercentrics_settings_id": getattr(

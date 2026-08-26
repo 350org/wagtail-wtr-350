@@ -21,9 +21,10 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 WAGTAILADMIN_BASE_URL = "http://localhost:8000"
 
-# Disable Usercentrics locally — the country injection relies on a Cloudflare
-# Worker that isn't in front of the dev server, and we don't want the external
-# CDN script loading during local development.
+# Disable Usercentrics locally — /cdn-cgi/trace isn't served outside of
+# Cloudflare's edge, so there's no reliable country signal on the dev server,
+# and we don't want the external CDN script loading during local development
+# anyway.
 WTRX_USERCENTRICS_SETTINGS_ID = ""
 
 # Disable 2FA enforcement locally so developers aren't forced into TOTP
