@@ -1,0 +1,30 @@
+{% load i18n %}
+{% comment %}
+`rows` (from PersonCardGridBlock.get_context) is a list of lists of people,
+each sized 2 or 3 — never 1 — computed by _person_grid_rows() in
+wtrx/blocks/__init__.py. Each row is its own flex container so a partial
+row (e.g. 2 people) centers via justify-center, which CSS Grid does not do
+for a trailing partial row without extra work — see CardGridBlock for the
+grid-based approach this deliberately departs from.
+
+Full-bleed width: same w-full-outer / max-w-inner two-tier pattern as
+card_grid_block.html.
+{% endcomment %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-[1218px]">
+        {% if value.heading %}
+            <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+        {% endif %}
+        <div class="wtr-person-card-grid flex flex-col gap-8">
+            {% for row in rows %}
+                <div class="flex flex-col gap-8 sm:flex-row sm:justify-center">
+                    {% for person in row %}
+                        <div class="w-full sm:max-w-[360px] sm:flex-1">
+                            {% include "wtrx/components/person_card.html" with person=person %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>

@@ -1,9 +1,14 @@
 {% load i18n %}
 {% comment %}
-Exactly 4 cards get a 2-col grid at lg+ (a balanced 2x2, matching Figma's
-"Areas of work") instead of the usual 3-col — 4 cards in 3 columns leaves
-an unbalanced trailing row of 1. Any other card count keeps the default
-3-col.
+`rows` (from CardGridBlock.get_context) is a list of lists of cards, each
+sized via _balanced_rows() (wtrx/blocks/__init__.py, max_per_row=3) — never
+a lone card on its own row, for any card count. Flexbox with
+justify-center, not CSS Grid: each row is its own flex container, so a
+partial row (e.g. 2 cards) centers naturally, matching the same
+dynamic-centering technique PersonCardGridBlock/ImageGridBlock/
+LogoGridBlock use. md:, not sm:, is the row-split breakpoint — cards carry
+more content (image, heading, description, tag, link) than a person card
+or a logo, so they need more room before splitting into multiple columns.
 
 Heading size/alignment matches the same left-aligned display-heading
 convention as CardCarouselBlock/ImageCardListBlock's own section headings
@@ -18,8 +23,7 @@ column, and owns the same w-full-outer / max-w-inner pair PageCardsBlock
 uses — max-w-[1218px], Figma's card row width. The two blocks are the
 same thing visually (a row of cards under a display heading), so a
 CardGridBlock sitting above or below a PageCardsBlock has to line its
-card edges up with it. Before this it inherited the shared body column
-and rendered a 3-across grid inside 800px.
+card edges up with it.
 
 As in page_cards_block.html, the 1218px cap has to be the ONLY
 max-w/padding pair on its own element, not stacked with the outer
@@ -31,9 +35,15 @@ just giving the row mobile-edge breathing room.
         {% if value.heading %}
             <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
         {% endif %}
-        <div class="wtr-card-grid grid gap-6 sm:grid-cols-2 {% if value.cards|length == 2 or value.cards|length == 4 %}lg:grid-cols-2{% else %}lg:grid-cols-3{% endif %}">
-            {% for card in value.cards %}
-                {% include "wtrx/components/card.html" with card=card %}
+        <div class="wtr-card-grid flex flex-col gap-6">
+            {% for row in rows %}
+                <div class="flex flex-col gap-6 md:flex-row md:justify-center">
+                    {% for card in row %}
+                        <div class="w-full md:max-w-[390px] md:flex-1">
+                            {% include "wtrx/components/card.html" with card=card %}
+                        </div>
+                    {% endfor %}
+                </div>
             {% endfor %}
         </div>
     </div>

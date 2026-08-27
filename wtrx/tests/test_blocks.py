@@ -31,13 +31,16 @@ from wagtail.models import Page
 
 from wtrx.blocks import (
     BACKGROUND_COLOR_CHOICES,
+    IMAGE_ALIGNMENT_CHOICES,
     LEGACY_BACKGROUND_VALUES,
     LIGHT_BACKGROUND_COLORS,
     BodyStreamBlock,
     ButtonBlock,
+    ButtonGroupBlock,
     CalloutBlock,
     CardBlock,
     CardCarouselBlock,
+    CardGridBlock,
     DonateBlock,
     DonateFundraiseUpBlock,
     FeaturePanelBlock,
@@ -45,9 +48,16 @@ from wtrx.blocks import (
     HeroCTABlock,
     ImageCardListBlock,
     ImageCardListItemBlock,
+    ImageGridBlock,
+    ImageGridItemBlock,
     ImageTextBlock,
+    LogoGridBlock,
+    LogoGridItemBlock,
     PageCardsBlock,
+    PersonCardBlock,
+    PersonCardGridBlock,
     QuoteBlock,
+    RawHTMLBlock,
     SectionBlock,
     SectionContentBlock,
     SignupActionKitBlock,
@@ -55,6 +65,7 @@ from wtrx.blocks import (
     SignupLinkBlock,
     SuccessMessageBlock,
     VideoBlock,
+    _balanced_rows,
     _validate_at_most_one_link,
     background_is_light,
     parse_action_network_url,
@@ -127,6 +138,124 @@ class TestButtonBlockValidation(SimpleTestCase):
         )
         with self.assertRaises(ValidationError):
             block.clean(value)
+
+
+class TestButtonGroupBlockFields(SimpleTestCase):
+    """ButtonGroupBlock field structure: a ListBlock of 1-5 ButtonBlocks, plus layout."""
+
+    def test_has_expected_fields(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"buttons", "layout"})
+
+    def test_buttons_min_num_is_one(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(block.declared_blocks["buttons"].meta.min_num, 1)
+
+    def test_buttons_max_num_is_five(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(block.declared_blocks["buttons"].meta.max_num, 5)
+
+    def test_buttons_child_block_is_button_block(self):
+        block = ButtonGroupBlock()
+        self.assertIsInstance(block.declared_blocks["buttons"].child_block, ButtonBlock)
+
+    def test_layout_defaults_to_horizontal(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(block.declared_blocks["layout"].meta.default, "horizontal")
+
+    def test_layout_choices(self):
+        block = ButtonGroupBlock()
+        choices = dict(block.declared_blocks["layout"].field.choices)
+        self.assertEqual(set(choices.keys()), {"horizontal", "vertical"})
+
+    def test_max_per_row_is_three(self):
+        self.assertEqual(ButtonGroupBlock.MAX_PER_ROW, 3)
+
+    def test_get_context_computes_rows_for_horizontal(self):
+        block = ButtonGroupBlock()
+        value = {"buttons": [1, 2, 3, 4], "layout": "horizontal"}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [2, 2])
+
+    def test_get_context_has_no_rows_for_vertical(self):
+        block = ButtonGroupBlock()
+        value = {"buttons": [1, 2, 3], "layout": "vertical"}
+        ctx = block.get_context(value, parent_context={})
+        self.assertNotIn("rows", ctx)
+
+
+class TestButtonGroupBlockValidation(SimpleTestCase):
+    """
+    ButtonGroupBlock has no clean() of its own — ButtonBlock.clean() runs
+    per-item automatically via ListBlock.clean(), so an invalid button
+    inside the group still raises.
+    """
+
+    def _button(self, link_url="https://example.com", text="Click me"):
+        return {"text": text, "link_page": None, "link_url": link_url, "anchor": "", "style": "primary"}
+
+    def test_valid_buttons_pass(self):
+        block = ButtonGroupBlock()
+        value = block.to_python({"buttons": [self._button(), self._button(link_url="https://example.org")]})
+        cleaned = block.clean(value)
+        self.assertEqual(len(cleaned["buttons"]), 2)
+
+    def test_invalid_button_in_group_raises(self):
+        block = ButtonGroupBlock()
+        value = block.to_python({"buttons": [self._button(link_url="")]})
+        with self.assertRaises(ValidationError):
+            block.clean(value)
+
+
+class TestRawHTMLBlockValidation(SimpleTestCase):
+    """
+    RawHTMLBlock.clean() rejects HTML with mismatched or unclosed tags.
+    This checks tag balance only — not full HTML5 conformance or markup
+    safety (RawHTMLBlock output is still unsanitized by design).
+    """
+
+    def _clean(self, value):
+        block = RawHTMLBlock()
+        return block.clean(block.to_python(value))
+
+    def test_balanced_html_passes(self):
+        cleaned = self._clean("<div><p>text</p></div>")
+        self.assertEqual(cleaned, "<div><p>text</p></div>")
+
+    def test_unclosed_div_raises(self):
+        with self.assertRaises(ValidationError):
+            self._clean("<div><p>text</p>")
+
+    def test_mismatched_nesting_raises(self):
+        with self.assertRaises(ValidationError):
+            self._clean("<div><p>text</div></p>")
+
+    def test_void_elements_do_not_false_positive(self):
+        cleaned = self._clean('<img src="x"><br><input type="text">')
+        self.assertEqual(cleaned, '<img src="x"><br><input type="text">')
+
+    def test_self_closing_tag_does_not_false_positive(self):
+        cleaned = self._clean("<div/>")
+        self.assertEqual(cleaned, "<div/>")
+
+    def test_script_content_does_not_false_positive(self):
+        html = "<div><script>if (a < b && b > c) { console.log('x'); }</script></div>"
+        cleaned = self._clean(html)
+        self.assertEqual(cleaned, html)
+
+    def test_style_content_does_not_false_positive(self):
+        html = "<div><style>.a > .b { color: red; }</style></div>"
+        cleaned = self._clean(html)
+        self.assertEqual(cleaned, html)
+
+    def test_empty_value_does_not_raise_tag_balance_error(self):
+        # RawHTMLBlock is required by default, so an empty value still
+        # raises -- but for Wagtail's own "this field is required" reason,
+        # not from the tag-balance validator (the `if value and ...` guard
+        # in clean() skips the balance check entirely for a falsy value).
+        block = RawHTMLBlock(required=False)
+        cleaned = block.clean(block.to_python(""))
+        self.assertEqual(cleaned, "")
 
 
 class TestVideoBlockValidation(SimpleTestCase):
@@ -266,6 +395,18 @@ class TestQuoteBlockValidation(SimpleTestCase):
         choices = dict(block.declared_blocks["alignment"].field.choices)
         self.assertIn("image-left", choices)
         self.assertIn("image-right", choices)
+
+    def test_alignment_uses_shared_image_alignment_choices(self):
+        """
+        QuoteBlock and FeaturePanelBlock used to each define their own
+        byte-identical alignment choices list; both now share
+        IMAGE_ALIGNMENT_CHOICES (see wtrx/blocks/__init__.py) so the two
+        can't silently drift apart again.
+        """
+        quote_choices = QuoteBlock().declared_blocks["alignment"].field.choices
+        panel_choices = FeaturePanelBlock().declared_blocks["alignment"].field.choices
+        self.assertEqual(list(quote_choices), list(IMAGE_ALIGNMENT_CHOICES))
+        self.assertEqual(list(panel_choices), list(IMAGE_ALIGNMENT_CHOICES))
 
     # --- link validation (via shared helper) ---
 
@@ -463,6 +604,15 @@ class TestSignupActionKitBlockPanelFields(SimpleTestCase):
         block = SignupActionKitBlock()
         self.assertEqual(block.child_blocks["background"].get_default(), "dark-grey")
 
+    def test_layout_defaults_to_columns(self):
+        block = SignupActionKitBlock()
+        self.assertEqual(block.child_blocks["layout"].get_default(), "columns")
+
+    def test_layout_choices(self):
+        block = SignupActionKitBlock()
+        choices = dict(block.child_blocks["layout"].field.choices)
+        self.assertEqual(set(choices.keys()), {"columns", "vertical"})
+
     def test_panel_tones_cover_only_the_colliding_fills(self):
         """
         Navy and red take no tone modifier: the stacked form's default
@@ -543,12 +693,16 @@ class TestSectionBlockStructure(SimpleTestCase):
         "image",
         "video",
         "button",
+        "button_group",
         "quote",
         "raw_html",
         "table",
         "card",
         "person_card",
+        "person_card_grid",
         "card_grid",
+        "image_grid",
+        "logo_grid",
         "image_card_list",
         "image_text",
         "feature_panel",
@@ -607,6 +761,307 @@ class TestCardBlockFields(SimpleTestCase):
         self.assertTrue(block.declared_blocks["heading"].required)
 
 
+class TestImageGridItemBlockFields(SimpleTestCase):
+    def test_has_expected_fields(self):
+        block = ImageGridItemBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"image", "alt_text"})
+
+    def test_alt_text_is_optional(self):
+        block = ImageGridItemBlock()
+        self.assertFalse(block.declared_blocks["alt_text"].required)
+
+
+class TestCardGridBlockFields(SimpleTestCase):
+    """
+    CardGridBlock field structure and its dynamic row-balancing via
+    _balanced_rows() (previously untested -- see AGENTS.md pitfall #44).
+    """
+
+    def test_has_expected_fields(self):
+        block = CardGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "cards"})
+
+    def test_cards_min_num_is_two(self):
+        block = CardGridBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.min_num, 2)
+
+    def test_cards_max_num_is_12(self):
+        block = CardGridBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.max_num, 12)
+
+    def test_cards_child_block_is_card_block(self):
+        block = CardGridBlock()
+        self.assertIsInstance(block.declared_blocks["cards"].child_block, CardBlock)
+
+    def test_max_per_row_is_three(self):
+        self.assertEqual(CardGridBlock.MAX_PER_ROW, 3)
+
+    def test_get_context_computes_rows(self):
+        block = CardGridBlock()
+        value = {"heading": "", "cards": [1, 2, 3, 4]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [2, 2])
+
+    def test_get_context_has_no_orphan_row_at_seven(self):
+        """
+        The regression case: the old CSS-only special case (2 or 4 cards
+        get lg:grid-cols-2, everything else lg:grid-cols-3) rendered 7
+        cards as an unbalanced 3+3+1. _balanced_rows() gives 3+2+2.
+        """
+        block = CardGridBlock()
+        value = {"heading": "", "cards": [1, 2, 3, 4, 5, 6, 7]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2, 2])
+
+
+class TestImageGridBlockFields(SimpleTestCase):
+    """ImageGridBlock field structure: heading + images (min 2, max 24)."""
+
+    def test_has_expected_fields(self):
+        block = ImageGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "images"})
+
+    def test_heading_is_optional(self):
+        block = ImageGridBlock()
+        self.assertFalse(block.declared_blocks["heading"].required)
+
+    def test_images_min_num_is_two(self):
+        block = ImageGridBlock()
+        self.assertEqual(block.declared_blocks["images"].meta.min_num, 2)
+
+    def test_images_max_num_is_24(self):
+        block = ImageGridBlock()
+        self.assertEqual(block.declared_blocks["images"].meta.max_num, 24)
+
+    def test_images_child_block_is_image_grid_item(self):
+        block = ImageGridBlock()
+        self.assertIsInstance(block.declared_blocks["images"].child_block, ImageGridItemBlock)
+
+    def test_max_per_row_is_four(self):
+        self.assertEqual(ImageGridBlock.MAX_PER_ROW, 4)
+
+    def test_get_context_computes_rows(self):
+        block = ImageGridBlock()
+        value = {"heading": "", "images": [1, 2, 3, 4, 5]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2])
+
+
+class TestLogoGridItemBlockFields(SimpleTestCase):
+    def test_has_expected_fields(self):
+        block = LogoGridItemBlock()
+        self.assertEqual(
+            set(block.declared_blocks.keys()), {"image", "name", "link_page", "link_url"}
+        )
+
+    def test_name_is_required(self):
+        block = LogoGridItemBlock()
+        self.assertTrue(block.declared_blocks["name"].required)
+
+    def test_links_are_optional(self):
+        block = LogoGridItemBlock()
+        self.assertFalse(block.declared_blocks["link_page"].required)
+        self.assertFalse(block.declared_blocks["link_url"].required)
+
+
+class TestLogoGridItemBlockValidation(SimpleTestCase):
+    """LogoGridItemBlock.clean() permits zero links but rejects two."""
+
+    def _raw(self, link_page=None, link_url=""):
+        return {"image": None, "name": "Example Org", "link_page": link_page, "link_url": link_url}
+
+    def test_neither_link_is_valid(self):
+        block = LogoGridItemBlock()
+        value = block.to_python(self._raw())
+        # Only exercising the link-count check here, not image resolution
+        # (that needs a database) -- call the shared helper directly via
+        # the fields clean() touches.
+        cleaned = {"link_page": value["link_page"], "link_url": value["link_url"]}
+        self.assertEqual(_validate_at_most_one_link(cleaned, {}), {})
+
+    def test_one_link_is_valid(self):
+        cleaned = {"link_page": None, "link_url": "https://example.com"}
+        self.assertEqual(_validate_at_most_one_link(cleaned, {}), {})
+
+    def test_both_links_raises(self):
+        cleaned = {"link_page": object(), "link_url": "https://example.com"}
+        errors = _validate_at_most_one_link(cleaned, {})
+        self.assertIn("link_page", errors)
+        self.assertIn("link_url", errors)
+
+
+class TestLogoGridBlockFields(SimpleTestCase):
+    """LogoGridBlock field structure: heading + logos (min 2, max 30)."""
+
+    def test_has_expected_fields(self):
+        block = LogoGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "logos"})
+
+    def test_logos_min_num_is_two(self):
+        block = LogoGridBlock()
+        self.assertEqual(block.declared_blocks["logos"].meta.min_num, 2)
+
+    def test_logos_max_num_is_30(self):
+        block = LogoGridBlock()
+        self.assertEqual(block.declared_blocks["logos"].meta.max_num, 30)
+
+    def test_logos_child_block_is_logo_grid_item(self):
+        block = LogoGridBlock()
+        self.assertIsInstance(block.declared_blocks["logos"].child_block, LogoGridItemBlock)
+
+    def test_max_per_row_is_five(self):
+        self.assertEqual(LogoGridBlock.MAX_PER_ROW, 5)
+
+    def test_get_context_computes_rows(self):
+        block = LogoGridBlock()
+        value = {"heading": "", "logos": [1, 2, 3, 4, 5, 6]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 3])
+
+
+class TestBalancedRows(SimpleTestCase):
+    """
+    _balanced_rows(items, max_per_row) is the row-layout algorithm shared
+    by CardGridBlock, ImageGridBlock, LogoGridBlock and
+    PersonCardGridBlock (each with their own max_per_row) -- never a row
+    of 1 for len(items) > max_per_row, see its docstring for the proof
+    this encodes as an executable check.
+    """
+
+    def _items(self, n):
+        return list(range(n))
+
+    def test_count_1_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(1), 3), [[0]])
+
+    def test_count_2_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(2), 3), [[0, 1]])
+
+    def test_count_at_cap_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(3), 3), [[0, 1, 2]])
+
+    def test_cap_3_count_4_is_2x2(self):
+        rows = _balanced_rows(self._items(4), 3)
+        self.assertEqual([len(r) for r in rows], [2, 2])
+
+    def test_cap_3_count_5_is_3_plus_2(self):
+        rows = _balanced_rows(self._items(5), 3)
+        self.assertEqual([len(r) for r in rows], [3, 2])
+
+    def test_cap_3_count_6_is_3_plus_3(self):
+        rows = _balanced_rows(self._items(6), 3)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+
+    def test_cap_3_count_7_has_no_orphan_row(self):
+        """
+        The key regression test: a naive uniform 2-or-3-column rule fails
+        for count=7 (both give a trailing row of 1) -- this is exactly
+        what CardGridBlock's old CSS-only special case did. The
+        evenly-distributed algorithm produces [3, 2, 2] instead.
+        """
+        rows = _balanced_rows(self._items(7), 3)
+        self.assertEqual([len(r) for r in rows], [3, 2, 2])
+
+    def test_cap_3_count_10(self):
+        rows = _balanced_rows(self._items(10), 3)
+        self.assertEqual([len(r) for r in rows], [3, 3, 2, 2])
+
+    def test_cap_4_count_5_is_3_plus_2(self):
+        """ImageGridBlock's cap (4): a count just over it still balances."""
+        rows = _balanced_rows(self._items(5), 4)
+        self.assertEqual([len(r) for r in rows], [3, 2])
+
+    def test_cap_4_count_9_has_no_orphan_row(self):
+        """A uniform 4-column grid would leave [4, 4, 1] here."""
+        rows = _balanced_rows(self._items(9), 4)
+        self.assertEqual([len(r) for r in rows], [3, 3, 3])
+
+    def test_cap_5_count_6_is_3_plus_3(self):
+        """LogoGridBlock's cap (5): a count just over it still balances."""
+        rows = _balanced_rows(self._items(6), 5)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+
+    def test_cap_5_count_11_has_no_orphan_row(self):
+        """A uniform 5-column grid would leave [5, 5, 1] here."""
+        rows = _balanced_rows(self._items(11), 5)
+        self.assertEqual([len(r) for r in rows], [4, 4, 3])
+
+    def test_no_row_of_one_for_a_spread_of_counts_and_caps(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) >= 2 for r in rows))
+
+    def test_no_row_exceeds_the_cap(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) <= max_per_row for r in rows))
+
+    def test_rows_cover_every_item_exactly_once(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(1, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    flattened = [p for row in rows for p in row]
+                    self.assertEqual(flattened, self._items(n))
+
+    def test_works_with_an_object_that_only_supports_int_indexing(self):
+        """
+        Regression test: Wagtail's real ListValue.__getitem__ only handles
+        integer indices, not slice objects -- items[i:j] on one silently
+        returns garbage (a plain list has .value called on it) rather than
+        raising, so a plain-list-only test suite can't catch it. This
+        stand-in reproduces that restriction to prove _balanced_rows()
+        converts to a real list before slicing.
+        """
+
+        class IntOnlyIndexable:
+            def __init__(self, items):
+                self._items = items
+
+            def __len__(self):
+                return len(self._items)
+
+            def __getitem__(self, i):
+                if not isinstance(i, int):
+                    raise TypeError("only int indices supported")
+                return self._items[i]
+
+        wrapped = IntOnlyIndexable(list(range(7)))
+        rows = _balanced_rows(wrapped, 3)
+        self.assertEqual([len(r) for r in rows], [3, 2, 2])
+        self.assertEqual([p for row in rows for p in row], list(range(7)))
+
+
+class TestPersonCardGridBlockFields(SimpleTestCase):
+    """PersonCardGridBlock field structure: heading + people (min 1, max 12)."""
+
+    def test_has_expected_fields(self):
+        block = PersonCardGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "people"})
+
+    def test_people_min_num_is_one(self):
+        block = PersonCardGridBlock()
+        self.assertEqual(block.declared_blocks["people"].meta.min_num, 1)
+
+    def test_people_max_num_is_12(self):
+        block = PersonCardGridBlock()
+        self.assertEqual(block.declared_blocks["people"].meta.max_num, 12)
+
+    def test_people_child_block_is_person_card(self):
+        block = PersonCardGridBlock()
+        self.assertIsInstance(block.declared_blocks["people"].child_block, PersonCardBlock)
+
+    def test_get_context_computes_rows(self):
+        block = PersonCardGridBlock()
+        value = {"heading": "", "people": [1, 2, 3, 4, 5]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2])
+
+
 class TestImageCardListItemBlockFields(SimpleTestCase):
     """ImageCardListItemBlock field structure: heading + description only."""
 
@@ -628,7 +1083,9 @@ class TestImageCardListBlockFields(SimpleTestCase):
 
     def test_has_expected_fields(self):
         block = ImageCardListBlock()
-        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "image", "cards"})
+        self.assertEqual(
+            set(block.declared_blocks.keys()), {"heading", "image", "cards", "alignment"}
+        )
 
     def test_heading_is_required(self):
         block = ImageCardListBlock()
@@ -650,13 +1107,24 @@ class TestImageCardListBlockFields(SimpleTestCase):
         block = ImageCardListBlock()
         self.assertIsInstance(block.declared_blocks["cards"].child_block, ImageCardListItemBlock)
 
+    def test_alignment_choices(self):
+        block = ImageCardListBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = ImageCardListBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
 
 class TestImageTextBlockFields(SimpleTestCase):
     """ImageTextBlock field structure: heading + image + text, all required."""
 
     def test_has_expected_fields(self):
         block = ImageTextBlock()
-        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "image", "text"})
+        self.assertEqual(
+            set(block.declared_blocks.keys()), {"heading", "image", "text", "alignment"}
+        )
 
     def test_heading_is_required(self):
         block = ImageTextBlock()
@@ -673,6 +1141,15 @@ class TestImageTextBlockFields(SimpleTestCase):
     def test_text_is_richtext(self):
         block = ImageTextBlock()
         self.assertIsInstance(block.declared_blocks["text"], RichTextBlock)
+
+    def test_alignment_choices(self):
+        block = ImageTextBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = ImageTextBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
 
 
 class TestFeaturePanelBlockFields(SimpleTestCase):
@@ -856,6 +1333,7 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
             "image_caption",
             "element_id",
             "designation_id",
+            "alignment",
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
@@ -867,6 +1345,15 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
         block = DonateFundraiseUpBlock()
         for name in ("heading", "description", "image", "image_caption", "designation_id"):
             self.assertFalse(block.declared_blocks[name].required, f"{name} should be optional")
+
+    def test_alignment_choices(self):
+        block = DonateFundraiseUpBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = DonateFundraiseUpBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
 
 
 class TestPageCardsBlockGetContext(TestCase):

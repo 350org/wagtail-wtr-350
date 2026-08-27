@@ -16,15 +16,11 @@ Body column is 800px (not the usual max-w-5xl 1024px every other page
 uses) per Figma's Post body text frame width.
 {% endcomment %}
 {% block content %}
-<div class="space-y-24">
+<div class="wtr-body-stack space-y-24">
 {% for block in page.body %}
-    {% if block.block_type == "section" or block.block_type == "card_grid" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "image" or block.block_type == "hero" or block.block_type == "quote" or block.block_type == "page_cards" %}
+    <div data-block-type="{{ block.block_type }}"{% if block.block_type == "section" or block.block_type == "card_grid" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "signup_actionkit" or block.block_type == "image" or block.block_type == "hero" or block.block_type == "quote" or block.block_type == "page_cards" or block.block_type == "image_grid" or block.block_type == "logo_grid" or block.block_type == "person_card_grid" %}{% else %} class="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8"{% endif %}>
         {% include_block block %}
-    {% else %}
-        <div class="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8">
-            {% include_block block %}
-        </div>
-    {% endif %}
+    </div>
 {% endfor %}
 </div>
 

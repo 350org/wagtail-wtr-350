@@ -321,6 +321,27 @@ def _button_block(style, text, anchor=None):
     )
 
 
+def _button_group_block(count=3, layout="horizontal"):
+    labels = ["Take Action", "Learn More", "Donate", "Volunteer", "Share"]
+    styles = ["primary", "outline", "secondary", "primary", "outline"]
+    return _sb(
+        "button_group",
+        {
+            "buttons": [
+                {
+                    "text": labels[i],
+                    "link_page": None,
+                    "link_url": "https://example.com",
+                    "anchor": "",
+                    "style": styles[i],
+                }
+                for i in range(count)
+            ],
+            "layout": layout,
+        },
+    )
+
+
 def _raw_html_block():
     return _sb(
         "raw_html",
@@ -401,15 +422,54 @@ def _person_card_block_minimal():
     )
 
 
+def _person_card_grid_block(image_id, count, heading="Person Card Grid"):
+    """
+    PersonCardGridBlock with `count` people, to eyeball _person_grid_rows()'s
+    row-balancing (e.g. count=5 -> 3+2, count=7 -> 3+2+2, no orphan row).
+    """
+    people = [
+        {
+            "name": f"Person {i + 1}",
+            "role": "Organizer",
+            "image": image_id,
+            "bio": "",
+            "email": "",
+            "phone": "",
+            "website": "",
+        }
+        for i in range(count)
+    ]
+    return _sb("person_card_grid", {"heading": heading, "people": people})
+
+
+def _image_grid_block(image_id, count=5, heading="Image Grid"):
+    images = [{"image": image_id, "alt_text": f"Grid image {i + 1}"} for i in range(count)]
+    return _sb("image_grid", {"heading": heading, "images": images})
+
+
+def _logo_grid_block(image_id, count=6, heading="Logo Grid"):
+    logos = [
+        {
+            "image": image_id,
+            "name": f"Partner Org {i + 1}",
+            "link_page": None,
+            "link_url": "https://example.com" if i % 2 == 0 else "",
+        }
+        for i in range(count)
+    ]
+    return _sb("logo_grid", {"heading": heading, "logos": logos})
+
+
 def _card_grid_block(image_id, count=3, heading="Card Grid"):
     """
     CardGridBlock with a mix of cards.
 
-    ``count`` exists because exactly four cards is the one count that lays out
-    2x2 instead of in three columns (see card_grid_block.html) — both paths
-    are worth eyeballing.
+    ``count`` exists to eyeball _balanced_rows()'s dynamic row-balancing
+    (max_per_row=3, see card_grid_block.html/AGENTS.md pitfall #44) —
+    count=4 gives 2x2, count=7 gives 3+2+2 (the old CSS-only special case
+    left an unbalanced 3+3+1 at 7, the regression this now fixes).
     """
-    cards = [
+    base_cards = [
         _card_value(
             "With image and tag",
             description="Image, tag pill and an external link.",
@@ -431,7 +491,8 @@ def _card_grid_block(image_id, count=3, heading="Card Grid"):
             icon_id=image_id,
         ),
     ]
-    return _sb("card_grid", {"heading": heading, "cards": cards[:count]})
+    cards = [base_cards[i % len(base_cards)] for i in range(count)]
+    return _sb("card_grid", {"heading": heading, "cards": cards})
 
 
 def _image_card_list_block(image_id):
@@ -685,14 +746,15 @@ def _signup_action_network_block(image_id, with_success=False):
     )
 
 
-def _signup_actionkit_block(image_id, background, with_success=False):
+def _signup_actionkit_block(image_id, background, with_success=False, layout="columns"):
     """
     SignupActionKitBlock.
 
     The block fetches its form markup from the client's live ActionKit
     instance. In dev that fetch fails and the template renders its fallback —
     which is itself worth eyeballing, and is the reason every background
-    variant is included here.
+    variant is included here. `layout` exercises the "side by side" (default)
+    vs. "stacked vertically" outer composition -- see signup_actionkit_block.html.
     """
     return _sb(
         "signup_actionkit",
@@ -701,10 +763,12 @@ def _signup_actionkit_block(image_id, background, with_success=False):
             "heading": f"Sign Up (ActionKit, {background})",
             "description": _RICHTEXT_INLINE,
             "background": background,
+            "layout": layout,
             "image": image_id,
             "image_caption": "Photo credit: placeholder",
             "short_form_id": "join",
-            "anchor_id": f"signup-actionkit-{background}",
+            "anchor_id": f"signup-actionkit-{background}"
+            + ("" if layout == "columns" else f"-{layout}"),
             "success_message": _success_message_stream(image_id) if with_success else [],
         },
     )
@@ -770,6 +834,15 @@ def _content_blocks(image_id, index_page_id, form_page_id):
     ]
 
     blocks += [
+        _label("button_group", "3 buttons — horizontal, single row"),
+        _button_group_block(count=3, layout="horizontal"),
+        _label("button_group", "4 buttons — horizontal, 2+2 balanced rows"),
+        _button_group_block(count=4, layout="horizontal"),
+        _label("button_group", "3 buttons — vertical, centered column"),
+        _button_group_block(count=3, layout="vertical"),
+    ]
+
+    blocks += [
         _label("quote", "image left, with CTA"),
         _quote_block(image_id, "image-left"),
         _label("quote", "image right, no CTA"),
@@ -795,11 +868,24 @@ def _content_blocks(image_id, index_page_id, form_page_id):
     ]
 
     blocks += [
+        _label("person_card_grid", "5 people — 3+2 row split"),
+        _person_card_grid_block(image_id, count=5, heading="Person Card Grid (5 people)"),
+        _label("person_card_grid", "7 people — 3+2+2, no orphan row"),
+        _person_card_grid_block(image_id, count=7, heading="Person Card Grid (7 people)"),
+    ]
+
+    blocks += [
         _label("card_grid", "3 cards — three-column layout"),
         _card_grid_block(image_id, count=3, heading="Card Grid (3 cards)"),
         _label("card_grid", "4 cards — 2x2 layout"),
         _card_grid_block(image_id, count=4, heading="Card Grid (4 cards)"),
+        _label("card_grid", "7 cards — 3+2+2, no orphan row"),
+        _card_grid_block(image_id, count=7, heading="Card Grid (7 cards)"),
     ]
+
+    blocks += [_label("image_grid", "5 images"), _image_grid_block(image_id, count=5)]
+
+    blocks += [_label("logo_grid", "6 logos, some linked"), _logo_grid_block(image_id, count=6)]
 
     blocks += [_label("image_card_list"), _image_card_list_block(image_id)]
 
@@ -862,6 +948,10 @@ def _content_blocks(image_id, index_page_id, form_page_id):
     blocks += [
         _label("signup_actionkit", "with a custom success message"),
         _signup_actionkit_block(image_id, "navy", with_success=True),
+    ]
+    blocks += [
+        _label("signup_actionkit", "stacked vertically layout"),
+        _signup_actionkit_block(image_id, "dark-grey", layout="vertical"),
     ]
 
     blocks += [_label("signup_link"), _signup_link_block()]

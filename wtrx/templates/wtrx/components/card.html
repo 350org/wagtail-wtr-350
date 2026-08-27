@@ -4,8 +4,16 @@ description_size: optional Tailwind text-size utility for card.description,
 default text-base (16px, matches CardGridBlock's "Areas of work" cards
 per Figma). card_carousel_block.html passes text-xl (20px) instead — its
 cards' body copy is sized larger per Figma's "Our work in action" cards.
+
+h-full: this card's root is one level deeper than the flex/grid item in
+every caller (card_grid_block.html/card_carousel_block.html each wrap it
+in their own item div), so the parent's default align-items:stretch only
+stretches that wrapper, not this root — without h-full, cards with
+different content lengths in the same row would have mismatched heights.
+Resolves to plain `auto` (a no-op) wherever no ancestor establishes a
+definite height, e.g. card_block.html's standalone single-card case.
 {% endcomment %}
-<div class="wtr-card flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 shadow-xs">
+<div class="wtr-card flex h-full flex-col overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 shadow-xs">
     {% if card.image %}
         {% image card.image fill-640x360 as img %}
         <div class="aspect-video overflow-hidden">
