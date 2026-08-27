@@ -19,7 +19,7 @@ See `PLAN.md` for the full specification and architectural decisions.
 ```
 wagtail-wtr/
 ├── wtrx/                   # Core reusable app (future pip package)
-│   ├── blocks/             # StreamField blocks, one file per category
+│   ├── blocks/             # StreamField blocks (currently one file, __init__.py, organized by comment-banner category)
 │   ├── integrations/       # One module per pre-set integration + the registry (see Integrations Framework below)
 │   ├── migrations/
 │   ├── templatetags/
@@ -53,7 +53,10 @@ wagtail-wtr/
 ```
 
 - `wtrx/` -- Core reusable app. All page models live here.
-- `wtrx/blocks/` -- StreamField blocks, one file per category.
+- `wtrx/blocks/` -- StreamField blocks. Currently one file (`__init__.py`,
+  organized by comment-banner category: Content/Cards/Layout/Actions) rather
+  than the per-category split the directory name suggests — add new blocks
+  there under the matching banner rather than starting a file split.
 - `wtrx/integrations/` -- One module per pre-set integration (ActionKit, Fundraise Up, ActBlue, Action Network), plus `registry.py`. See "Integrations Framework" below.
 - `wtrx/site_settings.py` -- All Wagtail site settings models.
 - `wtrx/models.py` -- BasePage, HeroMixin, HomePage, ContentPage, IndexPage, FormField, FormPage.
@@ -1203,6 +1206,22 @@ Two practical notes for agents:
       `.wtr-bg-white`, because a white panel on a white page only reads as a
       panel because of that outline. Every other fill is its own shape and
       takes none.
+    - The same consolidation pattern applies to `IMAGE_ALIGNMENT_CHOICES`
+      (also in `wtrx/blocks/__init__.py`) — the left/right image-alignment
+      list shared by `QuoteBlock`, `FeaturePanelBlock`, `ImageCardListBlock`,
+      `ImageTextBlock` and `DonateFundraiseUpBlock`. `QuoteBlock` and
+      `FeaturePanelBlock` each used to define their own byte-identical copy
+      of this list; both now point at the one constant. Every one of these
+      blocks reverses its image column the same way: the image stays the
+      first DOM child always, and picks up
+      `{% if value.alignment == 'image-right' %}md:order-2{% endif %}` on
+      itself — the other column needs no class, since flex/grid `order`
+      auto-promotes it to first once the image is pushed to `order-2`. This
+      works identically whether the row is CSS grid (`ImageCardListBlock`,
+      `DonateFundraiseUpBlock`) or flexbox (`ImageTextBlock`) — `order` is
+      not grid-specific. `SignupActionKitBlock` is deliberately excluded:
+      its image is a full-width band above the content, not a side column,
+      so "left/right" doesn't apply to it.
 
 36. **`--color-secondary-*` is navy, and `-600` *is* `--color-navy`**: the
     secondary ramp was a violet inherited from the WTR starter palette,
@@ -1399,6 +1418,21 @@ Two practical notes for agents:
       with the panel heading beside them, not AK-specific bugs. Do not
       "fix" the form's text on those fills alone; it would then disagree with
       the copy column it sits next to.
+    - **`SignupActionKitBlock.layout` (`columns`/`vertical`) is a different
+      axis from `stacked`/`inline` above — do not conflate them.** `layout`
+      picks the outer composition: `columns` (default, Figma's petition
+      panel) splits copy and form into two columns; `vertical` runs image,
+      copy and form down one narrow (`max-w-[800px]`) column, for a long form
+      with many fields and little copy. Both `layout` values still pass
+      `stacked=True` into `_actionkit_form.html` — the field-layout flag
+      this pitfall is about is unchanged either way. Because `layout` only
+      rearranges the wrapper and leaves every fill/state-dependent class
+      (`PANEL_TONES`, the eyebrow pill's `bg == 'dark-grey'` check, the
+      thank-you box) untouched, the same matrix applies in both layouts —
+      verified visually against `dark-grey` (pill and field boxes both
+      inverted correctly in the narrow column); re-check the rest of the
+      six-fill matrix in `vertical` before relying on that generalisation
+      for a fill this hasn't been eyeballed against yet.
 
 41. **ActionKit clears a validation error by emptying the `<ul>`, not
     removing it**: when the visitor corrects a field and resubmits, AK leaves
@@ -1421,6 +1455,173 @@ Two practical notes for agents:
       privacy notice, and the fix then is to move the `<ul>` into a real
       full-width flex line with JS, not a bigger number. It cannot be
       reordered from CSS: it is nested two levels inside the field wrapper.
+
+42. **Some body-block adjacencies are automatically tightened to 32px —
+    this is deliberate, not a bug to "fix" back to 96px**: the page-level
+    body loop (`content_page.html`, `post_page.html`, `index_page.html`,
+    `home_page.html`) separates blocks with a flat `space-y-24`/`space-y-32`
+    (96px/128px) gap sized to read as a section break — correct between two
+    unrelated pieces of content, wrong when one block is a continuation of
+    the one before it. A CTA button right after a paragraph, or a card row
+    illustrating the paragraph above it, read as disconnected at that gap.
+    - Each loop wraps every block in
+      `<div data-block-type="{{ block.block_type }}">` and the loop's outer
+      container carries a `wtr-body-stack` class alongside its `space-y-*`
+      utility. Unlayered rules in `main.css` (the "Body-stack spacing"
+      section, same unlayered-beats-`@layer`-utilities mechanism as the
+      heading-weight rules above) retarget `margin-block-end` — the
+      property `space-y-*` sets on every not-last child, so the gap between
+      block A and block B is entirely controlled by A's own
+      `margin-block-end` — down to **32px** for: any gap touching a
+      `button` block (both before and after it, via
+      `:has(+ [data-block-type='button'])` on the preceding sibling and a
+      direct rule on the button itself), and a `text` block immediately
+      before a `card_grid`/`card_carousel`/`page_cards` row. 32px is not a
+      new number — it's the same value `SectionBlock`'s own internal
+      `space-y-8` already uses, so there's one "closely related" spacing
+      value in the app, not two.
+    - This is **automatic and not editor-configurable**, on purpose —
+      matching how every other block relationship in this codebase is an
+      opinionated default rather than a raw layout control (rule #5).
+      Editors who want the full 96px break between, say, two paragraphs
+      that really are unrelated already get it by default; nothing here
+      lets them dial spacing per-instance.
+    - Scope is deliberately narrow and one-directional: `card_grid` (etc.)
+      followed by `text` stays at 96px — only `text` immediately *before* a
+      card row is tightened, because the "cards illustrate the paragraph
+      above them" reading only holds in that direction. Extending this to
+      new pairs means adding another `:has()` rule to the same CSS block,
+      not inventing a new mechanism.
+    - The new wrapper `<div>` this needed around every block (previously
+      only narrow blocks got a wrapper; full-bleed blocks like `section`/
+      `card_grid`/`hero` rendered as direct children of the loop) is
+      intentionally bare — no `max-w`/padding of its own — so full-bleed
+      blocks still own their own width per pitfall #34's "card rows share
+      one width" rule. Adding any class to that wrapper beyond
+      `data-block-type` (and, for narrow blocks, the existing
+      `max-w-[800px]`/`max-w-5xl` gutter) risks reintroducing the narrow-
+      gutter bug that pitfall describes.
+
+43. **`RawHTMLBlock` validates tag balance, not HTML safety or full
+    conformance**: `RawHTMLBlock.clean()` (`wtrx/blocks/__init__.py`) runs a
+    stdlib `html.parser.HTMLParser` subclass (`_TagBalanceParser`) that
+    tracks a stack of open tags and raises a plain `ValidationError` — a
+    hard, blocking error, the same `clean()`/`ValidationError` pattern
+    every other block's validation already uses — when a closing tag
+    doesn't match the innermost open tag, or a tag is left open at EOF.
+    HTML5 void elements (`br`, `img`, `input`, `hr`, `meta`, `link`, etc.)
+    are excluded from the stack so they don't need a closing tag.
+    - **This catches the single most common pasted-embed mistake** (a
+      stray or missing closing tag) and nothing more. It does not validate
+      attribute syntax, does not check the markup is safe, and does not
+      sanitize anything — the block's own docstring/description still say
+      so. An unbalanced-but-malicious script would still fail this check
+      (good), but a perfectly-balanced-and-malicious one would sail
+      through (also expected — this was never meant to be a security
+      control, see the block's original "only use it for code you trust"
+      guidance, which is unchanged).
+    - `beautifulsoup4` is a dependency already (used by the content-import
+      management commands), but with the lenient stdlib `html.parser`
+      backend it silently auto-corrects malformed markup rather than
+      raising — it cannot detect this class of mistake, which is why the
+      validator is a small hand-written stack-based check instead.
+    - `HTMLParser` does not descend into `<script>`/`<style>` content as
+      tags (stdlib CDATA-like handling), so inline JS/CSS containing
+      stray `<`/`>` characters (e.g. `if (a < b)`) does not false-positive
+      — this is pinned by `TestRawHTMLBlockValidation`, since it's the
+      single most likely false-positive source given what this block is
+      actually used for (embed codes routinely carry inline `<script>`).
+    - No migration is needed for this change — `clean()` logic isn't part
+      of a StreamField block's serialized/deconstructed definition.
+
+44. **`PersonCardGridBlock`'s row layout mixes rows of 3 and rows of 2 —
+    don't "simplify" it to one column count per grid**: a single global
+    column count (uniformly 2 or 3 for every row, the way `CardGridBlock`
+    picks one `lg:grid-cols-{2|3}` for the whole grid) cannot avoid a
+    trailing row of exactly 1 person for every possible count. Working it
+    out: a uniform 3-column grid leaves a lone last card whenever
+    `count % 3 == 1` (4, 7, 10, 13...); a uniform 2-column grid leaves one
+    whenever `count` is odd and greater than 2 (3, 5, 7, 9, 11...); the
+    counts where **both** fail are `count ≡ 1 (mod 6)` — 7, 13, 19... So
+    "just special-case 4 like CardGridBlock does" (the obvious-looking
+    fix) still breaks at 7.
+    - `_person_grid_rows()` (`wtrx/blocks/__init__.py`) instead computes
+      `rows_count = ceil(n / 3)`, `threes = n - 2*rows_count`,
+      `twos = 3*rows_count - n`, and emits `threes` rows of 3 followed by
+      `twos` rows of 2. Both counts are provably non-negative for every
+      `n >= 2` (see the function's docstring for the short proof), so
+      every row is size 2 or 3 — **never** 1, for any count. Count 5
+      becomes `[3, 2]`, 6 becomes `[3, 3]`, 7 becomes `[3, 2, 2]` (not the
+      `[3, 3, 1]` a uniform 3-column grid would give), and this keeps
+      holding for every larger count.
+    - `PersonCardGridBlock.get_context()` computes `rows` in Python and
+      the template (`person_card_grid_block.html`) renders each row as its
+      own `flex ... sm:justify-center` container — **flexbox, not CSS
+      Grid**, unlike `CardGridBlock`. `justify-center` naturally centers a
+      partial row (e.g. a row of 2), which CSS Grid does not do for a
+      trailing partial row without extra work; since rows are now
+      pre-computed explicitly, there's no need to fight Grid's own
+      auto-placement to get that centering.
+    - `_person_grid_rows()` converts its input to a real Python `list`
+      before slicing (`people = list(people)`). This is load-bearing, not
+      defensive boilerplate: Wagtail's real `ListValue` (what
+      `value["people"]` actually is at render time, versus a plain list in
+      a unit test) only implements integer-indexed `__getitem__`, and
+      slicing it (`people[i:j]`) does not raise — it silently returns
+      `self.bound_blocks[slice].value`, which is a plain `list` object
+      with no `.value` attribute, so it fails with a confusing
+      `AttributeError` deep inside Wagtail's own code instead of at the
+      call site. `TestPersonGridRows` pins this with a stand-in object
+      that only supports integer indexing, specifically because an
+      all-plain-list test suite cannot catch it.
+    - This logic has real Python test coverage
+      (`TestPersonGridRows`, including a property test asserting no row
+      has length 1 for every count from 2 to 29) — worth noting because
+      `CardGridBlock`'s equivalent "avoid an orphan row" logic has none at
+      all (it's pure-template `{% if %}` branching). Prefer computing
+      layout decisions like this in Python over template conditionals when
+      the logic gets more complex than one binary special case — it's
+      what made this bug provable and testable in the first place.
+
+45. **New StreamField blocks with no real content yet should use a
+    hand-authored `Meta.preview_value`, not `ContentPreviewMixin`, until
+    real content exists to harvest**: `ContentPreviewMixin`'s
+    `is_previewable` (pitfall #31) is `True` only when
+    `wtrx/previews/block_previews.json` has an entry for that block, and
+    entries only get added by `manage.py harvest_block_previews` scanning
+    *real published pages*. A brand-new block type — `ImageGridBlock`,
+    `LogoGridBlock`, `PersonCardGridBlock` when they were added — has no
+    such page yet, so mixing in `ContentPreviewMixin` on day one leaves
+    `is_previewable` `False` and fails
+    `test_every_block_in_the_picker_has_a_preview`
+    (`wtrx/tests/test_block_previews.py`), which requires every block in
+    `BodyStreamBlock` to have *some* preview.
+    - The fix each of those three blocks uses is the same one `HeroBlock`
+      and `PersonCardBlock` already established: a module-level
+      `_<block>_preview_value()` function, wired up via
+      `preview_value = staticmethod(_<block>_preview_value)` in `Meta`
+      (never a bare function reference — Wagtail instantiates `Meta`, so
+      an unwrapped function would be bound and called with `self`), using
+      `preview_image()` for any `ImageChooserBlock`/`ListBlock`-of-images
+      field. `preview_image()` returns one arbitrary real image from the
+      library — for a grid that needs several image slots, the same
+      placeholder image is simply reused across all of them; this is a
+      hand-authored placeholder, not real content, so repetition is fine.
+    - **Do not write `for _ in range(n)` inside one of these preview
+      functions.** `_` is this file's `gettext_lazy` import
+      (`from django.utils.translation import gettext_lazy as _`, used
+      throughout for every translatable string), and a throwaway loop
+      variable named `_` rebinds it for the rest of that function's scope
+      — every `_("...")` call afterward raises `TypeError: 'X' object is
+      not callable` instead of translating anything. Use `_i` (or any
+      other name) for a throwaway loop variable in this file specifically.
+    - Once a real page uses one of these three blocks, switching it over
+      to `ContentPreviewMixin` (after running
+      `manage.py harvest_block_previews`) is a reasonable follow-up — but
+      is not required, and the hand-authored preview is a perfectly
+      legitimate permanent choice too (it's what `ButtonBlock`,
+      `HeroBlock` and `PersonCardBlock` already do on purpose, per
+      `test_hand_authored_preview_is_used_over_harvested_content`).
 
 ## Git Conventions
 

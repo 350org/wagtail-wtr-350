@@ -1,0 +1,6 @@
+{% load i18n %}
+<div class="wtr-button-group flex flex-wrap items-center gap-4">
+    {% for button in value.buttons %}
+        {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
+    {% endfor %}
+</div>

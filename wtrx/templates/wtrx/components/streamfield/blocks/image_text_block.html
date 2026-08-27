@@ -28,7 +28,8 @@ comes from the page templates' space-y-32 on the block loop.
     <div class="mx-auto flex max-w-[1186px] flex-col gap-8 md:flex-row md:items-start md:justify-center lg:gap-32">
         {% image value.image max-756x598 as img %}
         <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
-             class="h-[299px] w-full shrink-0 object-contain md:w-[378px]" loading="lazy">
+             class="h-[299px] w-full shrink-0 object-contain md:w-[378px]{% if value.alignment == 'image-right' %} md:order-2{% endif %}"
+             loading="lazy">
         <div class="flex min-w-0 flex-1 flex-col gap-8">
             <h2 class="font-heading text-2xl leading-[1.2] tracking-tight text-dark sm:text-3xl lg:text-40">
                 {{ value.heading }}

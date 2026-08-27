@@ -1,0 +1,25 @@
+{% load i18n wagtailimages_tags %}
+{% comment %}
+Fixed responsive breakpoint grid (2/3/4 columns), not count-conditional CSS
+like card_grid_block.html — a cropped photo tolerates an uneven trailing
+row far better than a text-bearing card does. See ImageGridBlock's
+docstring in wtrx/blocks/__init__.py.
+
+Full-bleed width: same w-full-outer / max-w-inner two-tier pattern as
+card_grid_block.html.
+{% endcomment %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-[1218px]">
+        {% if value.heading %}
+            <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+        {% endif %}
+        <div class="wtr-image-grid grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
+            {% for item in value.images %}
+                {% image item.image fill-600x600 as img %}
+                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}"
+                     alt="{{ item.alt_text|default:img.alt }}"
+                     class="aspect-square w-full rounded-lg object-cover" loading="lazy">
+            {% endfor %}
+        </div>
+    </div>
+</div>

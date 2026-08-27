@@ -1,0 +1,41 @@
+{% load i18n wagtailimages_tags %}
+{% comment %}
+Denser columns and a fixed-height cell (object-contain) than
+image_grid_block.html — logos are small marks of mixed aspect ratio, not
+uniform photos, so they need to align on a common baseline rather than
+crop to fill a shape.
+
+Alt text follows the non-image-fallback pattern (AGENTS.md pitfall #38):
+image.description|default:logo.name, not bare rendition alt — a logo's
+fallback is an organization name, not a filename/description chain.
+
+Full-bleed width: same w-full-outer / max-w-inner two-tier pattern as
+image_grid_block.html.
+{% endcomment %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-[1218px]">
+        {% if value.heading %}
+            <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+        {% endif %}
+        <div class="wtr-logo-grid grid grid-cols-2 gap-x-12 gap-y-10 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {% for logo in value.logos %}
+                {% image logo.image max-300x160 as img %}
+                {% if logo.link_page or logo.link_url %}
+                    <a href="{% if logo.link_page %}{{ logo.link_page.url }}{% else %}{{ logo.link_url }}{% endif %}"
+                       {% if logo.link_url and not logo.link_page %}rel="noopener noreferrer"{% endif %}
+                       class="flex h-16 items-center justify-center sm:h-20">
+                        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}"
+                             alt="{{ logo.image.description|default:logo.name }}"
+                             class="h-16 w-auto object-contain sm:h-20" loading="lazy">
+                    </a>
+                {% else %}
+                    <div class="flex h-16 items-center justify-center sm:h-20">
+                        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}"
+                             alt="{{ logo.image.description|default:logo.name }}"
+                             class="h-16 w-auto object-contain sm:h-20" loading="lazy">
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>

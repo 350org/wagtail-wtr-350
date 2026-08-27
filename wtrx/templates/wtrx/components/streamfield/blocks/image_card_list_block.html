@@ -33,7 +33,7 @@ page templates' space-y-32 on the block loop.
             {{ value.heading }}
         </h2>
         <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-8">
-            <div>
+            <div{% if value.alignment == 'image-right' %} class="md:order-2"{% endif %}>
                 <div class="md:sticky md:top-0">
                     {% image value.image fill-1200x1200 as img %}
                     <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"

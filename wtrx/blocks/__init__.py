@@ -2,10 +2,12 @@
 StreamField blocks for the BodyStreamBlock.
 
 Block categories (in definition order):
-  Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock,
+  Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock, ButtonGroupBlock,
             RawHTMLBlock, TableBlock
   Cards:    CardBlock, CarouselCardBlock, PersonCardBlock
-  Layout:   AccordionItemBlock, CardGridBlock, ImageCardListItemBlock,
+  Layout:   AccordionItemBlock, CardGridBlock, ImageGridItemBlock,
+            ImageGridBlock, LogoGridItemBlock, LogoGridBlock,
+            PersonCardGridBlock, ImageCardListItemBlock,
             ImageCardListBlock, ImageTextBlock, FeaturePanelBlock,
             CardCarouselBlock, PageCardsBlock, AccordionBlock, QuoteBlock,
             CalloutBlock
@@ -21,7 +23,9 @@ All blocks are assembled into BodyStreamBlock at the bottom of this file.
 import copy
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
+from html.parser import HTMLParser
 import json
+import math
 from pathlib import Path
 import re
 from urllib.parse import urlparse
@@ -70,7 +74,13 @@ BUTTON_STYLE_CHOICES = [
     ("outline", _("Outline")),
 ]
 
-QUOTE_ALIGNMENT_CHOICES = [
+# Shared by every block that puts an image in a side column and lets the
+# editor flip which side it's on: QuoteBlock, FeaturePanelBlock,
+# ImageCardListBlock, ImageTextBlock, DonateFundraiseUpBlock. Each of these
+# used to define its own identical list (or, for the latter three, no
+# alignment field at all) — one shared constant here, following the same
+# "reuse rather than duplicate" precedent as BACKGROUND_COLOR_CHOICES below.
+IMAGE_ALIGNMENT_CHOICES = [
     ("image-left", _("Image left")),
     ("image-right", _("Image right")),
 ]
@@ -125,11 +135,6 @@ LEGACY_BACKGROUND_VALUES = {
     "primary": "blue-gradient",  # SectionBlock
     "secondary": "navy",         # SectionBlock
 }
-
-FEATURE_PANEL_ALIGNMENT_CHOICES = [
-    ("image-left", _("Image left")),
-    ("image-right", _("Image right")),
-]
 
 SECTION_PADDING_CHOICES = [
     ("sm", _("Small")),
@@ -505,6 +510,58 @@ def _person_card_preview_value():
     }
 
 
+def _image_grid_preview_value():
+    """
+    Placeholder value for ImageGridBlock's picker preview. Not
+    ContentPreviewMixin: no real page uses this brand-new block yet, so
+    there is nothing to harvest -- see preview_image()'s docstring for why
+    a hand-written preview_value is the right tool here, same as
+    HeroBlock/PersonCardBlock above. Reuses the one placeholder image
+    across all four slots, same as any hand-authored multi-image preview
+    in this file.
+    """
+    img = preview_image()
+    return {
+        "heading": "",
+        "images": [{"image": img, "alt_text": ""} for _i in range(4)],
+    }
+
+
+def _logo_grid_preview_value():
+    """Placeholder value for LogoGridBlock's picker preview."""
+    img = preview_image()
+    return {
+        "heading": "",
+        "logos": [
+            {"image": img, "name": _("Example Org"), "link_page": None, "link_url": ""}
+            for _i in range(4)
+        ],
+    }
+
+
+def _person_card_grid_preview_value():
+    """
+    Placeholder value for PersonCardGridBlock's picker preview. Five
+    people demonstrates the 3+2 row split -- see _person_grid_rows().
+    """
+    img = preview_image()
+    return {
+        "heading": "",
+        "people": [
+            {
+                "name": _("Jane Doe"),
+                "role": _("Regional Organising Lead"),
+                "image": img,
+                "bio": "",
+                "email": "",
+                "phone": "",
+                "website": "",
+            }
+            for _i in range(5)
+        ],
+    }
+
+
 def _signup_wagtail_forms_preview_value():
     """
     Placeholder value for SignupWagtailFormsBlock's picker preview.
@@ -709,17 +766,119 @@ class ButtonBlock(StructBlock):
         }
 
 
+class ButtonGroupBlock(StructBlock):
+    """
+    Two or more CTA buttons in a row. Does not replace ButtonBlock (a
+    single button) — that stays registered separately for pages that only
+    need one CTA and for backward compatibility with existing content.
+
+    NOTE: inline mid-paragraph buttons in rich text (a button embedded in
+    the flow of a text block, like a styled link) were explicitly deferred
+    — no custom Draftail entity/register_rich_text_features hook exists
+    anywhere in this codebase, and building one is a materially bigger
+    lift than this block. Revisit as a separate project if requested.
+    """
+
+    buttons = ListBlock(ButtonBlock(), min_num=1, max_num=5, label=_("Buttons"))
+
+    class Meta:
+        icon = "link"
+        label = _("Button Group")
+        template = "wtrx/components/streamfield/blocks/button_group_block.html"
+        description = _(
+            "Two or more call-to-action buttons displayed in a row. Use the "
+            "single Button block instead for one CTA."
+        )
+        preview_value = {
+            "buttons": [
+                {
+                    "text": _("Take action"),
+                    "link_page": None,
+                    "link_url": "https://example.com",
+                    "anchor": "",
+                    "style": "primary",
+                },
+                {
+                    "text": _("Learn more"),
+                    "link_page": None,
+                    "link_url": "https://example.com",
+                    "anchor": "",
+                    "style": "outline",
+                },
+            ]
+        }
+
+
+_VOID_ELEMENTS = {
+    "area", "base", "br", "col", "embed", "hr", "img", "input",
+    "link", "meta", "param", "source", "track", "wbr",
+}
+
+
+class _TagBalanceParser(HTMLParser):
+    """
+    Tracks open-tag nesting to catch the most common pasted-embed mistake
+    (a stray or missing closing tag). Does not validate full HTML5
+    conformance (attribute syntax etc.) — that would be noisy against
+    legitimate third-party embed codes, which is exactly what RawHTMLBlock
+    exists to hold. HTMLParser doesn't descend into <script>/<style>
+    content as tags, so inline JS/CSS containing "<"/">" is not an issue.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.stack = []
+        self.mismatched = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in _VOID_ELEMENTS:
+            self.stack.append(tag)
+
+    def handle_endtag(self, tag):
+        if tag in _VOID_ELEMENTS:
+            return
+        if not self.stack or self.stack[-1] != tag:
+            self.mismatched = True
+        elif self.stack:
+            self.stack.pop()
+
+    @property
+    def is_balanced(self):
+        return not self.mismatched and not self.stack
+
+
+def _html_is_balanced(value):
+    parser = _TagBalanceParser()
+    parser.feed(value)
+    parser.close()
+    return parser.is_balanced
+
+
 class RawHTMLBlock(WagtailRawHTMLBlock):
     """
     A raw HTML passthrough block for embed codes, custom widgets, etc.
 
-    Use sparingly. Output is not sanitized. wagtail-localize will expose
-    the raw markup to translators — brief editor guidance is recommended.
+    Use sparingly. Output is not sanitized -- validation only checks tag
+    balance (every opening tag has a matching closing tag), not markup
+    safety. wagtail-localize will expose the raw markup to translators —
+    brief editor guidance is recommended.
     """
 
     #: Laid out narrow so the preview scales it up: at the default desktop
     #: width this block's content is too small to read in the pane.
     preview_target_width = 700
+
+    def clean(self, value):
+        value = super().clean(value)
+        if value and not _html_is_balanced(value):
+            raise ValidationError(
+                _(
+                    "This HTML appears to have mismatched or unclosed tags "
+                    "— check that every opening tag has a matching closing "
+                    "tag."
+                )
+            )
+        return value
 
     class Meta:
         icon = "code"
@@ -728,7 +887,8 @@ class RawHTMLBlock(WagtailRawHTMLBlock):
         description = _(
             "Paste in HTML supplied by another service -- an embed, a widget, "
             "a snippet of markup. It is rendered exactly as given, so only use "
-            "it for code you trust."
+            "it for code you trust. Tag balance is validated on save; markup "
+            "safety is not."
         )
         preview_value = (
             '<div style="border:2px dashed #9aa5a8;border-radius:8px;padding:24px;'
@@ -1002,6 +1162,217 @@ class CardGridBlock(ContentPreviewMixin, StructBlock):
         )
 
 
+class ImageGridItemBlock(StructBlock):
+    """
+    A single item in an ImageGridBlock's `images` list: just an image and
+    an optional alt-text override. This is an internal sub-block rendered
+    by image_grid_block.html — no Meta.template, same as
+    ImageCardListItemBlock.
+    """
+
+    image = ImageChooserBlock(label=_("Image"))
+    alt_text = CharBlock(
+        required=False,
+        label=_("Alt text"),
+        help_text=_(
+            "Overrides the image description for screen readers. Leave "
+            "blank to use the description set on the image itself."
+        ),
+    )
+
+    class Meta:
+        icon = "image"
+        label = _("Image")
+
+
+class ImageGridBlock(StructBlock):
+    """
+    An auto-responsive grid of photos, cropped to a consistent square
+    aspect ratio.
+
+    Unlike CardGridBlock, column count is a fixed responsive breakpoint
+    grid (2/3/4 columns) rather than count-conditional CSS — a cropped
+    photo tolerates an uneven trailing row far better than a text-bearing
+    card does (no heading/body/CTA to look "orphaned"), and this block's
+    count range (2-24) is wider than cards' (2-12), so replicating
+    per-count branching isn't worth it. No per-image caption field — this
+    is a grid, not a set of individually captioned figures.
+
+    Not ContentPreviewMixin: no real page uses this block yet, so there is
+    nothing to harvest -- see _image_grid_preview_value().
+    """
+
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
+    images = ListBlock(
+        ImageGridItemBlock(),
+        min_num=2,
+        max_num=24,
+        label=_("Images"),
+    )
+
+    class Meta:
+        icon = "grip"
+        label = _("Image Grid")
+        template = "wtrx/components/streamfield/blocks/image_grid_block.html"
+        description = _(
+            "An auto-responsive grid of 2-24 photos, cropped to a consistent "
+            "square shape. No per-image captions. There are no column controls."
+        )
+        preview_value = staticmethod(_image_grid_preview_value)
+
+
+class LogoGridItemBlock(StructBlock):
+    """
+    A single item in a LogoGridBlock's `logos` list: an image, an
+    organization name (used as the alt-text fallback and, if the logo
+    links out, its accessible label), and an optional link.
+    """
+
+    image = ImageChooserBlock(label=_("Logo"))
+    name = CharBlock(
+        label=_("Organization name"),
+        help_text=_(
+            "Used as alt text if the image has no description, and as the "
+            "logo's accessible label if it links out."
+        ),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal page link. Set only one of the two link fields."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set only one of the two link fields."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "site"
+        label = _("Logo")
+
+
+class LogoGridBlock(StructBlock):
+    """
+    A grid of partner/funder logos, sized consistently regardless of each
+    logo's own aspect ratio (a fixed-height cell, object-contain). Denser
+    columns and more generous gaps than ImageGridBlock, since logos are
+    small marks rather than photos. Logos may optionally link out.
+
+    Not ContentPreviewMixin: no real page uses this block yet, so there is
+    nothing to harvest -- see _logo_grid_preview_value().
+    """
+
+    heading = CharBlock(required=False, label=_("Heading"))
+    logos = ListBlock(
+        LogoGridItemBlock(),
+        min_num=2,
+        max_num=30,
+        label=_("Logos"),
+    )
+
+    class Meta:
+        icon = "grip"
+        label = _("Logo Grid")
+        template = "wtrx/components/streamfield/blocks/logo_grid_block.html"
+        description = _(
+            "A grid of 2-30 partner/funder logos, sized consistently. Logos "
+            "may optionally link out."
+        )
+        preview_value = staticmethod(_logo_grid_preview_value)
+
+
+def _person_grid_rows(people):
+    """
+    Split `people` into rows of 3 (preferred) and 2, rows of 3 first.
+
+    A single global column count (uniformly 2 or 3 for every row) cannot
+    avoid a trailing row of exactly 1 person for every count: 3-col
+    orphans whenever count % 3 == 1 (4, 7, 10, 13...), 2-col orphans at
+    odd counts > 2 (3, 5, 7, 9, 11...), and the counts where BOTH fail are
+    count ≡ 1 (mod 6) — 7, 13, 19... Mixing rows of 3 and rows of 2 within
+    one grid, computed here, eliminates the orphan entirely for every
+    count >= 2:
+
+        rows_count = ceil(n / 3); threes = n - 2*rows_count; twos = 3*rows_count - n
+
+    Both `threes` and `twos` are provably non-negative for every n >= 2
+    (threes >= 0 needs n >= 2*rows_count, which holds because
+    n >= 3*rows_count - 2 >= 2*rows_count once rows_count >= 2, i.e. n >= 4;
+    n in {2, 3} each give rows_count == 1 and satisfy it directly). So
+    every row this produces is size 2 or 3 — never 1. See
+    TestPersonGridRows for the executable version of this proof.
+    """
+    # Wagtail's ListValue.__getitem__ only handles integer indices, not
+    # slice objects (people[i:j] silently misbehaves rather than raising),
+    # so convert to a plain list up front.
+    people = list(people)
+    n = len(people)
+    if n <= 1:
+        return [people]
+    rows_count = math.ceil(n / 3)
+    threes = n - 2 * rows_count
+    twos = 3 * rows_count - n
+    sizes = [3] * threes + [2] * twos
+    rows, i = [], 0
+    for size in sizes:
+        rows.append(people[i : i + size])
+        i += size
+    return rows
+
+
+class PersonCardGridBlock(StructBlock):
+    """
+    A grid of people (staff, spokespeople, board members), laid out so
+    there is never a lone card on its own row — see _person_grid_rows().
+
+    Flexbox with justify-center, not CSS Grid like CardGridBlock: rows are
+    computed explicitly in Python and each renders as its own small flex
+    row, so a partial row (e.g. 2 people) centers naturally. Reuses
+    PersonCardBlock as the item block and person_card.html for per-item
+    rendering — the standalone `person_card` registration is unchanged,
+    for single-person spotlight use.
+
+    Not ContentPreviewMixin: no real page uses this block yet, so there is
+    nothing to harvest -- see _person_card_grid_preview_value(). 5 people
+    in that preview demonstrates the 3+2 row split.
+    """
+
+    heading = CharBlock(required=False, label=_("Heading"))
+    people = ListBlock(
+        PersonCardBlock(),
+        min_num=1,
+        max_num=12,
+        label=_("People"),
+    )
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _person_grid_rows(value["people"])
+        return ctx
+
+    class Meta:
+        icon = "group"
+        label = _("Person Card Grid")
+        template = "wtrx/components/streamfield/blocks/person_card_grid_block.html"
+        description = _(
+            "A grid of up to 12 people, laid out automatically — never a "
+            "lone card on its own row. There are no column controls."
+        )
+        preview_value = staticmethod(_person_card_grid_preview_value)
+
+
 class ImageCardListItemBlock(StructBlock):
     """
     A single item in an ImageCardListBlock's `cards` list: a heading and a
@@ -1041,6 +1412,12 @@ class ImageCardListBlock(ContentPreviewMixin, StructBlock):
         min_num=2,
         label=_("Cards"),
     )
+    alignment = ChoiceBlock(
+        choices=IMAGE_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Image alignment"),
+        help_text=_("Which side the image sits on — the cards sit on the opposite side."),
+    )
 
     class Meta:
         icon = "grip"
@@ -1070,6 +1447,12 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
     text = RichTextBlock(
         features=RICHTEXT_FEATURES_INLINE,
         label=_("Text"),
+    )
+    alignment = ChoiceBlock(
+        choices=IMAGE_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Image alignment"),
+        help_text=_("Which side the image sits on — the text sits on the opposite side."),
     )
 
     class Meta:
@@ -1128,7 +1511,7 @@ class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
     )
     image = ImageChooserBlock(label=_("Image"))
     alignment = ChoiceBlock(
-        choices=FEATURE_PANEL_ALIGNMENT_CHOICES,
+        choices=IMAGE_ALIGNMENT_CHOICES,
         default="image-left",
         label=_("Alignment"),
         help_text=_("Which side of the panel the image sits on."),
@@ -1407,7 +1790,7 @@ class QuoteBlock(StructBlock):
         help_text=_("External link. Set either this or Link page, not both."),
     )
     alignment = ChoiceBlock(
-        choices=QUOTE_ALIGNMENT_CHOICES,
+        choices=IMAGE_ALIGNMENT_CHOICES,
         default="image-left",
         label=_("Media alignment"),
         help_text=_(
@@ -1671,6 +2054,15 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
         help_text=_(
             "Optional Fundraise Up designation ID to route this donation to "
             "a specific fund."
+        ),
+    )
+    alignment = ChoiceBlock(
+        choices=IMAGE_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Image alignment"),
+        help_text=_(
+            "Which side the image sits on — the dark panel sits on the "
+            "opposite side. Has no effect when no image is set."
         ),
     )
 
@@ -1949,6 +2341,19 @@ class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
         help_text=_(
             "Panel fill behind the heading, copy and form. The same palette "
             "as the page hero banner, callout and section blocks."
+        ),
+    )
+    layout = ChoiceBlock(
+        choices=[
+            ("columns", _("Side by side")),
+            ("vertical", _("Stacked vertically")),
+        ],
+        default="columns",
+        label=_("Layout"),
+        help_text=_(
+            "Side by side splits copy and form into two columns (default). "
+            "Stacked vertically runs image, copy and form down a single "
+            "narrow column — better for long forms with many fields."
         ),
     )
     image = ImageChooserBlock(
@@ -2284,12 +2689,16 @@ class SectionContentBlock(StreamBlock):
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()
+    button_group = ButtonGroupBlock()
     quote = QuoteBlock()
     raw_html = RawHTMLBlock()
     table = TableBlock()
     card = CardBlock()
     person_card = PersonCardBlock()
+    person_card_grid = PersonCardGridBlock()
     card_grid = CardGridBlock()
+    image_grid = ImageGridBlock()
+    logo_grid = LogoGridBlock()
     image_card_list = ImageCardListBlock()
     image_text = ImageTextBlock()
     feature_panel = FeaturePanelBlock()
@@ -2380,12 +2789,16 @@ class BodyStreamBlock(StreamBlock):
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()
+    button_group = ButtonGroupBlock()
     quote = QuoteBlock()
     raw_html = RawHTMLBlock()
     table = TableBlock()
     card = CardBlock()
     person_card = PersonCardBlock()
+    person_card_grid = PersonCardGridBlock()
     card_grid = CardGridBlock()
+    image_grid = ImageGridBlock()
+    logo_grid = LogoGridBlock()
     image_card_list = ImageCardListBlock()
     image_text = ImageTextBlock()
     feature_panel = FeaturePanelBlock()
