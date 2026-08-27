@@ -29,7 +29,7 @@
     space-y-32 on the block loop.
 {% endcomment %}
 <div class="w-full px-4 sm:px-6 lg:px-8">
-    <div class="wtr-donate mx-auto grid max-w-[1500px] grid-cols-1 overflow-hidden rounded-lg md:grid-cols-2">
+    <div class="wtr-donate mx-auto grid max-w-[1500px] grid-cols-1 overflow-hidden rounded-lg{% if value.image %} md:grid-cols-2{% endif %}">
         {% if value.image %}
             <div class="relative">
                 {% image value.image fill-1200x1200 as img %}
