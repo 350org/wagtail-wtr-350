@@ -36,9 +36,11 @@
         blocks here are narrower than on other page types; that's a
         pre-existing IndexPage limitation, not something this fixes.
         {% endcomment %}
-        <div class="mt-16 space-y-24">
+        <div class="wtr-body-stack mt-16 space-y-24">
             {% for block in page.body %}
-                {% include_block block %}
+                <div data-block-type="{{ block.block_type }}">
+                    {% include_block block %}
+                </div>
             {% endfor %}
         </div>
     {% endif %}
