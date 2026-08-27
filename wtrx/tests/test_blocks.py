@@ -40,6 +40,7 @@ from wtrx.blocks import (
     CalloutBlock,
     CardBlock,
     CardCarouselBlock,
+    CardGridBlock,
     DonateBlock,
     DonateFundraiseUpBlock,
     FeaturePanelBlock,
@@ -64,7 +65,7 @@ from wtrx.blocks import (
     SignupLinkBlock,
     SuccessMessageBlock,
     VideoBlock,
-    _person_grid_rows,
+    _balanced_rows,
     _validate_at_most_one_link,
     background_is_light,
     parse_action_network_url,
@@ -140,11 +141,11 @@ class TestButtonBlockValidation(SimpleTestCase):
 
 
 class TestButtonGroupBlockFields(SimpleTestCase):
-    """ButtonGroupBlock field structure: a ListBlock of 1-5 ButtonBlocks."""
+    """ButtonGroupBlock field structure: a ListBlock of 1-5 ButtonBlocks, plus layout."""
 
     def test_has_expected_fields(self):
         block = ButtonGroupBlock()
-        self.assertEqual(set(block.declared_blocks.keys()), {"buttons"})
+        self.assertEqual(set(block.declared_blocks.keys()), {"buttons", "layout"})
 
     def test_buttons_min_num_is_one(self):
         block = ButtonGroupBlock()
@@ -157,6 +158,30 @@ class TestButtonGroupBlockFields(SimpleTestCase):
     def test_buttons_child_block_is_button_block(self):
         block = ButtonGroupBlock()
         self.assertIsInstance(block.declared_blocks["buttons"].child_block, ButtonBlock)
+
+    def test_layout_defaults_to_horizontal(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(block.declared_blocks["layout"].meta.default, "horizontal")
+
+    def test_layout_choices(self):
+        block = ButtonGroupBlock()
+        choices = dict(block.declared_blocks["layout"].field.choices)
+        self.assertEqual(set(choices.keys()), {"horizontal", "vertical"})
+
+    def test_max_per_row_is_three(self):
+        self.assertEqual(ButtonGroupBlock.MAX_PER_ROW, 3)
+
+    def test_get_context_computes_rows_for_horizontal(self):
+        block = ButtonGroupBlock()
+        value = {"buttons": [1, 2, 3, 4], "layout": "horizontal"}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [2, 2])
+
+    def test_get_context_has_no_rows_for_vertical(self):
+        block = ButtonGroupBlock()
+        value = {"buttons": [1, 2, 3], "layout": "vertical"}
+        ctx = block.get_context(value, parent_context={})
+        self.assertNotIn("rows", ctx)
 
 
 class TestButtonGroupBlockValidation(SimpleTestCase):
@@ -746,6 +771,49 @@ class TestImageGridItemBlockFields(SimpleTestCase):
         self.assertFalse(block.declared_blocks["alt_text"].required)
 
 
+class TestCardGridBlockFields(SimpleTestCase):
+    """
+    CardGridBlock field structure and its dynamic row-balancing via
+    _balanced_rows() (previously untested -- see AGENTS.md pitfall #44).
+    """
+
+    def test_has_expected_fields(self):
+        block = CardGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "cards"})
+
+    def test_cards_min_num_is_two(self):
+        block = CardGridBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.min_num, 2)
+
+    def test_cards_max_num_is_12(self):
+        block = CardGridBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.max_num, 12)
+
+    def test_cards_child_block_is_card_block(self):
+        block = CardGridBlock()
+        self.assertIsInstance(block.declared_blocks["cards"].child_block, CardBlock)
+
+    def test_max_per_row_is_three(self):
+        self.assertEqual(CardGridBlock.MAX_PER_ROW, 3)
+
+    def test_get_context_computes_rows(self):
+        block = CardGridBlock()
+        value = {"heading": "", "cards": [1, 2, 3, 4]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [2, 2])
+
+    def test_get_context_has_no_orphan_row_at_seven(self):
+        """
+        The regression case: the old CSS-only special case (2 or 4 cards
+        get lg:grid-cols-2, everything else lg:grid-cols-3) rendered 7
+        cards as an unbalanced 3+3+1. _balanced_rows() gives 3+2+2.
+        """
+        block = CardGridBlock()
+        value = {"heading": "", "cards": [1, 2, 3, 4, 5, 6, 7]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2, 2])
+
+
 class TestImageGridBlockFields(SimpleTestCase):
     """ImageGridBlock field structure: heading + images (min 2, max 24)."""
 
@@ -768,6 +836,15 @@ class TestImageGridBlockFields(SimpleTestCase):
     def test_images_child_block_is_image_grid_item(self):
         block = ImageGridBlock()
         self.assertIsInstance(block.declared_blocks["images"].child_block, ImageGridItemBlock)
+
+    def test_max_per_row_is_four(self):
+        self.assertEqual(ImageGridBlock.MAX_PER_ROW, 4)
+
+    def test_get_context_computes_rows(self):
+        block = ImageGridBlock()
+        value = {"heading": "", "images": [1, 2, 3, 4, 5]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2])
 
 
 class TestLogoGridItemBlockFields(SimpleTestCase):
@@ -832,71 +909,112 @@ class TestLogoGridBlockFields(SimpleTestCase):
         block = LogoGridBlock()
         self.assertIsInstance(block.declared_blocks["logos"].child_block, LogoGridItemBlock)
 
+    def test_max_per_row_is_five(self):
+        self.assertEqual(LogoGridBlock.MAX_PER_ROW, 5)
 
-class TestPersonGridRows(SimpleTestCase):
+    def test_get_context_computes_rows(self):
+        block = LogoGridBlock()
+        value = {"heading": "", "logos": [1, 2, 3, 4, 5, 6]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 3])
+
+
+class TestBalancedRows(SimpleTestCase):
     """
-    _person_grid_rows() splits people into rows of 3 (preferred) and 2,
-    never a row of 1 for len(people) >= 2 -- see its docstring for the
-    proof this encodes as an executable check.
+    _balanced_rows(items, max_per_row) is the row-layout algorithm shared
+    by CardGridBlock, ImageGridBlock, LogoGridBlock and
+    PersonCardGridBlock (each with their own max_per_row) -- never a row
+    of 1 for len(items) > max_per_row, see its docstring for the proof
+    this encodes as an executable check.
     """
 
-    def _people(self, n):
+    def _items(self, n):
         return list(range(n))
 
-    def test_count_1(self):
-        self.assertEqual(_person_grid_rows(self._people(1)), [[0]])
+    def test_count_1_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(1), 3), [[0]])
 
-    def test_count_2(self):
-        self.assertEqual(_person_grid_rows(self._people(2)), [[0, 1]])
+    def test_count_2_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(2), 3), [[0, 1]])
 
-    def test_count_3(self):
-        self.assertEqual(_person_grid_rows(self._people(3)), [[0, 1, 2]])
+    def test_count_at_cap_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(3), 3), [[0, 1, 2]])
 
-    def test_count_4_is_2x2(self):
-        rows = _person_grid_rows(self._people(4))
+    def test_cap_3_count_4_is_2x2(self):
+        rows = _balanced_rows(self._items(4), 3)
         self.assertEqual([len(r) for r in rows], [2, 2])
 
-    def test_count_5_is_3_plus_2(self):
-        rows = _person_grid_rows(self._people(5))
+    def test_cap_3_count_5_is_3_plus_2(self):
+        rows = _balanced_rows(self._items(5), 3)
         self.assertEqual([len(r) for r in rows], [3, 2])
 
-    def test_count_6_is_3_plus_3(self):
-        rows = _person_grid_rows(self._people(6))
+    def test_cap_3_count_6_is_3_plus_3(self):
+        rows = _balanced_rows(self._items(6), 3)
         self.assertEqual([len(r) for r in rows], [3, 3])
 
-    def test_count_7_has_no_orphan_row(self):
+    def test_cap_3_count_7_has_no_orphan_row(self):
         """
         The key regression test: a naive uniform 2-or-3-column rule fails
-        for count=7 (both give a trailing row of 1). The mixed-row
-        algorithm produces [3, 2, 2] instead.
+        for count=7 (both give a trailing row of 1) -- this is exactly
+        what CardGridBlock's old CSS-only special case did. The
+        evenly-distributed algorithm produces [3, 2, 2] instead.
         """
-        rows = _person_grid_rows(self._people(7))
+        rows = _balanced_rows(self._items(7), 3)
         self.assertEqual([len(r) for r in rows], [3, 2, 2])
 
-    def test_count_10(self):
-        rows = _person_grid_rows(self._people(10))
+    def test_cap_3_count_10(self):
+        rows = _balanced_rows(self._items(10), 3)
         self.assertEqual([len(r) for r in rows], [3, 3, 2, 2])
 
-    def test_no_row_of_one_for_any_count_up_to_29(self):
-        for n in range(2, 30):
-            with self.subTest(count=n):
-                rows = _person_grid_rows(self._people(n))
-                self.assertTrue(all(len(r) >= 2 for r in rows))
+    def test_cap_4_count_5_is_3_plus_2(self):
+        """ImageGridBlock's cap (4): a count just over it still balances."""
+        rows = _balanced_rows(self._items(5), 4)
+        self.assertEqual([len(r) for r in rows], [3, 2])
 
-    def test_rows_cover_every_person_exactly_once(self):
-        for n in range(1, 30):
-            with self.subTest(count=n):
-                rows = _person_grid_rows(self._people(n))
-                flattened = [p for row in rows for p in row]
-                self.assertEqual(flattened, self._people(n))
+    def test_cap_4_count_9_has_no_orphan_row(self):
+        """A uniform 4-column grid would leave [4, 4, 1] here."""
+        rows = _balanced_rows(self._items(9), 4)
+        self.assertEqual([len(r) for r in rows], [3, 3, 3])
+
+    def test_cap_5_count_6_is_3_plus_3(self):
+        """LogoGridBlock's cap (5): a count just over it still balances."""
+        rows = _balanced_rows(self._items(6), 5)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+
+    def test_cap_5_count_11_has_no_orphan_row(self):
+        """A uniform 5-column grid would leave [5, 5, 1] here."""
+        rows = _balanced_rows(self._items(11), 5)
+        self.assertEqual([len(r) for r in rows], [4, 4, 3])
+
+    def test_no_row_of_one_for_a_spread_of_counts_and_caps(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) >= 2 for r in rows))
+
+    def test_no_row_exceeds_the_cap(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) <= max_per_row for r in rows))
+
+    def test_rows_cover_every_item_exactly_once(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(1, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    flattened = [p for row in rows for p in row]
+                    self.assertEqual(flattened, self._items(n))
 
     def test_works_with_an_object_that_only_supports_int_indexing(self):
         """
         Regression test: Wagtail's real ListValue.__getitem__ only handles
-        integer indices, not slice objects -- people[i:j] on one silently
+        integer indices, not slice objects -- items[i:j] on one silently
         returns garbage (a plain list has .value called on it) rather than
         raising, so a plain-list-only test suite can't catch it. This
-        stand-in reproduces that restriction to prove _person_grid_rows()
+        stand-in reproduces that restriction to prove _balanced_rows()
         converts to a real list before slicing.
         """
 
@@ -913,7 +1031,7 @@ class TestPersonGridRows(SimpleTestCase):
                 return self._items[i]
 
         wrapped = IntOnlyIndexable(list(range(7)))
-        rows = _person_grid_rows(wrapped)
+        rows = _balanced_rows(wrapped, 3)
         self.assertEqual([len(r) for r in rows], [3, 2, 2])
         self.assertEqual([p for row in rows for p in row], list(range(7)))
 

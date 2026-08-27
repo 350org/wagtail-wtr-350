@@ -962,6 +962,60 @@ h3, h4, h5, h6 {
 }
 
 /* ============================================================
+ * Body-stack spacing — .wtr-body-stack
+ * ============================================================
+ * The page-level body loop (content_page.html, post_page.html,
+ * index_page.html, home_page.html) separates every block with a flat
+ * space-y-24/32 (96px/128px) gap, sized to read as a section break. That's
+ * wrong for a block that's a continuation of the one before it rather than
+ * a new topic: a button placed right after a paragraph, or a card row that
+ * illustrates the paragraph above it. Both read as disconnected at 96px.
+ *
+ * These rules retarget specific block-type adjacencies down to 32px — the
+ * same value SectionBlock already uses for its own internal space-y-8, so
+ * there is one "closely related" spacing number in the app, not a second
+ * invented one. Scope is deliberately narrow: any gap touching a button
+ * (both before and after it), and text immediately before a card row
+ * (card_grid/card_carousel/page_cards). Every other adjacency is untouched.
+ *
+ * This is automatic and not editor-configurable, matching how every other
+ * block-to-block relationship in this codebase is opinionated rather than
+ * a raw layout control (see AGENTS.md rule #5).
+ *
+ * Each page template's body loop wraps every block in
+ * `data-block-type="{{ block.block_type }}"` and carries the
+ * `wtr-body-stack` class alongside its space-y-* utility. Overriding
+ * margin-block-end here — the property space-y-* sets on every
+ * not-last-child — works without fighting the cascade: these are unlayered
+ * rules and Tailwind's utilities live in `@layer utilities`, so unlayered
+ * rules win outright regardless of source order or specificity (same
+ * mechanism as the heading-weight rules above). The gap between two blocks
+ * is entirely controlled by the *earlier* block's margin-block-end, which
+ * is why "gap before a button" targets the preceding sibling via `:has()`
+ * rather than the button's own margin-block-start.
+ *
+ * button_group gets identical treatment to button — it's the same kind of
+ * page-continuation CTA, just one-or-more buttons instead of exactly one,
+ * so a single-line/paragraph adjacent to it reads the same way either
+ * block type is used.
+ * ============================================================ */
+.wtr-body-stack > [data-block-type='button'],
+.wtr-body-stack > [data-block-type='button_group'] {
+    margin-block-end: 2rem;
+}
+
+.wtr-body-stack > *:has(+ [data-block-type='button']),
+.wtr-body-stack > *:has(+ [data-block-type='button_group']) {
+    margin-block-end: 2rem;
+}
+
+.wtr-body-stack > [data-block-type='text']:has(+ [data-block-type='card_grid']),
+.wtr-body-stack > [data-block-type='text']:has(+ [data-block-type='card_carousel']),
+.wtr-body-stack > [data-block-type='text']:has(+ [data-block-type='page_cards']) {
+    margin-block-end: 2rem;
+}
+
+/* ============================================================
  * Rich text block headings — .wtr-text-block
  * ============================================================
  * Used by text_block.html. Tailwind Typography sizes headings relative to

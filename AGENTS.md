@@ -1534,54 +1534,87 @@ Two practical notes for agents:
     - No migration is needed for this change — `clean()` logic isn't part
       of a StreamField block's serialized/deconstructed definition.
 
-44. **`PersonCardGridBlock`'s row layout mixes rows of 3 and rows of 2 —
-    don't "simplify" it to one column count per grid**: a single global
-    column count (uniformly 2 or 3 for every row, the way `CardGridBlock`
-    picks one `lg:grid-cols-{2|3}` for the whole grid) cannot avoid a
-    trailing row of exactly 1 person for every possible count. Working it
-    out: a uniform 3-column grid leaves a lone last card whenever
-    `count % 3 == 1` (4, 7, 10, 13...); a uniform 2-column grid leaves one
-    whenever `count` is odd and greater than 2 (3, 5, 7, 9, 11...); the
-    counts where **both** fail are `count ≡ 1 (mod 6)` — 7, 13, 19... So
-    "just special-case 4 like CardGridBlock does" (the obvious-looking
-    fix) still breaks at 7.
-    - `_person_grid_rows()` (`wtrx/blocks/__init__.py`) instead computes
-      `rows_count = ceil(n / 3)`, `threes = n - 2*rows_count`,
-      `twos = 3*rows_count - n`, and emits `threes` rows of 3 followed by
-      `twos` rows of 2. Both counts are provably non-negative for every
-      `n >= 2` (see the function's docstring for the short proof), so
-      every row is size 2 or 3 — **never** 1, for any count. Count 5
-      becomes `[3, 2]`, 6 becomes `[3, 3]`, 7 becomes `[3, 2, 2]` (not the
-      `[3, 3, 1]` a uniform 3-column grid would give), and this keeps
-      holding for every larger count.
-    - `PersonCardGridBlock.get_context()` computes `rows` in Python and
-      the template (`person_card_grid_block.html`) renders each row as its
-      own `flex ... sm:justify-center` container — **flexbox, not CSS
-      Grid**, unlike `CardGridBlock`. `justify-center` naturally centers a
-      partial row (e.g. a row of 2), which CSS Grid does not do for a
-      trailing partial row without extra work; since rows are now
-      pre-computed explicitly, there's no need to fight Grid's own
-      auto-placement to get that centering.
-    - `_person_grid_rows()` converts its input to a real Python `list`
-      before slicing (`people = list(people)`). This is load-bearing, not
+44. **`_balanced_rows()` is the one row-layout algorithm shared by
+    `CardGridBlock`, `ImageGridBlock`, `LogoGridBlock` and
+    `PersonCardGridBlock` — don't reintroduce a per-block special case
+    instead of reusing it.** A single global row size (uniformly `k` or
+    `k - 1` items per row for the whole grid — e.g. CardGridBlock's old
+    CSS-only rule, `lg:grid-cols-2` for exactly 2 or 4 cards and
+    `lg:grid-cols-3` for everything else) cannot avoid a trailing row of
+    exactly 1 item for every possible count. That old CardGridBlock rule
+    genuinely broke at 7 cards — `lg:grid-cols-3` left an unbalanced
+    `[3, 3, 1]`, the exact orphan-row bug this function exists to prevent.
+    - `_balanced_rows(items, max_per_row)` (`wtrx/blocks/__init__.py`,
+      defined just above `ImageGridBlock`) takes the minimum number of
+      rows needed to respect the cap — `rows_count = ceil(n / max_per_row)`
+      — then distributes `n` items across those rows as evenly as
+      possible via `divmod(n, rows_count)`, rather than always preferring
+      the largest row size first. This is provably safe (every row has
+      2+ items, never 1) for any `n > max_per_row` as long as
+      `max_per_row >= 3` — see the function's docstring for the short
+      derivation, and `TestBalancedRows` for the executable property test
+      (asserts no row of length 1 across a spread of `(n, max_per_row)`
+      combinations). `n <= max_per_row` is simply one centered row of
+      everything — no splitting needed.
+    - Each block picks its own cap, matching how dense that content reads:
+      `PersonCardGridBlock.MAX_PER_ROW = 3` (the original, most detailed
+      content), `CardGridBlock.MAX_PER_ROW = 3`, `ImageGridBlock.MAX_PER_ROW = 4`
+      (photos are visually simpler than a card), `LogoGridBlock.MAX_PER_ROW = 5`
+      (logos are the smallest, densest content). The cap is a class
+      attribute (`self.MAX_PER_ROW`), not a magic number buried in
+      `get_context()` — read it off the class when adjusting a grid's
+      density rather than duplicating a literal `3`/`4`/`5` in a new call
+      site.
+    - Every one of these four blocks' `get_context()` computes `rows` in
+      Python and the matching template renders each row as its own
+      `flex ... justify-center` container — **flexbox, not CSS Grid**.
+      `justify-center` naturally centers a partial row (e.g. a row of 2),
+      which CSS Grid does not do for a trailing partial row without extra
+      work; since rows are pre-computed explicitly, there's no need to
+      fight Grid's own auto-placement to get that centering. The
+      breakpoint at which a row actually splits into multiple flex items
+      varies by block: `sm:` for `PersonCardGridBlock`/`ImageGridBlock`/
+      `LogoGridBlock` (content simple enough to split earlier), `md:` for
+      `CardGridBlock` (its cards carry more content — image, heading,
+      description, tag, link — and need more room before splitting).
+    - Whichever card-shaped component renders inside these rows needs
+      `h-full` on its own root (`components/card.html`,
+      `components/person_card.html`), even though the block templates
+      don't set an explicit height anywhere. Flexbox's default
+      `align-items: stretch` only stretches the *direct* flex item — each
+      block template wraps the shared component one level deeper (a
+      `w-full md:max-w-[…px] md:flex-1` div), so that wrapper gets
+      stretched to the row's tallest sibling, but the component's own
+      root, one level further in, won't match it without `h-full`.
+      Without this, two cards (or two person cards) with different
+      content lengths in the same row get mismatched heights/borders
+      instead of a clean shared bottom edge. `h-full` is a safe no-op
+      wherever no ancestor establishes a definite height (e.g.
+      `card_block.html`'s standalone single-card case) — CSS treats
+      `height: 100%` against an `auto`-height parent as `auto` too.
+      `ImageGridBlock`/`LogoGridBlock` don't need this: their items are
+      fixed-aspect-ratio images (`aspect-square`/`object-contain`), not
+      variable-height content, so there's no mismatch to fix.
+    - `_balanced_rows()` converts its input to a real Python `list`
+      before slicing (`items = list(items)`). This is load-bearing, not
       defensive boilerplate: Wagtail's real `ListValue` (what
-      `value["people"]` actually is at render time, versus a plain list in
-      a unit test) only implements integer-indexed `__getitem__`, and
-      slicing it (`people[i:j]`) does not raise — it silently returns
-      `self.bound_blocks[slice].value`, which is a plain `list` object
-      with no `.value` attribute, so it fails with a confusing
-      `AttributeError` deep inside Wagtail's own code instead of at the
-      call site. `TestPersonGridRows` pins this with a stand-in object
-      that only supports integer indexing, specifically because an
+      `value["people"]`/`value["cards"]`/etc. actually is at render time,
+      versus a plain list in a unit test) only implements integer-indexed
+      `__getitem__`, and slicing it (`items[i:j]`) does not raise — it
+      silently returns `self.bound_blocks[slice].value`, which is a plain
+      `list` object with no `.value` attribute, so it fails with a
+      confusing `AttributeError` deep inside Wagtail's own code instead of
+      at the call site. `TestBalancedRows` pins this with a stand-in
+      object that only supports integer indexing, specifically because an
       all-plain-list test suite cannot catch it.
-    - This logic has real Python test coverage
-      (`TestPersonGridRows`, including a property test asserting no row
-      has length 1 for every count from 2 to 29) — worth noting because
-      `CardGridBlock`'s equivalent "avoid an orphan row" logic has none at
-      all (it's pure-template `{% if %}` branching). Prefer computing
-      layout decisions like this in Python over template conditionals when
-      the logic gets more complex than one binary special case — it's
-      what made this bug provable and testable in the first place.
+    - This logic has real Python test coverage (`TestBalancedRows`,
+      including a property test asserting no row has length 1 across a
+      spread of counts and caps) — prefer computing layout decisions like
+      this in Python over template `{% if %}` conditionals once the logic
+      gets more complex than one binary special case; it's what made this
+      class of bug provable and testable in the first place, and what let
+      the CardGridBlock regression above get caught before it shipped
+      rather than after.
 
 45. **New StreamField blocks with no real content yet should use a
     hand-authored `Meta.preview_value`, not `ContentPreviewMixin`, until

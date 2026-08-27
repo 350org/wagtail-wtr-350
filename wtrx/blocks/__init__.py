@@ -528,13 +528,54 @@ def _image_grid_preview_value():
 
 
 def _logo_grid_preview_value():
-    """Placeholder value for LogoGridBlock's picker preview."""
-    img = preview_image()
+    """
+    Placeholder value for LogoGridBlock's picker preview.
+
+    Uses real partner-logo images already in the media library where
+    available (title contains "logo", excluding "350" -- that's the
+    site's own brand mark, not a partner) rather than repeating one
+    arbitrary image four times the way preview_image() alone would: a
+    logo grid specifically reads better with genuinely different marks
+    side by side, since the whole point is showing several organizations
+    at once. Falls back to preview_image() -- repeated, same as any other
+    hand-authored multi-image preview in this file -- when the library
+    doesn't have enough logo-titled images (e.g. a fresh dev DB with no
+    fixture data).
+
+    Deduplicates by title before capping at 7: the fixture library has at
+    least one logo re-uploaded under an identical title (Wagtail suffixes
+    the file name on a duplicate upload but leaves the title alone), which
+    would otherwise show the same mark twice in the preview.
+    """
+    from wtrx.images import CustomImage
+
+    candidates = (
+        CustomImage.objects.filter(title__icontains="logo")
+        .exclude(title__icontains="350")
+        .order_by("pk")[:20]
+    )
+    seen_titles = set()
+    logos = []
+    for img in candidates:
+        if img.title in seen_titles:
+            continue
+        seen_titles.add(img.title)
+        logos.append(img)
+        if len(logos) == 7:
+            break
+    if len(logos) < 2:
+        fallback = preview_image()
+        logos = [fallback] * 4
     return {
         "heading": "",
         "logos": [
-            {"image": img, "name": _("Example Org"), "link_page": None, "link_url": ""}
-            for _i in range(4)
+            {
+                "image": img,
+                "name": _("Partner Organization %(n)d") % {"n": i + 1},
+                "link_page": None,
+                "link_url": "",
+            }
+            for i, img in enumerate(logos)
         ],
     }
 
@@ -542,7 +583,7 @@ def _logo_grid_preview_value():
 def _person_card_grid_preview_value():
     """
     Placeholder value for PersonCardGridBlock's picker preview. Five
-    people demonstrates the 3+2 row split -- see _person_grid_rows().
+    people demonstrates the 3+2 row split -- see _balanced_rows().
     """
     img = preview_image()
     return {
@@ -766,11 +807,25 @@ class ButtonBlock(StructBlock):
         }
 
 
+BUTTON_GROUP_LAYOUT_CHOICES = [
+    ("horizontal", _("Horizontal")),
+    ("vertical", _("Vertical")),
+]
+
+
 class ButtonGroupBlock(StructBlock):
     """
-    Two or more CTA buttons in a row. Does not replace ButtonBlock (a
-    single button) — that stays registered separately for pages that only
-    need one CTA and for backward compatibility with existing content.
+    Two or more CTA buttons. Does not replace ButtonBlock (a single
+    button) — that stays registered separately for pages that only need
+    one CTA and for backward compatibility with existing content.
+
+    `layout` picks between two arrangements:
+      - "horizontal" (default): the same dynamic-centering row layout as
+        CardGridBlock/ImageGridBlock/LogoGridBlock/PersonCardGridBlock —
+        _balanced_rows() (max_per_row=3), rendered as centered flex rows.
+        Buttons themselves size to their own content, unlike those other
+        blocks' items — a button stretched to fill a row would look wrong.
+      - "vertical": a single centered column, no row-balancing needed.
 
     NOTE: inline mid-paragraph buttons in rich text (a button embedded in
     the flow of a text block, like a styled link) were explicitly deferred
@@ -780,14 +835,31 @@ class ButtonGroupBlock(StructBlock):
     """
 
     buttons = ListBlock(ButtonBlock(), min_num=1, max_num=5, label=_("Buttons"))
+    layout = ChoiceBlock(
+        choices=BUTTON_GROUP_LAYOUT_CHOICES,
+        default="horizontal",
+        label=_("Layout"),
+        help_text=_(
+            "Horizontal lays buttons out in centered rows. Vertical stacks "
+            "them in a centered column."
+        ),
+    )
+
+    MAX_PER_ROW = 3
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        if value.get("layout") != "vertical":
+            ctx["rows"] = _balanced_rows(value["buttons"], self.MAX_PER_ROW)
+        return ctx
 
     class Meta:
         icon = "link"
         label = _("Button Group")
         template = "wtrx/components/streamfield/blocks/button_group_block.html"
         description = _(
-            "Two or more call-to-action buttons displayed in a row. Use the "
-            "single Button block instead for one CTA."
+            "Two or more call-to-action buttons, laid out horizontally or "
+            "vertically. Use the single Button block instead for one CTA."
         )
         preview_value = {
             "buttons": [
@@ -805,7 +877,8 @@ class ButtonGroupBlock(StructBlock):
                     "anchor": "",
                     "style": "outline",
                 },
-            ]
+            ],
+            "layout": "horizontal",
         }
 
 
@@ -1122,11 +1195,19 @@ class CardGridBlock(ContentPreviewMixin, StructBlock):
     """
     An auto-responsive grid of content cards.
 
-    Minimum 2, maximum 12 cards. Column count is determined automatically
-    by CSS (2-col on sm, 3-col on lg+, except exactly 4 cards which use a
-    2-col grid at lg+ too for a balanced 2x2 instead of an unbalanced
-    3+1 — see card_grid_block.html). No column-count controls — editors
+    Minimum 2, maximum 12 cards. Same dynamic-centering layout as
+    PersonCardGridBlock/ImageGridBlock/LogoGridBlock (`_balanced_rows()`,
+    max_per_row=3, defined further down this file before
+    ImageGridBlock — Python doesn't care about definition order across a
+    module for a call inside a method body, only that the name exists by
+    the time the method actually runs). No column-count controls — editors
     cannot break the layout.
+
+    This replaced an earlier CSS-only special case (2 or 4 cards get
+    lg:grid-cols-2, everything else lg:grid-cols-3) that only handled one
+    bad count: 7 cards under that scheme rendered as an unbalanced 3+3+1,
+    the exact orphan-row bug PersonCardGridBlock was built to avoid.
+    `_balanced_rows()` fixes every count, not just 4.
 
     heading is optional (blank renders nothing above the grid), same
     required=False pattern as PageCardsBlock.heading — for consistency with
@@ -1146,19 +1227,24 @@ class CardGridBlock(ContentPreviewMixin, StructBlock):
         label=_("Cards"),
     )
 
-    #: Real content here has four cards, which is the one count that lays out
-    #: 2x2 instead of in three columns -- see card_grid_block.html.
-    preview_max_items = {"cards": 3}
+    MAX_PER_ROW = 3
+
+    #: 5 demonstrates the 3+2 balanced-row case in the block picker preview.
+    preview_max_items = {"cards": 5}
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _balanced_rows(value["cards"], self.MAX_PER_ROW)
+        return ctx
 
     class Meta:
         icon = "grip"
         label = _("Card Grid")
         template = "wtrx/components/streamfield/blocks/card_grid_block.html"
         description = _(
-            "An auto-responsive grid of 2-12 linked cards, three to a row on a "
-            "wide screen and two on a narrow one. Exactly four cards lay out "
-            "2x2 instead, to avoid a trailing row of one. There are no column "
-            "controls."
+            "An auto-responsive grid of 2-12 linked cards, laid out "
+            "automatically — never a lone card on its own row. There are no "
+            "column controls."
         )
 
 
@@ -1185,18 +1271,52 @@ class ImageGridItemBlock(StructBlock):
         label = _("Image")
 
 
+def _balanced_rows(items, max_per_row):
+    """
+    Split `items` into rows of `max_per_row` (preferred) and
+    `max_per_row - 1`, larger rows first, so a partial trailing row is
+    never a lone item of 1 — the same dynamic-centering technique used by
+    CardGridBlock's spirit (auto layout, no editor column control) but
+    generalized to genuinely avoid an orphan row for *every* count, not
+    just one special-cased count.
+
+    A single global row size (uniformly `k` or `k - 1` for every row)
+    cannot avoid a trailing row of exactly 1 for every possible count —
+    see PersonCardGridBlock's original derivation for `max_per_row == 3`,
+    proven in AGENTS.md pitfall #44. The general fix: choose the minimum
+    row count `R = ceil(n / max_per_row)` needed to respect the cap, then
+    distribute `n` items across those `R` rows as evenly as possible
+    (`divmod(n, R)`), rather than always preferring the biggest row size.
+    This provably keeps every row at 2+ items whenever `n > max_per_row`
+    and `max_per_row >= 3` (see TestBalancedRows for the property test).
+    `n <= max_per_row` is simply one centered row of everything.
+    """
+    # Wagtail's ListValue.__getitem__ only handles integer indices, not
+    # slice objects (items[i:j] silently misbehaves rather than raising),
+    # so convert to a plain list up front.
+    items = list(items)
+    n = len(items)
+    if n <= max_per_row:
+        return [items]
+    rows_count = math.ceil(n / max_per_row)
+    base, extra = divmod(n, rows_count)
+    sizes = [base + 1] * extra + [base] * (rows_count - extra)
+    rows, i = [], 0
+    for size in sizes:
+        rows.append(items[i : i + size])
+        i += size
+    return rows
+
+
 class ImageGridBlock(StructBlock):
     """
-    An auto-responsive grid of photos, cropped to a consistent square
-    aspect ratio.
-
-    Unlike CardGridBlock, column count is a fixed responsive breakpoint
-    grid (2/3/4 columns) rather than count-conditional CSS — a cropped
-    photo tolerates an uneven trailing row far better than a text-bearing
-    card does (no heading/body/CTA to look "orphaned"), and this block's
-    count range (2-24) is wider than cards' (2-12), so replicating
-    per-count branching isn't worth it. No per-image caption field — this
-    is a grid, not a set of individually captioned figures.
+    An auto-responsive grid of photos, laid out with the same dynamic
+    centering as PersonCardGridBlock (via `_balanced_rows()`, capped at 4
+    per row) rather than CardGridBlock's fixed-breakpoint CSS grid — no
+    count ever leaves a lone photo on its own row, and a small photo count
+    centers as one row instead of stretching thin across the full width.
+    No per-image caption field — this is a grid, not a set of
+    individually captioned figures.
 
     Not ContentPreviewMixin: no real page uses this block yet, so there is
     nothing to harvest -- see _image_grid_preview_value().
@@ -1213,6 +1333,15 @@ class ImageGridBlock(StructBlock):
         max_num=24,
         label=_("Images"),
     )
+
+    #: Photos are larger than logos, so a lower per-row cap than
+    #: LogoGridBlock's -- see _balanced_rows().
+    MAX_PER_ROW = 4
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _balanced_rows(value["images"], self.MAX_PER_ROW)
+        return ctx
 
     class Meta:
         icon = "grip"
@@ -1266,9 +1395,10 @@ class LogoGridItemBlock(StructBlock):
 class LogoGridBlock(StructBlock):
     """
     A grid of partner/funder logos, sized consistently regardless of each
-    logo's own aspect ratio (a fixed-height cell, object-contain). Denser
-    columns and more generous gaps than ImageGridBlock, since logos are
-    small marks rather than photos. Logos may optionally link out.
+    logo's own aspect ratio (a fixed-height cell, object-contain). Same
+    dynamic-centering layout as ImageGridBlock/PersonCardGridBlock (via
+    `_balanced_rows()`), capped denser at 5 per row since logos are small
+    marks rather than photos. Logos may optionally link out.
 
     Not ContentPreviewMixin: no real page uses this block yet, so there is
     nothing to harvest -- see _logo_grid_preview_value().
@@ -1282,6 +1412,15 @@ class LogoGridBlock(StructBlock):
         label=_("Logos"),
     )
 
+    #: Denser than ImageGridBlock's cap -- logos are small marks, not
+    #: photos -- see _balanced_rows().
+    MAX_PER_ROW = 5
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _balanced_rows(value["logos"], self.MAX_PER_ROW)
+        return ctx
+
     class Meta:
         icon = "grip"
         label = _("Logo Grid")
@@ -1293,56 +1432,19 @@ class LogoGridBlock(StructBlock):
         preview_value = staticmethod(_logo_grid_preview_value)
 
 
-def _person_grid_rows(people):
-    """
-    Split `people` into rows of 3 (preferred) and 2, rows of 3 first.
-
-    A single global column count (uniformly 2 or 3 for every row) cannot
-    avoid a trailing row of exactly 1 person for every count: 3-col
-    orphans whenever count % 3 == 1 (4, 7, 10, 13...), 2-col orphans at
-    odd counts > 2 (3, 5, 7, 9, 11...), and the counts where BOTH fail are
-    count ≡ 1 (mod 6) — 7, 13, 19... Mixing rows of 3 and rows of 2 within
-    one grid, computed here, eliminates the orphan entirely for every
-    count >= 2:
-
-        rows_count = ceil(n / 3); threes = n - 2*rows_count; twos = 3*rows_count - n
-
-    Both `threes` and `twos` are provably non-negative for every n >= 2
-    (threes >= 0 needs n >= 2*rows_count, which holds because
-    n >= 3*rows_count - 2 >= 2*rows_count once rows_count >= 2, i.e. n >= 4;
-    n in {2, 3} each give rows_count == 1 and satisfy it directly). So
-    every row this produces is size 2 or 3 — never 1. See
-    TestPersonGridRows for the executable version of this proof.
-    """
-    # Wagtail's ListValue.__getitem__ only handles integer indices, not
-    # slice objects (people[i:j] silently misbehaves rather than raising),
-    # so convert to a plain list up front.
-    people = list(people)
-    n = len(people)
-    if n <= 1:
-        return [people]
-    rows_count = math.ceil(n / 3)
-    threes = n - 2 * rows_count
-    twos = 3 * rows_count - n
-    sizes = [3] * threes + [2] * twos
-    rows, i = [], 0
-    for size in sizes:
-        rows.append(people[i : i + size])
-        i += size
-    return rows
-
-
 class PersonCardGridBlock(StructBlock):
     """
     A grid of people (staff, spokespeople, board members), laid out so
-    there is never a lone card on its own row — see _person_grid_rows().
+    there is never a lone card on its own row — see _balanced_rows(),
+    called here with max_per_row=3.
 
     Flexbox with justify-center, not CSS Grid like CardGridBlock: rows are
     computed explicitly in Python and each renders as its own small flex
     row, so a partial row (e.g. 2 people) centers naturally. Reuses
     PersonCardBlock as the item block and person_card.html for per-item
     rendering — the standalone `person_card` registration is unchanged,
-    for single-person spotlight use.
+    for single-person spotlight use. ImageGridBlock and LogoGridBlock use
+    the same technique (same _balanced_rows() helper, their own caps).
 
     Not ContentPreviewMixin: no real page uses this block yet, so there is
     nothing to harvest -- see _person_card_grid_preview_value(). 5 people
@@ -1357,9 +1459,11 @@ class PersonCardGridBlock(StructBlock):
         label=_("People"),
     )
 
+    MAX_PER_ROW = 3
+
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
-        ctx["rows"] = _person_grid_rows(value["people"])
+        ctx["rows"] = _balanced_rows(value["people"], self.MAX_PER_ROW)
         return ctx
 
     class Meta:

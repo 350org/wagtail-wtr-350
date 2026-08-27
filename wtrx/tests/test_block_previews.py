@@ -187,14 +187,18 @@ class BlockPreviewTest(TestCase):
         self.assertIn('["click", "submit"].forEach', html)
         self.assertIn("event.preventDefault();", html)
 
-    def test_card_grid_preview_is_trimmed_to_three_cards(self):
+    def test_card_grid_preview_is_capped_at_five_cards(self):
         """
-        Real content has four cards, and exactly four is the one count
-        card_grid_block.html lays out 2x2 rather than in three columns.
+        Caps harvested content at 5 (enough to demonstrate _balanced_rows()'s
+        3+2 split -- see AGENTS.md pitfall #44 -- if a future harvest picks
+        up a page with that many cards). The currently-harvested real page
+        has only 4, so this cap doesn't trim anything today; it just
+        guards against a future harvest handing the preview an unbounded
+        list.
         """
         block = BodyStreamBlock().child_blocks["card_grid"]
-        self.assertEqual(block.preview_max_items, {"cards": 3})
-        self.assertEqual(len(block.get_preview_value()["cards"]), 3)
+        self.assertEqual(block.preview_max_items, {"cards": 5})
+        self.assertLessEqual(len(block.get_preview_value()["cards"]), 5)
 
     def test_previews_never_call_a_third_party_platform(self):
         """

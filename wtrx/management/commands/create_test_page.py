@@ -321,33 +321,23 @@ def _button_block(style, text, anchor=None):
     )
 
 
-def _button_group_block():
+def _button_group_block(count=3, layout="horizontal"):
+    labels = ["Take Action", "Learn More", "Donate", "Volunteer", "Share"]
+    styles = ["primary", "outline", "secondary", "primary", "outline"]
     return _sb(
         "button_group",
         {
             "buttons": [
                 {
-                    "text": "Take Action",
+                    "text": labels[i],
                     "link_page": None,
                     "link_url": "https://example.com",
                     "anchor": "",
-                    "style": "primary",
-                },
-                {
-                    "text": "Learn More",
-                    "link_page": None,
-                    "link_url": "https://example.com",
-                    "anchor": "",
-                    "style": "outline",
-                },
-                {
-                    "text": "Donate",
-                    "link_page": None,
-                    "link_url": "https://example.com",
-                    "anchor": "",
-                    "style": "secondary",
-                },
-            ]
+                    "style": styles[i],
+                }
+                for i in range(count)
+            ],
+            "layout": layout,
         },
     )
 
@@ -474,11 +464,12 @@ def _card_grid_block(image_id, count=3, heading="Card Grid"):
     """
     CardGridBlock with a mix of cards.
 
-    ``count`` exists because exactly four cards is the one count that lays out
-    2x2 instead of in three columns (see card_grid_block.html) — both paths
-    are worth eyeballing.
+    ``count`` exists to eyeball _balanced_rows()'s dynamic row-balancing
+    (max_per_row=3, see card_grid_block.html/AGENTS.md pitfall #44) —
+    count=4 gives 2x2, count=7 gives 3+2+2 (the old CSS-only special case
+    left an unbalanced 3+3+1 at 7, the regression this now fixes).
     """
-    cards = [
+    base_cards = [
         _card_value(
             "With image and tag",
             description="Image, tag pill and an external link.",
@@ -500,7 +491,8 @@ def _card_grid_block(image_id, count=3, heading="Card Grid"):
             icon_id=image_id,
         ),
     ]
-    return _sb("card_grid", {"heading": heading, "cards": cards[:count]})
+    cards = [base_cards[i % len(base_cards)] for i in range(count)]
+    return _sb("card_grid", {"heading": heading, "cards": cards})
 
 
 def _image_card_list_block(image_id):
@@ -841,7 +833,14 @@ def _content_blocks(image_id, index_page_id, form_page_id):
         _button_block("primary", "Anchor Button (jumps to the ActionKit block)", anchor="signup-actionkit-navy"),
     ]
 
-    blocks += [_label("button_group", "3 buttons in a row"), _button_group_block()]
+    blocks += [
+        _label("button_group", "3 buttons — horizontal, single row"),
+        _button_group_block(count=3, layout="horizontal"),
+        _label("button_group", "4 buttons — horizontal, 2+2 balanced rows"),
+        _button_group_block(count=4, layout="horizontal"),
+        _label("button_group", "3 buttons — vertical, centered column"),
+        _button_group_block(count=3, layout="vertical"),
+    ]
 
     blocks += [
         _label("quote", "image left, with CTA"),
@@ -880,6 +879,8 @@ def _content_blocks(image_id, index_page_id, form_page_id):
         _card_grid_block(image_id, count=3, heading="Card Grid (3 cards)"),
         _label("card_grid", "4 cards — 2x2 layout"),
         _card_grid_block(image_id, count=4, heading="Card Grid (4 cards)"),
+        _label("card_grid", "7 cards — 3+2+2, no orphan row"),
+        _card_grid_block(image_id, count=7, heading="Card Grid (7 cards)"),
     ]
 
     blocks += [_label("image_grid", "5 images"), _image_grid_block(image_id, count=5)]

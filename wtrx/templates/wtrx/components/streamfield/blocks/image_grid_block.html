@@ -1,9 +1,11 @@
 {% load i18n wagtailimages_tags %}
 {% comment %}
-Fixed responsive breakpoint grid (2/3/4 columns), not count-conditional CSS
-like card_grid_block.html — a cropped photo tolerates an uneven trailing
-row far better than a text-bearing card does. See ImageGridBlock's
-docstring in wtrx/blocks/__init__.py.
+`rows` (from ImageGridBlock.get_context) is a list of lists of images,
+each sized via _balanced_rows() (wtrx/blocks/__init__.py, max_per_row=4)
+— never a lone photo on its own row, for any image count. Flexbox with
+justify-center, not CSS Grid: each row is its own flex container, so a
+partial row (e.g. 2 photos) centers naturally, the same dynamic-centering
+technique CardGridBlock/PersonCardGridBlock/LogoGridBlock use.
 
 Full-bleed width: same w-full-outer / max-w-inner two-tier pattern as
 card_grid_block.html.
@@ -13,12 +15,17 @@ card_grid_block.html.
         {% if value.heading %}
             <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
         {% endif %}
-        <div class="wtr-image-grid grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
-            {% for item in value.images %}
-                {% image item.image fill-600x600 as img %}
-                <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}"
-                     alt="{{ item.alt_text|default:img.alt }}"
-                     class="aspect-square w-full rounded-lg object-cover" loading="lazy">
+        <div class="wtr-image-grid flex flex-col gap-6">
+            {% for row in rows %}
+                <div class="flex flex-col gap-6 sm:flex-row sm:justify-center">
+                    {% for item in row %}
+                        {% image item.image fill-600x600 as img %}
+                        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}"
+                             alt="{{ item.alt_text|default:img.alt }}"
+                             class="aspect-square w-full rounded-lg object-cover sm:max-w-[280px] sm:flex-1"
+                             loading="lazy">
+                    {% endfor %}
+                </div>
             {% endfor %}
         </div>
     </div>

@@ -1,6 +1,27 @@
 {% load i18n %}
-<div class="wtr-button-group flex flex-wrap items-center gap-4">
-    {% for button in value.buttons %}
-        {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
-    {% endfor %}
-</div>
+{% comment %}
+"vertical" is a single centered column -- no row-balancing needed.
+"horizontal" (default) uses `rows` (from ButtonGroupBlock.get_context),
+the same _balanced_rows() dynamic-centering technique CardGridBlock/
+ImageGridBlock/LogoGridBlock/PersonCardGridBlock use, rendered as centered
+flex rows. Buttons size to their own content in both layouts -- unlike
+those other blocks' items, a button stretched to fill a row would look
+wrong, so there's no flex-1/max-w wrapper here.
+{% endcomment %}
+{% if value.layout == "vertical" %}
+    <div class="wtr-button-group flex flex-col items-center gap-4">
+        {% for button in value.buttons %}
+            {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="wtr-button-group flex flex-col gap-4">
+        {% for row in rows %}
+            <div class="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                {% for button in row %}
+                    {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
