@@ -16,6 +16,18 @@ component rather than a different layout of the same one. The border stays
 2px here (card.html uses 1px plus a shadow) — that is this card's own
 arrow-card shape, not a fill question.
 
+`text-left` on the root is load-bearing, not decorative: post_page.html's
+"Related blogs" panel is a `text-center` container (its own h2 and intro are
+centred), and text-align inherits, so without this the card's date pill,
+heading and description centre themselves in that one placement while the
+identical card on a Blogs index and in PageCardsBlock stays left. Pinning it
+on the card means a future centred container cannot do this again.
+
+heading_size defaults to text-2xl (24px) rather than the site's 28px h3
+step: every caller of this template is a card listing — Blogs index,
+PageCardsBlock, related blogs — and all three sit a step below. The
+parameter exists so a caller can opt out; none currently does.
+
 Expects `card`: heading, description, image, link_page, date — the same
 dict shape page_as_card() returns (link_page always a Page instance, never
 link_url — every caller here is page_as_card()-based, not editor-authored),
@@ -23,7 +35,7 @@ plus a "date" key layered on top by the caller (page_as_card() itself
 doesn't set one — see PageCardsBlock.get_context() and Blogs/Post.get_context()).
 {% endcomment %}
 <a href="{{ card.link_page.url }}"
-   class="wtr-post-card flex flex-col overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50">
+   class="wtr-post-card flex flex-col overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50 text-left">
     {% if card.image %}
         {% image card.image fill-640x360 as img %}
         <div class="aspect-video overflow-hidden bg-neutral-200">
@@ -37,7 +49,7 @@ doesn't set one — see PageCardsBlock.get_context() and Blogs/Post.get_context(
                     {{ card.date|date:"F j, Y" }}
                 </span>
             {% endif %}
-            <h3 class="font-heading {{ heading_size|default:"text-28" }} font-bold text-dark">{{ card.heading }}</h3>
+            <h3 class="font-heading {{ heading_size|default:"text-2xl" }} font-bold text-dark">{{ card.heading }}</h3>
             {% if card.description %}
                 <p class="text-base text-dark">{{ card.description }}</p>
             {% endif %}

@@ -1069,16 +1069,28 @@ Two practical notes for agents:
     tighter leading and margin. Do not reintroduce a per-block
     card-heading size or a responsive bump.
 
-    **Two card listings deliberately sit a step below at 24px**: the
-    `IndexPage` child grid and `PageCardsBlock`. Both render the shared
-    `card.html`/`post_card.html`, so the size is passed in as
-    `heading_size="text-2xl"` on the `{% include %}` — the same parameter
-    pattern `description_size` already uses — rather than branching inside
-    the card. The templates default to `text-28`, so every other caller
-    (`CardGridBlock`, `CardBlock`, `CardCarouselBlock`, the Blogs index and
-    post_page's related posts) keeps the site step without naming it. A new
-    listing that wants the smaller heading passes the parameter; it must
-    never be hardcoded back into the card templates, which are shared.
+    **Card *listings* deliberately sit a step below at 24px.** The split
+    runs along the two card shapes, so it is carried by each shared
+    template's own default rather than by every call site:
+    - `post_card.html` (the arrow card) defaults to `text-2xl` — every
+      caller of it is a listing (Blogs index, `PageCardsBlock`,
+      post_page's related blogs), so none passes anything.
+    - `card.html` (the "Areas of work" card) defaults to `text-28`, since
+      `CardBlock`, `CardGridBlock` and `CardCarouselBlock` are content, not
+      listings. `index_page.html` is the one listing caller and passes
+      `heading_size="text-2xl"`.
+
+    Both take a `heading_size` parameter — the same pattern
+    `description_size` already uses — so a caller opts out without the card
+    branching internally. A new listing passes the parameter; the size must
+    never be hardcoded per-block back into these shared templates.
+
+    **`post_card.html` pins `text-left` on its root.** post_page's
+    "Related blogs" panel is a `text-center` container (its h2 and intro
+    are centred) and `text-align` inherits, so the identical card centred
+    its date pill, heading and copy in that one placement while staying
+    left on a Blogs index and in `PageCardsBlock`. The fix belongs on the
+    card, not that container, so a future centred wrapper cannot repeat it.
 
     The whole set previously disagreed four ways: 24px stepping to 28px at
     `lg:` on cards and rich text, a flat 20px on the callout subheading, and
