@@ -503,6 +503,24 @@ html {
     color: var(--color-error-200);
 }
 
+/* Form-level error list, inline variant — the same #ak-errors box the
+ * stacked variant uses below, styled for the hero's dark scrim instead of a
+ * light field box: bold light-red type rather than a red-bordered light
+ * surface, matching this variant's own ul.ak-err treatment above. #action-
+ * form is a flex-wrap row here, so this needs an explicit full-width
+ * flex-basis to break onto its own line instead of sizing to its content. */
+.wtr-actionkit-embed-inline #ak-errors {
+    flex: 0 0 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.25;
+    color: var(--color-error-200);
+}
+
 /* ============================================================
  * ActionKit stacked embed override — .wtr-actionkit-embed-stacked
  * ============================================================

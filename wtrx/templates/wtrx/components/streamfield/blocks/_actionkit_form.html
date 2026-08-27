@@ -56,11 +56,21 @@
     when the form is short (the home page's two-field form) and the copy
     column beside it is shorter still.
     {% endcomment %}
-    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% if panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}{% endif %}" data-form-container>
+    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% if panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}{% endif %}"
+         data-form-container
+         data-msg-required="{% trans 'This field is required.' %}"
+         data-msg-email="{% trans 'Enter a valid email address.' %}"
+         data-msg-network-error="{% trans 'Something went wrong. Please try again.' %}">
         {{ form_html|safe }}
     </div>
+    {% comment %}
+    Always rendered, not just alongside success_message: the submit handler
+    below now intercepts every instance's form unconditionally (see the
+    script's comment), and needs this token whether or not the block has a
+    custom success_message configured.
+    {% endcomment %}
+    <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
     {% if success_message %}
-        <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
         {% comment %}
         The tone modifier rides along here as well as on the embed above,
         because this box replaces the form on success and so has to survive
@@ -78,12 +88,49 @@
     {% endif %}
     <script>
         (function () {
-            if (window.__wtrAkInit) { return; }
             {% if is_block_preview %}return;{% endif %}
-            window.__wtrAkInit = true;
+            {% comment %}
+            A page can carry more than one SignupActionKitBlock (the home
+            page always does: the hero CTA plus this standalone panel).
+            Every instance fetches and renders the *same* ActionKit
+            fragment, which hardcodes id="action-form"/name="act" — so the
+            page ends up with duplicate ids. document.getElementById and
+            ActionKit's own actionkit.js (forms.setForm walks
+            document.getElementsByTagName('form') and stops at the first
+            name match) can therefore only ever resolve the first instance
+            on the page. A single page-global "have I run yet" flag made
+            this worse: every instance after the first got no wiring at
+            all, so its form fell back to a bare, un-intercepted browser
+            POST straight to ActionKit — landing on ActionKit's raw
+            response instead of behaving inline.
+
+            The fix is to never do a page-global element lookup. Each
+            instance scopes every query to its own wrapper, found via
+            document.currentScript — reliable here because this script tag
+            always renders inside the same .wtr-signup-actionkit wrapper as
+            its own copy of the form (see signup_actionkit_block.html).
+            querySelector scoped to that wrapper finds the right #action-
+            form even though the id isn't unique page-wide. Loading jQuery/
+            actionkit.js still happens at most once per page (via the
+            shared promise below) since it's still useful for actionkit.js
+            to be present, but wiring submission and validation no longer
+            waits on it or defers to it — that's what left ActionKit's own
+            client validation as the only thing available, and it shares
+            the exact same first-instance-only limitation.
+            {% endcomment %}
+            var wrapper = document.currentScript.closest(".wtr-signup-actionkit");
+            if (!wrapper) { return; }
+            var formContainer = wrapper.querySelector("[data-form-container]");
+            var form = formContainer && formContainer.querySelector("#action-form");
+            if (!form) { return; }
+            var thankYou = wrapper.querySelector("[data-thank-you]");
+            var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
+            var msgRequired = formContainer.dataset.msgRequired;
+            var msgEmail = formContainer.dataset.msgEmail;
+            var msgNetworkError = formContainer.dataset.msgNetworkError;
+            var REQUIRED_FIELD_SELECTOR = ".input-text.required, .input-select.required, .input-checkbox.required, .input-radio.required";
+
             function populateUtmFields() {
-                var form = document.getElementById("action-form");
-                if (!form) { return; }
                 var params = new URLSearchParams(window.location.search);
                 ["source", "medium", "campaign", "term", "content"].forEach(function (name) {
                     var value = params.get("utm_" + name);
@@ -94,80 +141,170 @@
             }
             populateUtmFields();
 
-            function loadScript(src, onload) {
-                var s = document.createElement("script");
-                s.src = src;
-                if (onload) { s.onload = onload; }
-                document.body.appendChild(s);
+            {% comment %}
+            Field-level errors reuse ActionKit's own convention exactly —
+            .ak-error on the label/input, a <ul class="ak-err"><li> inside
+            the fieldbox — so main.css's existing (already-styled, already
+            fill-aware) rules for both the inline and stacked variants apply
+            with no new CSS. data-wtr-client-err distinguishes an error list
+            we inserted from one ActionKit itself might render, so clearing
+            never touches a node we don't own.
+            {% endcomment %}
+            function clearFieldError(fieldbox) {
+                var label = fieldbox.querySelector("label");
+                var control = fieldbox.querySelector("input, select, textarea");
+                if (label) { label.classList.remove("ak-error"); }
+                if (control) { control.classList.remove("ak-error"); }
+                var err = fieldbox.querySelector("ul.ak-err[data-wtr-client-err]");
+                if (err) { err.remove(); }
             }
 
-            var baseUrl = "{{ actionkit_base_url|escapejs }}";
-            if (!baseUrl) { return; }
+            function showFieldError(fieldbox, message) {
+                var label = fieldbox.querySelector("label");
+                var control = fieldbox.querySelector("input, select, textarea");
+                if (label) { label.classList.add("ak-error"); }
+                if (control) { control.classList.add("ak-error"); }
+                var err = fieldbox.querySelector("ul.ak-err[data-wtr-client-err]");
+                if (!err) {
+                    err = document.createElement("ul");
+                    err.className = "ak-err";
+                    err.setAttribute("data-wtr-client-err", "");
+                    err.appendChild(document.createElement("li"));
+                    fieldbox.appendChild(err);
+                }
+                err.querySelector("li").textContent = message;
+            }
 
-            {% if success_message %}
-            function wireInlineSubmit() {
-                var form = document.getElementById("action-form");
-                if (!form) { return; }
-                var wrapper = form.closest(".wtr-signup-actionkit");
-                if (!wrapper) { return; }
-                var formContainer = wrapper.querySelector("[data-form-container]");
-                var thankYou = wrapper.querySelector("[data-thank-you]");
-                var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
+            function fieldIsEmpty(fieldbox) {
+                var choices = fieldbox.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+                if (choices.length) {
+                    return !Array.prototype.some.call(choices, function (c) { return c.checked; });
+                }
+                var control = fieldbox.querySelector("input, select, textarea");
+                return !control || !control.value.trim();
+            }
 
-                form.onsubmit = null;
-                form.addEventListener("submit", function (event) {
-                    event.preventDefault();
-
-                    var emailField = form.querySelector('[name="email"]');
-                    if (emailField && !emailField.value.trim()) {
-                        emailField.focus();
-                        return;
+            function validateForm() {
+                var firstInvalid = null;
+                Array.prototype.forEach.call(form.querySelectorAll(REQUIRED_FIELD_SELECTOR), function (fieldbox) {
+                    clearFieldError(fieldbox);
+                    if (fieldIsEmpty(fieldbox)) {
+                        showFieldError(fieldbox, msgRequired);
+                        firstInvalid = firstInvalid || fieldbox;
                     }
+                });
 
-                    var submitButton = form.querySelector('[type="submit"]');
-                    if (submitButton) { submitButton.disabled = true; }
+                {% comment %}
+                ActionKit renders email as type="text", not type="email" —
+                there's no native format validation to lean on, so this is
+                the only field that gets an extra, explicit check.
+                {% endcomment %}
+                var emailField = form.querySelector('[name="email"]');
+                if (emailField && emailField.value.trim()) {
+                    var emailFieldbox = emailField.closest(".input-text, .input-select");
+                    if (emailFieldbox && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailField.value.trim())) {
+                        clearFieldError(emailFieldbox);
+                        showFieldError(emailFieldbox, msgEmail);
+                        firstInvalid = firstInvalid || emailFieldbox;
+                    }
+                }
 
-                    fetch("{% url 'actionkit_inline_signup' %}", {
-                        method: "POST",
-                        body: new FormData(form),
-                        headers: {
-                            "X-CSRFToken": csrfInput ? csrfInput.value : "",
-                            "X-Requested-With": "XMLHttpRequest"
-                        }
-                    }).then(function (response) {
-                        return response.json();
-                    }).then(function (data) {
-                        if (data.success) {
-                            if (formContainer) { formContainer.classList.add("hidden"); }
-                            if (thankYou) { thankYou.classList.remove("hidden"); }
-                        } else if (submitButton) {
-                            submitButton.disabled = false;
-                        }
-                    }).catch(function () {
+                if (firstInvalid) {
+                    var control = firstInvalid.querySelector("input, select, textarea");
+                    if (control) { control.focus(); }
+                    return false;
+                }
+                return true;
+            }
+
+            form.addEventListener("input", function (event) {
+                var fieldbox = event.target.closest(".input-text, .input-select, .input-checkbox, .input-radio");
+                if (fieldbox) { clearFieldError(fieldbox); }
+            });
+            form.addEventListener("change", function (event) {
+                var fieldbox = event.target.closest(".input-text, .input-select, .input-checkbox, .input-radio");
+                if (fieldbox) { clearFieldError(fieldbox); }
+            });
+
+            {% comment %}
+            #ak-errors is ActionKit's own form-level error list, already in
+            the fetched fragment (hidden via an inline style) and already
+            styled by main.css for server-side failures that belong to no
+            single field. ActionKit's own client normally toggles it; since
+            this form is never handed to ActionKit's client, this handler
+            owns it instead.
+            {% endcomment %}
+            function showFormError(message) {
+                var errs = form.querySelector("#ak-errors");
+                if (!errs) { return; }
+                if (message) {
+                    errs.querySelector("li").textContent = message;
+                    errs.style.display = "";
+                } else {
+                    errs.style.display = "none";
+                }
+            }
+
+            form.onsubmit = null;
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                showFormError("");
+
+                if (!validateForm()) { return; }
+
+                var submitButton = form.querySelector('[type="submit"]');
+                if (submitButton) { submitButton.disabled = true; }
+
+                fetch("{% url 'actionkit_inline_signup' %}", {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: {
+                        "X-CSRFToken": csrfInput ? csrfInput.value : "",
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (data) {
+                    if (data.success) {
+                        {% if success_message %}
+                        if (formContainer) { formContainer.classList.add("hidden"); }
+                        if (thankYou) { thankYou.classList.remove("hidden"); }
+                        {% endif %}
+                    } else {
+                        showFormError(data.message);
                         if (submitButton) { submitButton.disabled = false; }
+                    }
+                }).catch(function () {
+                    showFormError(msgNetworkError);
+                    if (submitButton) { submitButton.disabled = false; }
+                });
+            });
+
+            {% comment %}
+            Loaded for compatibility (other ActionKit page chrome may
+            expect window.actionkit to exist) but nothing above waits on
+            it — actionkit.forms.initForm is not called at all, since
+            forms.setForm can only ever target the first "act"-named form
+            on the page and would silently do nothing useful for any later
+            instance.
+            {% endcomment %}
+            var baseUrl = "{{ actionkit_base_url|escapejs }}";
+            if (baseUrl) {
+                if (!window.__wtrAkScriptPromise) {
+                    window.__wtrAkScriptPromise = new Promise(function (resolve) {
+                        var s = document.createElement("script");
+                        s.src = baseUrl + "/resources/actionkit.js";
+                        s.onload = resolve;
+                        document.body.appendChild(s);
                     });
+                }
+                window.__wtrAkScriptPromise.then(function () {
+                    if (window.__wtrAkPageInit) { return; }
+                    window.__wtrAkPageInit = true;
+                    actionkit.forms.contextRoot = baseUrl + "/context/";
+                    actionkit.forms.initPage();
                 });
             }
-            {% endif %}
-
-            function initForm() {
-                actionkit.forms.contextRoot = baseUrl + "/context/";
-                {% comment %}
-                initPage() sets ak.args (parsed from the querystring) and
-                other page-level state that a full ActionKit page sets up
-                via its own inline script — one our form_only=1 fragment
-                doesn't include. Without it, beforeContextLoad() throws on
-                ak.args being undefined and loadContext() never completes,
-                leaving the form unable to submit.
-                {% endcomment %}
-                actionkit.forms.initPage();
-                actionkit.forms.initForm("act");
-                {% if success_message %}
-                wireInlineSubmit();
-                {% endif %}
-            }
-
-            loadScript(baseUrl + "/resources/actionkit.js", initForm);
         })();
     </script>
 {% else %}

@@ -271,8 +271,20 @@
 
         The "centered" layout keeps its own roomier, symmetric padding —
         Figma only draws the left-aligned arrangement.
+
+        z-10 (not just relative): this column, the gradient scrim above, and
+        the background video/image below are all positioned siblings with no
+        z-index, so paint order falls back to DOM order — this column comes
+        last and should already win. That held in Chromium testing, but
+        video elements are a known spot for browsers to special-case
+        compositing/stacking, which silently broke it (the CTA's success
+        message rendered underneath the scrim). Both the banner variant's
+        text column and the video pause/play toggle above already carry an
+        explicit z-10 for the same reason; this brings the "full" variant's
+        content column in line with that instead of the one place still
+        depending on implicit ordering.
         {% endcomment %}
-        <div class="relative w-full text-light
+        <div class="relative z-10 w-full text-light
                     {% if hero.layout == 'left' %}px-6 py-10 text-left sm:px-10 sm:py-12 lg:px-32 lg:py-16{% else %}mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8{% endif %}">
 
             {% comment %}
