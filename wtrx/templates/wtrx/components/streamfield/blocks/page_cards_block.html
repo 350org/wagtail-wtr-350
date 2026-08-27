@@ -37,7 +37,7 @@ just providing mobile-edge breathing room around it).
         </div>
         <div class="mt-[21px] grid grid-cols-1 gap-[30px] sm:grid-cols-2 lg:grid-cols-3">
             {% for card in cards %}
-                {% include "wtrx/components/post_card.html" with card=card %}
+                {% include "wtrx/components/post_card.html" with card=card heading_size="text-2xl" %}
             {% endfor %}
         </div>
         {% if value.link_text and value.index_page %}

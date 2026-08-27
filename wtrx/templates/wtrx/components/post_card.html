@@ -37,7 +37,7 @@ doesn't set one — see PageCardsBlock.get_context() and Blogs/Post.get_context(
                     {{ card.date|date:"F j, Y" }}
                 </span>
             {% endif %}
-            <h3 class="font-heading text-2xl font-bold text-dark">{{ card.heading }}</h3>
+            <h3 class="font-heading {{ heading_size|default:"text-28" }} font-bold text-dark">{{ card.heading }}</h3>
             {% if card.description %}
                 <p class="text-base text-dark">{{ card.description }}</p>
             {% endif %}

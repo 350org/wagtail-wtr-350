@@ -984,8 +984,8 @@ Two practical notes for agents:
     | H2 section (Callout, ImageText, DonateFundraiseUp, SignupActionKit) | 64 `text-64` | 40 `text-40` |
     | H2 feature panel | 48 `text-5xl` | 36 `text-36` |
     | H2 minor (signup/donate block headings) | 30 `text-3xl` | 28 `text-28` |
-    | Card `h3` (card, post card, person card, image card list) | 18–24 | 24 `text-2xl` |
-    | Rich text `h2` / `h3` / `h4` (`.wtr-text-block`, main.css) | 64 / 40 / — | 40 / 24 / 20 |
+    | Card `h3` (card, post card, person card, image card list) | 18–24 | 28 `text-28` |
+    | Rich text `h2` / `h3` / `h4` (`.wtr-text-block`, main.css) | 64 / 40 / — | 40 / 28 / 24 |
     | Lead copy (PageCards, related posts) | 36 `text-36` | 20 `text-xl` |
     | Block description copy (Callout, SignupActionKit, DonateFundraiseUp, ImageText, CardCarousel) | 24 `text-2xl` | 20 `text-xl` |
     | Body paragraph | 16 (inherited) | 20 `text-xl` |
@@ -996,10 +996,10 @@ Two practical notes for agents:
     20px body size with everything else and then put back deliberately: a
     callout is a short pull-quote-ish interruption in the page, not running
     text, and at 20px it stopped reading as emphasis against the body copy
-    around it. Its `h3` subheading is also 24px, so heading and copy match on
-    size there — the hierarchy is carried by weight instead (Bold 700 vs
-    Regular), which is enough at that length. Do not "fix" the copy back down
-    to `text-xl` for consistency with the other blocks.
+    around it. Its `h3` subheading is 28px, one step above that copy, so the
+    hierarchy there is carried by size and weight together (Bold 700 vs
+    Regular). Do not "fix" the copy back down to `text-xl` for consistency
+    with the other blocks.
 
     The block-description row is a later correction to this same pass:
     those three blocks kept a 24px `lg:text-2xl` lead-copy size while
@@ -1056,25 +1056,42 @@ Two practical notes for agents:
     component rather than a different layout of the same one. Its 2px
     border stays — that is shape, not fill.
 
-    **Every `h3` on the site is one step, and that step is 24px**
-    (`text-2xl`) — flat, with no `lg:` bump. `card.html`,
-    `post_card.html`, `person_card.html`, `image_card_list_block.html` and
-    `CalloutBlock`'s `subheading` all carry `text-2xl` in the template;
-    rich-text `h3` gets it from `.wtr-text-block h3` in `main.css`, legacy
-    imported markup from `.title4`, and every other prose container — the
-    accordion answer is the one that matters — from the unscoped
-    `.prose h3` rule beside it. These previously disagreed four ways: 24px
-    stepping to 28px at `lg:` on cards and rich text, a flat 20px on the
-    callout subheading, and an em-derived 25px inside accordion answers,
-    because that panel is a plain `.prose` container carrying no
-    `.wtr-text-block`. Do not reintroduce a per-block card-heading size or
-    a responsive bump.
+    **Every `h3` on the site is one step, and that step is 28px**
+    (`text-28`) — flat, with no `lg:` bump; **`h4` is one step below it at
+    24px** (`text-2xl`). `card.html`, `post_card.html`, `person_card.html`,
+    `image_card_list_block.html` and `CalloutBlock`'s `subheading` all carry
+    `text-28` in the template; rich-text `h3` gets it from
+    `.wtr-text-block h3` in `main.css`, legacy imported markup from
+    `.title4` and the bare-`h3` rule beside it, and every other prose
+    container — the accordion answer is the one that matters — from the
+    unscoped `.prose h3` rule. `h4` mirrors that exactly: `.prose h4` pins
+    24px for every prose container and `.wtr-text-block h4` adds only the
+    tighter leading and margin. Do not reintroduce a per-block
+    card-heading size or a responsive bump.
 
-    `.prose h3` is deliberately unscoped: any rich-text container is a
-    content context and its headings belong on the content ramp. The one
-    `h3` that stays off the step is the footer's column labels (`text-sm`
-    uppercase) — that is interface chrome, not content, and it is never
-    inside `.prose`, so the rule cannot reach it.
+    **Two card listings deliberately sit a step below at 24px**: the
+    `IndexPage` child grid and `PageCardsBlock`. Both render the shared
+    `card.html`/`post_card.html`, so the size is passed in as
+    `heading_size="text-2xl"` on the `{% include %}` — the same parameter
+    pattern `description_size` already uses — rather than branching inside
+    the card. The templates default to `text-28`, so every other caller
+    (`CardGridBlock`, `CardBlock`, `CardCarouselBlock`, the Blogs index and
+    post_page's related posts) keeps the site step without naming it. A new
+    listing that wants the smaller heading passes the parameter; it must
+    never be hardcoded back into the card templates, which are shared.
+
+    The whole set previously disagreed four ways: 24px stepping to 28px at
+    `lg:` on cards and rich text, a flat 20px on the callout subheading, and
+    an em-derived 25px inside accordion answers, because that panel is a
+    plain `.prose` container carrying no `.wtr-text-block`. Unifying them at
+    24px fixed that; 28px/24px is the later size decision on top of the same
+    single-step structure.
+
+    `.prose h3` and `.prose h4` are deliberately unscoped: any rich-text
+    container is a content context and its headings belong on the content
+    ramp. The one `h3` that stays off the step is the footer's column labels
+    (`text-sm` uppercase) — that is interface chrome, not content, and it is
+    never inside `.prose`, so the rule cannot reach it.
 
     The carousel's own former override is gone:
     `.wtr-card-carousel-track .wtr-card h3` sets `line-height` only,
@@ -1084,7 +1101,7 @@ Two practical notes for agents:
     **Legacy imported markup**: content brought over from the old site marks
     sub-headings as `<p class="intro title4">` instead of a real `h3`. The
     unscoped `.title4` rule in `main.css` maps that onto the same step as a
-    rich-text `h3` (24px). It cannot be scoped under
+    rich-text `h3` (28px). It cannot be scoped under
     `.wtr-text-block` — the legacy markup arrives in `raw_html` blocks,
     which render outside it.
 

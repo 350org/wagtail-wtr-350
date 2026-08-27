@@ -18,7 +18,7 @@
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {% for child in children %}
                 {% page_as_card child as card %}
-                {% include "wtrx/components/card.html" %}
+                {% include "wtrx/components/card.html" with heading_size="text-2xl" %}
             {% endfor %}
         </div>
 

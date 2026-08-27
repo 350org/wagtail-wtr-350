@@ -22,10 +22,10 @@ cards' body copy is sized larger per Figma's "Our work in action" cards.
             {% image card.icon fill-24x24 as icon_img %}
             <div class="flex items-center gap-3">
                 <img src="{{ icon_img.url }}" width="{{ icon_img.width }}" height="{{ icon_img.height }}" alt="" class="h-6 w-6 shrink-0" loading="lazy">
-                <h3 class="font-heading text-2xl font-semibold text-dark">{{ card.heading }}</h3>
+                <h3 class="font-heading {{ heading_size|default:"text-28" }} font-semibold text-dark">{{ card.heading }}</h3>
             </div>
         {% else %}
-            <h3 class="font-heading text-2xl font-semibold text-dark">{{ card.heading }}</h3>
+            <h3 class="font-heading {{ heading_size|default:"text-28" }} font-semibold text-dark">{{ card.heading }}</h3>
         {% endif %}
         {% if card.description %}
             <p class="mt-2 flex-1 {{ description_size|default:"text-base" }} text-dark">{{ card.description }}</p>
