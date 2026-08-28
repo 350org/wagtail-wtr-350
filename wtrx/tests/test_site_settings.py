@@ -933,3 +933,46 @@ class TestFooterNewsletterSignupRendersInFooter(TestCase):
         content = self.client.get(self.home.url).content.decode()
         self.assertIn("wtr-footer-newsletter", content)
         self.assertIn("temporarily unavailable", content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_wrapper_carries_the_shared_actionkit_scoping_class(self, mock_fetch):
+        """
+        _actionkit_form.html's script scopes itself to the nearest
+        .wtr-signup-actionkit ancestor (document.currentScript.closest(...))
+        so this box's form is found independently of any other ActionKit
+        embed already on the page — see the class comment in footer.html.
+        """
+        mock_fetch.return_value = "<form>default form</form>"
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn('wtr-footer-newsletter wtr-signup-actionkit"', content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_default_page_renders_site_default_success_message(self, mock_fetch):
+        mock_fetch.return_value = "<form>default form</form>"
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn("Thanks for signing up!", content)
+        self.assertIn("data-thank-you", content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_override_success_message_overrides_site_default(self, mock_fetch):
+        mock_fetch.return_value = "<form>canada form</form>"
+        overrides = self.footer.footer_overrides
+        overrides[0].value["newsletter_success_message"] = "Merci de vous inscrire!"
+        self.footer.footer_overrides = overrides
+        self.footer.save()
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn("Merci de vous inscrire!", content)
+        self.assertNotIn("Thanks for signing up!", content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_override_falls_back_to_site_default_success_message_when_blank(self, mock_fetch):
+        """
+        Unlike every other field on FooterOverrideBlock, a blank
+        newsletter_success_message falls back to the site default rather
+        than resolving to nothing — see resolved_footer_newsletter_signup()'s
+        docstring. Leaving it unset on an override must not silently disable
+        the inline AJAX submit path for that section.
+        """
+        mock_fetch.return_value = "<form>canada form</form>"
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn("Thanks for signing up!", content)

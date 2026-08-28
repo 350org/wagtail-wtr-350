@@ -4,10 +4,15 @@
     standalone panel and by the hero's signup CTA choice (components/
     hero.html, via signup_actionkit_block.html with compact=True).
 
-    Expects from context: form_html, success_message, actionkit_base_url
-    (all set by SignupActionKitBlock.get_context()), and exactly one of the
-    layout flags `inline` / `stacked`, passed explicitly by the including
-    template:
+    Expects from context: form_html, actionkit_base_url, and exactly one of
+    the layout flags `inline` / `stacked`, passed explicitly by the including
+    template. Also expects thank-you content, in one of two forms depending
+    on the caller: `success_message` (a SuccessMessageBlock StreamValue, set
+    by SignupActionKitBlock.get_context() — rendered via include_block) or
+    `success_text` (a plain string, set by resolved_footer_newsletter_signup()
+    for the footer's newsletter box, which has no StreamField content editor
+    of its own — rendered as-is). A caller sets at most one; either enables
+    the thank-you swap below.
 
       inline=True  → .wtr-actionkit-embed-inline: fields wrap across one
                      row with the submit button on the same line. For the
@@ -70,7 +75,7 @@
     custom success_message configured.
     {% endcomment %}
     <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
-    {% if success_message %}
+    {% if success_message or success_text %}
         {% comment %}
         The tone modifier rides along here as well as on the embed above,
         because this box replaces the form on success and so has to survive
@@ -83,7 +88,11 @@
         {% endcomment %}
         <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50{% if stacked and panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}"
              data-thank-you>
-            {% include_block success_message %}
+            {% if success_message %}
+                {% include_block success_message %}
+            {% else %}
+                <p>{{ success_text }}</p>
+            {% endif %}
         </div>
     {% endif %}
     <script>
@@ -266,7 +275,7 @@
                     return response.json();
                 }).then(function (data) {
                     if (data.success) {
-                        {% if success_message %}
+                        {% if success_message or success_text %}
                         if (formContainer) { formContainer.classList.add("hidden"); }
                         if (thankYou) { thankYou.classList.remove("hidden"); }
                         {% endif %}

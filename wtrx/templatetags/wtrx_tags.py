@@ -146,11 +146,21 @@ def resolved_footer_newsletter_signup(context):
     SignupActionKitBlock uses for its own panel (see
     actionkit.fetch_and_cache_embed_form_html).
 
-    Returns a dict with `form_html` and `actionkit_base_url` — suitable for
-    including directly into
+    Returns a dict with `form_html`, `actionkit_base_url`, and
+    `success_message` — suitable for including directly into
     wtrx/components/streamfield/blocks/_actionkit_form.html — or None when
     no shortname is configured for this page's footer, meaning no signup box
     should render at all.
+
+    Unlike every other field on FooterOverrideBlock, `newsletter_success_message`
+    falls back to the site FooterSettings' own value when an override leaves
+    it blank, rather than resolving to nothing: _actionkit_form.html's inline
+    AJAX submit path (see its wireInlineSubmit()) only wires up when a success
+    message is present, and the footer box is scoped per-instance (see that
+    template) specifically so it works no matter where it sits relative to
+    other ActionKit embeds on the page — an override that forgets to set its
+    own message shouldn't silently regress to relying on ActionKit's own
+    script, which only ever binds the first embed in the DOM.
 
     Usage in templates (after {% resolved_footer as footer %}):
         {% load wtrx_tags %}
@@ -175,9 +185,17 @@ def resolved_footer_newsletter_signup(context):
     if hostname:
         form_html = actionkit.fetch_and_cache_embed_form_html(hostname, short_form_id)
 
+    success_message = _resolved_attr(footer, "newsletter_success_message", "")
+    if not success_message:
+        try:
+            success_message = FooterSettings.for_request(request).newsletter_success_message
+        except (FooterSettings.DoesNotExist, Site.DoesNotExist):
+            success_message = ""
+
     return {
         "form_html": form_html,
         "actionkit_base_url": actionkit.base_url(hostname) if hostname else "",
+        "success_message": success_message,
     }
 
 

@@ -302,6 +302,16 @@ class FooterOverrideBlock(StructBlock):
             "one set."
         ),
     )
+    newsletter_success_message = CharBlock(
+        required=False,
+        label=_("Newsletter signup — success message"),
+        help_text=_(
+            "Shown in place of the form after a successful signup for this "
+            "section. Falls back to the site default's message when left "
+            "blank (unlike the other fields on this override, which show "
+            "nothing rather than fall back)."
+        ),
+    )
 
     class Meta:
         icon = "bars"
@@ -696,6 +706,17 @@ class FooterSettings(BaseSiteSetting):
             "override instead."
         ),
     )
+    newsletter_success_message = models.CharField(
+        max_length=255,
+        blank=True,
+        default=_("Thanks for signing up!"),
+        verbose_name=_("newsletter signup — success message"),
+        help_text=_(
+            "Shown in place of the form after a successful newsletter "
+            "signup. Sections with their own footer override set this on "
+            "the override instead."
+        ),
+    )
 
     panels = [
         FieldPanel("layout"),
@@ -712,6 +733,7 @@ class FooterSettings(BaseSiteSetting):
         FieldPanel("footer_overrides"),
         FieldPanel("regional_sites"),
         FieldPanel("newsletter_actionkit_shortname"),
+        FieldPanel("newsletter_success_message"),
     ]
 
     @property

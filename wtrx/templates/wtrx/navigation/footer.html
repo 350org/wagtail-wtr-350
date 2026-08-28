@@ -227,11 +227,19 @@
             divide from, so the line would float above the heading instead.
             {% endcomment %}
             {% if newsletter %}
-                <div class="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 min-w-0 border-t border-neutral-700 pt-8 lg:border-t-0 lg:pt-0 wtr-footer-newsletter">
+                {% comment %}
+                wtr-signup-actionkit is the marker class _actionkit_form.html's
+                script scopes itself to (via document.currentScript.closest())
+                so this box's ActionKit form is found and wired independently
+                of however many other ActionKit embeds (hero CTA, an "Act Now"
+                block, etc.) already sit earlier in the page — same class the
+                block's own two variants use, see signup_actionkit_block.html.
+                {% endcomment %}
+                <div class="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 min-w-0 border-t border-neutral-700 pt-8 lg:border-t-0 lg:pt-0 wtr-footer-newsletter wtr-signup-actionkit">
                     <h3 class="font-heading font-semibold text-light text-28 mb-4">
                         {% trans "Sign up to stay connected." %}
                     </h3>
-                    {% with form_html=newsletter.form_html actionkit_base_url=newsletter.actionkit_base_url panel_tone="on-dark" stacked=True %}
+                    {% with form_html=newsletter.form_html actionkit_base_url=newsletter.actionkit_base_url success_text=newsletter.success_message panel_tone="on-dark" stacked=True %}
                         {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" %}
                     {% endwith %}
                 </div>

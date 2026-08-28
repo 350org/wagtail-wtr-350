@@ -1,39 +1,86 @@
 {% load i18n %}
 {% comment %}
-"Around the World" region switcher (Figma: globe icon + label + chevron pill
-beside the footer logo). A flat list of external links to other regional
-350.org sites — the same list on every page regardless of any footer
-override, since it isn't itself region-specific content (see
-FooterSettings.regional_sites).
+"Around the World" region switcher (Figma: globe icon + label pill beside
+the footer logo). A flat list of external links to other regional 350.org
+sites — the same list on every page regardless of any footer override,
+since it isn't itself region-specific content (see FooterSettings.regional_sites).
 
-Opens on hover and on keyboard focus (group-focus-within), the same
-JS-free dropdown pattern as the nav submenu in header.html.
+Opens a native <dialog> modal (RegionalSiteModal, static/js/components/
+regional-site-modal.js) rather than a hover dropdown — easier to reach on
+touch, and doesn't rely on hover for discovery. showModal() gives us
+Escape-to-close and top-layer stacking for free; the JS only needs to wire
+the trigger, the close button, and a backdrop click.
+
+Full-bleed layout (centered title, grid of pin-marker cards, large corner
+close button) rather than a small anchored popover — modelled on a
+location-switcher reference the design gave, minus the region groupings and
+per-entry language line that reference has: RegionalSiteLinkBlock is just
+text + url, with no grouping field, so every entry renders in one flat grid.
+
+data-regional-sites-trigger is scoped to its own .wtr-regional-site-switcher
+ancestor (not a page-wide id lookup) the same way _actionkit_form.html's
+script scopes itself — this partial is included from two mutually exclusive
+footer layout branches (minimal vs columns) today, but scoping per-instance
+means a future third call site on the same page still works correctly.
 
 Expects `regional_sites` (a StreamField of RegionalSiteLinkBlock) in context.
 {% endcomment %}
 {% if regional_sites %}
-    <div class="relative group">
+    <div class="wtr-regional-site-switcher relative">
         <button type="button"
-                class="inline-flex items-center gap-2 rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-white cursor-pointer hover:bg-white/[0.16] transition-colors"
-                aria-haspopup="true">
+                class="wtr-regional-sites-trigger inline-flex items-center gap-2 rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-white cursor-pointer hover:bg-white/[0.16] transition-colors"
+                aria-haspopup="dialog"
+                data-regional-sites-trigger>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
             </svg>
             {% trans "Around the World" %}
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
         </button>
-        <div class="hidden group-hover:block group-focus-within:block absolute left-0 top-full pt-2 z-40 min-w-48">
-            <div class="wtr-regional-sites rounded-lg shadow-lg py-2 bg-light border border-neutral-200">
-                {% for item in regional_sites %}
-                    <a href="{{ item.value.url }}"
-                       rel="noopener noreferrer"
-                       class="block px-4 py-2 text-sm font-medium text-neutral-700 hover:text-navy hover:bg-neutral-100 transition-colors">
-                        {{ item.value.text }}
-                    </a>
-                {% endfor %}
+        {% comment %}
+        p-0 resets the UA stylesheet's default dialog padding/border so the
+        inner wrapper below owns all of it; m-auto keeps the browser's own
+        dialog[open] centering (position: fixed + inset: 0 from the UA
+        stylesheet, centered by auto margins) rather than reimplementing
+        centering by hand. Deliberately no `relative` utility here — Tailwind's
+        `position: relative` would override that same UA `position: fixed`
+        rule (same cascade layer, later source), dropping the dialog back
+        into normal document flow whatever page position it happened to be
+        included at (typically off-screen, wherever the footer sits). The
+        inner wrapper below carries `relative` instead, purely so the close
+        button can anchor to its corner.
+        {% endcomment %}
+        <dialog class="wtr-regional-sites-modal m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-5xl overflow-y-auto rounded-lg border-0 p-0 backdrop:bg-dark/70 backdrop:backdrop-blur-sm"
+                data-regional-sites-dialog
+                aria-labelledby="wtr-regional-sites-modal-title">
+            <div class="relative">
+                <button type="button"
+                        class="absolute right-4 top-4 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-dark text-light cursor-pointer hover:bg-navy transition-colors"
+                        aria-label="{% trans 'Close' %}"
+                        data-regional-sites-close>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div class="mx-auto max-w-4xl px-6 py-12 sm:px-10 sm:py-16">
+                    <h2 id="wtr-regional-sites-modal-title"
+                        class="font-heading text-2xl leading-[1.2] tracking-tight text-dark text-center sm:text-3xl lg:text-40">
+                        {% trans "Around the World" %}
+                    </h2>
+                    <div class="wtr-regional-sites mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:mt-12 lg:grid-cols-4">
+                        {% for item in regional_sites %}
+                            <a href="{{ item.value.url }}"
+                               rel="noopener noreferrer"
+                               class="flex items-center gap-2 rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                                </svg>
+                                {{ item.value.text }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-        </div>
+        </dialog>
     </div>
 {% endif %}
