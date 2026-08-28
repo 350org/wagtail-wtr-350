@@ -67,15 +67,14 @@ own shape and needs none.
                     </p>
                 {% endif %}
                 {% comment %}
-                [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
-                prose-invert body color (a muted ~87%-lightness gray, meant for long-form
-                reading) to pure white, matching Figma — same override callout_block.html
-                applies for the same reason. The h2 (heading typed at the top of `content`)
-                gets its font-size/tracking pinned via .wtr-feature-panel-content in
-                main.css, same technique .wtr-text-block uses.
+                prose-invert's body color is pinned to pure white centrally,
+                in main.css — see the .prose-invert rule there. The h2
+                (heading typed at the top of `content`) gets its font-size/
+                tracking pinned via .wtr-feature-panel-content in main.css,
+                same technique .wtr-text-block uses.
                 {% endcomment %}
                 <div class="wtr-feature-panel-content prose max-w-none text-lg sm:text-xl
-                            {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                            {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
                     {{ value.content|richtext }}
                 </div>
                 {% if value.link_text and value.link_page or value.link_text and value.link_url or value.link_text and value.anchor %}

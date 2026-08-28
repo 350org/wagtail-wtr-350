@@ -1034,6 +1034,45 @@ h3, h4, h5, h6 {
 }
 
 /* ============================================================
+ * Inverted rich text body color — .prose-invert
+ * ============================================================
+ * Tailwind Typography's prose-invert defaults body text (paragraphs, list
+ * items) to a muted ~87%-lightness gray, meant for long-form reading on a
+ * dark background — headings/bold/links already default to pure white in
+ * prose-invert, only body text doesn't. Every dark-background block in this
+ * app wants pure white body copy instead, so this is centralized here
+ * rather than repeated as a `[--tw-prose-invert-body:var(--color-light)]`
+ * arbitrary utility at every call site (that was the previous pattern, in
+ * CalloutBlock/FeaturePanelBlock/SignupActionKitBlock/hero.html, and it
+ * silently doesn't help a *new* prose-invert usage that forgets to repeat
+ * it — exactly what happened to text_block.html/ImageTextBlock/
+ * CardCarouselBlock/PageCardsBlock/DonateFundraiseUpBlock/LeadTextBlock
+ * when their `in-data-[bg-tone=dark]:prose-invert` dark-section inversion
+ * was added: correct headings, grey body text). One rule here covers every
+ * current and future `.prose-invert` usage, conditional or not.
+ * ============================================================ */
+.prose-invert {
+    --tw-prose-invert-body: var(--color-light);
+}
+
+/* Covers the same fix for `in-data-[bg-tone=dark]:prose-invert` specifically
+ * (text_block.html, ImageTextBlock, CardCarouselBlock, PageCardsBlock,
+ * LeadTextBlock) -- the rule above alone doesn't reach these. Tailwind's
+ * `in-*` variant doesn't add a plain "prose-invert" class token to the
+ * rendered HTML; it generates one compound class whose *name* is the
+ * literal string "in-data-[bg-tone=dark]:prose-invert", so a selector
+ * written as plain `.prose-invert` never matches it. Keying off the real
+ * `data-bg-tone="dark"` attribute directly (the same signal the variant
+ * itself reads) sidesteps that entirely: `--tw-prose-invert-body` is a
+ * custom property, resolved against the element's own cascaded value at
+ * used-value time, so it doesn't matter which mechanism actually flips
+ * prose-invert on for a given element -- only that this rule's higher
+ * specificity (and unlayered position) wins the assignment either way. */
+[data-bg-tone="dark"] .prose {
+    --tw-prose-invert-body: var(--color-light);
+}
+
+/* ============================================================
  * Rich text block headings — .wtr-text-block
  * ============================================================
  * Used by text_block.html. Tailwind Typography sizes headings relative to
