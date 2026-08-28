@@ -1,0 +1,39 @@
+{% load i18n %}
+{% comment %}
+"Around the World" region switcher (Figma: globe icon + label + chevron pill
+beside the footer logo). A flat list of external links to other regional
+350.org sites — the same list on every page regardless of any footer
+override, since it isn't itself region-specific content (see
+FooterSettings.regional_sites).
+
+Opens on hover and on keyboard focus (group-focus-within), the same
+JS-free dropdown pattern as the nav submenu in header.html.
+
+Expects `regional_sites` (a StreamField of RegionalSiteLinkBlock) in context.
+{% endcomment %}
+{% if regional_sites %}
+    <div class="relative group">
+        <button type="button"
+                class="inline-flex items-center gap-2 rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-white cursor-pointer hover:bg-white/[0.16] transition-colors"
+                aria-haspopup="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
+            </svg>
+            {% trans "Around the World" %}
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+        <div class="hidden group-hover:block group-focus-within:block absolute left-0 top-full pt-2 z-40 min-w-48">
+            <div class="wtr-regional-sites rounded-lg shadow-lg py-2 bg-light border border-neutral-200">
+                {% for item in regional_sites %}
+                    <a href="{{ item.value.url }}"
+                       rel="noopener noreferrer"
+                       class="block px-4 py-2 text-sm font-medium text-neutral-700 hover:text-navy hover:bg-neutral-100 transition-colors">
+                        {{ item.value.text }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endif %}

@@ -7,9 +7,12 @@ from django.utils.safestring import mark_safe
 from wagtail.models import Site
 
 from wtrx.blocks import background_is_light as _background_is_light, resolve_background
+from wtrx.integrations import actionkit
 from wtrx.site_settings import (
     SOCIAL_PLATFORM_CHOICES,
     BrandingSEOSettings,
+    FooterSettings,
+    IntegrationSettings,
     NavigationSettings,
     SocialSettings,
 )
@@ -77,6 +80,23 @@ def background_is_light(value):
 # ---------------------------------------------------------------------------
 
 
+def _resolved_attr(resolved, name, default=""):
+    """
+    Read ``name`` off whatever NavigationSettings/FooterSettings.resolved_for_page()
+    returned — either the settings model instance itself (a real object, plain
+    ``getattr`` works) or a StructValue from an override entry (a bare
+    ``collections.OrderedDict`` with no attribute access at all). Django
+    templates paper over this by trying dict-lookup before ``getattr`` on
+    every ``{{ var.attr }}``, but that resolution only happens inside the
+    template engine — plain Python code (like a simple_tag's function body)
+    needs this explicitly, or a StructValue field silently reads back as the
+    default every time.
+    """
+    if isinstance(resolved, dict):
+        return resolved.get(name, default)
+    return getattr(resolved, name, default)
+
+
 @register.simple_tag(takes_context=True)
 def resolved_navigation(context):
     """
@@ -95,6 +115,70 @@ def resolved_navigation(context):
         return None
     nav_settings = NavigationSettings.for_request(request)
     return nav_settings.resolved_for_page(context.get("page"))
+
+
+@register.simple_tag(takes_context=True)
+def resolved_footer(context):
+    """
+    Return the FooterSettings-shaped object to render for the current page:
+    the site's default FooterSettings, or the most specific matching entry
+    from its footer_overrides if the current page falls under one of their
+    root pages. See FooterSettings.resolved_for_page().
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% resolved_footer as footer %}
+    """
+    request = context.get("request")
+    if request is None:
+        return None
+    footer_settings = FooterSettings.for_request(request)
+    return footer_settings.resolved_for_page(context.get("page"))
+
+
+@register.simple_tag(takes_context=True)
+def resolved_footer_newsletter_signup(context):
+    """
+    Fetch (and cache) the ActionKit form powering the footer's newsletter
+    signup box, for whichever footer is resolved for the current page — the
+    resolved footer's own newsletter_actionkit_shortname (site default or
+    footer override), the same auto-rendered-form mechanism
+    SignupActionKitBlock uses for its own panel (see
+    actionkit.fetch_and_cache_embed_form_html).
+
+    Returns a dict with `form_html` and `actionkit_base_url` — suitable for
+    including directly into
+    wtrx/components/streamfield/blocks/_actionkit_form.html — or None when
+    no shortname is configured for this page's footer, meaning no signup box
+    should render at all.
+
+    Usage in templates (after {% resolved_footer as footer %}):
+        {% load wtrx_tags %}
+        {% resolved_footer_newsletter_signup as newsletter %}
+    """
+    request = context.get("request")
+    footer = context.get("footer")
+    if request is None or footer is None:
+        return None
+    short_form_id = _resolved_attr(footer, "newsletter_actionkit_shortname", "")
+    if not short_form_id:
+        return None
+
+    hostname = ""
+    try:
+        config = IntegrationSettings.for_request(request).get_integration_config("actionkit")
+        hostname = config.get("hostname", "") if config else ""
+    except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+        hostname = ""
+
+    form_html = None
+    if hostname:
+        form_html = actionkit.fetch_and_cache_embed_form_html(hostname, short_form_id)
+
+    return {
+        "form_html": form_html,
+        "actionkit_base_url": actionkit.base_url(hostname) if hostname else "",
+    }
 
 
 def _page_is_within(page, target):
