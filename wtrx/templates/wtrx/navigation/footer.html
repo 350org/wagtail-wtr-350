@@ -1,5 +1,7 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
-{% with footer=settings.wtrx.FooterSettings social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings %}
+{% resolved_footer as footer %}
+{% resolved_footer_newsletter_signup as newsletter %}
+{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings regional_sites=settings.wtrx.FooterSettings.regional_sites %}
 
 {% if footer.layout == "minimal" %}
 
@@ -14,27 +16,36 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div class="flex flex-col sm:flex-row items-center justify-between gap-4 flex-wrap">
 
-                {% comment %}Left: logo + copyright{% endcomment %}
+                {% comment %}
+                Left: logo lockup + copyright. The lockup anchor always
+                renders (text fallback when no logo is configured, same
+                pattern as header.html) so the root_page link and regional
+                badge work regardless of whether a logo is set.
+                {% endcomment %}
                 <div class="flex items-center gap-4">
-                    {% if branding.dark_logo %}
-                        {% image branding.dark_logo max-120x48 as footer_logo %}
-                        <a href="/" class="shrink-0">
+                    <a href="{% if footer.root_page %}{% pageurl footer.root_page %}{% else %}/{% endif %}" class="shrink-0 flex items-center gap-2">
+                        {% if branding.dark_logo %}
+                            {% image branding.dark_logo max-120x48 as footer_logo %}
                             <img src="{{ footer_logo.url }}"
                                  width="{{ footer_logo.width }}"
                                  height="{{ footer_logo.height }}"
                                  alt="{{ footer_logo.image.description|default:current_site.site_name }}"
                                  class="h-8 w-auto object-contain">
-                        </a>
-                    {% elif branding.logo %}
-                        {% image branding.logo max-120x48 as footer_logo %}
-                        <a href="/" class="shrink-0">
+                        {% elif branding.logo %}
+                            {% image branding.logo max-120x48 as footer_logo %}
                             <img src="{{ footer_logo.url }}"
                                  width="{{ footer_logo.width }}"
                                  height="{{ footer_logo.height }}"
                                  alt="{{ footer_logo.image.description|default:current_site.site_name }}"
                                  class="h-8 w-auto object-contain">
-                        </a>
-                    {% endif %}
+                        {% else %}
+                            <span class="font-heading font-bold text-lg text-light">{{ current_site.site_name }}</span>
+                        {% endif %}
+                        {% if footer.regional_label %}
+                            <span class="wtr-footer-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white">{{ footer.regional_label }}</span>
+                        {% endif %}
+                    </a>
+                    {% include "wtrx/components/regional_site_switcher.html" %}
                     <p class="text-sm text-neutral-400">
                         {% if footer.copyright_text %}
                             {{ footer.copyright_text }}
@@ -98,80 +109,148 @@
     {% endcomment %}
     <footer class="wtr-footer bg-dark text-neutral-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {% comment %}
+        Grid, not flex — the newsletter box needs to reorder to sit between
+        the nav columns and the bottom bar on mobile (order-2) while
+        staying a single right-hand column spanning both rows on desktop
+        (explicit lg:col-start-2/lg:row-span-2). A single flex axis can't
+        do both: reordering three flex siblings would also reorder them at
+        desktop, and nesting the bottom bar inside the same flex item as
+        the nav columns (so mobile order could skip over it) would break
+        the desktop column split. grid-cols-1 (no newsletter) degrades to
+        the same stacked layout flex gave before.
+        {% endcomment %}
+        <div class="grid grid-cols-1 gap-y-8 lg:items-start {% if newsletter %}lg:grid-cols-[1fr_368px] lg:gap-x-12{% endif %}">
 
-            {% comment %}Logo — prefers dark_logo on the dark footer bg, falls back to primary logo.{% endcomment %}
-            {% if branding.dark_logo %}
-                {% image branding.dark_logo max-160x60 as footer_logo %}
-                <div class="mb-10">
-                    <a href="/" class="inline-block">
-                        <img src="{{ footer_logo.url }}"
-                             width="{{ footer_logo.width }}"
-                             height="{{ footer_logo.height }}"
-                             alt="{{ footer_logo.image.description|default:current_site.site_name }}"
-                             class="h-10 w-auto object-contain">
+            {% comment %}
+            Main content: logo lockup + regional badge + nav columns. The
+            logo anchor always renders (text fallback when no logo is
+            configured, same pattern as header.html) so the root_page link
+            and regional badge work regardless of whether a logo is set.
+            Prefers dark_logo on the dark footer bg, falls back to primary
+            logo. order-1 on mobile (first); lg:order-none because desktop
+            positioning comes from this being the first auto-placed grid
+            item in column 1, not from `order`.
+            {% endcomment %}
+            <div class="order-1 lg:order-none min-w-0">
+                <div class="mb-10 flex items-center gap-8">
+                    <a href="{% if footer.root_page %}{% pageurl footer.root_page %}{% else %}/{% endif %}" class="inline-flex items-center gap-2">
+                        {% if branding.dark_logo %}
+                            {% image branding.dark_logo max-160x60 as footer_logo %}
+                            <img src="{{ footer_logo.url }}"
+                                 width="{{ footer_logo.width }}"
+                                 height="{{ footer_logo.height }}"
+                                 alt="{{ footer_logo.image.description|default:current_site.site_name }}"
+                                 class="h-10 w-auto object-contain">
+                        {% elif branding.logo %}
+                            {% image branding.logo max-160x60 as footer_logo %}
+                            <img src="{{ footer_logo.url }}"
+                                 width="{{ footer_logo.width }}"
+                                 height="{{ footer_logo.height }}"
+                                 alt="{{ footer_logo.image.description|default:current_site.site_name }}"
+                                 class="h-10 w-auto object-contain">
+                        {% else %}
+                            <span class="font-heading font-bold text-2xl text-light">{{ current_site.site_name }}</span>
+                        {% endif %}
+                        {% if footer.regional_label %}
+                            <span class="wtr-footer-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white">{{ footer.regional_label }}</span>
+                        {% endif %}
                     </a>
+                    {% include "wtrx/components/regional_site_switcher.html" %}
                 </div>
-            {% elif branding.logo %}
-                {% image branding.logo max-160x60 as footer_logo %}
-                <div class="mb-10">
-                    <a href="/" class="inline-block">
-                        <img src="{{ footer_logo.url }}"
-                             width="{{ footer_logo.width }}"
-                             height="{{ footer_logo.height }}"
-                             alt="{{ footer_logo.image.description|default:current_site.site_name }}"
-                             class="h-10 w-auto object-contain">
-                    </a>
+
+                {% comment %}
+                Footer navigation columns — FooterSettings.footer_navigation.
+                Each column is a FooterColumnBlock: heading + list of link blocks.
+                {% endcomment %}
+                {% if footer.footer_navigation %}
+                    <nav aria-label="{% trans 'Footer navigation' %}">
+                    <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+                        {% for column in footer.footer_navigation %}
+                            <div>
+                                {% if column.value.heading %}
+                                    <h3 class="font-heading font-semibold text-light text-sm uppercase tracking-wider mb-4">
+                                        {{ column.value.heading }}
+                                    </h3>
+                                {% endif %}
+                                <ul class="space-y-2">
+                                    {% for link in column.value.links %}
+                                        <li>
+                                            {% if link.block_type == "internal" and link.value.page %}
+                                                <a href="{% pageurl link.value.page %}"
+                                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                                                    {{ link.value.text }}
+                                                </a>
+                                            {% elif link.block_type == "external" %}
+                                                <a href="{{ link.value.url }}"
+                                                   rel="noopener noreferrer"
+                                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                                                    {{ link.value.text }}
+                                                </a>
+                                            {% elif link.block_type == "anchor" %}
+                                                <a href="#{{ link.value.anchor }}"
+                                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                                                    {{ link.value.text }}
+                                                </a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    </nav>
+                {% endif %}
+            </div>
+
+            {% comment %}
+            Newsletter signup box (Figma: "Sign up to stay connected", the
+            368px right-hand column) — only rendered when
+            {% resolved_footer_newsletter_signup %} found a configured
+            ActionKit shortname for this page's resolved footer. Reuses the
+            same fetched-form renderer SignupActionKitBlock uses for its own
+            panel, `stacked` variant, sized for the same ~370px column
+            (see _actionkit_form.html) — no separate email/country markup to
+            hand-build here. `panel_tone="on-dark"` because the footer's
+            background is always the dark panel fill, unlike the block's own
+            `background`-driven choice.
+
+            order-2 on mobile — between the nav columns and the bottom bar,
+            per design request. lg:row-span-2 makes it sit beside *both*
+            grid-auto-placed siblings (main content in row 1, bottom bar in
+            row 2) rather than just the first.
+
+            The border-t divider is mobile-only (lg:border-t-0 lg:pt-0):
+            stacked between the nav links and the form it reads as a
+            section break, same as the bottom bar's own border-t below it;
+            side-by-side on desktop there's nothing above this column to
+            divide from, so the line would float above the heading instead.
+            {% endcomment %}
+            {% if newsletter %}
+                {% comment %}
+                wtr-signup-actionkit is the marker class _actionkit_form.html's
+                script scopes itself to (via document.currentScript.closest())
+                so this box's ActionKit form is found and wired independently
+                of however many other ActionKit embeds (hero CTA, an "Act Now"
+                block, etc.) already sit earlier in the page — same class the
+                block's own two variants use, see signup_actionkit_block.html.
+                {% endcomment %}
+                <div class="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 min-w-0 border-t border-neutral-700 pt-8 lg:border-t-0 lg:pt-0 wtr-footer-newsletter wtr-signup-actionkit">
+                    <h3 class="font-heading font-semibold text-light text-28 mb-4">
+                        {% trans "Sign up to stay connected." %}
+                    </h3>
+                    {% with form_html=newsletter.form_html actionkit_base_url=newsletter.actionkit_base_url success_text=newsletter.success_message panel_tone="on-dark" stacked=True %}
+                        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" %}
+                    {% endwith %}
                 </div>
             {% endif %}
 
             {% comment %}
-            Footer navigation columns — FooterSettings.footer_navigation.
-            Each column is a FooterColumnBlock: heading + list of link blocks.
+            Bottom bar: social links left, copyright right. order-3 on
+            mobile (last, below the newsletter box). Social icons only
+            rendered when SocialSettings.show_in_footer is True.
             {% endcomment %}
-            {% if footer.footer_navigation %}
-                <nav aria-label="{% trans 'Footer navigation' %}">
-                <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 mb-10">
-                    {% for column in footer.footer_navigation %}
-                        <div>
-                            {% if column.value.heading %}
-                                <h3 class="font-heading font-semibold text-light text-sm uppercase tracking-wider mb-4">
-                                    {{ column.value.heading }}
-                                </h3>
-                            {% endif %}
-                            <ul class="space-y-2">
-                                {% for link in column.value.links %}
-                                    <li>
-                                        {% if link.block_type == "internal" and link.value.page %}
-                                            <a href="{% pageurl link.value.page %}"
-                                               class="text-sm text-neutral-400 hover:text-light transition-colors">
-                                                {{ link.value.text }}
-                                            </a>
-                                        {% elif link.block_type == "external" %}
-                                            <a href="{{ link.value.url }}"
-                                               rel="noopener noreferrer"
-                                               class="text-sm text-neutral-400 hover:text-light transition-colors">
-                                                {{ link.value.text }}
-                                            </a>
-                                        {% elif link.block_type == "anchor" %}
-                                            <a href="#{{ link.value.anchor }}"
-                                               class="text-sm text-neutral-400 hover:text-light transition-colors">
-                                                {{ link.value.text }}
-                                            </a>
-                                        {% endif %}
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endfor %}
-                </div>
-                </nav>
-            {% endif %}
-
-            {% comment %}
-            Bottom bar: social links left, copyright right.
-            Social icons only rendered when SocialSettings.show_in_footer is True.
-            {% endcomment %}
-            <div class="border-t border-neutral-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="order-3 lg:order-none min-w-0 border-t border-neutral-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
 
                 {% comment %}Social links{% endcomment %}
                 {% if social.show_in_footer and social.social_links %}
@@ -200,6 +279,8 @@
                 </p>
 
             </div>
+
+        </div>
         </div>
     </footer>
 

@@ -17,16 +17,20 @@ Tests for wtrx.site_settings.
 """
 
 import base64
+from unittest.mock import patch
 
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, RequestFactory, TestCase
 from wagtail.models import Page, Site
 
 from wtrx.blocks import DonateBlock
 from wtrx.images import CustomImage
+from wtrx.integrations.actionkit import ActionKitError
 from wtrx.models import ContentPage, HomePage
 from wtrx.site_settings import (
     BrandingSEOSettings,
+    FooterSettings,
     IntegrationSettings,
     NavigationSettings,
 )
@@ -405,6 +409,347 @@ class TestRegionalLabelRendersInHeader(TestCase):
         self.assertIn("Indonesia", content)
 
 
+class TestFooterSettingsResolvedForPage(TestCase):
+    """
+    FooterSettings.resolved_for_page() — identical algorithm to
+    NavigationSettings.resolved_for_page(), see
+    TestNavigationSettingsResolvedForPage for the page tree this mirrors.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = Page(title="Home", slug="footer-override-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="footer-override-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Footer Override Test",
+        )
+        cls.canada = Page(title="Canada", slug="canada")
+        cls.home.add_child(instance=cls.canada)
+        cls.canada_program = Page(title="Canada Program", slug="program")
+        cls.canada.add_child(instance=cls.canada_program)
+        cls.other = Page(title="Other", slug="other")
+        cls.home.add_child(instance=cls.other)
+
+        cls.footer, _ = FooterSettings.objects.get_or_create(site=cls.site)
+        cls.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": cls.canada,
+                    "regional_label": "",
+                    "layout": "",
+                    "footer_navigation": [],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                },
+            )
+        ]
+        cls.footer.save()
+
+    def test_root_page_itself_uses_override(self):
+        resolved = self.footer.resolved_for_page(self.canada)
+        self.assertEqual(resolved.get("root_page").pk, self.canada.pk)
+
+    def test_descendant_of_root_page_uses_override(self):
+        resolved = self.footer.resolved_for_page(self.canada_program)
+        self.assertEqual(resolved.get("root_page").pk, self.canada.pk)
+
+    def test_unrelated_page_uses_site_default(self):
+        resolved = self.footer.resolved_for_page(self.other)
+        self.assertIs(resolved, self.footer)
+
+    def test_home_page_uses_site_default(self):
+        resolved = self.footer.resolved_for_page(self.home)
+        self.assertIs(resolved, self.footer)
+
+    def test_no_page_uses_site_default(self):
+        self.assertIs(self.footer.resolved_for_page(None), self.footer)
+
+    def test_no_overrides_uses_site_default(self):
+        self.footer.footer_overrides = []
+        self.footer.save()
+        self.assertIs(self.footer.resolved_for_page(self.canada), self.footer)
+
+    def test_most_specific_override_wins(self):
+        """A nested override (deeper root_page) beats a broader ancestor override."""
+        self.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": self.canada,
+                    "regional_label": "",
+                    "layout": "",
+                    "footer_navigation": [],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                },
+            ),
+            (
+                "override",
+                {
+                    "root_page": self.canada_program,
+                    "regional_label": "",
+                    "layout": "",
+                    "footer_navigation": [],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                },
+            ),
+        ]
+        self.footer.save()
+        resolved = self.footer.resolved_for_page(self.canada_program)
+        self.assertEqual(resolved.get("root_page").pk, self.canada_program.pk)
+
+
+class TestFooterOverrideRendersInFooter(TestCase):
+    """
+    End-to-end check that {% resolved_footer %} (wtrx_tags.py), wired up in
+    wtrx/templates/wtrx/navigation/footer.html, actually renders the
+    override's columns for pages under its root_page and the default site
+    columns everywhere else.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="footer-render-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="footer-render-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Footer Render Test",
+        )
+        cls.canada = ContentPage(title="Canada", slug="canada")
+        cls.home.add_child(instance=cls.canada)
+        cls.other = ContentPage(title="Other", slug="other")
+        cls.home.add_child(instance=cls.other)
+
+        cls.footer, _ = FooterSettings.objects.get_or_create(site=cls.site)
+        cls.footer.footer_navigation = [
+            (
+                "column",
+                {
+                    "heading": "Default Column",
+                    "links": [("internal", {"text": "Default Link", "page": cls.home})],
+                },
+            )
+        ]
+        cls.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": cls.canada,
+                    "regional_label": "",
+                    "layout": "",
+                    "footer_navigation": [
+                        (
+                            "column",
+                            {
+                                "heading": "Canada Column",
+                                "links": [
+                                    (
+                                        "internal",
+                                        {"text": "Canada Only Link", "page": cls.canada},
+                                    )
+                                ],
+                            },
+                        )
+                    ],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                },
+            )
+        ]
+        cls.footer.save()
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="footer-render-test.localhost")
+
+    def test_default_page_shows_default_footer_only(self):
+        response = self.client.get(self.other.url)
+        content = response.content.decode()
+        self.assertIn("Default Link", content)
+        self.assertNotIn("Canada Only Link", content)
+
+    def test_override_root_page_shows_override_footer_only(self):
+        response = self.client.get(self.canada.url)
+        content = response.content.decode()
+        self.assertIn("Canada Only Link", content)
+        self.assertNotIn("Default Link", content)
+
+
+class TestFooterRegionalLabelRendersInFooter(TestCase):
+    """
+    The footer's regional badge, driven by regional_label on a footer
+    override — independent of NavigationSettings.regional_label by design
+    (FooterSettings is self-contained, same as every other settings model).
+
+    Tree:
+        home
+        ├── canada          (override root_page, regional_label="Canada")
+        │   └── program     (descendant — should inherit the badge)
+        └── other           (outside the override — no badge)
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="footer-regional-label-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="footer-regional-label-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Footer Regional Label Test",
+        )
+        cls.canada = ContentPage(title="Canada", slug="canada")
+        cls.home.add_child(instance=cls.canada)
+        cls.program = ContentPage(title="Program", slug="program")
+        cls.canada.add_child(instance=cls.program)
+        cls.other = ContentPage(title="Other", slug="other")
+        cls.home.add_child(instance=cls.other)
+
+        cls.footer, _ = FooterSettings.objects.get_or_create(site=cls.site)
+        cls.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": cls.canada,
+                    "regional_label": "Canada",
+                    "layout": "",
+                    "footer_navigation": [],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                },
+            )
+        ]
+        cls.footer.save()
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="footer-regional-label-test.localhost")
+
+    def test_resolved_footer_exposes_override_label(self):
+        resolved = self.footer.resolved_for_page(self.canada)
+        self.assertEqual(resolved.get("regional_label"), "Canada")
+
+    def test_site_default_exposes_blank_label_and_no_root_page(self):
+        resolved = self.footer.resolved_for_page(self.other)
+        self.assertIs(resolved, self.footer)
+        self.assertEqual(resolved.regional_label, "")
+        self.assertIsNone(resolved.root_page)
+
+    def test_badge_renders_on_override_root_page(self):
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn("wtr-footer-regional-label", content)
+        self.assertIn("Canada", content)
+
+    def test_badge_renders_on_descendant_page(self):
+        content = self.client.get(self.program.url).content.decode()
+        self.assertIn("wtr-footer-regional-label", content)
+
+    def test_no_badge_outside_the_override(self):
+        content = self.client.get(self.other.url).content.decode()
+        self.assertNotIn("wtr-footer-regional-label", content)
+
+    def test_no_badge_when_label_is_blank(self):
+        self.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": self.canada,
+                    "regional_label": "",
+                    "layout": "",
+                    "footer_navigation": [],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                },
+            )
+        ]
+        self.footer.save()
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertNotIn("wtr-footer-regional-label", content)
+
+    def test_lockup_links_to_override_root_page(self):
+        content = self.client.get(self.program.url).content.decode()
+        self.assertIn(
+            '<a href="/canada/" class="inline-flex items-center gap-2">', content
+        )
+
+    def test_lockup_links_to_site_root_without_an_override(self):
+        content = self.client.get(self.other.url).content.decode()
+        self.assertIn('<a href="/" class="inline-flex items-center gap-2">', content)
+
+
+class TestRegionalSitesSwitcherRendersInFooter(TestCase):
+    """
+    The "Around the World" region switcher (FooterSettings.regional_sites) —
+    a flat, site-wide list of links to other regional 350.org sites, shown
+    beside the footer logo. Unlike footer_overrides, this list is not
+    region-scoped content itself, so it must render identically on every
+    page regardless of any footer override in effect.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="regional-sites-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="regional-sites-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Regional Sites Test",
+        )
+        cls.canada = ContentPage(title="Canada", slug="canada")
+        cls.home.add_child(instance=cls.canada)
+
+        cls.footer, _ = FooterSettings.objects.get_or_create(site=cls.site)
+        cls.footer.regional_sites = [
+            ("site", {"text": "Canada", "url": "https://canada.350.org"}),
+            ("site", {"text": "Indonesia", "url": "https://350.or.id"}),
+        ]
+        cls.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": cls.canada,
+                    "regional_label": "Canada",
+                    "layout": "",
+                    "footer_navigation": [],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                },
+            )
+        ]
+        cls.footer.save()
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="regional-sites-test.localhost")
+
+    def test_switcher_renders_on_default_page(self):
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn("wtr-regional-sites", content)
+        self.assertIn("https://canada.350.org", content)
+        self.assertIn("https://350.or.id", content)
+
+    def test_switcher_also_renders_on_page_under_an_override(self):
+        """Not scoped by footer_overrides — same list everywhere."""
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn("wtr-regional-sites", content)
+        self.assertIn("https://canada.350.org", content)
+
+    def test_no_switcher_when_regional_sites_is_empty(self):
+        self.footer.regional_sites = []
+        self.footer.save()
+        content = self.client.get(self.home.url).content.decode()
+        self.assertNotIn("wtr-regional-sites", content)
+
+
 class TestHeaderLogoRendering(TestCase):
     """
     The header logo hovers with the regional badge beside it, both driven by
@@ -475,3 +820,159 @@ class TestHeaderLogoRendering(TestCase):
         """Without `transition` the filter snaps instead of easing."""
         self._set_logo("logo.svg", SVG_LOGO, "image/svg+xml")
         self.assertIn("transition group-hover:brightness", self._header())
+
+
+class TestFooterNewsletterSignupRendersInFooter(TestCase):
+    """
+    The footer's newsletter signup box — {% resolved_footer_newsletter_signup %}
+    (wtrx_tags.py), reusing SignupActionKitBlock's own fetched-form renderer
+    (_actionkit_form.html) rather than hand-building email/country fields.
+
+    Tree:
+        home
+        └── canada  (footer override, its own newsletter_actionkit_shortname)
+
+    FooterSettings.newsletter_actionkit_shortname is the site default; the
+    canada override sets a different shortname, so the two pages must fetch
+    (and cache) two distinct ActionKit forms.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="newsletter-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="newsletter-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Newsletter Test",
+        )
+        cls.canada = ContentPage(title="Canada", slug="canada")
+        cls.home.add_child(instance=cls.canada)
+
+        IntegrationSettings.objects.update_or_create(
+            site=cls.site,
+            defaults={
+                "integrations": [
+                    (
+                        "actionkit",
+                        {
+                            "enabled": True,
+                            "hostname": "myorg.actionkit.com",
+                            "api_username": "",
+                            "api_password": "",
+                        },
+                    )
+                ],
+            },
+        )
+
+        cls.footer, _ = FooterSettings.objects.get_or_create(site=cls.site)
+        cls.footer.newsletter_actionkit_shortname = "newsletter"
+        cls.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": cls.canada,
+                    "regional_label": "",
+                    "layout": "",
+                    "footer_navigation": [],
+                    "minimal_links": [],
+                    "copyright_text": "",
+                    "newsletter_actionkit_shortname": "newsletter-canada",
+                },
+            )
+        ]
+        cls.footer.save()
+
+    def setUp(self):
+        cache.clear()
+        self.client = Client(HTTP_HOST="newsletter-test.localhost")
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_default_page_fetches_and_renders_the_site_default_shortname(self, mock_fetch):
+        mock_fetch.return_value = "<form>default form</form>"
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn("default form", content)
+        mock_fetch.assert_called_once_with("myorg.actionkit.com", "newsletter")
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_override_page_fetches_and_renders_the_override_shortname(self, mock_fetch):
+        mock_fetch.return_value = "<form>canada form</form>"
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn("canada form", content)
+        mock_fetch.assert_called_once_with("myorg.actionkit.com", "newsletter-canada")
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_second_render_within_cache_window_does_not_refetch(self, mock_fetch):
+        mock_fetch.return_value = "<form>default form</form>"
+        self.client.get(self.home.url)
+        self.client.get(self.home.url)
+        mock_fetch.assert_called_once()
+
+    def test_no_signup_box_when_shortname_is_blank(self):
+        self.footer.newsletter_actionkit_shortname = ""
+        self.footer.footer_overrides = []
+        self.footer.save()
+        content = self.client.get(self.home.url).content.decode()
+        self.assertNotIn("wtr-footer-newsletter", content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_fetch_failure_shows_unavailable_fallback(self, mock_fetch):
+        mock_fetch.side_effect = ActionKitError("boom")
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn("wtr-footer-newsletter", content)
+        self.assertIn("temporarily unavailable", content)
+
+    def test_box_shows_unavailable_fallback_when_actionkit_not_configured(self):
+        """A shortname is set but ActionKit itself isn't — box still renders, form falls back."""
+        integration = IntegrationSettings.for_site(self.site)
+        integration.integrations = []
+        integration.save()
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn("wtr-footer-newsletter", content)
+        self.assertIn("temporarily unavailable", content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_wrapper_carries_the_shared_actionkit_scoping_class(self, mock_fetch):
+        """
+        _actionkit_form.html's script scopes itself to the nearest
+        .wtr-signup-actionkit ancestor (document.currentScript.closest(...))
+        so this box's form is found independently of any other ActionKit
+        embed already on the page — see the class comment in footer.html.
+        """
+        mock_fetch.return_value = "<form>default form</form>"
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn('wtr-footer-newsletter wtr-signup-actionkit"', content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_default_page_renders_site_default_success_message(self, mock_fetch):
+        mock_fetch.return_value = "<form>default form</form>"
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn("Thanks for signing up!", content)
+        self.assertIn("data-thank-you", content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_override_success_message_overrides_site_default(self, mock_fetch):
+        mock_fetch.return_value = "<form>canada form</form>"
+        overrides = self.footer.footer_overrides
+        overrides[0].value["newsletter_success_message"] = "Merci de vous inscrire!"
+        self.footer.footer_overrides = overrides
+        self.footer.save()
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn("Merci de vous inscrire!", content)
+        self.assertNotIn("Thanks for signing up!", content)
+
+    @patch("wtrx.integrations.actionkit.fetch_embed_form_html")
+    def test_override_falls_back_to_site_default_success_message_when_blank(self, mock_fetch):
+        """
+        Unlike every other field on FooterOverrideBlock, a blank
+        newsletter_success_message falls back to the site default rather
+        than resolving to nothing — see resolved_footer_newsletter_signup()'s
+        docstring. Leaving it unset on an override must not silently disable
+        the inline AJAX submit path for that section.
+        """
+        mock_fetch.return_value = "<form>canada form</form>"
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn("Thanks for signing up!", content)

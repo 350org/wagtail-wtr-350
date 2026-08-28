@@ -7,10 +7,16 @@
     classes share their form-fetching/caching/panel-tone logic via
     SignupActionKitFormMixin.
 
-    Expects from context: form_html, success_message, actionkit_base_url
-    (all set by SignupActionKitFormMixin.get_context()), and exactly one of
-    the layout flags `inline` / `stacked`, passed explicitly by the
-    including template:
+    Expects from context: form_html, actionkit_base_url (set by
+    SignupActionKitFormMixin.get_context()), and exactly one of the layout
+    flags `inline` / `stacked`, passed explicitly by the including template.
+    Also expects thank-you content, in one of two forms depending on the
+    caller: `success_message` (a SuccessMessageBlock StreamValue, set by
+    SignupActionKitFormMixin.get_context() — rendered via include_block) or
+    `success_text` (a plain string, set by resolved_footer_newsletter_signup()
+    for the footer's newsletter box, which has no StreamField content editor
+    of its own — rendered as-is). A caller sets at most one; either enables
+    the thank-you swap below.
 
       inline=True  → .wtr-actionkit-embed-inline: fields wrap across one
                      row with the submit button on the same line. For the
@@ -74,7 +80,7 @@
     custom success_message configured.
     {% endcomment %}
     <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
-    {% if success_message %}
+    {% if success_message or success_text %}
         {% comment %}
         The tone modifier rides along here as well as on the embed above,
         because this box replaces the form on success and so has to survive
@@ -91,11 +97,18 @@
         text and only flips to `prose-invert` when an ancestor carries this
         attribute (see SectionBlock's own data-bg-tone). Without it, the
         message text was grey-on-dark-grey and unreadable on every fill —
-        stacked or inline (hero).
+        stacked or inline (hero). success_text (the footer newsletter box's
+        plain-string case) isn't wrapped in .wtr-text-block/.prose at all,
+        so it doesn't need this to invert — but the attribute is harmless
+        either way, and keeping it unconditional avoids a third branch here.
         {% endcomment %}
         <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50{% if stacked and panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}"
              data-thank-you data-bg-tone="dark">
-            {% include_block success_message %}
+            {% if success_message %}
+                {% include_block success_message %}
+            {% else %}
+                <p>{{ success_text }}</p>
+            {% endif %}
         </div>
     {% endif %}
     <script>
@@ -278,7 +291,7 @@
                     return response.json();
                 }).then(function (data) {
                     if (data.success) {
-                        {% if success_message %}
+                        {% if success_message or success_text %}
                         if (formContainer) { formContainer.classList.add("hidden"); }
                         if (thankYou) { thankYou.classList.remove("hidden"); }
                         {% endif %}

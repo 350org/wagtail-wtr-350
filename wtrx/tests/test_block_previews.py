@@ -10,6 +10,7 @@ from wagtail.images.tests.utils import get_test_image_file
 from wtrx import blocks as blocks_module
 from wtrx.blocks import BodyStreamBlock
 from wtrx.images import CustomImage
+from wtrx.integrations import actionkit as actionkit_module
 
 
 class BlockPreviewTest(TestCase):
@@ -215,9 +216,9 @@ class BlockPreviewTest(TestCase):
         self.client.force_login(self.user)
         blocks = BodyStreamBlock().child_blocks
         with mock.patch.object(
-            blocks_module.requests, "get", side_effect=AssertionError("outbound call")
+            actionkit_module.requests, "get", side_effect=AssertionError("outbound call")
         ), mock.patch.object(
-            blocks_module.requests, "post", side_effect=AssertionError("outbound call")
+            actionkit_module.requests, "post", side_effect=AssertionError("outbound call")
         ):
             actionkit = self._preview(blocks["signup_actionkit"]).content.decode()
             fundraiseup = self._preview(blocks["donate_fundraiseup"]).content.decode()

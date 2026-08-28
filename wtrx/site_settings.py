@@ -223,6 +223,101 @@ class FooterColumnBlock(StructBlock):
         label = _("Footer column")
 
 
+# Module-level per AGENTS.md pitfall #10 — gettext_lazy in choices requires
+# module-level definition to avoid migration serialization failures.
+FOOTER_LAYOUT_CHOICES = [
+    ("columns", _("Columns")),
+    ("minimal", _("Minimal")),
+]
+
+
+class FooterOverrideBlock(StructBlock):
+    """
+    An alternate footer (layout, columns/links, copyright) scoped to a root
+    page and everything beneath it. See FooterSettings.resolved_for_page().
+    """
+
+    root_page = PageChooserBlock(
+        label=_("Root page"),
+        help_text=_(
+            "This page and every page beneath it will use this footer "
+            "instead of the default. If a page falls under more than one "
+            "override, the override with the most specific (closest) root "
+            "page wins."
+        ),
+    )
+    regional_label = CharBlock(
+        required=False,
+        max_length=50,
+        label=_("Regional label"),
+        help_text=_(
+            "Region name shown as a badge beside the logo for this section, "
+            "e.g. \"Canada\". Leave blank for no badge."
+        ),
+    )
+    layout = ChoiceBlock(
+        choices=FOOTER_LAYOUT_CHOICES,
+        required=False,
+        label=_("Footer layout"),
+        help_text=_("Leave blank to use the columns layout."),
+    )
+    footer_navigation = StreamBlock(
+        [("column", FooterColumnBlock())],
+        blank=True,
+        label=_("Footer navigation"),
+        help_text=_(
+            "Footer link columns for this section. Each column has a "
+            "heading and a list of links."
+        ),
+    )
+    minimal_links = StreamBlock(
+        [
+            ("internal", InternalLinkBlock()),
+            ("external", ExternalLinkBlock()),
+            ("anchor", AnchorLinkBlock()),
+        ],
+        blank=True,
+        label=_("Minimal footer links"),
+        help_text=_(
+            "Flat list of links displayed inline in the minimal footer "
+            "layout for this section."
+        ),
+    )
+    copyright_text = CharBlock(
+        required=False,
+        max_length=255,
+        label=_("Copyright text"),
+        help_text=_(
+            'Optional. Overrides the default "© {year} {site name}" '
+            "copyright line for this section."
+        ),
+    )
+    newsletter_actionkit_shortname = CharBlock(
+        required=False,
+        label=_("Newsletter signup — ActionKit page shortname"),
+        help_text=_(
+            "The ActionKit page's short name (e.g. 'newsletter-canada') "
+            "powering this section's footer signup box. Leave blank to show "
+            "no signup box for this section, even if the site default has "
+            "one set."
+        ),
+    )
+    newsletter_success_message = CharBlock(
+        required=False,
+        label=_("Newsletter signup — success message"),
+        help_text=_(
+            "Shown in place of the form after a successful signup for this "
+            "section. Falls back to the site default's message when left "
+            "blank (unlike the other fields on this override, which show "
+            "nothing rather than fall back)."
+        ),
+    )
+
+    class Meta:
+        icon = "bars"
+        label = _("Footer override")
+
+
 # Module-level so it can be reused in templates/filters if needed.
 SOCIAL_PLATFORM_CHOICES = [
     ("facebook", "Facebook"),
@@ -253,12 +348,19 @@ class SocialLinkBlock(StructBlock):
         label = _("Social link")
 
 
-# Module-level per AGENTS.md pitfall #10 — gettext_lazy in choices requires
-# module-level definition to avoid migration serialization failures.
-FOOTER_LAYOUT_CHOICES = [
-    ("columns", _("Columns")),
-    ("minimal", _("Minimal")),
-]
+class RegionalSiteLinkBlock(StructBlock):
+    """
+    A single entry in the "Around the World" region switcher — a link out to
+    another regional 350.org site. Explicitly named (not anonymous) per the
+    same migration-serialization rule as SocialLinkBlock.
+    """
+
+    text = CharBlock(label=_("Region name"), help_text=_('e.g. "Canada".'))
+    url = URLBlock(label=_("URL"), help_text=_("Link to that region's site."))
+
+    class Meta:
+        icon = "site"
+        label = _("Regional site link")
 
 
 # ---------------------------------------------------------------------------
@@ -558,6 +660,63 @@ class FooterSettings(BaseSiteSetting):
             'Optional. Overrides the default "© {year} {site name}" copyright line.'
         ),
     )
+    regional_label = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name=_("regional label"),
+        help_text=_(
+            "Region name shown as a badge beside the logo across the whole "
+            "site, e.g. \"Canada\". Leave blank for no badge. Sections with "
+            "their own footer override set this on the override instead."
+        ),
+    )
+    footer_overrides = StreamField(
+        [("override", FooterOverrideBlock())],
+        blank=True,
+        verbose_name=_("footer overrides"),
+        help_text=_(
+            "Alternate footers for specific sections of the site. Each "
+            "override applies to a chosen root page and every page beneath "
+            "it; pages outside any override use the default footer above."
+        ),
+        use_json_field=True,
+    )
+    regional_sites = StreamField(
+        [("site", RegionalSiteLinkBlock())],
+        blank=True,
+        verbose_name=_("regional sites"),
+        help_text=_(
+            'Links to other regional 350.org sites, shown in an "Around the '
+            "World\" dropdown beside the footer logo on every page — the "
+            "same list regardless of any footer override, since it isn't "
+            "region-specific content itself."
+        ),
+        use_json_field=True,
+    )
+    newsletter_actionkit_shortname = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("newsletter signup — ActionKit page shortname"),
+        help_text=_(
+            "The ActionKit page's short name (e.g. 'newsletter') powering "
+            "the site-wide footer signup box. Its form is fetched from "
+            "ActionKit and rendered automatically, the same as the "
+            "Sign Up (ActionKit) block. Leave blank to show no signup box. "
+            "Sections with their own footer override set this on the "
+            "override instead."
+        ),
+    )
+    newsletter_success_message = models.CharField(
+        max_length=255,
+        blank=True,
+        default=_("Thanks for signing up!"),
+        verbose_name=_("newsletter signup — success message"),
+        help_text=_(
+            "Shown in place of the form after a successful newsletter "
+            "signup. Sections with their own footer override set this on "
+            "the override instead."
+        ),
+    )
 
     panels = [
         FieldPanel("layout"),
@@ -570,7 +729,48 @@ class FooterSettings(BaseSiteSetting):
             heading=_("Minimal layout"),
         ),
         AIFieldPanel("copyright_text"),
+        FieldPanel("regional_label"),
+        FieldPanel("footer_overrides"),
+        FieldPanel("regional_sites"),
+        FieldPanel("newsletter_actionkit_shortname"),
+        FieldPanel("newsletter_success_message"),
     ]
+
+    @property
+    def root_page(self):
+        """
+        Always ``None`` for the site default. Present so templates can read
+        ``footer.root_page`` off whatever ``resolved_for_page()`` handed
+        them — see NavigationSettings.root_page, same trick.
+        """
+        return None
+
+    def resolved_for_page(self, page):
+        """
+        Return the footer to render for ``page``: either this settings
+        instance itself (the site default) or the value of the most
+        specific matching entry in ``footer_overrides`` — whichever's
+        ``root_page`` is an ancestor of (or is) ``page``, breaking ties by
+        depth so a more specific/nested override wins over a broader one.
+
+        See NavigationSettings.resolved_for_page() — identical algorithm.
+        The returned object exposes the same attribute names either way
+        (``layout``, ``footer_navigation``, ``minimal_links``,
+        ``copyright_text``, ``regional_label``, ``root_page``).
+        """
+        if page is None:
+            return self
+        best_override = None
+        best_depth = -1
+        for stream_child in self.footer_overrides:
+            override = stream_child.value
+            root_page = override.get("root_page")
+            if root_page is None:
+                continue
+            if page.path.startswith(root_page.path) and root_page.depth > best_depth:
+                best_override = override
+                best_depth = root_page.depth
+        return best_override if best_override is not None else self
 
     class Meta:
         verbose_name = _("Footer")

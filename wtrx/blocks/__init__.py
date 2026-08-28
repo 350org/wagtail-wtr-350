@@ -30,7 +30,6 @@ from pathlib import Path
 import re
 from urllib.parse import urlparse
 
-import requests
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.functional import cached_property
@@ -64,7 +63,6 @@ from wtrx.constants import (
     RICHTEXT_FEATURES_INLINE,
 )
 from wtrx.integrations import actionkit
-from wtrx.integrations.actionkit import ActionKitError
 from wtrx.site_settings import IntegrationSettings
 
 # ---------------------------------------------------------------------------
@@ -2477,10 +2475,6 @@ class SignupActionKitFormMixin:
     message instead of breaking the page.
     """
 
-    SUCCESS_CACHE_TIMEOUT = 60 * 15  # 15 minutes
-    FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
-    _FAILURE_SENTINEL = "__actionkit_embed_fetch_failed__"
-
     # Which panel fills the fetched ActionKit form's own chrome has to react
     # to, mapped to the .wtr-ak-{tone} modifier class _actionkit_form.html
     # puts on the embed wrapper (see main.css). The form's default chrome —
@@ -2513,23 +2507,12 @@ class SignupActionKitFormMixin:
         "white": "on-white",
     }
 
-    def _fetch_form_html(self, hostname, short_form_id):
-        """Return the cached (or freshly fetched) form fragment, or None on failure."""
-        cache_key = f"wtrx:actionkit_embed:{hostname}:{short_form_id}"
-        cached = cache.get(cache_key)
-        if cached == self._FAILURE_SENTINEL:
-            return None
-        if cached is not None:
-            return cached
-
-        try:
-            html = actionkit.fetch_embed_form_html(hostname, short_form_id)
-        except (ActionKitError, requests.RequestException):
-            cache.set(cache_key, self._FAILURE_SENTINEL, self.FAILURE_CACHE_TIMEOUT)
-            return None
-
-        cache.set(cache_key, html, self.SUCCESS_CACHE_TIMEOUT)
-        return html
+    # Fetch-and-cache logic used to live here as _fetch_form_html(); moved to
+    # actionkit.fetch_and_cache_embed_form_html() so the footer newsletter
+    # signup box (which also auto-renders a fetched ActionKit form, but has
+    # no StreamField block of its own) shares the same cache key format and
+    # retry window instead of keeping a second copy of this logic — see that
+    # function's docstring in wtrx/integrations/actionkit.py.
 
     #: Stand-in for the real ActionKit form in the block picker preview.
     #: The live block fetches its form markup from the client's ActionKit
@@ -2576,7 +2559,7 @@ class SignupActionKitFormMixin:
             entry = self._harvested_entry() or {}
             form_html = entry.get("form_html") or self.PREVIEW_FORM_HTML
         elif hostname and short_form_id:
-            form_html = self._fetch_form_html(hostname, short_form_id)
+            form_html = actionkit.fetch_and_cache_embed_form_html(hostname, short_form_id)
 
         ctx["form_html"] = form_html
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""

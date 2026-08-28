@@ -24,6 +24,7 @@ visitors of the hosted page, just without the surrounding site chrome.
 """
 
 import requests
+from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import BooleanBlock, CharBlock, StructBlock
 
@@ -181,6 +182,41 @@ def fetch_embed_form_html(hostname, short_form_id, timeout=5):
         )
 
     return response.text
+
+
+# Shared by every caller that auto-renders a fetched ActionKit form
+# (SignupActionKitBlock, the footer newsletter signup) so they hit the same
+# cache key format and retry window instead of each keeping its own copy of
+# this logic — the same ActionKit page fetched from two call sites should
+# still only hit ActionKit's live server at this one shared rate.
+EMBED_FORM_SUCCESS_CACHE_TIMEOUT = 60 * 15  # 15 minutes
+EMBED_FORM_FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
+_EMBED_FORM_FETCH_FAILED = "__actionkit_embed_fetch_failed__"
+
+
+def fetch_and_cache_embed_form_html(hostname, short_form_id):
+    """
+    Cached wrapper around fetch_embed_form_html().
+
+    Returns the cached (or freshly fetched) form fragment, or None if the
+    fetch failed (also cached, briefly, so a broken/misconfigured page
+    doesn't get hit on every render).
+    """
+    cache_key = f"wtrx:actionkit_embed:{hostname}:{short_form_id}"
+    cached = cache.get(cache_key)
+    if cached == _EMBED_FORM_FETCH_FAILED:
+        return None
+    if cached is not None:
+        return cached
+
+    try:
+        html = fetch_embed_form_html(hostname, short_form_id)
+    except (ActionKitError, requests.RequestException):
+        cache.set(cache_key, _EMBED_FORM_FETCH_FAILED, EMBED_FORM_FAILURE_CACHE_TIMEOUT)
+        return None
+
+    cache.set(cache_key, html, EMBED_FORM_SUCCESS_CACHE_TIMEOUT)
+    return html
 
 
 # ---------------------------------------------------------------------------
