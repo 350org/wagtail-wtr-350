@@ -20,7 +20,11 @@ image_grid_block.html.
 <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-[1218px]">
         {% if value.heading %}
-            <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+            {% comment %}
+            in-data-[bg-tone=dark]: — see card_grid_block.html's comment;
+            this heading has no fill of its own to fall back on.
+            {% endcomment %}
+            <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
         {% endif %}
         <div class="wtr-logo-grid flex flex-col gap-y-10">
             {% for row in rows %}

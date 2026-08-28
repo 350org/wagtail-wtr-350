@@ -31,7 +31,10 @@ image_text_block.html's section heading, mirroring the gap Figma draws
 between them (48px vs 64px there). Figma sizes the light panel's heading
 smaller than the dark one, but sizing type off the background choice would
 conflate two unrelated concerns — background controls color inversion
-only. See the type scale note in AGENTS.md.
+only. See the type scale note in AGENTS.md. Heading and body text used to
+be two fields; now they're one richtext field (`content`, heading typed
+as an H2), with its size pinned via .wtr-feature-panel-content in main.css
+— see FeaturePanelBlock's docstring for the field history.
 
 Background comes from the shared palette (main.css's .wtr-bg-{color}),
 the same six fills the section, callout, hero banner and signup panel
@@ -63,21 +66,18 @@ own shape and needs none.
                         {{ value.eyebrow }}
                     </p>
                 {% endif %}
-                <h2 class="font-heading text-2xl tracking-tight sm:text-3xl lg:text-36">
-                    {{ value.heading }}
-                </h2>
-                {% if value.text %}
-                    {% comment %}
-                    [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
-                    prose-invert body color (a muted ~87%-lightness gray, meant for long-form
-                    reading) to pure white, matching Figma — same override callout_block.html
-                    applies for the same reason.
-                    {% endcomment %}
-                    <div class="prose mt-2 max-w-none text-lg sm:text-xl
-                                {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
-                        {{ value.text|richtext }}
-                    </div>
-                {% endif %}
+                {% comment %}
+                [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
+                prose-invert body color (a muted ~87%-lightness gray, meant for long-form
+                reading) to pure white, matching Figma — same override callout_block.html
+                applies for the same reason. The h2 (heading typed at the top of `content`)
+                gets its font-size/tracking pinned via .wtr-feature-panel-content in
+                main.css, same technique .wtr-text-block uses.
+                {% endcomment %}
+                <div class="wtr-feature-panel-content prose max-w-none text-lg sm:text-xl
+                            {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                    {{ value.content|richtext }}
+                </div>
                 {% if value.link_text and value.link_page or value.link_text and value.link_url or value.link_text and value.anchor %}
                     {% comment %}
                     max-w-full + whitespace-normal on the button: wtr-btn is

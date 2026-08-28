@@ -44,12 +44,15 @@
         {% endif %}
         <div class="flex flex-col items-center justify-center bg-dark px-6 py-12 text-light sm:px-10 sm:py-16">
             <div class="w-full max-w-lg">
-                {% if value.heading %}
-                    <h2 class="font-heading text-2xl sm:text-3xl lg:text-40">{{ value.heading }}</h2>
-                {% endif %}
-                {% if value.description %}
-                    <div class="prose prose-invert mt-4 max-w-none text-lg sm:text-xl">
-                        {{ value.description|richtext }}
+                {% comment %}
+                This panel is always bg-dark, so prose-invert is unconditional
+                (unlike the on_light-branched blocks). Heading size is pinned
+                via .wtr-donate-fundraiseup-content in main.css, same
+                technique .wtr-text-block uses.
+                {% endcomment %}
+                {% if value.content %}
+                    <div class="wtr-donate-fundraiseup-content prose prose-invert max-w-none text-lg sm:text-xl">
+                        {{ value.content|richtext }}
                     </div>
                 {% endif %}
                 <div class="mt-8">

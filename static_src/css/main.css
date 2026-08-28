@@ -1116,6 +1116,193 @@ h3, h4, h5, h6 {
 }
 
 /* ============================================================
+ * Condensed heading+text blocks
+ * ============================================================
+ * ImageTextBlock, FeaturePanelBlock, CalloutBlock and CardCarouselBlock
+ * each used to have a separate heading (CharBlock) field rendered as its
+ * own <h2>/<h3> with block-specific utility classes. They were condensed
+ * into a single richtext field per block (see each block's docstring in
+ * wtrx/blocks/__init__.py and migration 0045_condense_heading_text_blocks),
+ * so the heading is now typed inline and rendered through the same
+ * .prose container as the body copy. Typography sizes prose headings
+ * relative to the container's own body text-* class, not to an absolute
+ * step, so each block's previous heading size is pinned here the same way
+ * .wtr-text-block h2/h3/h4 are pinned above — an unlayered element
+ * selector outranks Tailwind's layered utilities (AGENTS.md pitfall #37).
+ * ============================================================ */
+.wtr-image-text-content h2,
+.wtr-feature-panel-content h2,
+.wtr-card-carousel-content h2 {
+    font-family: var(--font-heading);
+    line-height: 1.2;
+    letter-spacing: -0.025em; /* tracking-tight */
+    margin-bottom: 0.5rem;
+}
+
+.wtr-image-text-content h2 {
+    font-size: var(--text-2xl);
+}
+@media (width >= 40rem) {
+    .wtr-image-text-content h2 {
+        font-size: var(--text-3xl);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-image-text-content h2 {
+        font-size: var(--text-40);
+    }
+}
+
+.wtr-feature-panel-content h2 {
+    font-size: var(--text-2xl);
+}
+@media (width >= 40rem) {
+    .wtr-feature-panel-content h2 {
+        font-size: var(--text-3xl);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-feature-panel-content h2 {
+        font-size: var(--text-36);
+    }
+}
+
+.wtr-card-carousel-content h2 {
+    font-size: var(--text-3xl);
+}
+@media (width >= 40rem) {
+    .wtr-card-carousel-content h2 {
+        font-size: var(--text-4xl);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-card-carousel-content h2 {
+        font-size: var(--text-5xl);
+    }
+}
+
+/* CalloutBlock never had tracking-tight on its heading, and its subheading
+ * (H3) sits 0.5rem below the H2, matching the old mt-2 on a bare <h3>. */
+.wtr-callout-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+@media (width >= 40rem) {
+    .wtr-callout-content h2 {
+        font-size: var(--text-3xl);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-callout-content h2 {
+        font-size: var(--text-40);
+    }
+}
+.wtr-callout-content h3 {
+    font-family: var(--font-heading);
+    font-size: var(--text-28);
+    line-height: 1.2;
+    margin-top: 0.5rem;
+}
+
+/* Second wave of the same condensation: DonateBlock, DonateFundraiseUpBlock,
+ * SignupWagtailFormsBlock, SignupActionNetworkBlock, SignupActionKitBlock,
+ * SignupLinkBlock and PageCardsBlock each had a heading (+ PageCardsBlock's
+ * "subheading", itself a plain paragraph despite the name) CharBlock/
+ * RichTextBlock pair, condensed the same way (see migration
+ * 0047_condense_more_heading_text_blocks). */
+.wtr-donate-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+@media (width >= 48rem) {
+    .wtr-donate-content h2 {
+        font-size: var(--text-28);
+    }
+}
+
+.wtr-donate-fundraiseup-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+@media (width >= 40rem) {
+    .wtr-donate-fundraiseup-content h2 {
+        font-size: var(--text-3xl);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-donate-fundraiseup-content h2 {
+        font-size: var(--text-40);
+    }
+}
+
+/* Shared by signup_wagtail_forms_block.html, signup_action_network_block.html
+ * and signup_link_block.html, which render this identically. */
+.wtr-signup-panel-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+@media (width >= 48rem) {
+    .wtr-signup-panel-content h2 {
+        font-size: var(--text-28);
+    }
+}
+
+/* SignupActionKitBlock's hero CTA strip -- flat text-xl, no responsive step,
+ * since the strip itself is a compact one-line-ish widget. */
+.wtr-signup-actionkit-inline-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-xl);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+}
+
+/* SignupActionKitBlock's standalone panel -- shared by its "vertical" and
+ * "columns" layouts, which render this identically. */
+.wtr-signup-actionkit-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+    letter-spacing: -0.025em; /* tracking-tight */
+    margin-bottom: 0.5rem;
+}
+@media (width >= 40rem) {
+    .wtr-signup-actionkit-content h2 {
+        font-size: var(--text-3xl);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-signup-actionkit-content h2 {
+        font-size: var(--text-40);
+    }
+}
+
+.wtr-page-cards-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-3xl);
+    line-height: 1.2;
+    letter-spacing: -0.025em; /* tracking-tight */
+    margin-bottom: 0.5rem;
+}
+@media (width >= 40rem) {
+    .wtr-page-cards-content h2 {
+        font-size: var(--text-4xl);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-page-cards-content h2 {
+        font-size: var(--text-5xl);
+    }
+}
+
+/* ============================================================
  * Legacy content — .title4
  * ============================================================
  * Content imported from the old site marks its sub-headings as

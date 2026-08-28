@@ -7,10 +7,17 @@
 {% trans "Donate" as default_donate_text %}
 {% with donate_url=value.override_url|default:donation_base_url %}
 <div class="wtr-donate rounded-lg bg-primary-50 px-6 py-10 text-center">
-    {% if value.heading %}<h2 class="font-heading text-2xl text-primary-900 md:text-28">{{ value.heading }}</h2>{% endif %}
-    {% if value.description %}
-        <div class="prose prose-neutral mx-auto mt-4 max-w-2xl text-lg sm:text-xl">
-            {{ value.description|richtext }}
+    {% if value.content %}
+        {% comment %}
+        --tw-prose-headings overrides Typography's default (near-black)
+        heading colour to the brand blue this panel's heading used to carry
+        directly (text-primary-900) before heading+description merged into
+        one richtext field. Sizing is pinned via .wtr-donate-content in
+        main.css, same technique .wtr-text-block uses.
+        {% endcomment %}
+        <div class="wtr-donate-content prose prose-neutral mx-auto max-w-2xl text-lg sm:text-xl
+                    [--tw-prose-headings:var(--color-primary-900)]">
+            {{ value.content|richtext }}
         </div>
     {% endif %}
     {% comment %}

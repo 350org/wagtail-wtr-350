@@ -1,10 +1,16 @@
 {% load i18n wagtailcore_tags %}
 <div class="wtr-signup wtr-signup-action-network rounded-lg bg-neutral-50 px-6 py-10"{% if value.anchor_id %} id="{{ value.anchor_id }}"{% endif %}>
     <div class="mx-auto max-w-2xl">
-        {% if value.heading %}<h2 class="font-heading text-2xl text-dark md:text-28">{{ value.heading }}</h2>{% endif %}
-        {% if value.description %}
-            <div class="prose prose-neutral mt-4 max-w-none text-lg sm:text-xl">
-                {{ value.description|richtext }}
+        {% comment %}
+        This panel is always bg-neutral-50, so no dark-section inversion is
+        needed. Heading size is pinned via .wtr-signup-panel-content in
+        main.css (shared with signup_wagtail_forms_block.html and
+        signup_link_block.html, which render this identically), same
+        technique .wtr-text-block uses.
+        {% endcomment %}
+        {% if value.content %}
+            <div class="wtr-signup-panel-content prose prose-neutral max-w-none text-lg sm:text-xl">
+                {{ value.content|richtext }}
             </div>
         {% endif %}
         {% if action_type and slug %}
@@ -45,8 +51,17 @@
                     </div>
                 {% endif %}
                 {% if success_message %}
+                    {% comment %}
+                    data-bg-tone="dark": same fix as _actionkit_form.html's
+                    thank-you box — success_message's "text" field renders
+                    through text_block.html, whose prose-neutral defaults to
+                    grey and only inverts to white when an ancestor carries
+                    this attribute. Without it the message was grey text on
+                    this box's own bg-dark fill, regardless of the page
+                    around it.
+                    {% endcomment %}
                     <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
-                         data-thank-you>
+                         data-thank-you data-bg-tone="dark">
                         {% include_block success_message %}
                     </div>
                 {% endif %}

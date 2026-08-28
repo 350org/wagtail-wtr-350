@@ -26,12 +26,17 @@ just providing mobile-edge breathing room around it).
 <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-[1218px]">
         <div class="mx-auto flex max-w-3xl flex-col items-center gap-[21px] text-center">
-            {% if value.heading %}
-                <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl">{{ value.heading }}</h2>
-            {% endif %}
-            {% if value.subheading %}
-                <div class="prose prose-neutral max-w-[628px] text-lg text-dark sm:text-xl">
-                    {{ value.subheading|richtext }}
+            {% comment %}
+            in-data-[bg-tone=dark]: on this one prose container covers
+            heading + copy now they're a single richtext field — the
+            post_card grid below keeps its own always-light bg-light fill
+            regardless (AGENTS.md pitfall #34), so only this text needs to
+            invert. Heading size is pinned via .wtr-page-cards-content in
+            main.css, same technique .wtr-text-block uses.
+            {% endcomment %}
+            {% if value.content %}
+                <div class="wtr-page-cards-content prose prose-neutral max-w-[628px] text-lg text-dark in-data-[bg-tone=dark]:prose-invert in-data-[bg-tone=dark]:text-light sm:text-xl">
+                    {{ value.content|richtext }}
                 </div>
             {% endif %}
         </div>

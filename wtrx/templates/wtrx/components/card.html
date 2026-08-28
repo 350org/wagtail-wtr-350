@@ -1,8 +1,23 @@
-{% load i18n wagtailimages_tags %}
+{% load i18n wagtailimages_tags wagtailcore_tags %}
 {% comment %}
-description_size: optional Tailwind text-size utility for card.description,
-default text-base (16px, matches CardGridBlock's "Areas of work" cards
-per Figma). card_carousel_block.html passes text-xl (20px) instead — its
+Two card shapes share this template: CardBlock/CarouselCardBlock's `content`
+(a single richtext field, heading typed as an H3 — see CardBlock's docstring)
+and page_as_card()'s plain `heading`/`description` strings (auto-generated
+from a real Page's title/search_description for a listing, e.g.
+index_page.html's children grid — there's no "type an H3 inline" for that
+case, so it keeps the older separate-fields shape). `card.content` is only
+ever present for the former, so it's the branch condition below.
+
+description_size/heading_size: optional Tailwind text-size utilities, used
+only by the page_as_card() branch — description_size still sizes the
+richtext branch's body copy too (Typography sizes a <p> relative to its
+container's own text-* class), but heading_size has no equivalent there:
+no caller of the richtext branch has ever needed a heading override, so
+its H3 relies on the flat, unscoped `.prose h3` 28px step (AGENTS.md
+pitfall #34) instead of a per-call-site class.
+
+Default text-base (16px, matches CardGridBlock's "Areas of work" cards per
+Figma). card_carousel_block.html passes text-xl (20px) instead — its
 cards' body copy is sized larger per Figma's "Our work in action" cards.
 
 h-full: this card's root is one level deeper than the flex/grid item in
@@ -26,17 +41,42 @@ definite height, e.g. card_block.html's standalone single-card case.
                 {{ card.tag }}
             </span>
         {% endif %}
-        {% if card.icon %}
-            {% image card.icon fill-24x24 as icon_img %}
-            <div class="flex items-center gap-3">
-                <img src="{{ icon_img.url }}" width="{{ icon_img.width }}" height="{{ icon_img.height }}" alt="" class="h-6 w-6 shrink-0" loading="lazy">
-                <h3 class="font-heading {{ heading_size|default:"text-28" }} font-semibold text-dark">{{ card.heading }}</h3>
-            </div>
+        {% if card.content %}
+            {% comment %}
+            The icon sits beside the whole content block now (heading +
+            paragraph together), not pinned to just the heading line the way
+            it was when heading was a separate field — there's no way to
+            float an icon beside only the first line of arbitrary editor
+            richtext. items-start (not items-center, unlike the
+            page_as_card() branch below) keeps the icon pinned to the top
+            rather than centering against the now-taller two-line block.
+            {% endcomment %}
+            {% if card.icon %}
+                {% image card.icon fill-24x24 as icon_img %}
+                <div class="flex items-start gap-3">
+                    <img src="{{ icon_img.url }}" width="{{ icon_img.width }}" height="{{ icon_img.height }}" alt="" class="mt-1 h-6 w-6 shrink-0" loading="lazy">
+                    <div class="wtr-card-content prose prose-neutral max-w-none flex-1 {{ description_size|default:"text-base" }} text-dark">
+                        {{ card.content|richtext }}
+                    </div>
+                </div>
+            {% else %}
+                <div class="wtr-card-content prose prose-neutral max-w-none flex-1 {{ description_size|default:"text-base" }} text-dark">
+                    {{ card.content|richtext }}
+                </div>
+            {% endif %}
         {% else %}
-            <h3 class="font-heading {{ heading_size|default:"text-28" }} font-semibold text-dark">{{ card.heading }}</h3>
-        {% endif %}
-        {% if card.description %}
-            <p class="mt-2 flex-1 {{ description_size|default:"text-base" }} text-dark">{{ card.description }}</p>
+            {% if card.icon %}
+                {% image card.icon fill-24x24 as icon_img %}
+                <div class="flex items-center gap-3">
+                    <img src="{{ icon_img.url }}" width="{{ icon_img.width }}" height="{{ icon_img.height }}" alt="" class="h-6 w-6 shrink-0" loading="lazy">
+                    <h3 class="font-heading {{ heading_size|default:"text-28" }} font-semibold text-dark">{{ card.heading }}</h3>
+                </div>
+            {% else %}
+                <h3 class="font-heading {{ heading_size|default:"text-28" }} font-semibold text-dark">{{ card.heading }}</h3>
+            {% endif %}
+            {% if card.description %}
+                <p class="mt-2 flex-1 {{ description_size|default:"text-base" }} text-dark">{{ card.description }}</p>
+            {% endif %}
         {% endif %}
         {% if card.link_page or card.link_url %}
             <div class="mt-4">

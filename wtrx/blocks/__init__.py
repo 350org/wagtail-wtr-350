@@ -58,6 +58,9 @@ from wagtailmedia.blocks import VideoChooserBlock
 
 from wtrx.constants import (
     RICHTEXT_FEATURES_FULL,
+    RICHTEXT_FEATURES_HEADING_H2,
+    RICHTEXT_FEATURES_HEADING_H3,
+    RICHTEXT_FEATURES_HEADINGS_H2_H3,
     RICHTEXT_FEATURES_INLINE,
 )
 from wtrx.integrations import actionkit
@@ -615,8 +618,10 @@ def _signup_wagtail_forms_preview_value():
     from wtrx.models import FormPage
 
     return {
-        "heading": _("Sign up for updates"),
-        "description": "<p>Tell us where to reach you and we will keep you posted.</p>",
+        "content": (
+            "<h2>Sign up for updates</h2>"
+            "<p>Tell us where to reach you and we will keep you posted.</p>"
+        ),
         "button_text": _("Sign up"),
         "form_page": FormPage.objects.live().first(),
     }
@@ -641,6 +646,45 @@ class TextBlock(ContentPreviewMixin, RichTextBlock):
         description = _(
             "Rich text: paragraphs, headings, lists, bold/italic and links. "
             "The default choice for ordinary body copy."
+        )
+
+
+class LeadTextBlock(RichTextBlock):
+    """
+    A short lead-in paragraph, rendered larger than ordinary body copy.
+
+    Restricted to RICHTEXT_FEATURES_INLINE (no headings/lists/blockquote) —
+    a lead paragraph is a single opening statement; TextBlock already covers
+    longer structured copy.
+
+    Deliberately NOT ContentPreviewMixin (AGENTS.md pitfall #45): no real
+    page uses this block yet, so there is nothing in
+    wtrx/previews/block_previews.json to harvest, and that mixin's
+    is_previewable ignores Meta.preview_value entirely -- it would leave
+    this block with no picker preview at all. Plain Wagtail preview_value is
+    a full alternative here since, unlike an image-bearing block, nothing
+    needs to be looked up at request time.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("features", RICHTEXT_FEATURES_INLINE)
+        super().__init__(**kwargs)
+
+    class Meta:
+        icon = "pilcrow"
+        label = _("Lead paragraph")
+        template = "wtrx/components/streamfield/blocks/lead_text_block.html"
+        description = _(
+            "A larger introductory paragraph for opening a page or section. "
+            "Bold/italic/links only — use a regular Text block for headings "
+            "or lists."
+        )
+        # preview_value must live on Meta, not the block class itself --
+        # Wagtail's default get_preview_value()/is_previewable() only ever
+        # look at self.meta.preview_value (AGENTS.md pitfall #45).
+        preview_value = _(
+            "<p>A short, larger opening statement that sits above the "
+            "regular body copy.</p>"
         )
 
 
@@ -1015,9 +1059,18 @@ class CardBlock(ContentPreviewMixin, StructBlock):
     A content card with a heading, optional icon, optional image, description,
     and link.
 
-    When an icon is set, it renders at 24x24 beside the heading. Used directly
-    in the StreamField and as the child block of CardGridBlock. At most one of
-    link_page or link_url may be set. clean() enforces this.
+    When an icon is set, it renders at 24x24 beside the content block. Used
+    directly in the StreamField and as the child block of CardGridBlock. At
+    most one of link_page or link_url may be set. clean() enforces this.
+
+    `content` used to be two fields — `heading` (CharBlock, required) and
+    `description` (a plain TextBlock, optional — no markup at all, unlike
+    every other block condensed this way, whose body field was already
+    richtext) — condensed into one richtext field, heading typed as an H3 to
+    match the level card.html already rendered it at. Migration
+    0051_condense_card_heading_description folded every existing card's
+    heading/description pair into this field's HTML on upgrade, escaping and
+    `<p>`-wrapping the plain-text description in the same step.
     """
 
     tag = CharBlock(
@@ -1029,13 +1082,13 @@ class CardBlock(ContentPreviewMixin, StructBlock):
         required=False,
         label=_("Icon"),
         help_text=_(
-            "Optional small icon image (ideally square) displayed beside the heading."
+            "Optional small icon image (ideally square) displayed beside the content."
         ),
     )
-    heading = CharBlock(label=_("Heading"))
-    description = WagtailTextBlock(
-        required=False,
-        label=_("Description"),
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H3,
+        label=_("Content"),
+        help_text=_("Type your heading as an H3 at the top, then optional supporting copy."),
     )
     image = ImageChooserBlock(
         required=False,
@@ -1483,10 +1536,20 @@ class ImageCardListItemBlock(StructBlock):
     description, nothing else — no icon/image/link, unlike CardBlock. This
     layout's cards are plain bordered text boxes (see image_card_list_block.html),
     so reusing CardBlock would expose fields the template never renders.
+
+    `content` used to be two fields — `heading` (CharBlock) and `description`
+    (a plain TextBlock, no markup) — condensed into one richtext field, same
+    treatment and same reasoning as CardBlock's own merge (heading typed as
+    an H3, matching the level this template already rendered it at).
+    Migration 0051_condense_card_heading_description folded every existing
+    item's heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(label=_("Heading"))
-    description = WagtailTextBlock(label=_("Description"))
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H3,
+        label=_("Content"),
+        help_text=_("Type your heading as an H3 at the top, then the supporting copy."),
+    )
 
     class Meta:
         icon = "doc-full"
@@ -1541,16 +1604,20 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
     top heading at all — its heading sits inline in the text column — and
     the "cards" are just one richtext field, for freeform paragraph copy
     (e.g. a campaign pitch) rather than a repeatable list of short points.
+
+    `content` used to be two fields — `heading` (CharBlock) and `text`
+    (RichTextBlock) — condensed into this one richtext field so the editor
+    types the heading as an H2 at the top, the same convention SectionBlock's
+    own content list already uses. Migration 0045_condense_heading_text_blocks
+    folded every existing page's heading/text pair into this field's HTML on
+    upgrade; see that migration for the exact transform.
     """
 
-    heading = CharBlock(
-        label=_("Heading"),
-        help_text=_("Heading above the text, in the right-hand column."),
-    )
     image = ImageChooserBlock(label=_("Image"))
-    text = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        label=_("Text"),
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then the body text."),
     )
     alignment = ChoiceBlock(
         choices=IMAGE_ALIGNMENT_CHOICES,
@@ -1593,6 +1660,13 @@ class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
     Django's URLValidator rejects a bare "#petition", so a panel whose CTA
     scrolls to a signup block further down the same page had no way to
     express that target at all.
+
+    `content` used to be two fields — `heading` (CharBlock) and `text`
+    (optional RichTextBlock) — condensed into this one richtext field so the
+    editor types the heading as an H2 at the top, same as ImageTextBlock.
+    `eyebrow` stays a separate field: it renders as its own pill, not part of
+    the text flow. Migration 0045_condense_heading_text_blocks folded every
+    existing page's heading/text pair into this field's HTML on upgrade.
     """
 
     eyebrow = CharBlock(
@@ -1603,15 +1677,10 @@ class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
             'e.g. "Featured Campaign". Leave blank to omit the pill.'
         ),
     )
-    heading = CharBlock(
-        label=_("Heading"),
-        help_text=_("Panel heading, rendered as an H2."),
-    )
-    text = RichTextBlock(
-        required=False,
-        features=RICHTEXT_FEATURES_INLINE,
-        label=_("Text"),
-        help_text=_("Optional supporting copy shown below the heading."),
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     image = ImageChooserBlock(label=_("Image"))
     alignment = ChoiceBlock(
@@ -1676,16 +1745,19 @@ class CardCarouselBlock(ContentPreviewMixin, StructBlock):
     pulled from pages) — minimum 3, no maximum. At most one of link_page or
     link_url may be set; clean() enforces this, same pattern as CardBlock
     and QuoteBlock.
+
+    `content` used to be two fields — `heading` (CharBlock) and `content`
+    (RichTextBlock) — condensed into this one richtext field, same
+    convention as ImageTextBlock/FeaturePanelBlock: the editor types the
+    heading as an H2 at the top, then the supporting copy. Migration
+    0045_condense_heading_text_blocks folded every existing page's
+    heading/content pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
-        label=_("Heading"),
-        help_text=_("Section heading, rendered as an H2."),
-    )
     content = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        label=_("Text"),
-        help_text=_("Supporting copy shown below the heading."),
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then the supporting copy."),
     )
     link_text = CharBlock(
         required=False,
@@ -1747,17 +1819,21 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
     it falls back to first_published_at, which every Page has — keeping
     that case a single query. The date shown on each card still prefers
     published_at whenever the child has one.
+
+    `content` used to be two fields — `heading` (CharBlock) and `subheading`
+    (RichTextBlock, rendered as a plain paragraph despite its name, not an
+    H3) — condensed into this one richtext field, same convention as
+    ImageTextBlock: the editor types the heading as an H2 at the top, then
+    the supporting copy. Migration 0047_condense_more_heading_text_blocks
+    folded every existing page's heading/subheading pair into this field's
+    HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Section heading, rendered as an H2."),
-    )
-    subheading = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Subheading"),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     index_page = PageChooserBlock(
         page_type=["wtrx.IndexPage", "wtrx.Blogs"],
@@ -1947,22 +2023,24 @@ class CalloutBlock(ContentPreviewMixin, StructBlock):
     light-grey need dark text and a dark-outline button. See
     LIGHT_BACKGROUND_COLORS and main.css's .wtr-bg-{color} classes for that
     pairing.
+
+    `content` used to be three fields — `heading` (H2), `subheading` (H3) and
+    `content` (paragraph) — condensed into this one richtext field, all
+    optional (a callout can be just a background + button). The editor types
+    an H2 and/or H3 at the top followed by the paragraph, same convention as
+    ImageTextBlock/FeaturePanelBlock. Migration
+    0045_condense_heading_text_blocks folded every existing page's
+    heading/subheading/content trio into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
-        required=False,
-        label=_("Heading"),
-        help_text=_("Optional. Rendered as an H2."),
-    )
-    subheading = CharBlock(
-        required=False,
-        label=_("Subheading"),
-        help_text=_("Optional. Rendered as an H3."),
-    )
     content = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
+        features=RICHTEXT_FEATURES_HEADINGS_H2_H3,
         required=False,
-        label=_("Paragraph"),
+        label=_("Content"),
+        help_text=_(
+            "Optional heading (H2) and/or subheading (H3) at the top, "
+            "followed by an optional paragraph."
+        ),
     )
     link_text = CharBlock(
         required=False,
@@ -2026,18 +2104,19 @@ class DonateBlock(StructBlock):
     IntegrationSettings at render time — not hardcoded here. The
     override_amounts and override_url fields let editors override the
     site-wide defaults on a per-block basis.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Donation section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     button_text = CharBlock(
         required=False,
@@ -2098,8 +2177,10 @@ class DonateBlock(StructBlock):
             "unless overridden here."
         )
         preview_value = {
-            "heading": _("Chip in to keep the pressure on"),
-            "description": "<p>Every contribution funds organisers, research and public campaigning.</p>",
+            "content": (
+                "<h2>Chip in to keep the pressure on</h2>"
+                "<p>Every contribution funds organisers, research and public campaigning.</p>"
+            ),
             "button_text": _("Donate"),
             "override_amounts": ["10", "25", "50", "100"],
             "override_url": "https://example.com/donate",
@@ -2123,18 +2204,19 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
     Fundraise Up element) — use a Fundraise Up element configured as an
     inline/embedded form in your dashboard, not a modal-trigger button, so
     it actually renders inline in the panel rather than as a small button.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Donation section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     image = ImageChooserBlock(
         required=False,
@@ -2183,18 +2265,19 @@ class SignupWagtailFormsBlock(StructBlock):
     AJAX submission posts to form_page.url. On success, the form is replaced
     with success_message (or a generic fallback). The form instance is
     instantiated in the template via form_page.get_form_class()().
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Signup section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     button_text = CharBlock(
         required=False,
@@ -2282,18 +2365,19 @@ class SignupActionNetworkBlock(StructBlock):
     default thank-you screen. When provided, a MutationObserver in the template
     detects the AN widget's blocks and replaces it with the custom StreamField
     content.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Signup section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     action_url = URLBlock(
         label=_("Action Network URL"),
@@ -2356,14 +2440,24 @@ class SignupActionNetworkBlock(StructBlock):
             "Supporters sign up without leaving the site."
         )
         preview_value = {
-            "heading": _("Add your name"),
-            "description": "<p>Join supporters around the world calling for an end to fossil fuel expansion.</p>",
+            "content": (
+                "<h2>Add your name</h2>"
+                "<p>Join supporters around the world calling for an end to fossil fuel expansion.</p>"
+            ),
             "action_url": "https://actionnetwork.org/forms/example-petition",
         }
 
 
-class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
+class SignupActionKitFormMixin:
     """
+    Shared logic (no fields) for both SignupActionKitBlock (body/section
+    panel, with a heading/copy `content` field) and HeroSignupActionKitBlock
+    (the hero's inline CTA strip, which has no `content` field — see
+    HeroSignupActionKitBlock's docstring). Not a Block subclass itself, so
+    Wagtail's DeclarativeSubBlocksMetaclass never picks it up as a source of
+    child blocks — only fields declared directly on the two concrete classes
+    below apply.
+
     Auto-renders an ActionKit page's own signup form.
 
     Editors provide only the ActionKit page's short name. The block fetches
@@ -2418,88 +2512,6 @@ class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
         "light-grey": "on-light",
         "white": "on-white",
     }
-
-    eyebrow = CharBlock(
-        required=False,
-        label=_("Eyebrow"),
-        help_text=_(
-            "Optional short label shown as a pill above the heading "
-            "(e.g. 'Sign the Petition')."
-        ),
-    )
-    heading = CharBlock(
-        required=False,
-        label=_("Heading"),
-        help_text=_("Signup section heading, shown above the ActionKit form."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
-    )
-    background = ChoiceBlock(
-        choices=BACKGROUND_COLOR_CHOICES,
-        default="dark-grey",
-        label=_("Background"),
-        help_text=_(
-            "Panel fill behind the heading, copy and form. The same palette "
-            "as the page hero banner, callout and section blocks."
-        ),
-    )
-    layout = ChoiceBlock(
-        choices=[
-            ("columns", _("Side by side")),
-            ("vertical", _("Stacked vertically")),
-        ],
-        default="columns",
-        label=_("Layout"),
-        help_text=_(
-            "Side by side splits copy and form into two columns (default). "
-            "Stacked vertically runs image, copy and form down a single "
-            "narrow column — better for long forms with many fields."
-        ),
-    )
-    image = ImageChooserBlock(
-        required=False,
-        label=_("Image"),
-    )
-    image_caption = CharBlock(
-        required=False,
-        label=_("Image caption"),
-        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
-    )
-    short_form_id = CharBlock(
-        label=_("ActionKit Page Shortname"),
-        help_text=_(
-            "The ActionKit page's short name (e.g. 'join'). Its signup form "
-            "is fetched from ActionKit and rendered automatically — whatever "
-            "fields that page is configured with will appear, with no further "
-            "setup needed here."
-        ),
-    )
-    anchor_id = CharBlock(
-        required=False,
-        label=_("Anchor ID"),
-        help_text=_(
-            "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
-        ),
-    )
-    success_message = SuccessMessageBlock(
-        required=False,
-        label=_("Success message"),
-        help_text=_(
-            "Optional. When set, a successful signup shows this message in "
-            "place of the form instead of redirecting to ActionKit's own "
-            "thank-you page. ActionKit's normal submission is a full-page "
-            "POST directly to ActionKit, so this works by forwarding the "
-            "signup through our own server (the same "
-            "integrations.actionkit.submit_action REST call FormPage signups "
-            "already use) instead — which does not go through ActionKit's own "
-            "recaptcha check, the same trade-off that forwarding already "
-            "accepts elsewhere."
-        ),
-    )
 
     def _fetch_form_html(self, hostname, short_form_id):
         """Return the cached (or freshly fetched) form fragment, or None on failure."""
@@ -2574,10 +2586,203 @@ class SignupActionKitBlock(ContentPreviewMixin, StructBlock):
         )
         return ctx
 
+
+class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, StructBlock):
+    """
+    The standalone ActionKit signup panel — see SignupActionKitFormMixin for
+    the shared form-fetching/caching/panel-tone logic.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock/FeaturePanelBlock.
+    `eyebrow` stays separate — it renders as its own pill, not part of the
+    text flow. Migration 0047_condense_more_heading_text_blocks folded every
+    existing page's heading/description pair into this field's HTML on
+    upgrade.
+
+    Distinct from HeroSignupActionKitBlock (mounted as HeroCTABlock's
+    "signup" choice): that one has no `content` field at all — the hero's
+    compact inline strip never rendered it, and the fields are otherwise
+    identical (both classes reuse SignupActionKitFormMixin).
+    """
+
+    eyebrow = CharBlock(
+        required=False,
+        label=_("Eyebrow"),
+        help_text=_(
+            "Optional short label shown as a pill above the heading "
+            "(e.g. 'Sign the Petition')."
+        ),
+    )
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        required=False,
+        label=_("Content"),
+        help_text=_(
+            "Type your heading as an H2 at the top, then optional supporting "
+            "copy, shown above the ActionKit form."
+        ),
+    )
+    background = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="dark-grey",
+        label=_("Background"),
+        help_text=_(
+            "Panel fill behind the heading, copy and form. The same palette "
+            "as the page hero banner, callout and section blocks."
+        ),
+    )
+    layout = ChoiceBlock(
+        choices=[
+            ("columns", _("Side by side")),
+            ("vertical", _("Stacked vertically")),
+        ],
+        default="columns",
+        label=_("Layout"),
+        help_text=_(
+            "Side by side splits copy and form into two columns (default). "
+            "Stacked vertically runs image, copy and form down a single "
+            "narrow column — better for long forms with many fields."
+        ),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
+    )
+    short_form_id = CharBlock(
+        label=_("ActionKit Page Shortname"),
+        help_text=_(
+            "The ActionKit page's short name (e.g. 'join'). Its signup form "
+            "is fetched from ActionKit and rendered automatically — whatever "
+            "fields that page is configured with will appear, with no further "
+            "setup needed here."
+        ),
+    )
+    anchor_id = CharBlock(
+        required=False,
+        label=_("Anchor ID"),
+        help_text=_(
+            "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
+        ),
+    )
+    success_message = SuccessMessageBlock(
+        required=False,
+        label=_("Success message"),
+        help_text=_(
+            "Optional. When set, a successful signup shows this message in "
+            "place of the form instead of redirecting to ActionKit's own "
+            "thank-you page. ActionKit's normal submission is a full-page "
+            "POST directly to ActionKit, so this works by forwarding the "
+            "signup through our own server (the same "
+            "integrations.actionkit.submit_action REST call FormPage signups "
+            "already use) instead — which does not go through ActionKit's own "
+            "recaptcha check, the same trade-off that forwarding already "
+            "accepts elsewhere."
+        ),
+    )
+
     class Meta:
         icon = "form"
         label = _("Sign Up (ActionKit)")
         template = "wtrx/components/streamfield/blocks/signup_actionkit_block.html"
+
+
+class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, StructBlock):
+    """
+    The hero's inline ActionKit CTA strip — HeroCTABlock's "signup" choice
+    (components/hero.html). See SignupActionKitFormMixin for the shared
+    form-fetching/caching/panel-tone logic.
+
+    No `content` field: the hero's compact rendering is a single-line strip
+    sitting directly in the hero's own dark overlay, with no room (and no
+    real use in practice — every existing hero CTA signup panel has always
+    left it blank) for a heading/copy above the form. Use SignupActionKitBlock
+    (the standalone body/section panel) when a heading is actually needed.
+    Every other field carries over unchanged from SignupActionKitBlock,
+    including ones the hero's compact template doesn't currently render
+    (e.g. `eyebrow`) — only `content` was asked to go.
+    """
+
+    eyebrow = CharBlock(
+        required=False,
+        label=_("Eyebrow"),
+        help_text=_(
+            "Optional short label shown as a pill above the heading "
+            "(e.g. 'Sign the Petition')."
+        ),
+    )
+    background = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="dark-grey",
+        label=_("Background"),
+        help_text=_(
+            "Panel fill behind the heading, copy and form. The same palette "
+            "as the page hero banner, callout and section blocks."
+        ),
+    )
+    layout = ChoiceBlock(
+        choices=[
+            ("columns", _("Side by side")),
+            ("vertical", _("Stacked vertically")),
+        ],
+        default="columns",
+        label=_("Layout"),
+        help_text=_(
+            "Side by side splits copy and form into two columns (default). "
+            "Stacked vertically runs image, copy and form down a single "
+            "narrow column — better for long forms with many fields."
+        ),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
+    )
+    short_form_id = CharBlock(
+        label=_("ActionKit Page Shortname"),
+        help_text=_(
+            "The ActionKit page's short name (e.g. 'join'). Its signup form "
+            "is fetched from ActionKit and rendered automatically — whatever "
+            "fields that page is configured with will appear, with no further "
+            "setup needed here."
+        ),
+    )
+    anchor_id = CharBlock(
+        required=False,
+        label=_("Anchor ID"),
+        help_text=_(
+            "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
+        ),
+    )
+    success_message = SuccessMessageBlock(
+        required=False,
+        label=_("Success message"),
+        help_text=_(
+            "Optional. When set, a successful signup shows this message in "
+            "place of the form instead of redirecting to ActionKit's own "
+            "thank-you page. ActionKit's normal submission is a full-page "
+            "POST directly to ActionKit, so this works by forwarding the "
+            "signup through our own server (the same "
+            "integrations.actionkit.submit_action REST call FormPage signups "
+            "already use) instead — which does not go through ActionKit's own "
+            "recaptcha check, the same trade-off that forwarding already "
+            "accepts elsewhere."
+        ),
+    )
+
+    class Meta:
+        icon = "form"
+        label = _("Sign Up (ActionKit)")
+        template = "wtrx/components/streamfield/blocks/signup_actionkit_hero_block.html"
 
 
 class SignupLinkBlock(StructBlock):
@@ -2586,18 +2791,19 @@ class SignupLinkBlock(StructBlock):
 
     Renders a heading, optional description, and a button that links to an
     external signup URL. Use when the signup form is hosted elsewhere.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Signup section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     button_text = CharBlock(
         required=False,
@@ -2626,8 +2832,10 @@ class SignupLinkBlock(StructBlock):
             "hosted elsewhere, rather than embedding one."
         )
         preview_value = {
-            "heading": _("Join the movement"),
-            "description": "<p>Get campaign updates and ways to take action, straight to your inbox.</p>",
+            "content": (
+                "<h2>Join the movement</h2>"
+                "<p>Get campaign updates and ways to take action, straight to your inbox.</p>"
+            ),
             "button_text": _("Sign up"),
             "external_url": "https://example.com/signup",
         }
@@ -2688,7 +2896,7 @@ class HeroCTABlock(StreamBlock):
     """
 
     button = ButtonBlock()
-    signup = SignupActionKitBlock()
+    signup = HeroSignupActionKitBlock()
     donate = DonateBlock()
     announcement = AnnouncementBarBlock()
 
@@ -2790,6 +2998,7 @@ class SectionContentBlock(StreamBlock):
     """
 
     text = TextBlock()
+    lead_text = LeadTextBlock()
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()
@@ -2890,6 +3099,7 @@ class BodyStreamBlock(StreamBlock):
     """
 
     text = TextBlock()
+    lead_text = LeadTextBlock()
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()

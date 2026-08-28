@@ -280,6 +280,14 @@ def _text_block():
     return _sb("text", _RICHTEXT_PARAGRAPH)
 
 
+def _lead_text_block():
+    return _sb(
+        "lead_text",
+        "<p>This is a lead paragraph — larger than ordinary body copy, "
+        "for opening a page or section with one standout statement.</p>",
+    )
+
+
 def _image_block_full(image_id):
     """ImageBlock with caption and explicit alt text."""
     return _sb(
@@ -358,11 +366,13 @@ def _table_block():
 
 def _card_value(heading, description="", image_id=None, icon_id=None, tag="", link=True):
     """A CardBlock value — shared by the standalone card, the grid and the carousel."""
+    content = f"<h3>{heading}</h3>"
+    if description:
+        content += f"<p>{description}</p>"
     return {
         "tag": tag,
         "icon": icon_id,
-        "heading": heading,
-        "description": description,
+        "content": content,
         "image": image_id,
         "link_page": None,
         "link_url": "https://example.com" if link else None,
@@ -503,16 +513,22 @@ def _image_card_list_block(image_id):
             "image": image_id,
             "cards": [
                 {
-                    "heading": "First point",
-                    "description": "A plain bordered text card — no icon, image or link.",
+                    "content": (
+                        "<h3>First point</h3>"
+                        "<p>A plain bordered text card — no icon, image or link.</p>"
+                    ),
                 },
                 {
-                    "heading": "Second point",
-                    "description": "The card column and the image column share a height.",
+                    "content": (
+                        "<h3>Second point</h3>"
+                        "<p>The card column and the image column share a height.</p>"
+                    ),
                 },
                 {
-                    "heading": "Third point",
-                    "description": "Single column on mobile, two columns from md: up.",
+                    "content": (
+                        "<h3>Third point</h3>"
+                        "<p>Single column on mobile, two columns from md: up.</p>"
+                    ),
                 },
             ],
         },
@@ -523,12 +539,11 @@ def _image_text_block(image_id):
     return _sb(
         "image_text",
         {
-            "heading": "Image + Text",
             "image": image_id,
-            "text": (
-                "<p>Freeform paragraph copy beside an image at its natural "
-                "aspect ratio. The heading sits inline in the text column, not "
-                "above both columns.</p>"
+            "content": (
+                "<h2>Image + Text</h2><p>Freeform paragraph copy beside an "
+                "image at its natural aspect ratio. The heading sits inline "
+                "in the text column, not above both columns.</p>"
             ),
         },
     )
@@ -539,8 +554,7 @@ def _feature_panel_block(image_id, alignment, background, eyebrow="", with_cta=T
         "feature_panel",
         {
             "eyebrow": eyebrow,
-            "heading": f"Feature Panel ({alignment}, {background})",
-            "text": _RICHTEXT_INLINE,
+            "content": f"<h2>Feature Panel ({alignment}, {background})</h2>" + _RICHTEXT_INLINE,
             "image": image_id,
             "alignment": alignment,
             "background": background,
@@ -557,8 +571,7 @@ def _card_carousel_block(image_id):
     return _sb(
         "card_carousel",
         {
-            "heading": "Card Carousel",
-            "content": _RICHTEXT_INLINE,
+            "content": "<h2>Card Carousel</h2>" + _RICHTEXT_INLINE,
             "link_text": "See all",
             "link_page": None,
             "link_url": "https://example.com",
@@ -579,8 +592,10 @@ def _page_cards_block(index_page_id):
     return _sb(
         "page_cards",
         {
-            "heading": "Page Cards",
-            "subheading": "<p>The 3 most recently published children of the chosen index page.</p>",
+            "content": (
+                "<h2>Page Cards</h2>"
+                "<p>The 3 most recently published children of the chosen index page.</p>"
+            ),
             "index_page": index_page_id,
             "link_text": "Read more",
         },
@@ -610,9 +625,11 @@ def _callout_block(color, image_id=None, with_cta=True):
     return _sb(
         "callout",
         {
-            "heading": f"Callout ({color})",
-            "subheading": "An optional sub-heading, rendered as an H3.",
-            "content": _RICHTEXT_INLINE,
+            "content": (
+                f"<h2>Callout ({color})</h2>"
+                "<h3>An optional sub-heading, rendered as an H3.</h3>"
+            )
+            + _RICHTEXT_INLINE,
             "link_text": "Take action" if with_cta else "",
             "link_page": None,
             "link_url": "https://example.com" if with_cta else None,
@@ -658,8 +675,10 @@ def _donate_block_full():
     return _sb(
         "donate",
         {
-            "heading": "Support Our Campaign",
-            "description": "<p>Every dollar helps us reach more voters.</p>",
+            "content": (
+                "<h2>Support Our Campaign</h2>"
+                "<p>Every dollar helps us reach more voters.</p>"
+            ),
             "button_text": "Donate Now",
             "override_amounts": ["10.00", "25.00", "50.00", "100.00"],
             "override_url": "https://secure.actblue.com/donate/example",
@@ -672,8 +691,7 @@ def _donate_block_minimal():
     return _sb(
         "donate",
         {
-            "heading": "Donate (using site defaults)",
-            "description": "",
+            "content": "<h2>Donate (using site defaults)</h2>",
             "button_text": "",
             "override_amounts": [],
             "override_url": "",
@@ -692,8 +710,7 @@ def _donate_fundraiseup_block(image_id):
     return _sb(
         "donate_fundraiseup",
         {
-            "heading": "Donate (Fundraise Up)",
-            "description": _RICHTEXT_INLINE,
+            "content": "<h2>Donate (Fundraise Up)</h2>" + _RICHTEXT_INLINE,
             "image": image_id,
             "image_caption": "Photo credit: placeholder",
             "element_id": "XTESTFRU",
@@ -706,8 +723,7 @@ def _signup_wagtail_forms_block(form_page_id):
     return _sb(
         "signup_wagtail_forms",
         {
-            "heading": "Sign Up (Wagtail Forms)",
-            "description": _RICHTEXT_INLINE,
+            "content": "<h2>Sign Up (Wagtail Forms)</h2>" + _RICHTEXT_INLINE,
             "button_text": "Sign Up",
             "form_page": form_page_id,
             "success_message": "Thanks — you're on the list.",
@@ -737,8 +753,7 @@ def _signup_action_network_block(image_id, with_success=False):
     return _sb(
         "signup_action_network",
         {
-            "heading": "Sign Up (Action Network)",
-            "description": _RICHTEXT_INLINE,
+            "content": "<h2>Sign Up (Action Network)</h2>" + _RICHTEXT_INLINE,
             "action_url": "https://actionnetwork.org/forms/join-30",
             "success_message": _success_message_stream(image_id) if with_success else [],
             "anchor_id": "signup-action-network" + ("-success" if with_success else ""),
@@ -760,8 +775,7 @@ def _signup_actionkit_block(image_id, background, with_success=False, layout="co
         "signup_actionkit",
         {
             "eyebrow": "Sign the petition",
-            "heading": f"Sign Up (ActionKit, {background})",
-            "description": _RICHTEXT_INLINE,
+            "content": f"<h2>Sign Up (ActionKit, {background})</h2>" + _RICHTEXT_INLINE,
             "background": background,
             "layout": layout,
             "image": image_id,
@@ -778,8 +792,10 @@ def _signup_link_block():
     return _sb(
         "signup_link",
         {
-            "heading": "Sign Up (Link)",
-            "description": "<p>Sign up to stay informed and take action.</p>",
+            "content": (
+                "<h2>Sign Up (Link)</h2>"
+                "<p>Sign up to stay informed and take action.</p>"
+            ),
             "button_text": "Sign Up",
             "external_url": "https://actionnetwork.org/forms/example",
             "anchor_id": "signup-link",
@@ -815,6 +831,8 @@ def _content_blocks(image_id, index_page_id, form_page_id):
     blocks += [_heading("2. Content blocks")]
 
     blocks += [_label("text"), _text_block()]
+
+    blocks += [_label("lead_text"), _lead_text_block()]
 
     blocks += [
         _label("image", "with alt text and caption"),
