@@ -49,13 +49,11 @@ CalloutBlock's docstring for the field history.
         <div class="relative max-w-[804px] {% if on_light %}text-dark{% else %}text-light{% endif %}">
             {% if value.content %}
                 {% comment %}
-                [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
-                prose-invert body color (a muted ~87%-lightness gray, meant for long-form
-                reading) to pure white, matching the reference design — headings/bold/links
-                already default to white in prose-invert, only body text doesn't.
+                prose-invert's body color is pinned to pure white centrally,
+                in main.css — see the .prose-invert rule there.
                 {% endcomment %}
                 <div class="wtr-callout-content prose max-w-none text-lg leading-[1.35] sm:text-xl lg:text-2xl
-                            {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                            {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
                     {{ value.content|richtext }}
                 </div>
             {% endif %}
