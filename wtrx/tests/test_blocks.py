@@ -46,6 +46,7 @@ from wtrx.blocks import (
     FeaturePanelBlock,
     HeroBlock,
     HeroCTABlock,
+    HeroSignupActionKitBlock,
     ImageCardListBlock,
     ImageCardListItemBlock,
     ImageGridBlock,
@@ -513,7 +514,16 @@ class TestHeroCTABlock(SimpleTestCase):
 
     def test_signup_choice_is_actionkit(self):
         block = HeroCTABlock()
-        self.assertIsInstance(block.declared_blocks["signup"], SignupActionKitBlock)
+        self.assertIsInstance(block.declared_blocks["signup"], HeroSignupActionKitBlock)
+
+    def test_signup_choice_has_no_content_field(self):
+        """
+        The hero's inline CTA strip has no room (and no real use in
+        practice) for a heading/copy above the form — see
+        HeroSignupActionKitBlock's docstring.
+        """
+        block = HeroCTABlock()
+        self.assertNotIn("content", block.declared_blocks["signup"].declared_blocks)
 
     def test_donate_choice_is_donate_block(self):
         block = HeroCTABlock()
@@ -527,12 +537,11 @@ class TestHeroCTABlock(SimpleTestCase):
 
 
 class TestSignupLinkBlockValidation(SimpleTestCase):
-    """SignupLinkBlock requires external_url; heading and anchor_id are optional."""
+    """SignupLinkBlock requires external_url; content and anchor_id are optional."""
 
-    def _raw(self, heading="Sign Up", external_url="https://example.com"):
+    def _raw(self, content="<h2>Sign Up</h2>", external_url="https://example.com"):
         return {
-            "heading": heading,
-            "description": "",
+            "content": content,
             "button_text": "",
             "external_url": external_url,
             "anchor_id": "",
@@ -544,12 +553,12 @@ class TestSignupLinkBlockValidation(SimpleTestCase):
         cleaned = block.clean(value)
         self.assertEqual(cleaned["external_url"], "https://example.com")
 
-    def test_heading_optional(self):
-        """heading is now optional — omitting it must not raise."""
+    def test_content_optional(self):
+        """content is optional — omitting it must not raise."""
         block = SignupLinkBlock()
-        value = block.to_python(self._raw(heading=""))
+        value = block.to_python(self._raw(content=""))
         cleaned = block.clean(value)
-        self.assertEqual(cleaned["heading"], "")
+        self.assertEqual(str(cleaned["content"]), "")
 
     def test_external_url_required(self):
         block = SignupLinkBlock()
@@ -569,8 +578,12 @@ class TestSignupLinkBlockValidation(SimpleTestCase):
 
     def test_has_expected_fields(self):
         block = SignupLinkBlock()
-        expected = {"heading", "description", "button_text", "external_url", "anchor_id"}
+        expected = {"content", "button_text", "external_url", "anchor_id"}
         self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_supports_h2(self):
+        block = SignupLinkBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
 
 
 class TestSectionBlockWidth(SimpleTestCase):
@@ -682,6 +695,27 @@ class TestSignupActionKitBlockPanelFields(SimpleTestCase):
         self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "on-dark")
 
 
+class TestSignupActionKitBlockContentField(SimpleTestCase):
+    """
+    content (heading+description merged) is optional; eyebrow stays a
+    separate field, since it renders as its own pill.
+    """
+
+    def test_content_is_optional(self):
+        block = SignupActionKitBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = SignupActionKitBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_eyebrow_stays_separate(self):
+        block = SignupActionKitBlock()
+        self.assertIn("eyebrow", block.declared_blocks)
+        self.assertNotIn("heading", block.declared_blocks)
+        self.assertNotIn("description", block.declared_blocks)
+
+
 class TestSectionBlockStructure(SimpleTestCase):
     """
     SectionBlock.content must include all BodyStreamBlock block types except
@@ -690,6 +724,7 @@ class TestSectionBlockStructure(SimpleTestCase):
 
     EXPECTED_BLOCK_NAMES = {
         "text",
+        "lead_text",
         "image",
         "video",
         "button",
@@ -747,8 +782,7 @@ class TestCardBlockFields(SimpleTestCase):
         expected = {
             "tag",
             "icon",
-            "heading",
-            "description",
+            "content",
             "image",
             "link_page",
             "link_url",
@@ -756,9 +790,13 @@ class TestCardBlockFields(SimpleTestCase):
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
-    def test_heading_is_required(self):
+    def test_content_is_required(self):
         block = CardBlock()
-        self.assertTrue(block.declared_blocks["heading"].required)
+        self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_content_supports_h3(self):
+        block = CardBlock()
+        self.assertIn("h3", block.declared_blocks["content"].features)
 
 
 class TestImageGridItemBlockFields(SimpleTestCase):
@@ -1063,19 +1101,19 @@ class TestPersonCardGridBlockFields(SimpleTestCase):
 
 
 class TestImageCardListItemBlockFields(SimpleTestCase):
-    """ImageCardListItemBlock field structure: heading + description only."""
+    """ImageCardListItemBlock field structure: content (heading+description merged) only."""
 
     def test_has_expected_fields(self):
         block = ImageCardListItemBlock()
-        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "description"})
+        self.assertEqual(set(block.declared_blocks.keys()), {"content"})
 
-    def test_heading_is_required(self):
+    def test_content_is_required(self):
         block = ImageCardListItemBlock()
-        self.assertTrue(block.declared_blocks["heading"].required)
+        self.assertTrue(block.declared_blocks["content"].required)
 
-    def test_description_is_required(self):
+    def test_content_supports_h3(self):
         block = ImageCardListItemBlock()
-        self.assertTrue(block.declared_blocks["description"].required)
+        self.assertIn("h3", block.declared_blocks["content"].features)
 
 
 class TestImageCardListBlockFields(SimpleTestCase):
@@ -1118,29 +1156,29 @@ class TestImageCardListBlockFields(SimpleTestCase):
 
 
 class TestImageTextBlockFields(SimpleTestCase):
-    """ImageTextBlock field structure: heading + image + text, all required."""
+    """ImageTextBlock field structure: image + content (heading+text merged), all required."""
 
     def test_has_expected_fields(self):
         block = ImageTextBlock()
         self.assertEqual(
-            set(block.declared_blocks.keys()), {"heading", "image", "text", "alignment"}
+            set(block.declared_blocks.keys()), {"image", "content", "alignment"}
         )
-
-    def test_heading_is_required(self):
-        block = ImageTextBlock()
-        self.assertTrue(block.declared_blocks["heading"].required)
 
     def test_image_is_required(self):
         block = ImageTextBlock()
         self.assertTrue(block.declared_blocks["image"].required)
 
-    def test_text_is_required(self):
+    def test_content_is_required(self):
         block = ImageTextBlock()
-        self.assertTrue(block.declared_blocks["text"].required)
+        self.assertTrue(block.declared_blocks["content"].required)
 
-    def test_text_is_richtext(self):
+    def test_content_is_richtext(self):
         block = ImageTextBlock()
-        self.assertIsInstance(block.declared_blocks["text"], RichTextBlock)
+        self.assertIsInstance(block.declared_blocks["content"], RichTextBlock)
+
+    def test_content_supports_h2(self):
+        block = ImageTextBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
 
     def test_alignment_choices(self):
         block = ImageTextBlock()
@@ -1165,8 +1203,7 @@ class TestFeaturePanelBlockFields(SimpleTestCase):
         block = FeaturePanelBlock()
         expected = {
             "eyebrow",
-            "heading",
-            "text",
+            "content",
             "image",
             "alignment",
             "background",
@@ -1177,25 +1214,30 @@ class TestFeaturePanelBlockFields(SimpleTestCase):
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
-    def test_heading_is_required(self):
+    def test_content_is_required(self):
+        """content carries the required heading, typed as an H2 at the top."""
         block = FeaturePanelBlock()
-        self.assertTrue(block.declared_blocks["heading"].required)
+        self.assertTrue(block.declared_blocks["content"].required)
 
     def test_image_is_required(self):
         block = FeaturePanelBlock()
         self.assertTrue(block.declared_blocks["image"].required)
 
     def test_optional_fields_are_optional(self):
-        """Everything but heading/image is optional — the Figma dark panel
-        has no eyebrow, and the light one has no body copy."""
+        """Everything but content/image is optional — the Figma dark panel
+        has no eyebrow."""
         block = FeaturePanelBlock()
-        for name in ("eyebrow", "text", "link_text", "link_page", "link_url", "anchor"):
+        for name in ("eyebrow", "link_text", "link_page", "link_url", "anchor"):
             with self.subTest(field=name):
                 self.assertFalse(block.declared_blocks[name].required)
 
-    def test_text_is_richtext(self):
+    def test_content_is_richtext(self):
         block = FeaturePanelBlock()
-        self.assertIsInstance(block.declared_blocks["text"], RichTextBlock)
+        self.assertIsInstance(block.declared_blocks["content"], RichTextBlock)
+
+    def test_content_supports_h2(self):
+        block = FeaturePanelBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
 
     def test_alignment_choices(self):
         block = FeaturePanelBlock()
@@ -1225,16 +1267,17 @@ class TestCardCarouselBlockFields(SimpleTestCase):
 
     def test_has_expected_fields(self):
         block = CardCarouselBlock()
-        expected = {"heading", "content", "link_text", "link_page", "link_url", "cards"}
+        expected = {"content", "link_text", "link_page", "link_url", "cards"}
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
-    def test_heading_is_required(self):
-        block = CardCarouselBlock()
-        self.assertTrue(block.declared_blocks["heading"].required)
-
     def test_content_is_required(self):
+        """content carries the required heading, typed as an H2 at the top."""
         block = CardCarouselBlock()
         self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = CardCarouselBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
 
     def test_link_fields_are_optional(self):
         block = CardCarouselBlock()
@@ -1270,8 +1313,6 @@ class TestCalloutBlockFields(SimpleTestCase):
     def test_has_expected_fields(self):
         block = CalloutBlock()
         expected = {
-            "heading",
-            "subheading",
             "content",
             "link_text",
             "link_page",
@@ -1281,17 +1322,16 @@ class TestCalloutBlockFields(SimpleTestCase):
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
-    def test_heading_is_optional(self):
-        block = CalloutBlock()
-        self.assertFalse(block.declared_blocks["heading"].required)
-
-    def test_subheading_is_optional(self):
-        block = CalloutBlock()
-        self.assertFalse(block.declared_blocks["subheading"].required)
-
     def test_content_is_optional(self):
+        """A callout can be just a background + button, per its docstring."""
         block = CalloutBlock()
         self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2_and_h3(self):
+        block = CalloutBlock()
+        features = block.declared_blocks["content"].features
+        self.assertIn("h2", features)
+        self.assertIn("h3", features)
 
     def test_image_is_optional(self):
         block = CalloutBlock()
@@ -1317,6 +1357,28 @@ class TestCalloutBlockFields(SimpleTestCase):
         self.assertEqual(block.declared_blocks["color"].meta.default, "navy")
 
 
+class TestDonateBlockFields(SimpleTestCase):
+    """DonateBlock field structure: content (heading+description merged), all optional."""
+
+    def test_has_expected_fields(self):
+        block = DonateBlock()
+        expected = {
+            "content",
+            "button_text",
+            "override_amounts",
+            "override_url",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_is_optional(self):
+        block = DonateBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = DonateBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+
 class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     """
     DonateFundraiseUpBlock field structure. No custom clean() — element_id
@@ -1327,8 +1389,7 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     def test_has_expected_fields(self):
         block = DonateFundraiseUpBlock()
         expected = {
-            "heading",
-            "description",
+            "content",
             "image",
             "image_caption",
             "element_id",
@@ -1343,8 +1404,12 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
 
     def test_other_fields_are_optional(self):
         block = DonateFundraiseUpBlock()
-        for name in ("heading", "description", "image", "image_caption", "designation_id"):
+        for name in ("content", "image", "image_caption", "designation_id"):
             self.assertFalse(block.declared_blocks[name].required, f"{name} should be optional")
+
+    def test_content_supports_h2(self):
+        block = DonateFundraiseUpBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
 
     def test_alignment_choices(self):
         block = DonateFundraiseUpBlock()
@@ -1354,6 +1419,27 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     def test_alignment_defaults_to_image_left(self):
         block = DonateFundraiseUpBlock()
         self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+
+class TestPageCardsBlockFields(SimpleTestCase):
+    """
+    content (heading+subheading merged) is optional. subheading used to
+    render as a plain paragraph despite its name, not an H3 — the merged
+    field only needs h2 support.
+    """
+
+    def test_content_is_optional(self):
+        block = PageCardsBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = PageCardsBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_no_separate_heading_or_subheading_fields(self):
+        block = PageCardsBlock()
+        self.assertNotIn("heading", block.declared_blocks)
+        self.assertNotIn("subheading", block.declared_blocks)
 
 
 class TestPageCardsBlockGetContext(TestCase):
@@ -1597,11 +1683,12 @@ class TestSignupActionNetworkBlockValidation(SimpleTestCase):
     """SignupActionNetworkBlock.clean() validates the pasted Action Network URL."""
 
     def _raw(
-        self, action_url="https://actionnetwork.org/forms/join-30", heading="Sign Up"
+        self,
+        action_url="https://actionnetwork.org/forms/join-30",
+        content="<h2>Sign Up</h2>",
     ):
         return {
-            "heading": heading,
-            "description": "",
+            "content": content,
             "action_url": action_url,
             "success_message": "",
             "anchor_id": "",
@@ -1641,12 +1728,12 @@ class TestSignupActionNetworkBlockValidation(SimpleTestCase):
         with self.assertRaises(ValidationError):
             block.clean(value)
 
-    def test_heading_optional(self):
-        """heading is now optional — omitting it must not raise."""
+    def test_content_optional(self):
+        """content is optional — omitting it must not raise."""
         block = SignupActionNetworkBlock()
-        value = block.to_python(self._raw(heading=""))
+        value = block.to_python(self._raw(content=""))
         cleaned = block.clean(value)
-        self.assertEqual(cleaned["heading"], "")
+        self.assertEqual(str(cleaned["content"]), "")
 
     def test_action_url_required(self):
         block = SignupActionNetworkBlock()
@@ -1667,8 +1754,12 @@ class TestSignupActionNetworkBlockValidation(SimpleTestCase):
 
     def test_has_expected_fields(self):
         block = SignupActionNetworkBlock()
-        expected = {"heading", "description", "action_url", "success_message", "anchor_id"}
+        expected = {"content", "action_url", "success_message", "anchor_id"}
         self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_supports_h2(self):
+        block = SignupActionNetworkBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
 
 
 class TestSignupActionNetworkBlockContext(SimpleTestCase):

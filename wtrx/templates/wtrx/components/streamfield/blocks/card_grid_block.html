@@ -33,7 +33,13 @@ just giving the row mobile-edge breathing room.
 <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-[1218px]">
         {% if value.heading %}
-            <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+            {% comment %}
+            in-data-[bg-tone=dark]: — this heading sits directly on whatever
+            it's placed in (page background or a SectionBlock fill); the
+            cards below keep their own always-light bg-neutral-50 fill
+            (AGENTS.md pitfall #44) regardless, same as accordion items.
+            {% endcomment %}
+            <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
         {% endif %}
         <div class="wtr-card-grid flex flex-col gap-6">
             {% for row in rows %}

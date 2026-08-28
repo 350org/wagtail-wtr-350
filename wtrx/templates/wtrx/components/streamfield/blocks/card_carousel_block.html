@@ -80,37 +80,41 @@ No pr-4/6/8 on the row itself — the cards column intentionally has no
 padding there, so cards still visually run to (and get cut off at) this
 container's own right edge, same look as before, just capped at 1500px
 instead of the true viewport edge. The text column carries its own
-pr-4/sm:pr-6 instead (reset to lg:pr-0), scoped to mobile/tablet only —
-below lg: the columns stack (flex-col) and share the row's full width, so
+pr-4/sm:pr-6 instead (reset to md:pr-0), scoped to mobile only — below
+md: the columns stack (flex-col) and share the row's full width, so
 without it the right-aligned text/button would run flush to the row's
-own right edge same as the cards; at lg:+ the column's width is already
-capped well short of that edge by lg:w-[583px] (matching Figma's text
-column width), so no extra padding is needed there.
+own right edge same as the cards; at md:+ the column's width is already
+capped well short of that edge by md:max-w-[400px], so no extra padding
+is needed there.
+
+md:, not lg:, is the row-split breakpoint: side-by-side now holds through
+tablet, and only phones (below md:) stack — narrower than the 520/583px
+column this used to size against, so tablet has plenty of room for the
+row without wrapping oddly.
 {% endcomment %}
-<div class="wtr-card-carousel mx-auto flex max-w-[1500px] flex-col gap-8 pl-4 sm:pl-6 lg:flex-row lg:items-center lg:gap-12 lg:pl-8" data-carousel>
+<div class="wtr-card-carousel mx-auto flex max-w-[1500px] flex-col gap-8 pl-4 sm:pl-6 lg:pl-8 md:flex-row md:items-center md:gap-12" data-carousel>
     {% comment %}
-    lg:w-[520px], down from Figma's 583px. The description dropped from 24px
-    to the site's 20px body size (AGENTS.md pitfall #34), so the same copy
-    needs less measure and 583 left the column visibly loose against the
-    cards beside it.
+    md:max-w-[400px]: the copy column caps at 400px on tablet and desktop
+    alike (not a fixed width — a short heading/paragraph shouldn't force
+    the column out to 400px, only wrap short of it).
 
-    520 is where the measurements land, not a round number: the longest real
-    copy on the site (canada's, 195 characters) holds at four lines all the
-    way down to 520 and gains a fifth at 490, so this takes back the slack
-    the smaller type created without costing a line anywhere. The 63px goes
-    to the cards column.
-
-    The 48px heading is the other constraint and it is the reason this
-    cannot go to Figma's number *and* be thinner: "Voices from the
-    Gathering" (/take-action/renew-our-power/) fits 583 by under 20px and
-    wraps to two lines at 563 or below. That wrap is accepted rather than
-    designed around — the column cannot be sized to keep an editor-authored
-    heading on one line in general, and a two-line 48px heading above
-    right-aligned copy reads fine.
+    md:ml-8 sits on this column, not on the row's own pl-4/6/8: at a
+    narrower 400px measure the right-aligned copy still reads close to the
+    full column width, so this keeps a little breathing room from the
+    row's left edge. Margin (not padding) leaves the column's own max-w
+    untouched; it only shifts the column right, which the cards column
+    (flex-1) simply yields room for.
     {% endcomment %}
-    <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 lg:w-[520px] lg:shrink-0 lg:pr-0">
-        <h2 class="font-heading text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl">{{ value.heading }}</h2>
-        <div class="prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl">
+    {% comment %}
+    in-data-[bg-tone=dark]: on this one prose container covers heading +
+    body now they're a single richtext field — the cards in the scrolling
+    track keep their own always-light bg-neutral-50 fill regardless
+    (AGENTS.md pitfall #34), so only this text column needs to invert. The
+    h2's font-size/tracking are pinned via .wtr-card-carousel-content in
+    main.css, same technique .wtr-text-block uses.
+    {% endcomment %}
+    <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 md:ml-8 md:max-w-[400px] md:shrink-0 md:pr-0">
+        <div class="wtr-card-carousel-content prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl in-data-[bg-tone=dark]:prose-invert">
             {{ value.content|richtext }}
         </div>
         {% if value.link_page or value.link_url %}

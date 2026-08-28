@@ -1,14 +1,18 @@
 {% load i18n wagtailcore_tags %}
 {% comment %}
     Shared ActionKit form renderer, used by signup_actionkit_block.html's
-    standalone panel and by the hero's signup CTA choice (components/
-    hero.html, via signup_actionkit_block.html with compact=True).
+    standalone panel (SignupActionKitBlock) and by
+    signup_actionkit_hero_block.html's hero CTA strip
+    (HeroSignupActionKitBlock, HeroCTABlock's "signup" choice). Both block
+    classes share their form-fetching/caching/panel-tone logic via
+    SignupActionKitFormMixin.
 
-    Expects from context: form_html, actionkit_base_url, and exactly one of
-    the layout flags `inline` / `stacked`, passed explicitly by the including
-    template. Also expects thank-you content, in one of two forms depending
-    on the caller: `success_message` (a SuccessMessageBlock StreamValue, set
-    by SignupActionKitBlock.get_context() — rendered via include_block) or
+    Expects from context: form_html, actionkit_base_url (set by
+    SignupActionKitFormMixin.get_context()), and exactly one of the layout
+    flags `inline` / `stacked`, passed explicitly by the including template.
+    Also expects thank-you content, in one of two forms depending on the
+    caller: `success_message` (a SuccessMessageBlock StreamValue, set by
+    SignupActionKitFormMixin.get_context() — rendered via include_block) or
     `success_text` (a plain string, set by resolved_footer_newsletter_signup()
     for the footer's newsletter box, which has no StreamField content editor
     of its own — rendered as-is). A caller sets at most one; either enables
@@ -24,8 +28,8 @@
     Neither flag renders ActionKit's own unstyled vertical stack; both are
     full restyles of the same fetched markup. See main.css for each.
 
-    `panel_tone` (from SignupActionKitBlock.get_context(), via
-    SignupActionKitBlock.PANEL_TONES) adds a .wtr-ak-on-{tone} modifier for
+    `panel_tone` (from SignupActionKitFormMixin.get_context(), via
+    SignupActionKitFormMixin.PANEL_TONES) adds a .wtr-ak-on-{tone} modifier for
     the panel fills the stacked chrome collides with — a dark panel behind
     the dark fine-print box, a blue panel behind the blue submit button, a
     light panel behind light-on-color labels. Applied only alongside
@@ -35,8 +39,9 @@
 {% if form_html %}
     {% comment %}
     The block picker preview renders a static stand-in form (see
-    SignupActionKitBlock.PREVIEW_FORM_HTML), which needs neither jQuery nor the
-    submit/UTM wiring below -- and must not pull either from a third party.
+    SignupActionKitFormMixin.PREVIEW_FORM_HTML), which needs neither jQuery
+    nor the submit/UTM wiring below -- and must not pull either from a
+    third party.
     {% endcomment %}
     {% if not is_block_preview %}
         <script>
@@ -50,8 +55,8 @@
     and the hero already sets the gap between its headline and this widget
     (20px, per Figma's Content frame) on the wrapper it renders around the
     block; stacking another 32px inside pushed the form to 52px below the
-    headline, and the compact wrapper's own flex gap-4 is what spaces it
-    from an optional heading/description above it.
+    headline. HeroSignupActionKitBlock has no heading/description field of
+    its own, so there is nothing else for that gap to space from.
 
     The stacked one used to carry mt-8, which was always dead space: its
     only caller is signup_actionkit_block.html's standalone panel, where
@@ -85,9 +90,20 @@
         stacked panel needs it: the hero's compact rendering sits on the
         hero's own scrim, which this block's background field has no say
         over. See main.css for the rule.
+
+        data-bg-tone="dark" is unconditional (not tied to stacked/panel_tone
+        above): success_message's "text" field renders through
+        text_block.html, whose `prose-neutral` defaults to dark grey body
+        text and only flips to `prose-invert` when an ancestor carries this
+        attribute (see SectionBlock's own data-bg-tone). Without it, the
+        message text was grey-on-dark-grey and unreadable on every fill —
+        stacked or inline (hero). success_text (the footer newsletter box's
+        plain-string case) isn't wrapped in .wtr-text-block/.prose at all,
+        so it doesn't need this to invert — but the attribute is harmless
+        either way, and keeping it unconditional avoids a third branch here.
         {% endcomment %}
         <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50{% if stacked and panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}"
-             data-thank-you>
+             data-thank-you data-bg-tone="dark">
             {% if success_message %}
                 {% include_block success_message %}
             {% else %}

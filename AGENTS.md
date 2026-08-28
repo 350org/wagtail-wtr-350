@@ -1656,6 +1656,134 @@ Two practical notes for agents:
       `HeroBlock` and `PersonCardBlock` already do on purpose, per
       `test_hand_authored_preview_is_used_over_harvested_content`).
 
+46. **Condensing a block's separate heading (+subheading) field into its
+    richtext body field needs a hand-authored data migration keyed on the
+    OLD field name, not the new one.** `ImageTextBlock`, `FeaturePanelBlock`,
+    `CalloutBlock` and `CardCarouselBlock` each used to have a heading
+    (and, for Callout, a subheading) CharBlock rendered as a bare `<h2>`/
+    `<h3>` beside a separate richtext field; they were condensed into one
+    `content` richtext field per block (editor types the heading inline as
+    an H2, same convention `SectionBlock`'s content list already uses,
+    following the same `RICHTEXT_FEATURES_HEADING_H2`/
+    `RICHTEXT_FEATURES_HEADINGS_H2_H3` constants in `wtrx/constants.py`).
+    - The migration (`0045_condense_heading_text_blocks.py`) walks raw
+      StreamField JSON exactly like `0040_unify_block_background_values`
+      does (same reasons: revisions hold their own copy and reverting to
+      one would bring the old keys back), `pop()`-ing the heading/
+      subheading CharBlock value(s), HTML-escaping them (they were plain
+      text, not richtext), and folding them into `content` as `<h2>`/`<h3>`
+      tags ahead of the existing body copy.
+    - **The trap**: two of these four blocks (`ImageTextBlock`,
+      `FeaturePanelBlock`) called their pre-existing richtext body field
+      `text`, not `content` — only `CalloutBlock`/`CardCarouselBlock`
+      already used `content`. A migration that reads/writes `value["content"]`
+      uniformly across all four types will find nothing under that key for
+      the two `text`-named blocks, silently produce `content` containing
+      only the synthesized heading, and leave the real body copy sitting
+      under an orphaned, now-unused `text` key — no error, just discarded
+      content on every existing page. Map old-field-name per block type
+      explicitly (`TEXT_SOURCE_FIELD` in that migration) and verify by
+      reading a real migrated row's raw JSON afterward, not just by running
+      `migrate` without error and the test suite going green — the Python
+      block/template tests only exercise fresh in-memory values, never the
+      stored JSON shape a real page has.
+    - Run `python manage.py harvest_block_previews` after migrating real
+      content — the block-picker previews for these four are
+      `ContentPreviewMixin`-sourced and the harvested JSON still has the
+      pre-migration shape (`heading`/`text` keys) until re-harvested,
+      which otherwise renders a preview missing its heading. Check for
+      stray hand-authored `Meta.preview_value` dicts too (a plain grep for
+      `"heading":`/`"description":` across `wtrx/blocks/__init__.py`) —
+      those are not "content", so re-harvesting doesn't touch them, and a
+      leftover one raises `KeyError` in the admin's live preview panel
+      (`normalize()` tries to look up a child block for every key in the
+      dict) rather than failing quietly.
+    - **A block registered under more than one StreamBlock can be keyed
+      differently in each.** `SignupActionKitBlock` is `signup_actionkit`
+      in `BodyStreamBlock`/`SectionContentBlock` but `signup` inside
+      `HeroCTABlock` (the hero's CTA choice) — a migration keyed only on
+      `"signup_actionkit"` silently skips every hero CTA signup panel, no
+      error, just unmigrated data sitting right next to correctly-migrated
+      content. The second wave of this
+      (`0047_condense_more_heading_text_blocks.py`) maps both type-strings
+      to the same source field for this reason. When condensing a block's
+      fields, grep every `StreamBlock` definition for the block class name,
+      not just its "home" registration, to find every key it's mounted
+      under.
+    - The schema-level `AlterField` migration (from `makemigrations`,
+      reflecting the new `block_lookup`) is pure bookkeeping — StreamField
+      is one opaque column regardless of block shape, so it does not
+      actually alter anything at the DB level and can safely depend on the
+      data migration without a real schema race.
+
+47. **`SignupActionKitBlock` and `HeroSignupActionKitBlock` are two block
+    classes sharing one mixin, not one block used two ways.** The hero's
+    inline CTA strip (`HeroCTABlock`'s `signup` choice,
+    `signup_actionkit_hero_block.html`) has no `content` (heading/copy)
+    field — the strip is a single-line row sitting directly in the hero's
+    own dark overlay, with no room for a heading above it, and in practice
+    every existing hero CTA signup panel already left it blank. The
+    standalone panel (`SignupActionKitBlock`, `signup_actionkit_block.html`)
+    keeps `content`. Both classes inherit `SignupActionKitFormMixin` for the
+    actually-shared logic — `_fetch_form_html()`/caching, `get_context()`,
+    `PANEL_TONES`, `PREVIEW_FORM_HTML` — a plain mixin with no fields, so
+    Wagtail's `DeclarativeSubBlocksMetaclass` never picks it up as a source
+    of child blocks.
+    - This is deliberately NOT "subclass adds a field" (`Hero... = Base`,
+      `Signup... = Hero... + content`): Wagtail's declarative block metaclass
+      sorts a struct's fields by creation-order *across the whole module*,
+      not by MRO position, so a field added only in a subclass sorts to the
+      end of that subclass's admin form — which would have silently moved
+      `content` from its current position (second, right after `eyebrow`) to
+      last on the widely-used standalone panel. Both concrete classes
+      instead redeclare every field they need, in the order they need it;
+      only non-field logic lives on the mixin.
+    - Before assuming a shared-class field is "the same field everywhere",
+      grep the field's own name and every `StreamBlock` that mounts the
+      class (same check as pitfall #46's `HeroCTABlock`/`"signup"` alias
+      gotcha) — a field can look load-bearing in one context and be
+      completely inert (never read by that context's template) in another.
+      `eyebrow`, `background`, `layout` and `image` are all still on
+      `HeroSignupActionKitBlock` despite none of them being rendered by
+      `signup_actionkit_hero_block.html` today — only `content` was asked to
+      go, and dropping a field nobody requested (even one that looks equally
+      dead) is a scope call for whoever's asking, not an inference to make
+      unilaterally from "this also looks unused."
+
+48. **A `ListBlock`'s raw StreamField JSON wraps each item — it is not a bare
+    list of the child block's own values.** Every earlier heading/text
+    condensation migration (0045/0047/0049) only ever touched `StreamBlock`
+    entries, whose shape is `{"type": "<name>", "value": {...}}`. `CardBlock`
+    and `ImageCardListItemBlock` also live inside a `ListBlock` — `cards` on
+    `CardGridBlock`/`CardCarouselBlock`/`ImageCardListBlock` — and a
+    `ListBlock`'s items turned out to carry their *own* wrapper,
+    `{"id": "<uuid>", "type": "item", "value": {...the actual card
+    fields...}}`, not the bare field dict a StreamBlock-shaped migration
+    would expect. `0051_condense_card_heading_description.py`'s first
+    version checked for `"heading" in card_value` directly on that outer
+    wrapper — found nothing, changed nothing, and reported no error either,
+    because the idempotency guard (`"heading" in value`) that makes every
+    one of these migrations safe to re-run is the exact same shape as
+    "field not found, nothing to do here." Both look identical from the
+    outside: a `migrate` with no errors and a green test suite (the
+    in-memory Python tests never touch a `ListBlock`'s serialized JSON
+    shape at all).
+    - Caught only by actually reading a real migrated row's raw JSON
+      afterward and checking it against a plain-language description of
+      what should be there — "does this card have a `content` key with
+      both the heading and the body in it", not "did the migration
+      command exit zero." The fix was one line: unwrap `card_item["value"]`
+      before checking for `"heading"`, once per list item.
+    - The general lesson repeats pitfall #46's: a data migration's
+      correctness is a claim about the *shape of the actual stored JSON*,
+      which differs by exactly how a block is nested (top-level StreamBlock
+      entry vs. `StructBlock` field vs. `ListBlock` item), not by what
+      class the block is written as. Before trusting a migration that walks
+      nested StreamField JSON, print a real affected row's structure first
+      and match the walker's assumptions to it — don't infer the shape from
+      how a *different* nesting pattern already handled elsewhere happened
+      to look.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive branch names: `feature/signup-block`,

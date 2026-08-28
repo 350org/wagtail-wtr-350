@@ -1,0 +1,11 @@
+{% load wagtailcore_tags %}
+{% comment %}
+One step up from ordinary body copy (text-lg sm:text-xl) at every
+breakpoint, reaching 28px (--text-28, an existing scale step — AGENTS.md
+pitfall #34) on desktop rather than stopping at CalloutBlock's 24px cap.
+in-data-[bg-tone=dark]:prose-invert follows the same SectionBlock
+data-bg-tone contract as text_block.html.
+{% endcomment %}
+<div class="wtr-lead-text prose prose-neutral max-w-none text-xl leading-[1.35] sm:text-2xl lg:text-28 in-data-[bg-tone=dark]:prose-invert">
+    {{ value|richtext }}
+</div>

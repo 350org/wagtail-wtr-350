@@ -1,10 +1,11 @@
-{% load i18n wagtailimages_tags %}
+{% load i18n wagtailimages_tags wagtailcore_tags %}
 {% comment %}
 Centered heading above a two-column split — image left, vertical stack of
-simple text cards right (ImageCardListItemBlock: heading + description
-only, plain bordered boxes, no icon/link/image of their own). Single
-column on mobile (image, then cards, in that DOM order — grid-cols-1
-below md:, where the sticky behavior below is also disabled).
+simple text cards right (ImageCardListItemBlock: one richtext `content`
+field, heading typed as an H3 — see its docstring — plain bordered boxes,
+no icon/link/image of their own). Single column on mobile (image, then
+cards, in that DOM order — grid-cols-1 below md:, where the sticky
+behavior below is also disabled).
 
 Sticky image: per Figma (this section's image frame is itself
 `sticky top-0`), the image pins to the top of the viewport while the
@@ -29,7 +30,13 @@ page templates' space-y-32 on the block loop.
 {% endcomment %}
 <div class="wtr-image-card-list w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-7xl">
-        <h2 class="font-heading text-center text-3xl tracking-tight text-dark sm:text-4xl lg:text-5xl">
+        {% comment %}
+        in-data-[bg-tone=dark]: on this heading only — the per-card h3 below
+        keeps text-dark unconditionally, since each card has its own
+        always-light bg-neutral-50 fill (AGENTS.md pitfall #44), same as
+        accordion items.
+        {% endcomment %}
+        <h2 class="font-heading text-center text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl">
             {{ value.heading }}
         </h2>
         <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch md:gap-8">
@@ -43,8 +50,15 @@ page templates' space-y-32 on the block loop.
             <div class="flex flex-col gap-4">
                 {% for card in value.cards %}
                     <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-6">
-                        <h3 class="font-heading text-28 font-bold text-dark">{{ card.heading }}</h3>
-                        <p class="mt-2 text-sm text-neutral-700 sm:text-base">{{ card.description }}</p>
+                        {% comment %}
+                        No scoped CSS needed for the H3: the unscoped
+                        .prose h3 rule (AGENTS.md pitfall #34) already pins
+                        it to the same flat 28px/bold step this used to set
+                        directly.
+                        {% endcomment %}
+                        <div class="prose prose-neutral max-w-none text-sm text-neutral-700 sm:text-base">
+                            {{ card.content|richtext }}
+                        </div>
                     </div>
                 {% endfor %}
             </div>

@@ -1,184 +1,150 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 {% comment %}
-    This block's own `compact` (below) is only ever True when rendered as a
-    HeroBlock.cta choice (see components/hero.html) — it picks the slim
-    inline CTA wrapper (no image, no card, light-on-dark text sitting
-    directly in the hero's own dark overlay) over the standalone image +
-    color split panel card.
+SignupActionKitBlock — the standalone image + color split panel card. See
+signup_actionkit_hero_block.html for HeroSignupActionKitBlock's slim inline
+CTA strip (HeroCTABlock's "signup" choice) — a separate block class since it
+has no heading/copy field, sharing SignupActionKitFormMixin for the rest of
+its logic.
 
-    The two branches pass different layout flags on to _actionkit_form.html:
+Full-bleed width, matching donate_fundraiseup_block.html's w-full-outer /
+max-w-inner two-tier pattern — signup_actionkit is special-cased in
+content_page.html/home_page.html to skip the shared max-w-5xl wrapper,
+so this owns its own width instead. max-w-[1426px] is Figma's petition
+panel width (node 1:1239); its 800px copy column + 128px gutter + 370px
+form column sit inside that with the panel's own 64px padding. No
+vertical padding on the w-full-outer wrapper — the 128px gap between
+body blocks comes from the page templates' space-y-32 on the block loop.
 
-      - compact=True (hero CTA)     → inline=True: one wrapping row of pill
-                                      inputs with the submit button on the
-                                      same line, since the hero CTA is a
-                                      full-width strip with no room to stack.
-      - the standalone panel below  → stacked=True: a 370px column of
-                                      full-width fields, per Figma's Signup
-                                      component (node 1:1245). It used to
-                                      pass inline=True here too, which left
-                                      four fields squeezed onto one row
-                                      across the whole panel width instead
-                                      of the narrow stack the design draws.
+background draws from the shared palette — BACKGROUND_COLOR_CHOICES
+and main.css's .wtr-bg-{color} classes, the same six fills the section,
+callout, feature panel and hero banner offer. Three things branch off
+it. There is no single element whose class can flip all of them, so
+each is written out separately, the same way callout_block.html and
+feature_panel_block.html do it — but the colour question itself is
+asked once and held in `on_light`/`bg`:
 
-    See main.css's .wtr-actionkit-embed-inline / -stacked rules.
+  - the panel text and prose invert on the palette's light fills
+    (white and light grey), which need dark text;
+  - the eyebrow pill inverts on dark grey specifically — not on every
+    dark fill — since that is the one the pill's own --color-dark
+    background would otherwise vanish into;
+  - the fetched ActionKit form's chrome reacts via a .wtr-ak-{tone}
+    modifier class, computed in SignupActionKitFormMixin.PANEL_TONES and
+    applied by _actionkit_form.html.
+
+`value.layout` picks between two compositions of the same content —
+"columns" (default, Figma's petition panel, node 1:1239) and
+"vertical" (image/copy/form stacked in one narrow column, for long
+forms with many fields and little copy). Both pass stacked=True into
+_actionkit_form.html — that flag is the form's own field-layout CSS
+(one field per line), an axis unrelated to this outer composition
+choice, and is correct in both layouts.
 {% endcomment %}
-{% if compact %}
-    {% comment %}flex gap-4 rather than mt-* on each child: with no heading and
-       no description (the hero's usual case) there is then nothing between the
-       hero's own 20px gap and the form — see _actionkit_form.html.{% endcomment %}
-    <div class="wtr-signup wtr-signup-actionkit wtr-signup-inline flex flex-col gap-4" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
-        {% if value.heading %}
-            <h2 class="font-heading text-xl text-light">{{ value.heading }}</h2>
-        {% endif %}
-        {% if value.description %}
-            <div class="prose prose-invert prose-sm max-w-none">
-                {{ value.description|richtext }}
-            </div>
-        {% endif %}
-        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with inline=True %}
-    </div>
-{% else %}
-    {% comment %}
-    Full-bleed width, matching donate_fundraiseup_block.html's w-full-outer /
-    max-w-inner two-tier pattern — signup_actionkit is special-cased in
-    content_page.html/home_page.html to skip the shared max-w-5xl wrapper,
-    so this owns its own width instead. max-w-[1426px] is Figma's petition
-    panel width (node 1:1239); its 800px copy column + 128px gutter + 370px
-    form column sit inside that with the panel's own 64px padding. No
-    vertical padding on the w-full-outer wrapper — the 128px gap between
-    body blocks comes from the page templates' space-y-32 on the block loop.
-
-    background draws from the shared palette — BACKGROUND_COLOR_CHOICES
-    and main.css's .wtr-bg-{color} classes, the same six fills the section,
-    callout, feature panel and hero banner offer. Three things branch off
-    it. There is no single element whose class can flip all of them, so
-    each is written out separately, the same way callout_block.html and
-    feature_panel_block.html do it — but the colour question itself is
-    asked once and held in `on_light`/`bg`:
-
-      - the panel text and prose invert on the palette's light fills
-        (white and light grey), which need dark text;
-      - the eyebrow pill inverts on dark grey specifically — not on every
-        dark fill — since that is the one the pill's own --color-dark
-        background would otherwise vanish into;
-      - the fetched ActionKit form's chrome reacts via a .wtr-ak-{tone}
-        modifier class, computed in SignupActionKitBlock.PANEL_TONES and
-        applied by _actionkit_form.html.
-
-    `value.layout` picks between two compositions of the same content —
-    "columns" (default, Figma's petition panel, node 1:1239) and
-    "vertical" (image/copy/form stacked in one narrow column, for long
-    forms with many fields and little copy). Both pass stacked=True into
-    _actionkit_form.html — that flag is the form's own field-layout CSS
-    (one field per line), an axis unrelated to this outer composition
-    choice, and is correct in both layouts.
-    {% endcomment %}
-    {% with bg=value.background|background_key on_light=value.background|background_is_light %}
-    <div class="w-full px-4 sm:px-6 lg:px-8">
-        <div class="wtr-signup wtr-signup-actionkit wtr-bg-{{ bg }} mx-auto overflow-hidden rounded-lg
-                    {% if value.layout == 'vertical' %}max-w-[800px]{% else %}max-w-[1426px]{% endif %}"
-             {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
-            {% if value.layout == 'vertical' %}
-                {% if value.image %}
-                    <div class="relative">
-                        {% image value.image fill-1200x600 as img %}
-                        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
-                             class="h-48 w-full object-cover sm:h-56" loading="lazy">
-                        {% if value.image_caption %}
-                            <div class="absolute inset-x-0 bottom-4 flex justify-center px-4">
-                                <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ value.image_caption }}</p>
-                            </div>
-                        {% endif %}
+{% with bg=value.background|background_key on_light=value.background|background_is_light %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="wtr-signup wtr-signup-actionkit wtr-bg-{{ bg }} mx-auto overflow-hidden rounded-lg
+                {% if value.layout == 'vertical' %}max-w-[800px]{% else %}max-w-[1426px]{% endif %}"
+         {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+        {% if value.layout == 'vertical' %}
+            {% if value.image %}
+                <div class="relative">
+                    {% image value.image fill-1200x600 as img %}
+                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
+                         class="h-48 w-full object-cover sm:h-56" loading="lazy">
+                    {% if value.image_caption %}
+                        <div class="absolute inset-x-0 bottom-4 flex justify-center px-4">
+                            <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ value.image_caption }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+            <div class="flex flex-col gap-8 p-6 sm:p-10
+                        {% if on_light %}text-dark{% else %}text-light{% endif %}">
+                {% if value.eyebrow %}
+                    <p class="wtr-signup-eyebrow font-heading inline-block self-start rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
+                              {% if bg == 'dark-grey' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
+                        {{ value.eyebrow }}
+                    </p>
+                {% endif %}
+                {% comment %}
+                Heading size pinned via .wtr-signup-actionkit-content in
+                main.css, same technique .wtr-text-block uses.
+                {% endcomment %}
+                {% if value.content %}
+                    <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
+                                {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                        {{ value.content|richtext }}
                     </div>
                 {% endif %}
-                <div class="flex flex-col gap-8 p-6 sm:p-10
+                <div class="w-full">
+                    {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with stacked=True %}
+                </div>
+            </div>
+        {% else %}
+            {% if value.image %}
+                <div class="relative">
+                    {% image value.image fill-1600x500 as img %}
+                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
+                         class="h-64 w-full object-cover sm:h-80" loading="lazy">
+                    {% if value.image_caption %}
+                        <div class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
+                            <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ value.image_caption }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% comment %}
+            The two columns are centred against each other (lg:items-center)
+            and sized to Figma exactly — 800px of copy, a 128px gutter, a
+            370px form that never grows or shrinks.
+
+            items-center, not items-stretch: the alignment must not make the
+            form grow to the copy column's height. That is the distinction
+            this row has always turned on — a plain 2-col grid split them
+            50/50 and stretched the form to ~460px, which is what the flex
+            row replaced. Any of start/center/end keeps the form at its
+            natural height; only stretch breaks it. This was lg:items-end
+            (both pinned to the panel floor) and then briefly lg:items-start.
+            {% endcomment %}
+            <div class="flex flex-col gap-10 p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-center lg:gap-32 lg:p-16">
+                <div class="flex flex-col items-start gap-8 lg:max-w-[800px] lg:flex-1
                             {% if on_light %}text-dark{% else %}text-light{% endif %}">
                     {% if value.eyebrow %}
-                        <p class="wtr-signup-eyebrow font-heading inline-block self-start rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
+                        {% comment %}
+                        Same dark pill as feature_panel_block.html's eyebrow, at Figma's
+                        24px — except on the dark grey panel, where that pill is the same
+                        --color-dark as the panel behind it and would read as invisible
+                        text; there it flips to light-on-dark, exactly as
+                        feature_panel_block.html's pill does on its own dark background.
+                        {% endcomment %}
+                        <p class="wtr-signup-eyebrow font-heading inline-block rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
                                   {% if bg == 'dark-grey' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
                             {{ value.eyebrow }}
                         </p>
                     {% endif %}
-                    {% if value.heading %}
-                        <h2 class="font-heading text-2xl leading-[1.2] tracking-tight sm:text-3xl lg:text-40">{{ value.heading }}</h2>
-                    {% endif %}
-                    {% if value.description %}
-                        <div class="prose max-w-none text-lg leading-[1.2] sm:text-xl
+                    {% comment %}
+                    [--tw-prose-invert-body:var(--color-light)] overrides Typography's
+                    default prose-invert body color (a muted ~87%-lightness gray) to
+                    pure white — same fix callout_block.html applies, for the same
+                    reason. Figma draws this copy at 24px, but it renders at the
+                    site's 20px body size instead — see AGENTS.md pitfall #34,
+                    which took the whole non-hero ramp down a notch against a
+                    20px paragraph. Heading size pinned via
+                    .wtr-signup-actionkit-content in main.css, same technique
+                    .wtr-text-block uses.
+                    {% endcomment %}
+                    {% if value.content %}
+                        <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
                                     {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
-                            {{ value.description|richtext }}
+                            {{ value.content|richtext }}
                         </div>
                     {% endif %}
-                    <div class="w-full">
-                        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with stacked=True %}
-                    </div>
                 </div>
-            {% else %}
-                {% if value.image %}
-                    <div class="relative">
-                        {% image value.image fill-1600x500 as img %}
-                        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
-                             class="h-64 w-full object-cover sm:h-80" loading="lazy">
-                        {% if value.image_caption %}
-                            <div class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
-                                <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ value.image_caption }}</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                {% endif %}
-                {% comment %}
-                The two columns are centred against each other (lg:items-center)
-                and sized to Figma exactly — 800px of copy, a 128px gutter, a
-                370px form that never grows or shrinks.
-
-                items-center, not items-stretch: the alignment must not make the
-                form grow to the copy column's height. That is the distinction
-                this row has always turned on — a plain 2-col grid split them
-                50/50 and stretched the form to ~460px, which is what the flex
-                row replaced. Any of start/center/end keeps the form at its
-                natural height; only stretch breaks it. This was lg:items-end
-                (both pinned to the panel floor) and then briefly lg:items-start.
-                {% endcomment %}
-                <div class="flex flex-col gap-10 p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-center lg:gap-32 lg:p-16">
-                    <div class="flex flex-col items-start gap-8 lg:max-w-[800px] lg:flex-1
-                                {% if on_light %}text-dark{% else %}text-light{% endif %}">
-                        {% if value.eyebrow %}
-                            {% comment %}
-                            Same dark pill as feature_panel_block.html's eyebrow, at Figma's
-                            24px — except on the dark grey panel, where that pill is the same
-                            --color-dark as the panel behind it and would read as invisible
-                            text; there it flips to light-on-dark, exactly as
-                            feature_panel_block.html's pill does on its own dark background.
-                            {% endcomment %}
-                            <p class="wtr-signup-eyebrow font-heading inline-block rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
-                                      {% if bg == 'dark-grey' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
-                                {{ value.eyebrow }}
-                            </p>
-                        {% endif %}
-                        {% if value.heading %}
-                            <h2 class="font-heading text-2xl leading-[1.2] tracking-tight sm:text-3xl lg:text-40">{{ value.heading }}</h2>
-                        {% endif %}
-                        {% if value.description %}
-                            {% comment %}
-                            [--tw-prose-invert-body:var(--color-light)] overrides Typography's
-                            default prose-invert body color (a muted ~87%-lightness gray) to
-                            pure white — same fix callout_block.html applies, for the same
-                            reason. Figma draws this copy at 24px, but it renders at the
-                            site's 20px body size instead — see AGENTS.md pitfall #34,
-                            which took the whole non-hero ramp down a notch against a
-                            20px paragraph.
-                            {% endcomment %}
-                            <div class="prose max-w-none text-lg leading-[1.2] sm:text-xl
-                                        {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
-                                {{ value.description|richtext }}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="w-full lg:w-[370px] lg:shrink-0">
-                        {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with stacked=True %}
-                    </div>
+                <div class="w-full lg:w-[370px] lg:shrink-0">
+                    {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with stacked=True %}
                 </div>
-            {% endif %}
-        </div>
+            </div>
+        {% endif %}
     </div>
-    {% endwith %}
-{% endif %}
+</div>
+{% endwith %}
