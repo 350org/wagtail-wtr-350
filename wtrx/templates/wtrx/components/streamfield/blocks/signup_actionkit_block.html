@@ -72,7 +72,7 @@ choice, and is correct in both layouts.
                 {% endcomment %}
                 {% if value.content %}
                     <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
-                                {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                                {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
                         {{ value.content|richtext }}
                     </div>
                 {% endif %}
@@ -123,19 +123,18 @@ choice, and is correct in both layouts.
                         </p>
                     {% endif %}
                     {% comment %}
-                    [--tw-prose-invert-body:var(--color-light)] overrides Typography's
-                    default prose-invert body color (a muted ~87%-lightness gray) to
-                    pure white — same fix callout_block.html applies, for the same
-                    reason. Figma draws this copy at 24px, but it renders at the
-                    site's 20px body size instead — see AGENTS.md pitfall #34,
-                    which took the whole non-hero ramp down a notch against a
-                    20px paragraph. Heading size pinned via
-                    .wtr-signup-actionkit-content in main.css, same technique
-                    .wtr-text-block uses.
+                    prose-invert's body color is pinned to pure white
+                    centrally, in main.css — see the .prose-invert rule
+                    there. Figma draws this copy at 24px, but it renders at
+                    the site's 20px body size instead — see AGENTS.md
+                    pitfall #34, which took the whole non-hero ramp down a
+                    notch against a 20px paragraph. Heading size pinned via
+                    .wtr-signup-actionkit-content in main.css, same
+                    technique .wtr-text-block uses.
                     {% endcomment %}
                     {% if value.content %}
                         <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
-                                    {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                                    {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
                             {{ value.content|richtext }}
                         </div>
                     {% endif %}

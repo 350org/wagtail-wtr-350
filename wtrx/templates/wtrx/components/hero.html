@@ -154,9 +154,9 @@
                     {% endif %}
                     {% if hero.copy %}
                         {% comment %}
-                        [--tw-prose-invert-body:var(--color-light)] overrides Typography's default
-                        prose-invert body color (a muted ~87%-lightness gray) to pure white — same
-                        fix as callout_block.html's paragraph text.
+                        prose-invert's body color is pinned to pure white
+                        centrally, in main.css — see the .prose-invert rule
+                        there.
 
                         28px/1.25. leading-[1.25] sits on this container rather
                         than on the paragraphs because Typography sets its 1.75
@@ -166,7 +166,7 @@
                         image_text_block.html uses.
                         {% endcomment %}
                         <div class="wtr-hero-copy prose max-w-none text-lg leading-[1.25] sm:text-xl lg:text-28
-                                    {% if on_light %}prose-neutral{% else %}prose-invert [--tw-prose-invert-body:var(--color-light)]{% endif %}">
+                                    {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
                             {% if hero.copy_is_block %}
                                 {% include_block hero.copy %}
                             {% else %}
