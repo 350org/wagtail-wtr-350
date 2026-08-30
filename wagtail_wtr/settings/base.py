@@ -243,6 +243,23 @@ ACCOUNT_EMAIL_VERIFICATION = "none"  # Google has already verified the email
 # login template's button already is the deliberate click that starts SSO.
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
+# Without this pair, a user whose account a superuser pre-created in the
+# Wagtail Users admin (matching email, no SocialAccount yet) cannot complete
+# SSO at all: allauth sees the email is already taken by a local account and
+# refuses auto-signup rather than logging into it, bouncing the user to the
+# unstyled allauth "sign up" form, which then fails again on the same email
+# collision — an unrecoverable loop that ends with the user trying to type a
+# password into allauth's own login form for an account that (per
+# NoSignupAccountAdapter/wtrx/forms.py) has none. EMAIL_AUTHENTICATION treats
+# a Google-verified email match against an existing local account as a login
+# to that account instead of a signup conflict — safe here because Google is
+# the only configured provider and email verification is trustworthy.
+# AUTO_CONNECT persists that match as a real SocialAccount so later logins
+# take the fast lookup-by-provider-id path instead of re-matching by email
+# every time.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+
 WTRX_GOOGLE_SSO_DOMAIN = os.environ.get("WTRX_GOOGLE_SSO_DOMAIN", "")
 WTRX_GOOGLE_SSO_ONLY = os.environ.get("WTRX_GOOGLE_SSO_ONLY", "false").lower() in (
     "true",

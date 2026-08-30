@@ -4,7 +4,8 @@ Tests for allauth_adapter.py.
 
 from unittest.mock import MagicMock
 
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.contrib.auth.models import User
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from wtrx.allauth_adapter import DomainRestrictedSocialAccountAdapter, NoSignupAccountAdapter
@@ -117,3 +118,65 @@ class TestGetLoginRedirectUrl(SimpleTestCase):
         adapter, request = self._adapter_and_request(has_admin_access=True)
         adapter.get_login_redirect_url(request)
         request.user.has_perm.assert_called_once_with("wagtailadmin.access_admin")
+
+
+class TestPreCreatedAccountSsoLookup(TestCase):
+    """
+    Regression test for the "admin creates an account, then the user signs in
+    via Google" flow: a superuser adds a User in the Wagtail Users admin
+    (real email, no password, no SocialAccount) *before* that person ever
+    logs in via SSO. Without SOCIALACCOUNT_EMAIL_AUTHENTICATION, allauth
+    treats the incoming Google login as a brand-new signup, sees the email
+    is already taken by that pre-created account, refuses auto-signup, and
+    redirects to allauth's own unstyled "third-party signup" form — which
+    then fails again on the same email collision, an unrecoverable loop that
+    ends with the user trying to type a password into allauth's login form
+    for an account that has none.
+
+    This test exercises allauth's real SocialLogin.lookup() (not a mock) to
+    confirm the settings actually produce the intended behavior: the Google
+    login resolves to the existing local account instead of colliding with
+    it.
+    """
+
+    def _sociallogin_for(self, email):
+        from allauth.account.models import EmailAddress
+        from allauth.socialaccount.models import SocialAccount, SocialLogin
+
+        request = RequestFactory().get("/accounts/google/login/callback/")
+        incoming_user = User(email=email)
+        account = SocialAccount(provider="google", uid="1234567890")
+        email_address = EmailAddress(email=email, verified=True, primary=True)
+        return SocialLogin(
+            user=incoming_user,
+            account=account,
+            email_addresses=[email_address],
+            provider=account.get_provider(request),
+        )
+
+    @override_settings(
+        SOCIALACCOUNT_EMAIL_AUTHENTICATION=True,
+        SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT=True,
+    )
+    def test_sso_login_resolves_to_preexisting_account(self):
+        existing_user = User.objects.create(
+            username="funda.bergel@350.org", email="funda.bergel@350.org"
+        )
+
+        sociallogin = self._sociallogin_for("funda.bergel@350.org")
+        sociallogin.lookup()
+
+        self.assertTrue(sociallogin.is_existing)
+        self.assertEqual(sociallogin.user, existing_user)
+
+    @override_settings(SOCIALACCOUNT_EMAIL_AUTHENTICATION=False)
+    def test_without_email_authentication_sso_login_does_not_resolve(self):
+        """Pinned to document the bug this settings pair fixes: with the
+        setting off (allauth's own default), the exact same pre-created
+        account is invisible to the incoming Google login."""
+        User.objects.create(username="funda.bergel@350.org", email="funda.bergel@350.org")
+
+        sociallogin = self._sociallogin_for("funda.bergel@350.org")
+        sociallogin.lookup()
+
+        self.assertFalse(sociallogin.is_existing)
