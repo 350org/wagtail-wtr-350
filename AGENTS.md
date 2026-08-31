@@ -884,6 +884,12 @@ Two practical notes for agents:
     logo beside it; that is a literal height rather than `self-stretch`,
     because the lockup anchor is `items-center` and a stretched child would
     size to whatever the tallest thing in the lockup happens to be.
+    `h-10` stays fixed at every breakpoint (it's tied to the logo's own
+    height, not to available width), but `text-sm sm:text-base` and
+    matching smaller `px-2 sm:px-3`/`tracking-normal sm:tracking-[1px]`
+    shrink the badge below `sm:` — a long label like `INDONESIA` at the
+    full desktop size pushed the mobile header row (logo + badge + CTA +
+    hamburger, all in one line) past the viewport width and wrapped.
 
 28. **Nav interaction states — navy hover, blue active underline**: Both come
     from Figma's nav (node 1:965) and are applied in
@@ -1851,6 +1857,95 @@ Two practical notes for agents:
       and match the walker's assumptions to it — don't infer the shape from
       how a *different* nesting pattern already handled elsewhere happened
       to look.
+
+49. **The standard mobile nav panel is a fixed full-screen overlay, not an
+    in-flow strip — the collapsed-desktop dropdown (pitfall #18) is not,
+    and the two must not be confused.** `header.html`'s "Standard
+    mobile-only panel" (`{% if not nav.collapse_desktop_menu %}` block) is
+    `fixed inset-x-0 top-[65px] bottom-0` with its own `overflow-y-auto`.
+    `top-[65px]` (the header's own `pt-6` = 24px plus its ~41px logo/CTA
+    row, deliberately **not** the header's full ~89px box height including
+    its own `pb-6` bottom padding — see the math below) is a **no-JS
+    fallback only**. The real position is set at runtime: `mobile-menu.js`
+    measures `[data-mobile-menu-header-row]`'s (the header's inner
+    `flex items-center justify-between` row)
+    `getBoundingClientRect().bottom` every time the overlay opens and
+    writes it as an inline `style.top`, because the header's true rendered
+    height drifts with content — a long regional label, font-load timing,
+    text wrapping at an odd width — and any hardcoded pixel guess will
+    eventually overlap the CTA/hamburger or leave a gap. Don't remove that
+    JS measurement to "simplify" back to a pure-CSS `top-[Npx]`; it was
+    added after exactly that drift caused a visible overlap.
+    - **Why 65, not 89**: the overlay starts right where the visible row
+      ends, before the header's own bottom padding, because the overlay's
+      own `bg-light`/`bg-dark` matches the header's — overlapping the
+      header's last 24px of padding is invisible (same color), and it's
+      what makes the overlay's own `p-4` the *only* source of the gap
+      between the visible row and the inset card inside it (see below),
+      matching the `p-4` gap on the other three sides. Starting at the
+      full ~89px instead double-stacks the header's own 24px bottom
+      padding underneath the overlay's 16px top padding — a 40px top gap
+      against 16px on the sides, which is a bug, not a design choice.
+    The toggle button (already showing the close/X icon while open, via
+    the existing icon-swap) and the CTA both live in the header *above*
+    this overlay, not inside it, so there is no separate close button or
+    duplicate CTA in the overlay markup — moving either into the header
+    would silently break that assumption.
+    - **The overlay's inner content wrapper has no chrome of its own** —
+      no background fill, no border, no rounded corners. The outer
+      `#mobile-menu` is the per-variant background with a `p-4` inset gap;
+      the inner div is a flat flex/padding wrapper only. This has gone
+      back and forth once already (an intermediate version made it a
+      bordered, rounded, light-gray card) — the current, deliberate state
+      is flat. The only line separating the header from this content is
+      the header's own `has-[...]:border-b` (below), not any border on
+      the overlay/wrapper itself.
+    - The **collapsed-desktop dropdown** (rendered when
+      `collapse_desktop_menu` is True, used at every breakpoint including
+      desktop) intentionally stayed a compact `absolute` anchored panel —
+      it was not converted to a full-screen takeover, since that would be
+      wrong on a wide viewport. It only picked up the same fade/slide
+      transition classes as the mobile overlay (see below), nothing else.
+    - **Submenus in the mobile overlay ARE tap-to-expand accordions**,
+      reusing `accordion.js`'s `data-accordion` / `data-accordion-toggle` /
+      `data-accordion-content` pattern — the same instant
+      `hidden`-class-toggle plus `rotate-180` chevron idiom
+      `accordion_block.html` already uses, not a new mechanism. One
+      `data-accordion` container wraps the whole nav list; each submenu's
+      `<button>`+content pair sits inside its own wrapping `<div>` so
+      `accordion.js`'s `toggle.parentElement.querySelector(...)` lookup
+      finds the right content without cross-contamination between sibling
+      submenus. This too has flip-flopped once (a flat always-expanded
+      list, no accordion, was tried in between) — treat this file's
+      current markup as the source of truth over this paragraph's history
+      if they ever disagree.
+    - **Sub-items are deliberately flush-left with no extra indent**,
+      matching every other item in the panel — this was an explicit
+      design call (not an oversight), so don't reintroduce a `pl-*`/`pr-*`
+      indent there.
+    - `mobile-menu.js` now animates the panel open/close (fade + slight
+      slide, via `opacity-0 -translate-y-2 transition duration-200
+      ease-out` base classes on the panel) instead of an instant
+      `hidden`-class toggle, and this is shared by *both* panel variants
+      since they go through the same `open()`/`close()` functions.
+      `display:none` (`hidden`) has no intermediate state to transition
+      through, so `open()` removes `hidden` first, forces a reflow
+      (`void menu.offsetHeight`) so the browser actually registers the
+      opacity-0/-translate-y-2 starting point, then removes those classes;
+      `close()` re-adds them immediately (animating out) but only re-adds
+      `hidden` after a `TRANSITION_MS` (200ms) `setTimeout`, guarded so a
+      reopen during that window doesn't get hidden out from under it. Any
+      new panel using this same toggle mechanism needs those same three
+      base classes or it simply won't animate (no error — it'll just snap
+      open/closed like before).
+    - `body.wtr-scroll-locked` (`main.css`) still uses plain
+      `overflow: hidden` rather than the position:fixed
+      scroll-position-freeze trick, even for the now-full-screen mobile
+      overlay — chosen to keep the collapsed-desktop dropdown's behavior
+      (preserving the page's exact scroll offset across open/close) intact
+      for both variants from one shared rule, at the cost of some iOS
+      rubber-banding bleed-through at the very top/bottom of the page
+      while the mobile overlay is open.
 
 ## Git Conventions
 
