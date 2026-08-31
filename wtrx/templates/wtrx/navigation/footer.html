@@ -25,7 +25,7 @@
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
                                aria-label="{{ item.value.platform|social_platform_label }}"
-                               class="text-neutral-400 hover:text-light transition-colors">
+                               class="text-light hover:text-primary-400 transition-colors">
                                 {% social_icon item.value.platform %}
                             </a>
                         {% endfor %}
@@ -68,7 +68,7 @@
                     {% endif %}
                 </a>
                 {% include "wtrx/components/regional_site_switcher.html" %}
-                <p class="text-sm text-neutral-400">
+                <p class="text-sm text-light">
                     {% if footer.copyright_text %}
                         {{ footer.copyright_text }}
                     {% else %}
@@ -160,18 +160,18 @@
                                         <li>
                                             {% if link.block_type == "internal" and link.value.page %}
                                                 <a href="{% pageurl link.value.page %}"
-                                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                                                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                                                     {{ link.value.text }}
                                                 </a>
                                             {% elif link.block_type == "external" %}
                                                 <a href="{{ link.value.url }}"
                                                    rel="noopener noreferrer"
-                                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                                                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                                                     {{ link.value.text }}
                                                 </a>
                                             {% elif link.block_type == "anchor" %}
                                                 <a href="#{{ link.value.anchor }}"
-                                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                                                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                                                     {{ link.value.text }}
                                                 </a>
                                             {% endif %}
@@ -246,7 +246,7 @@
                                 <a href="{{ item.value.url }}"
                                    rel="noopener noreferrer"
                                    aria-label="{{ item.value.platform|social_platform_label }}"
-                                   class="text-neutral-400 hover:text-light transition-colors">
+                                   class="text-light hover:text-primary-400 transition-colors">
                                     {% social_icon item.value.platform %}
                                 </a>
                             {% endfor %}
@@ -259,7 +259,7 @@
                 </div>
 
                 {% comment %}Copyright{% endcomment %}
-                <p class="text-sm text-neutral-400">
+                <p class="text-sm text-light">
                     {% if footer.copyright_text %}
                         {{ footer.copyright_text }}
                     {% else %}

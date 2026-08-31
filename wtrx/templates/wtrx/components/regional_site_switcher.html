@@ -94,9 +94,12 @@ Expects `regional_sites` (a StreamField of RegionalSiteLinkBlock) in context.
                     Entries with a description (e.g. 350 Action, 350 Global)
                     — their own 2-column row, giving each card more width
                     for the region name + subheading than the dense grid
-                    above allows.
+                    above allows. mt-12 (vs. the plain grid's own gap-4
+                    between rows) is deliberately triple that gap, so this
+                    row reads as visually separate from the regional sites
+                    above it rather than just another row of the same list.
                     {% endcomment %}
-                    <div class="wtr-regional-sites-featured mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="wtr-regional-sites-featured mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {% for item in regional_sites %}
                             {% if item.value.description %}
                                 <a href="{{ item.value.url }}"

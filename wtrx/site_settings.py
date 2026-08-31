@@ -329,6 +329,7 @@ SOCIAL_PLATFORM_CHOICES = [
     ("threads", "Threads"),
     ("bluesky", "Bluesky"),
     ("mastodon", "Mastodon"),
+    ("whatsapp", "WhatsApp"),
 ]
 
 
