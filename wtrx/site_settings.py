@@ -356,6 +356,18 @@ class RegionalSiteLinkBlock(StructBlock):
     """
 
     text = CharBlock(label=_("Region name"), help_text=_('e.g. "Canada".'))
+    description = CharBlock(
+        required=False,
+        max_length=255,
+        label=_("Description"),
+        help_text=_(
+            "Optional. Shown as a subheading below the region name — for a "
+            "linked site that isn't a regional site itself and needs a "
+            "line of context (e.g. \"350 Action\", \"350 Global\"). Entries "
+            "with a description render in their own two-column row below "
+            "the plain region links, since the extra text needs more room."
+        ),
+    )
     url = URLBlock(label=_("URL"), help_text=_("Link to that region's site."))
 
     class Meta:

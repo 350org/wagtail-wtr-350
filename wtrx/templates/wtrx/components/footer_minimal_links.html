@@ -1,0 +1,33 @@
+{% load i18n wagtailcore_tags %}
+{% comment %}
+Pipe-separated inline link list (e.g. "Privacy Policy | Terms of Service").
+Shared by both footer layouts — the minimal layout's top row and the columns
+layout's bottom bar. Expects `links` (a minimal_links StreamValue).
+forloop.first skips the separator before the first link.
+{% endcomment %}
+{% if links %}
+    <nav class="flex items-center flex-wrap gap-x-3 gap-y-2" aria-label="{% trans 'Footer links' %}">
+        {% for item in links %}
+            {% if not forloop.first %}
+                <span class="text-neutral-600" aria-hidden="true">|</span>
+            {% endif %}
+            {% if item.block_type == "internal" and item.value.page %}
+                <a href="{% pageurl item.value.page %}"
+                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                    {{ item.value.text }}
+                </a>
+            {% elif item.block_type == "external" %}
+                <a href="{{ item.value.url }}"
+                   rel="noopener noreferrer"
+                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                    {{ item.value.text }}
+                </a>
+            {% elif item.block_type == "anchor" %}
+                <a href="#{{ item.value.anchor }}"
+                   class="text-sm text-neutral-400 hover:text-light transition-colors">
+                    {{ item.value.text }}
+                </a>
+            {% endif %}
+        {% endfor %}
+    </nav>
+{% endif %}

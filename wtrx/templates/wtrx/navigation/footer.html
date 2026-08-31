@@ -8,55 +8,17 @@
     {% comment %}
     =========================================================================
     Minimal footer layout:
-    Single row — [logo + copyright]  [social icons if enabled]  [inline links]
-    Stacks vertically on mobile.
+    Two rows — [social icons]  [inline links, pipe-separated] on top,
+    [logo + copyright] below. Each row stacks vertically on mobile.
     =========================================================================
     {% endcomment %}
     <footer class="wtr-footer bg-dark text-neutral-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 flex-wrap">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
 
-                {% comment %}
-                Left: logo lockup + copyright. The lockup anchor always
-                renders (text fallback when no logo is configured, same
-                pattern as header.html) so the root_page link and regional
-                badge work regardless of whether a logo is set.
-                {% endcomment %}
-                <div class="flex items-center gap-4">
-                    <a href="{% if footer.root_page %}{% pageurl footer.root_page %}{% else %}/{% endif %}" class="shrink-0 flex items-center gap-2">
-                        {% if branding.dark_logo %}
-                            {% image branding.dark_logo max-120x48 as footer_logo %}
-                            <img src="{{ footer_logo.url }}"
-                                 width="{{ footer_logo.width }}"
-                                 height="{{ footer_logo.height }}"
-                                 alt="{{ footer_logo.image.description|default:current_site.site_name }}"
-                                 class="h-8 w-auto object-contain">
-                        {% elif branding.logo %}
-                            {% image branding.logo max-120x48 as footer_logo %}
-                            <img src="{{ footer_logo.url }}"
-                                 width="{{ footer_logo.width }}"
-                                 height="{{ footer_logo.height }}"
-                                 alt="{{ footer_logo.image.description|default:current_site.site_name }}"
-                                 class="h-8 w-auto object-contain">
-                        {% else %}
-                            <span class="font-heading font-bold text-lg text-light">{{ current_site.site_name }}</span>
-                        {% endif %}
-                        {% if footer.regional_label %}
-                            <span class="wtr-footer-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white">{{ footer.regional_label }}</span>
-                        {% endif %}
-                    </a>
-                    {% include "wtrx/components/regional_site_switcher.html" %}
-                    <p class="text-sm text-neutral-400">
-                        {% if footer.copyright_text %}
-                            {{ footer.copyright_text }}
-                        {% else %}
-                            {% now "Y" as current_year %}
-                            {% blocktrans with year=current_year name=current_site.site_name %}&copy; {{ year }} {{ name }}{% endblocktrans %}
-                        {% endif %}
-                    </p>
-                </div>
+            {% comment %}Top row: social icons (left) + inline links (right){% endcomment %}
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
 
-                {% comment %}Center: social icons (if enabled and present){% endcomment %}
+                {% comment %}Social icons (if enabled and present){% endcomment %}
                 {% if social.show_in_footer and social.social_links %}
                     <div class="wtr-social-links flex items-center gap-3">
                         {% for item in social.social_links %}
@@ -68,34 +30,54 @@
                             </a>
                         {% endfor %}
                     </div>
+                {% else %}
+                    <div></div>
                 {% endif %}
 
-                {% comment %}Right: inline link list{% endcomment %}
-                {% if footer.minimal_links %}
-                    <nav class="flex items-center flex-wrap gap-x-5 gap-y-2" aria-label="{% trans 'Footer navigation' %}">
-                        {% for item in footer.minimal_links %}
-                            {% if item.block_type == "internal" and item.value.page %}
-                                <a href="{% pageurl item.value.page %}"
-                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
-                                    {{ item.value.text }}
-                                </a>
-                            {% elif item.block_type == "external" %}
-                                <a href="{{ item.value.url }}"
-                                   rel="noopener noreferrer"
-                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
-                                    {{ item.value.text }}
-                                </a>
-                            {% elif item.block_type == "anchor" %}
-                                <a href="#{{ item.value.anchor }}"
-                                   class="text-sm text-neutral-400 hover:text-light transition-colors">
-                                    {{ item.value.text }}
-                                </a>
-                            {% endif %}
-                        {% endfor %}
-                    </nav>
-                {% endif %}
+                {% include "wtrx/components/footer_minimal_links.html" with links=footer.minimal_links %}
 
             </div>
+
+            {% comment %}
+            Bottom row: logo lockup + copyright. The lockup anchor always
+            renders (text fallback when no logo is configured, same pattern
+            as header.html) so the root_page link and regional badge work
+            regardless of whether a logo is set.
+            {% endcomment %}
+            <div class="flex flex-col sm:flex-row items-center sm:items-center gap-4">
+                <a href="{% if footer.root_page %}{% pageurl footer.root_page %}{% else %}/{% endif %}" class="shrink-0 flex items-center gap-2">
+                    {% if branding.dark_logo %}
+                        {% image branding.dark_logo max-120x48 as footer_logo %}
+                        <img src="{{ footer_logo.url }}"
+                             width="{{ footer_logo.width }}"
+                             height="{{ footer_logo.height }}"
+                             alt="{{ footer_logo.image.description|default:current_site.site_name }}"
+                             class="h-8 w-auto object-contain">
+                    {% elif branding.logo %}
+                        {% image branding.logo max-120x48 as footer_logo %}
+                        <img src="{{ footer_logo.url }}"
+                             width="{{ footer_logo.width }}"
+                             height="{{ footer_logo.height }}"
+                             alt="{{ footer_logo.image.description|default:current_site.site_name }}"
+                             class="h-8 w-auto object-contain">
+                    {% else %}
+                        <span class="font-heading font-bold text-lg text-light">{{ current_site.site_name }}</span>
+                    {% endif %}
+                    {% if footer.regional_label %}
+                        <span class="wtr-footer-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white">{{ footer.regional_label }}</span>
+                    {% endif %}
+                </a>
+                {% include "wtrx/components/regional_site_switcher.html" %}
+                <p class="text-sm text-neutral-400">
+                    {% if footer.copyright_text %}
+                        {{ footer.copyright_text }}
+                    {% else %}
+                        {% now "Y" as current_year %}
+                        {% blocktrans with year=current_year name=current_site.site_name %}&copy; {{ year }} {{ name }}{% endblocktrans %}
+                    {% endif %}
+                </p>
+            </div>
+
         </div>
     </footer>
 
@@ -246,27 +228,35 @@
             {% endif %}
 
             {% comment %}
-            Bottom bar: social links left, copyright right. order-3 on
-            mobile (last, below the newsletter box). Social icons only
-            rendered when SocialSettings.show_in_footer is True.
+            Bottom bar: social links + inline links (minimal_links, e.g.
+            "Privacy Policy | Terms of Service") on top, copyright full-width
+            below. order-3 on mobile (last, below the newsletter box).
+            Social icons only rendered when SocialSettings.show_in_footer is
+            True. minimal_links renders here regardless of `footer.layout`
+            — it isn't gated to the minimal layout, since the columns layout
+            wants the same links in its own bottom bar.
             {% endcomment %}
-            <div class="order-3 lg:order-none min-w-0 border-t border-neutral-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="order-3 lg:order-none min-w-0 border-t border-neutral-700 pt-8 space-y-4">
 
-                {% comment %}Social links{% endcomment %}
-                {% if social.show_in_footer and social.social_links %}
-                    <div class="wtr-social-links flex items-center gap-4">
-                        {% for item in social.social_links %}
-                            <a href="{{ item.value.url }}"
-                               rel="noopener noreferrer"
-                               aria-label="{{ item.value.platform|social_platform_label }}"
-                               class="text-neutral-400 hover:text-light transition-colors">
-                                {% social_icon item.value.platform %}
-                            </a>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div></div>
-                {% endif %}
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    {% comment %}Social links{% endcomment %}
+                    {% if social.show_in_footer and social.social_links %}
+                        <div class="wtr-social-links flex items-center gap-4">
+                            {% for item in social.social_links %}
+                                <a href="{{ item.value.url }}"
+                                   rel="noopener noreferrer"
+                                   aria-label="{{ item.value.platform|social_platform_label }}"
+                                   class="text-neutral-400 hover:text-light transition-colors">
+                                    {% social_icon item.value.platform %}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div></div>
+                    {% endif %}
+
+                    {% include "wtrx/components/footer_minimal_links.html" with links=footer.minimal_links %}
+                </div>
 
                 {% comment %}Copyright{% endcomment %}
                 <p class="text-sm text-neutral-400">

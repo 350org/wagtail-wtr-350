@@ -13,9 +13,17 @@ the trigger, the close button, and a backdrop click.
 
 Full-bleed layout (centered title, grid of pin-marker cards, large corner
 close button) rather than a small anchored popover — modelled on a
-location-switcher reference the design gave, minus the region groupings and
-per-entry language line that reference has: RegionalSiteLinkBlock is just
-text + url, with no grouping field, so every entry renders in one flat grid.
+location-switcher reference the design gave, minus the region groupings
+that reference has.
+
+Most entries are plain regional sites (just a region name) and render in
+the dense 4-column grid. An entry with `description` set (e.g. "350
+Action", "350 Global" — sites that aren't a regional 350.org site and need
+a line of context) instead renders in its own 2-column row below, since
+the extra text needs more room than the dense grid's cards give it. Two
+passes over the same `regional_sites` list rather than a Python-side
+partition — the split is a single boolean check, not worth a get_context()
+this include doesn't otherwise need.
 
 data-regional-sites-trigger is scoped to its own .wtr-regional-site-switcher
 ancestor (not a page-wide id lookup) the same way _actionkit_form.html's
@@ -68,15 +76,42 @@ Expects `regional_sites` (a StreamField of RegionalSiteLinkBlock) in context.
                     </h2>
                     <div class="wtr-regional-sites mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:mt-12 lg:grid-cols-4">
                         {% for item in regional_sites %}
-                            <a href="{{ item.value.url }}"
-                               rel="noopener noreferrer"
-                               class="flex items-center gap-2 rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                                </svg>
-                                {{ item.value.text }}
-                            </a>
+                            {% if not item.value.description %}
+                                <a href="{{ item.value.url }}"
+                                   rel="noopener noreferrer"
+                                   class="flex items-center gap-2 rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                                    </svg>
+                                    {{ item.value.text }}
+                                </a>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+
+                    {% comment %}
+                    Entries with a description (e.g. 350 Action, 350 Global)
+                    — their own 2-column row, giving each card more width
+                    for the region name + subheading than the dense grid
+                    above allows.
+                    {% endcomment %}
+                    <div class="wtr-regional-sites-featured mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        {% for item in regional_sites %}
+                            {% if item.value.description %}
+                                <a href="{{ item.value.url }}"
+                                   rel="noopener noreferrer"
+                                   class="flex items-start gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                                    </svg>
+                                    <span>
+                                        <span class="block">{{ item.value.text }}</span>
+                                        <span class="mt-0.5 block text-sm font-normal text-neutral-500">{{ item.value.description }}</span>
+                                    </span>
+                                </a>
+                            {% endif %}
                         {% endfor %}
                     </div>
                 </div>
