@@ -22,12 +22,13 @@ which SimpleTestCase doesn't have.
 """
 
 from datetime import timedelta
+import json
 
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.utils import timezone
 from wagtail.blocks import RichTextBlock
-from wagtail.models import Page
+from wagtail.models import Page, Site
 
 from wtrx.blocks import (
     BACKGROUND_COLOR_CHOICES,
@@ -73,6 +74,7 @@ from wtrx.blocks import (
     resolve_background,
 )
 from wtrx.models import Blogs, ContentPage, HomePage, IndexPage, Post
+from wtrx.site_settings import IntegrationSettings
 
 
 class TestButtonBlockValidation(SimpleTestCase):
@@ -1381,9 +1383,11 @@ class TestDonateBlockFields(SimpleTestCase):
 
 class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     """
-    DonateFundraiseUpBlock field structure. No custom clean() — element_id
-    is the only field Wagtail's built-in required-field validation needs to
-    enforce, so no separate validation test class is needed.
+    DonateFundraiseUpBlock field structure. No custom clean() — every field
+    is optional, so no separate validation test class is needed. There is no
+    element_id field: every instance shows the visitor's region-specific
+    Fundraise Up element, resolved from FundraiseUpConfigBlock's settings
+    (see wtrx/integrations/fundraiseup.py).
     """
 
     def test_has_expected_fields(self):
@@ -1392,17 +1396,12 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
             "content",
             "image",
             "image_caption",
-            "element_id",
             "designation_id",
             "alignment",
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
-    def test_element_id_is_required(self):
-        block = DonateFundraiseUpBlock()
-        self.assertTrue(block.declared_blocks["element_id"].required)
-
-    def test_other_fields_are_optional(self):
+    def test_all_fields_are_optional(self):
         block = DonateFundraiseUpBlock()
         for name in ("content", "image", "image_caption", "designation_id"):
             self.assertFalse(block.declared_blocks[name].required, f"{name} should be optional")
@@ -1419,6 +1418,95 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     def test_alignment_defaults_to_image_left(self):
         block = DonateFundraiseUpBlock()
         self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+
+class TestDonateFundraiseUpBlockGeolocationContext(TestCase):
+    """
+    DonateFundraiseUpBlock.get_context() builds the region → element ID map
+    consumed client-side by donate_fundraiseup_block.html's inline script.
+    See FundraiseUpConfigBlock's docstring (wtrx/integrations/fundraiseup.py)
+    for why this resolution has to happen client-side rather than here.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+
+    def _set_fundraiseup_config(self, **overrides):
+        config = {
+            "enabled": True,
+            "installation_code": "<script>fru</script>",
+            "element_id_us": "US_ID",
+            "element_id_nl": "NL_ID",
+            "element_id_ca": "CA_ID",
+            "element_id_gb": "GB_ID",
+            "eu_country_codes": "DE,FR,ES",
+            "element_id_eu": "EU_ID",
+            "element_id_default": "DEFAULT_ID",
+        }
+        config.update(overrides)
+        self.integration.integrations = [("fundraiseup", config)]
+        self.integration.save()
+
+    def _get_context(self):
+        block = DonateFundraiseUpBlock()
+        request = RequestFactory().get("/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        return block.get_context({"designation_id": ""}, parent_context={"request": request})
+
+    def test_default_element_id_is_used_as_the_initial_href_target(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context()
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_region_map_carries_every_configured_region(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "US_ID")
+        self.assertEqual(regions["NL"], "NL_ID")
+        self.assertEqual(regions["CA"], "CA_ID")
+        self.assertEqual(regions["GB"], "GB_ID")
+        self.assertEqual(regions["_eu"], "EU_ID")
+        self.assertEqual(regions["_default"], "DEFAULT_ID")
+        self.assertEqual(regions["_eu_countries"], ["DE", "FR", "ES"])
+
+    def test_eu_country_codes_are_split_trimmed_and_uppercased(self):
+        self._set_fundraiseup_config(eu_country_codes=" de, fr ,es")
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["_eu_countries"], ["DE", "FR", "ES"])
+
+    def test_blank_region_field_falls_back_to_the_default(self):
+        """An editor who's only filled in some regions still gets a working
+        form for everyone else, rather than an empty element ID."""
+        self._set_fundraiseup_config(element_id_gb="", element_id_eu="")
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["GB"], "DEFAULT_ID")
+        self.assertEqual(regions["_eu"], "DEFAULT_ID")
+
+    def test_no_fundraiseup_config_yields_blank_defaults(self):
+        """Fundraise Up not configured/enabled at all — no request crash,
+        just an empty default (the anchor stays hidden, same as an
+        unconfigured ActionKit/ActBlue integration elsewhere)."""
+        self.integration.integrations = []
+        self.integration.save()
+        ctx = self._get_context()
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+        self.assertEqual(json.loads(ctx["fundraiseup_region_map_json"]), {"_default": ""})
+
+    def test_no_request_in_parent_context_does_not_crash(self):
+        """Mirrors DonateBlock's own ActBlue lookup — get_context() must
+        tolerate being called without a request (e.g. direct block-preview
+        rendering in tests) rather than raising."""
+        block = DonateFundraiseUpBlock()
+        ctx = block.get_context({"designation_id": ""}, parent_context={})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
 
 
 class TestPageCardsBlockFields(SimpleTestCase):

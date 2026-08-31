@@ -82,7 +82,73 @@
                             <span class="mt-4 block rounded-lg bg-primary-600 px-6 py-3 text-center text-lg font-semibold text-light">{% trans "Donate" %}</span>
                         </div>
                     {% else %}
-                        <a href="#{{ value.element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}" style="display: none"></a>
+                        {% comment %}
+                        Region geolocation — see FundraiseUpConfigBlock's
+                        docstring (wtrx/integrations/fundraiseup.py) for the
+                        full rationale. The anchor's initial href is
+                        `fundraiseup_default_element_id` — server-rendered,
+                        identical for every visitor, safe under this site's
+                        Cloudflare edge cache. The inline script below then
+                        best-effort swaps it client-side once the visitor's
+                        country is known via Cloudflare's /cdn-cgi/trace edge
+                        endpoint (never reaches Django, so it can't poison
+                        the page cache either). wtr-donate-fundraiseup scopes
+                        the script to its own anchor via document.currentScript,
+                        the same convention _actionkit_form.html uses, so a
+                        page carrying more than one of these blocks wires
+                        each one independently.
+                        {% endcomment %}
+                        <div class="wtr-donate-fundraiseup">
+                            <a href="#{{ fundraiseup_default_element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}"
+                               data-fundraiseup-anchor
+                               data-fundraiseup-designation-id="{{ value.designation_id|cut:"#" }}"
+                               style="display: none"></a>
+                            <script type="application/json" data-fundraiseup-region-map>{{ fundraiseup_region_map_json|safe }}</script>
+                            <script>
+                                (function () {
+                                    var wrapper = document.currentScript.closest(".wtr-donate-fundraiseup");
+                                    if (!wrapper) { return; }
+                                    var anchor = wrapper.querySelector("[data-fundraiseup-anchor]");
+                                    var configEl = wrapper.querySelector("[data-fundraiseup-region-map]");
+                                    if (!anchor || !configEl) { return; }
+                                    var regions;
+                                    try {
+                                        regions = JSON.parse(configEl.textContent);
+                                    } catch (e) {
+                                        return;
+                                    }
+
+                                    function applyRegion(countryCode) {
+                                        var elementId;
+                                        if (countryCode === "US" || countryCode === "NL" || countryCode === "CA" || countryCode === "GB") {
+                                            elementId = regions[countryCode];
+                                        } else if (countryCode && regions._eu_countries && regions._eu_countries.indexOf(countryCode) !== -1) {
+                                            elementId = regions._eu;
+                                        } else {
+                                            elementId = regions._default;
+                                        }
+                                        if (!elementId) { return; }
+                                        var designationId = anchor.dataset.fundraiseupDesignationId || "";
+                                        anchor.setAttribute("href", "#" + elementId + (designationId ? "?designationId=" + designationId : ""));
+                                    }
+
+                                    {% comment %}
+                                    Best-effort only — see this block's own
+                                    comment above and FundraiseUpConfigBlock's
+                                    docstring for why this isn't guaranteed to
+                                    win the race against Fundraise Up's own
+                                    installation script.
+                                    {% endcomment %}
+                                    fetch("/cdn-cgi/trace")
+                                        .then(function (response) { return response.text(); })
+                                        .then(function (text) {
+                                            var match = text.match(/^loc=([A-Z]{2})$/m);
+                                            if (match) { applyRegion(match[1]); }
+                                        })
+                                        .catch(function () {});
+                                })();
+                            </script>
+                        </div>
                     {% endif %}
                 </div>
             </div>

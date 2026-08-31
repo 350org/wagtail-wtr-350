@@ -2208,6 +2208,14 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
     richtext field, same convention as ImageTextBlock. Migration
     0047_condense_more_heading_text_blocks folded every existing page's
     heading/description pair into this field's HTML on upgrade.
+
+    There is deliberately no `element_id` field on this block any more — every
+    instance always shows the visitor's region-specific Fundraise Up element,
+    resolved client-side from FundraiseUpConfigBlock's settings (see
+    wtrx/integrations/fundraiseup.py for the full geolocation mechanism and
+    why it has to be client-side on this cached site). A block author who
+    wants a single fixed element regardless of region has no override here —
+    that was a deliberate product decision, not an oversight.
     """
 
     content = RichTextBlock(
@@ -2225,19 +2233,13 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
         label=_("Image caption"),
         help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
     )
-    element_id = CharBlock(
-        label=_("Fundraise Up element ID"),
-        help_text=_(
-            "The element ID from your Fundraise Up dashboard, e.g. "
-            "'XJKPQPZV' (without the #)."
-        ),
-    )
     designation_id = CharBlock(
         required=False,
         label=_("Designation ID"),
         help_text=_(
             "Optional Fundraise Up designation ID to route this donation to "
-            "a specific fund."
+            "a specific fund. Applies on top of whichever region-specific "
+            "form the visitor is shown."
         ),
     )
     alignment = ChoiceBlock(
@@ -2249,6 +2251,43 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
             "opposite side. Has no effect when no image is set."
         ),
     )
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        request = (parent_context or {}).get("request")
+        fundraiseup_config = None
+        if request is not None:
+            try:
+                fundraiseup_config = IntegrationSettings.for_request(request).get_integration_config(
+                    "fundraiseup"
+                )
+            except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+                fundraiseup_config = None
+
+        default_id = fundraiseup_config.get("element_id_default", "") if fundraiseup_config else ""
+        ctx["fundraiseup_default_element_id"] = default_id
+
+        if fundraiseup_config:
+            eu_codes_raw = fundraiseup_config.get("eu_country_codes", "") or ""
+            eu_codes = [code.strip().upper() for code in eu_codes_raw.split(",") if code.strip()]
+            # Every region falls back to the site default when its own field
+            # is left blank, rather than resolving to an empty element ID —
+            # an editor who's only filled in a couple of regions still gets a
+            # working donate form for everyone else.
+            ctx["fundraiseup_region_map_json"] = json.dumps(
+                {
+                    "US": fundraiseup_config.get("element_id_us", "") or default_id,
+                    "NL": fundraiseup_config.get("element_id_nl", "") or default_id,
+                    "CA": fundraiseup_config.get("element_id_ca", "") or default_id,
+                    "GB": fundraiseup_config.get("element_id_gb", "") or default_id,
+                    "_eu": fundraiseup_config.get("element_id_eu", "") or default_id,
+                    "_eu_countries": eu_codes,
+                    "_default": default_id,
+                }
+            )
+        else:
+            ctx["fundraiseup_region_map_json"] = json.dumps({"_default": ""})
+        return ctx
 
     class Meta:
         icon = "pick"

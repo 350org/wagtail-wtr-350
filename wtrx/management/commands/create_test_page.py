@@ -703,9 +703,11 @@ def _donate_fundraiseup_block(image_id):
     """
     DonateFundraiseUpBlock.
 
-    element_id points at a Fundraise Up element that does not exist; without
-    the Fundraise Up script loaded (Settings > Integrations) the anchor stays
-    hidden, which is the expected dev-environment rendering.
+    No element_id field — every instance shows the visitor's region-specific
+    Fundraise Up element, resolved client-side from the Fundraise Up
+    integration's settings (Settings > Integrations). Without any region IDs
+    configured there, the anchor stays hidden, which is the expected
+    dev-environment rendering.
     """
     return _sb(
         "donate_fundraiseup",
@@ -713,7 +715,6 @@ def _donate_fundraiseup_block(image_id):
             "content": "<h2>Donate (Fundraise Up)</h2>" + _RICHTEXT_INLINE,
             "image": image_id,
             "image_caption": "Photo credit: placeholder",
-            "element_id": "XTESTFRU",
             "designation_id": "",
         },
     )
