@@ -93,7 +93,6 @@ class TestFormPageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
-            "layout",
             "cta",
         }
         self.assertEqual(set(ctx["hero"].keys()), expected)

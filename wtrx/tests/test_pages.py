@@ -6,14 +6,17 @@ WagtailPageTests covers parent/subpage type constraints.
 TestCase with RequestFactory covers get_context() behaviour.
 """
 
+import json
 from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
+from wagtail.images.tests.utils import get_test_image_file
 from wagtail.models import Page
 from wagtail.test.utils import WagtailPageTests
 
+from wtrx.images import CustomImage
 from wtrx.models import (
     BlogCategory,
     Blogs,
@@ -24,6 +27,95 @@ from wtrx.models import (
     ITEMS_PER_PAGE,
     Post,
 )
+
+
+# ---------------------------------------------------------------------------
+# HeroMixin panel selection: hero_panels (full variant) vs.
+# banner_hero_panels (banner variant) — see HeroMixin/banner_hero_panels'
+# docstrings in wtrx/models.py.
+# ---------------------------------------------------------------------------
+
+
+def _collect_panel_field_names(panels):
+    """Walk a content_panels list (including nested MultiFieldPanel children)
+    and return every FieldPanel-derived field_name found."""
+    names = []
+    for panel in panels:
+        field_name = getattr(panel, "field_name", None)
+        if field_name:
+            names.append(field_name)
+        children = getattr(panel, "children", None)
+        if children:
+            names.extend(_collect_panel_field_names(children))
+    return names
+
+
+class TestHeroPanelSelection(TestCase):
+    """
+    HomePage is the only HeroMixin page type using the "full" hero variant,
+    so it alone should expose hero_video in the editor. ContentPage,
+    IndexPage, and Blogs always render the "banner" variant
+    (HeroMixin.hero_variant default) where hero_video sits inert, so their
+    content_panels use HeroMixin.banner_hero_panels instead — same
+    underlying model field (no migration), just a smaller edit form.
+
+    hero_cta is exposed on BOTH panel sets: components/hero.html's "banner"
+    rendering already only renders hero_cta's plain `button` choice (see
+    banner_hero_panels' own docstring), so it's a real, working field there
+    too, not an inert one like hero_video.
+
+    hero_layout no longer exists at all (removed rather than hidden) — the
+    "full" variant renders a single fixed left-aligned layout now, matching
+    what every real "full"-variant page already used in practice.
+    """
+
+    def test_home_page_has_all_six_hero_fields(self):
+        names = _collect_panel_field_names(HomePage.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_video",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+
+    def test_content_page_has_only_banner_hero_fields(self):
+        names = _collect_panel_field_names(ContentPage.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+        self.assertNotIn("hero_video", names)
+
+    def test_index_page_has_only_banner_hero_fields(self):
+        names = _collect_panel_field_names(IndexPage.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+        self.assertNotIn("hero_video", names)
+
+    def test_blogs_has_only_banner_hero_fields(self):
+        names = _collect_panel_field_names(Blogs.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+        self.assertNotIn("hero_video", names)
 
 
 # ---------------------------------------------------------------------------
@@ -101,10 +193,6 @@ class TestHomePageGetContext(TestCase):
         ctx = self._get_context(self.home)
         self.assertIsNone(ctx["hero"]["video"])
 
-    def test_hero_layout_defaults_centered(self):
-        ctx = self._get_context(self.home)
-        self.assertEqual(ctx["hero"]["layout"], "centered")
-
     def test_hero_variant_is_full(self):
         """HomePage is the only page type using the "full" hero variant."""
         ctx = self._get_context(self.home)
@@ -123,7 +211,6 @@ class TestHomePageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
-            "layout",
             "banner_color",
             "cta",
         }
@@ -220,7 +307,6 @@ class TestContentPageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
-            "layout",
             "banner_color",
             "cta",
         }
@@ -508,6 +594,108 @@ class TestPostMeta(TestCase):
 
     def test_verbose_name_plural(self):
         self.assertEqual(Post._meta.verbose_name_plural, "posts")
+
+
+class TestPostGetCardImage(TestCase):
+    """
+    Post.get_card_image() is what feeds post_card.html a thumbnail — via
+    the override in Post.get_context()/Blogs.get_context() (related posts /
+    the Blogs index) and in PageCardsBlock.get_context() — for a post that
+    never had an explicit header image set.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-cci")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-cci")
+        home.add_child(instance=cls.blogs)
+
+        cls.hero_image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        cls.body_image = CustomImage.objects.create(
+            title="Body image", file=get_test_image_file(size=(1200, 800))
+        )
+
+    def _make_post(self, slug, hero_image=None, body=None):
+        post = Post(title="Test post", slug=slug, hero_image=hero_image)
+        if body is not None:
+            post.body = json.dumps(body)
+        self.blogs.add_child(instance=post)
+        # Re-fetch so `body` is the real deserialized StreamValue a saved
+        # page would have, not the raw JSON string just assigned above.
+        return Post.objects.get(pk=post.pk)
+
+    def test_explicit_hero_image_wins(self):
+        """An explicit header image is used as-is — the body isn't even inspected."""
+        body = [
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "11111111-1111-1111-1111-111111111111",
+            }
+        ]
+        post = self._make_post("hero-wins", hero_image=self.hero_image, body=body)
+        self.assertEqual(post.get_card_image(), self.hero_image)
+
+    def test_falls_back_to_first_image_in_body(self):
+        """No header image: the first image found in the body is used instead."""
+        body = [
+            {"type": "text", "value": "<p>No image here.</p>", "id": "22222222-2222-2222-2222-222222222222"},
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "33333333-3333-3333-3333-333333333333",
+            },
+        ]
+        post = self._make_post("body-fallback", hero_image=None, body=body)
+        self.assertEqual(post.get_card_image(), self.body_image)
+
+    def test_finds_image_nested_inside_a_card_grids_list_items(self):
+        """The search reaches into a ListBlock item's own `image` field (a CardGridBlock card)."""
+        body = [
+            {
+                "type": "card_grid",
+                "value": {
+                    "heading": "Grid",
+                    "cards": [
+                        {
+                            "tag": "",
+                            "icon": None,
+                            "content": "<h3>No image</h3>",
+                            "image": None,
+                            "link_page": None,
+                            "link_url": None,
+                            "link_text": "",
+                        },
+                        {
+                            "tag": "",
+                            "icon": None,
+                            "content": "<h3>Has image</h3>",
+                            "image": self.body_image.pk,
+                            "link_page": None,
+                            "link_url": None,
+                            "link_text": "",
+                        },
+                    ],
+                },
+                "id": "44444444-4444-4444-4444-444444444444",
+            }
+        ]
+        post = self._make_post("card-grid-fallback", hero_image=None, body=body)
+        self.assertEqual(post.get_card_image(), self.body_image)
+
+    def test_none_when_no_image_anywhere(self):
+        """No header image and no image in the body degrades to None, not an error."""
+        body = [{"type": "text", "value": "<p>Just words.</p>", "id": "55555555-5555-5555-5555-555555555555"}]
+        post = self._make_post("no-image", hero_image=None, body=body)
+        self.assertIsNone(post.get_card_image())
+
+    def test_none_when_body_is_empty(self):
+        post = self._make_post("empty-body", hero_image=None, body=[])
+        self.assertIsNone(post.get_card_image())
 
 
 # ---------------------------------------------------------------------------

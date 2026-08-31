@@ -1,4 +1,13 @@
 {% load i18n %}
+{% comment %}
+value.size is "regular"/"large" (BUTTON_SIZE_CHOICES); button.html's own
+size= param only distinguishes "lg" from everything else, so "large" is
+the only value translated on the way through.
+{% endcomment %}
 <div>
-    {% include "wtrx/components/button.html" with text=value.text link_page=value.link_page link_url=value.link_url anchor=value.anchor style=value.style %}
+    {% if value.size == "large" %}
+        {% include "wtrx/components/button.html" with text=value.text link_page=value.link_page link_url=value.link_url anchor=value.anchor style=value.style size="lg" %}
+    {% else %}
+        {% include "wtrx/components/button.html" with text=value.text link_page=value.link_page link_url=value.link_url anchor=value.anchor style=value.style %}
+    {% endif %}
 </div>

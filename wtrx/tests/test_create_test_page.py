@@ -531,6 +531,3 @@ class TestCreateTestPageRendering(TestCase):
         for colour in ("white", "light-grey", "dark-grey", "navy", "red", "blue-gradient"):
             self.assertIn(f"Sign Up (ActionKit, {colour})", html)
 
-    def test_signup_link_renders(self):
-        response = self._get()
-        self.assertContains(response, "Sign Up (Link)")

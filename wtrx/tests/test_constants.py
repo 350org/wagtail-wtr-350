@@ -70,6 +70,5 @@ class TestConstantsUsedInBlocks(SimpleTestCase):
             "donate",
             "signup_wagtail_forms",
             "signup_action_network",
-            "signup_link",
         ):
             self.assertIn(name, block.child_blocks)

@@ -3,8 +3,8 @@ Tests for StreamField blocks.
 
 Content blocks (ButtonBlock, VideoBlock), layout blocks (QuoteBlock,
 HeroBlock, SectionBlock, CardCarouselBlock, CalloutBlock), and action blocks
-(SignupLinkBlock, SignupActionNetworkBlock) are tested here with
-SimpleTestCase since their clean() methods don't require a database.
+(SignupActionNetworkBlock) are tested here with SimpleTestCase since their
+clean() methods don't require a database.
 
 DonateBlock, DonateFundraiseUpBlock, and SignupWagtailFormsBlock have no
 custom clean() — their fields are validated by Wagtail's built-in block
@@ -64,7 +64,6 @@ from wtrx.blocks import (
     SectionContentBlock,
     SignupActionKitBlock,
     SignupActionNetworkBlock,
-    SignupLinkBlock,
     SuccessMessageBlock,
     VideoBlock,
     _balanced_rows,
@@ -74,6 +73,7 @@ from wtrx.blocks import (
     resolve_background,
 )
 from wtrx.models import Blogs, ContentPage, HomePage, IndexPage, Post
+from wtrx.request_context import _current_request
 from wtrx.site_settings import IntegrationSettings
 
 
@@ -113,6 +113,27 @@ class TestButtonBlockValidation(SimpleTestCase):
             )
             cleaned = block.clean(value)
             self.assertEqual(cleaned["style"], style)
+
+    def test_size_defaults_to_regular(self):
+        block = ButtonBlock()
+        self.assertEqual(block.declared_blocks["size"].meta.default, "regular")
+
+    def test_size_choices(self):
+        # Only two tiers exist -- see BUTTON_SIZE_CHOICES. The third
+        # "small" tier (wtr-btn-sm) was removed rather than exposed here.
+        block = ButtonBlock()
+        choices = dict(block.declared_blocks["size"].field.choices)
+        self.assertEqual(set(choices.keys()), {"regular", "large"})
+
+    def test_all_sizes_accepted(self):
+        block = ButtonBlock()
+        for size in ("regular", "large"):
+            value = block.to_python(
+                self._raw(link_url="https://example.com")
+            )
+            value["size"] = size
+            cleaned = block.clean(value)
+            self.assertEqual(cleaned["size"], size)
 
     def test_text_is_required(self):
         block = ButtonBlock()
@@ -538,56 +559,6 @@ class TestHeroCTABlock(SimpleTestCase):
         self.assertEqual(HeroCTABlock().meta.min_num, 0)
 
 
-class TestSignupLinkBlockValidation(SimpleTestCase):
-    """SignupLinkBlock requires external_url; content and anchor_id are optional."""
-
-    def _raw(self, content="<h2>Sign Up</h2>", external_url="https://example.com"):
-        return {
-            "content": content,
-            "button_text": "",
-            "external_url": external_url,
-            "anchor_id": "",
-        }
-
-    def test_valid(self):
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw())
-        cleaned = block.clean(value)
-        self.assertEqual(cleaned["external_url"], "https://example.com")
-
-    def test_content_optional(self):
-        """content is optional — omitting it must not raise."""
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw(content=""))
-        cleaned = block.clean(value)
-        self.assertEqual(str(cleaned["content"]), "")
-
-    def test_external_url_required(self):
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw(external_url=""))
-        with self.assertRaises(ValidationError):
-            block.clean(value)
-
-    def test_button_text_optional(self):
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw())
-        cleaned = block.clean(value)
-        self.assertEqual(cleaned["button_text"], "")
-
-    def test_anchor_id_optional(self):
-        block = SignupLinkBlock()
-        self.assertFalse(block.declared_blocks["anchor_id"].required)
-
-    def test_has_expected_fields(self):
-        block = SignupLinkBlock()
-        expected = {"content", "button_text", "external_url", "anchor_id"}
-        self.assertEqual(set(block.declared_blocks.keys()), expected)
-
-    def test_content_supports_h2(self):
-        block = SignupLinkBlock()
-        self.assertIn("h2", block.declared_blocks["content"].features)
-
-
 class TestSectionBlockWidth(SimpleTestCase):
     """
     SectionBlock.width picks the inner content column's measure — see
@@ -753,7 +724,6 @@ class TestSectionBlockStructure(SimpleTestCase):
         "signup_wagtail_forms",
         "signup_action_network",
         "signup_actionkit",
-        "signup_link",
     }
 
     def test_content_block_names(self):
@@ -1163,7 +1133,7 @@ class TestImageTextBlockFields(SimpleTestCase):
     def test_has_expected_fields(self):
         block = ImageTextBlock()
         self.assertEqual(
-            set(block.declared_blocks.keys()), {"image", "content", "alignment"}
+            set(block.declared_blocks.keys()), {"image", "content", "alignment", "size"}
         )
 
     def test_image_is_required(self):
@@ -1190,6 +1160,24 @@ class TestImageTextBlockFields(SimpleTestCase):
     def test_alignment_defaults_to_image_left(self):
         block = ImageTextBlock()
         self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+    def test_size_choices(self):
+        block = ImageTextBlock()
+        choices = dict(block.declared_blocks["size"].field.choices)
+        self.assertEqual(set(choices.keys()), {"small", "default", "large"})
+
+    def test_size_defaults_to_default(self):
+        block = ImageTextBlock()
+        self.assertEqual(block.declared_blocks["size"].meta.default, "default")
+
+    def test_missing_size_in_stored_value_falls_back_to_default(self):
+        # Simulates harvested preview JSON (or a real page) saved before the
+        # `size` field existed -- StructBlock.to_python() must fall back to
+        # the field's own default for a missing key, not raise, so old data
+        # keeps rendering. See ImageTextBlock's docstring / AGENTS.md rule #45.
+        block = ImageTextBlock()
+        value = block.to_python({"image": None, "content": "<p>Hi</p>", "alignment": "image-left"})
+        self.assertEqual(value["size"], "default")
 
 
 class TestFeaturePanelBlockFields(SimpleTestCase):
@@ -1335,6 +1323,12 @@ class TestCalloutBlockFields(SimpleTestCase):
         self.assertIn("h2", features)
         self.assertIn("h3", features)
 
+    def test_content_supports_lists(self):
+        block = CalloutBlock()
+        features = block.declared_blocks["content"].features
+        self.assertIn("ol", features)
+        self.assertIn("ul", features)
+
     def test_image_is_optional(self):
         block = CalloutBlock()
         self.assertFalse(block.declared_blocks["image"].required)
@@ -1380,6 +1374,12 @@ class TestDonateBlockFields(SimpleTestCase):
         block = DonateBlock()
         self.assertIn("h2", block.declared_blocks["content"].features)
 
+    def test_content_supports_h3(self):
+        # Editors can add an optional H3 subheading below the H2 heading,
+        # same as CalloutBlock (RICHTEXT_FEATURES_HEADINGS_H2_H3).
+        block = DonateBlock()
+        self.assertIn("h3", block.declared_blocks["content"].features)
+
 
 class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     """
@@ -1409,6 +1409,12 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     def test_content_supports_h2(self):
         block = DonateFundraiseUpBlock()
         self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_content_supports_h3(self):
+        # Editors can add an optional H3 subheading below the H2 heading,
+        # same as CalloutBlock/DonateBlock.
+        block = DonateFundraiseUpBlock()
+        self.assertIn("h3", block.declared_blocks["content"].features)
 
     def test_alignment_choices(self):
         block = DonateFundraiseUpBlock()
@@ -2054,3 +2060,120 @@ class TestBackgroundResolution(SimpleTestCase):
         self.assertTrue(background_is_light("light"))
         self.assertTrue(background_is_light("muted"))
         self.assertFalse(background_is_light("dark"))
+
+
+class TestIntegrationGatedStreamBlockVisibility(TestCase):
+    """
+    IntegrationGatedStreamBlockMixin (wtrx/blocks/__init__.py) filters
+    BodyStreamBlock/SectionContentBlock's "Add block" picker
+    (sorted_child_blocks()/grouped_child_blocks()) by IntegrationSettings,
+    without ever touching child_blocks itself — see the mixin's docstring
+    for why that split matters.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+
+    def _set_integrations(self, data):
+        self.integration.integrations = data
+        self.integration.save()
+
+    def _set_current_request(self):
+        request = RequestFactory().get("/admin/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        token = _current_request.set(request)
+        self.addCleanup(_current_request.reset, token)
+
+    def test_no_request_context_shows_everything(self):
+        """
+        A management command or test with no request in scope must never
+        silently hide content — see
+        _hidden_block_names_for_current_request()'s docstring.
+        """
+        self._set_integrations([])
+        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        self.assertIn("donate", names)
+        self.assertIn("signup_actionkit", names)
+
+    def test_disabled_integration_hides_its_block_from_picker(self):
+        self._set_integrations([])
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        self.assertNotIn("donate", names)  # actblue disabled
+        self.assertNotIn("signup_actionkit", names)  # actionkit disabled
+
+    def test_enabled_integration_keeps_its_block_in_picker(self):
+        self._set_integrations(
+            [
+                (
+                    "actblue",
+                    {
+                        "enabled": True,
+                        "base_url": "",
+                        "suggested_amounts": "",
+                        "default_recurring": False,
+                    },
+                )
+            ]
+        )
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        self.assertIn("donate", names)
+        self.assertNotIn("donate_fundraiseup", names)
+
+    def test_wagtail_forms_visible_by_default(self):
+        self._set_integrations([])
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        self.assertIn("signup_wagtail_forms", names)
+
+    def test_disabling_wagtail_forms_hides_it(self):
+        self._set_integrations([("wagtail_forms", {"enabled": False})])
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        self.assertNotIn("signup_wagtail_forms", names)
+
+    def test_child_blocks_always_contains_every_block_regardless_of_context(self):
+        """
+        The critical safety property: hiding a block from the picker must
+        never affect child_blocks, which parsing/rendering/validation read
+        directly — see IntegrationGatedStreamBlockMixin's docstring.
+        """
+        self._set_integrations([])
+        self._set_current_request()
+        block = BodyStreamBlock()
+        self.assertNotIn("donate", {b.name for b in block.sorted_child_blocks()})
+        self.assertIn("donate", block.child_blocks)
+
+    def test_existing_content_of_a_now_hidden_block_type_still_round_trips(self):
+        """
+        A page that already has a `donate` block placed while ActBlue was
+        enabled must keep rendering correctly after ActBlue is disabled —
+        this is the whole reason child_blocks is never filtered.
+        """
+        self._set_integrations([])  # actblue disabled
+        self._set_current_request()
+        block = BodyStreamBlock()
+        donate_block = block.child_blocks["donate"]
+        default_value = donate_block.get_default()
+        stream_value = block.to_python(
+            [
+                {
+                    "type": "donate",
+                    "value": donate_block.get_prep_value(default_value),
+                    "id": "test-id",
+                }
+            ]
+        )
+        self.assertEqual(stream_value[0].block_type, "donate")
+
+    def test_section_content_block_also_filters(self):
+        self._set_integrations([])
+        self._set_current_request()
+        names = {b.name for b in SectionContentBlock().sorted_child_blocks()}
+        self.assertNotIn("donate", names)

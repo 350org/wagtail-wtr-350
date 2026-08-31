@@ -1,13 +1,16 @@
 """
-Tests for wagtail_hooks.py — block visibility hooks.
+Tests for wagtail_hooks.py.
+
+Block-type visibility is no longer a hook in this file — see
+wtrx/tests/test_blocks.py's TestIntegrationGatedStreamBlockVisibility for
+that behavior, which now lives in IntegrationGatedStreamBlockMixin
+(wtrx/blocks/__init__.py). The registry-metadata tests below still belong
+here since they're about the IntegrationType contract, not the hook file.
 """
 
-from django.test import RequestFactory, TestCase
-from wagtail.models import Site
+from django.test import TestCase
 
 from wtrx.integrations.registry import get_integration
-from wtrx.site_settings import IntegrationSettings
-from wtrx.wagtail_hooks import _block_visibility_js
 
 
 class TestIntegrationRegistryMetadata(TestCase):
@@ -41,107 +44,32 @@ class TestIntegrationRegistryMetadata(TestCase):
             integration_type.content_block_names, ("signup_action_network",)
         )
 
-
-class TestBlockVisibilityJS(TestCase):
-    """Test the _block_visibility_js view function."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.site = Site.objects.get(is_default_site=True)
-        cls.integration, _ = IntegrationSettings.objects.get_or_create(
-            site=cls.site,
+    def test_wagtail_forms_gates_signup_wagtail_forms_block(self):
+        """
+        Wagtail Forms is a built-in feature, not a third-party integration —
+        it's registered with default_enabled=True so its block stays visible
+        out of the box, hideable only by an explicit disabled entry (or by
+        enabling a real signup integration — see
+        IntegrationSettings.is_integration_enabled()'s category-yielding
+        rule).
+        """
+        integration_type = get_integration("wagtail_forms")
+        self.assertEqual(integration_type.category, "signup")
+        self.assertEqual(
+            integration_type.content_block_names, ("signup_wagtail_forms",)
         )
+        self.assertTrue(integration_type.default_enabled)
 
-    def _make_request(self):
-        request = RequestFactory().get("/admin/wtrx/block-visibility.js")
-        request.META["HTTP_HOST"] = self.site.hostname
-        request.META["SERVER_PORT"] = str(self.site.port)
-        return request
-
-    def _set_integrations(self, data):
-        self.integration.integrations = data
-        self.integration.save()
-
-    def test_returns_javascript_content_type(self):
-        response = _block_visibility_js(self._make_request())
-        self.assertEqual(response["Content-Type"], "application/javascript")
-
-    def test_no_integrations_hides_all_gated_blocks(self):
-        """With nothing configured, every integration-gated block is hidden."""
-        self._set_integrations([])
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        for name in (
-            "donate",
-            "donate_fundraiseup",
-            "signup_actionkit",
-            "signup_action_network",
-        ):
-            self.assertIn(f'data-contentpath=\\"{name}\\"', content)
-
-    def test_enabled_actblue_shows_donate_hides_fundraiseup(self):
-        self._set_integrations(
-            [
-                (
-                    "actblue",
-                    {
-                        "enabled": True,
-                        "base_url": "",
-                        "suggested_amounts": "",
-                        "default_recurring": False,
-                    },
-                )
-            ]
-        )
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        self.assertNotIn('data-contentpath=\\"donate\\"', content)
-        self.assertIn('data-contentpath=\\"donate_fundraiseup\\"', content)
-
-    def test_disabled_entry_is_treated_as_not_enabled(self):
-        """An entry present but with enabled=False still hides its block."""
-        self._set_integrations(
-            [
-                (
-                    "actionkit",
-                    {
-                        "enabled": False,
-                        "hostname": "x.actionkit.com",
-                        "api_username": "u",
-                        "api_password": "",
-                    },
-                )
-            ]
-        )
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        self.assertIn('data-contentpath=\\"signup_actionkit\\"', content)
-
-    def test_multiple_signup_integrations_can_be_enabled_simultaneously(self):
-        """Independent toggles: ActionKit and Action Network can both be enabled at once."""
-        self._set_integrations(
-            [
-                (
-                    "actionkit",
-                    {
-                        "enabled": True,
-                        "hostname": "x.actionkit.com",
-                        "api_username": "u",
-                        "api_password": "",
-                    },
-                ),
-                ("action_network", {"enabled": True, "api_key": ""}),
-            ]
-        )
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        self.assertNotIn('data-contentpath=\\"signup_actionkit\\"', content)
-        self.assertNotIn('data-contentpath=\\"signup_action_network\\"', content)
-
-    def test_signup_wagtail_forms_and_signup_link_never_hidden(self):
-        """These two blocks aren't gated by any integration."""
-        self._set_integrations([])
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        self.assertNotIn('data-contentpath=\\"signup_wagtail_forms\\"', content)
-        self.assertNotIn('data-contentpath=\\"signup_link\\"', content)
+    def test_only_built_in_pseudo_integrations_default_to_enabled(self):
+        """
+        Every genuine third-party integration must stay hidden until a site
+        explicitly configures and enables it — default_enabled=True should
+        never spread to one of them by accident. Only a built-in,
+        zero-configuration option (currently just Wagtail Forms) may set it.
+        """
+        for slug in ("actionkit", "fundraiseup", "actblue", "action_network"):
+            integration_type = get_integration(slug)
+            self.assertFalse(
+                integration_type.default_enabled,
+                f"{slug} should not default to enabled",
+            )

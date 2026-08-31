@@ -10,7 +10,6 @@
     copy_is_block — True if copy should be rendered via include_block, False for |richtext
     image         — optional CustomImage instance
     video         — optional wagtailmedia Media instance (type="video")
-    layout        — "centered" (default) or "left". "full" variant only.
     banner_color  — one of BACKGROUND_COLOR_CHOICES. "banner" variant only.
     cta           — optional HeroCTABlock stream value (0 or 1 items:
                     button/signup/donate/announcement). The "full" variant
@@ -232,12 +231,13 @@
 {% else %}
 
     {# ------------------------------------------------------------------ #}
-    {# FULL VARIANT — background image/video, text centered (default)     #}
-    {# or left-aligned and anchored toward the bottom (hero.layout="left")#}
+    {# FULL VARIANT — background image/video, text left-aligned and       #}
+    {# anchored toward the bottom. There used to be a "centered" layout   #}
+    {# choice too; removed in favor of always left-aligned, matching what #}
+    {# every real "full"-variant page already used in practice.           #}
     {# ------------------------------------------------------------------ #}
-    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col mx-4 rounded-lg
-                {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}
-                {% if hero.layout == 'left' %}justify-end{% else %}justify-center{% endif %}"
+    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col mx-4 rounded-lg justify-end
+                {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}"
          {% if hero.video %}data-hero{% endif %}>
 
         {% if hero.video %}
@@ -260,17 +260,14 @@
         {% endif %}
 
         {% comment %}
-        The "left" layout's padding is Figma's Hero Video - Condensed Signup
-        (node 1:560) read literally: its Content frame sits 128px in from the
-        hero's left edge and 64px up off its floor, with no max-width
-        centering of its own — the headline's own 1033px cap (below) is what
-        bounds the line length. This was mx-auto max-w-7xl, which lands near
-        128px at Figma's own 1512px frame width but drifts wider on every
-        larger screen (336px at 1920), pulling the headline away from the
-        edge the design anchors it to.
-
-        The "centered" layout keeps its own roomier, symmetric padding —
-        Figma only draws the left-aligned arrangement.
+        This padding is Figma's Hero Video - Condensed Signup (node 1:560)
+        read literally: its Content frame sits 128px in from the hero's left
+        edge and 64px up off its floor, with no max-width centering of its
+        own — the headline's own 1033px cap (below) is what bounds the line
+        length. This was mx-auto max-w-7xl, which lands near 128px at
+        Figma's own 1512px frame width but drifts wider on every larger
+        screen (336px at 1920), pulling the headline away from the edge the
+        design anchors it to.
 
         z-10 (not just relative): this column, the gradient scrim above, and
         the background video/image below are all positioned siblings with no
@@ -284,8 +281,7 @@
         content column in line with that instead of the one place still
         depending on implicit ordering.
         {% endcomment %}
-        <div class="relative z-10 w-full text-light
-                    {% if hero.layout == 'left' %}px-6 py-10 text-left sm:px-10 sm:py-12 lg:px-32 lg:py-16{% else %}mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8{% endif %}">
+        <div class="relative z-10 w-full text-light px-6 py-10 text-left sm:px-10 sm:py-12 lg:px-32 lg:py-16">
 
             {% comment %}
             96px/1.135, no tracking, capped at 1033px — Figma's headline text
@@ -299,7 +295,7 @@
             </h1>
 
             {% if hero.copy %}
-                <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl {% if hero.layout != 'left' %}mx-auto{% endif %}">
+                <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl">
                     {% if hero.copy_is_block %}
                         {% include_block hero.copy %}
                     {% else %}
@@ -312,15 +308,15 @@
             hero.cta — at most one of a signup bar, donate block, or
             announcement bar.
 
-            "left" sizing is Figma's again: 20px below the headline (its
-            Content frame's gap), and a 677px-wide widget — exactly what the
-            Signup Horizontal instance measures, and just enough for its two
-            250px fields plus the submit button on one row (250 + 250 + 144
-            + two 16px gaps). max-w-2xl (672px) fell 5px short of that and
-            wrapped the button onto its own line.
+            Sizing is Figma's: 20px below the headline (its Content frame's
+            gap), and a 677px-wide widget — exactly what the Signup
+            Horizontal instance measures, and just enough for its two 250px
+            fields plus the submit button on one row (250 + 250 + 144 + two
+            16px gaps). max-w-2xl (672px) fell 5px short of that and wrapped
+            the button onto its own line.
             {% endcomment %}
             {% for cta_block in hero.cta %}
-                <div class="{% if hero.layout == 'left' %}mt-5 max-w-[677px]{% else %}mx-auto mt-8 max-w-2xl{% endif %}">
+                <div class="mt-5 max-w-[677px]">
                     {% include_block cta_block with compact=True %}
                 </div>
             {% endfor %}

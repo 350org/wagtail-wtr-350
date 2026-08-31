@@ -12,7 +12,7 @@ Block categories (in definition order):
             CardCarouselBlock, PageCardsBlock, AccordionBlock, QuoteBlock,
             CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
-            SignupActionKitBlock, SignupLinkBlock
+            SignupActionKitBlock
   Layout²:  AnnouncementBarBlock, HeroCTABlock, HeroBlock, SectionBlock
             (defined after action blocks so their nested/optional fields
             can instantiate the action block classes)
@@ -75,6 +75,18 @@ BUTTON_STYLE_CHOICES = [
     ("outline", _("Outline")),
 ]
 
+# Only two tiers exist: "large" is the handful of hardcoded, non-editor-
+# configurable CTAs in specific templates (hero, post_page back-link,
+# FeaturePanelBlock, PageCardsBlock, CalloutBlock); everything else,
+# including an unset size, is "regular" (button.html's base size — no
+# modifier class). There used to be a third "small" tier (wtr-btn-sm) but
+# it had exactly one caller (the search page's submit button) and offered
+# editors nothing, so it was removed rather than exposed here.
+BUTTON_SIZE_CHOICES = [
+    ("regular", _("Regular")),
+    ("large", _("Large")),
+]
+
 # Shared by every block that puts an image in a side column and lets the
 # editor flip which side it's on: QuoteBlock, FeaturePanelBlock,
 # ImageCardListBlock, ImageTextBlock, DonateFundraiseUpBlock. Each of these
@@ -84,6 +96,17 @@ BUTTON_STYLE_CHOICES = [
 IMAGE_ALIGNMENT_CHOICES = [
     ("image-left", _("Image left")),
     ("image-right", _("Image right")),
+]
+
+# ImageTextBlock's image column width. There's no Figma spec for anything
+# but the default (378px, the measure documented in image_text_block.html) —
+# these are a judgment call, kept in reasonable proportion to the shared
+# 1186px row width (see that template) so the text column never gets
+# uncomfortably narrow even at "Large".
+IMAGE_TEXT_SIZE_CHOICES = [
+    ("small", _("Small (280px)")),
+    ("default", _("Default (378px)")),
+    ("large", _("Large (480px)")),
 ]
 
 # ---------------------------------------------------------------------------
@@ -154,12 +177,6 @@ SECTION_WIDTH_CHOICES = [
     ("narrow", _("Narrow (800px)")),
     ("default", _("Default (1152px)")),
     ("wide", _("Wide (1266px)")),
-]
-
-
-HERO_LAYOUT_CHOICES = [
-    ("centered", _("Centered")),
-    ("left", _("Left-aligned")),
 ]
 
 # Mapping of Action Network URL path segments (plural) to embed types (singular).
@@ -781,6 +798,14 @@ class ButtonBlock(StructBlock):
     expressed at all before. It is the natural target for a hero CTA that
     scrolls to a signup/donate block further down the same page (see
     components/hero.html's banner CTA and each block's own anchor_id field).
+
+    `size` is the only editor-facing size control anywhere on the site —
+    every other `wtr-btn-lg` usage (hero, post_page's back-link,
+    FeaturePanelBlock, PageCardsBlock, CalloutBlock) is a hardcoded,
+    non-editor-configurable design choice baked into its own template, and
+    the third "small" tier (wtr-btn-sm) was removed outright rather than
+    exposed here — it had exactly one caller (the search page) and gave
+    editors nothing worth choosing. See BUTTON_SIZE_CHOICES.
     """
 
     text = CharBlock(label=_("Button text"))
@@ -807,6 +832,11 @@ class ButtonBlock(StructBlock):
         choices=BUTTON_STYLE_CHOICES,
         default="primary",
         label=_("Style"),
+    )
+    size = ChoiceBlock(
+        choices=BUTTON_SIZE_CHOICES,
+        default="regular",
+        label=_("Size"),
     )
 
     def clean(self, value):
@@ -846,6 +876,7 @@ class ButtonBlock(StructBlock):
             "text": _("Take action"),
             "link_url": "https://example.com",
             "style": "primary",
+            "size": "regular",
         }
 
 
@@ -911,6 +942,7 @@ class ButtonGroupBlock(StructBlock):
                     "link_url": "https://example.com",
                     "anchor": "",
                     "style": "primary",
+                    "size": "regular",
                 },
                 {
                     "text": _("Learn more"),
@@ -918,6 +950,7 @@ class ButtonGroupBlock(StructBlock):
                     "link_url": "https://example.com",
                     "anchor": "",
                     "style": "outline",
+                    "size": "regular",
                 },
             ],
             "layout": "horizontal",
@@ -1592,10 +1625,19 @@ class ImageCardListBlock(ContentPreviewMixin, StructBlock):
 
 class ImageTextBlock(ContentPreviewMixin, StructBlock):
     """
-    A two-column split: an image on the left (natural aspect ratio, not
-    stretched to match the text column like ImageCardListBlock's image
-    does), a heading + richtext body on the right. Both columns are
-    top-aligned, single column on mobile — see image_text_block.html.
+    A two-column split: an image on the left, a heading + richtext body on
+    the right, both vertically centered against each other. Single column
+    on mobile — see image_text_block.html.
+
+    The image is always force-cropped to a square (`aspect-square
+    object-cover`, `rounded-lg`) — the same treatment ImageCardListBlock's
+    and ImageGridBlock's images already use — rather than the old
+    `object-contain` letterbox inside a fixed 378x299 box. There is no
+    mechanism anywhere in this codebase for detecting a specific image's
+    actual aspect ratio at render time and conditionally rounding/cropping
+    only when needed, so the corner-rounding rides along unconditionally
+    with the crop, matching that same precedent. No background is applied
+    to the image or its wrapper.
 
     Distinct from ImageCardListBlock: that one has a heading spanning
     above both columns and a fixed list of bordered cards; this one has no
@@ -1609,6 +1651,13 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
     own content list already uses. Migration 0045_condense_heading_text_blocks
     folded every existing page's heading/text pair into this field's HTML on
     upgrade; see that migration for the exact transform.
+
+    `size` controls the image column's fixed width (see
+    IMAGE_TEXT_SIZE_CHOICES); it defaults to "default" so harvested preview
+    JSON saved before this field existed (AGENTS.md rule #45 /
+    ContentPreviewMixin) still renders correctly — StructBlock.to_python()
+    falls back to a missing field's own default, not an error, for any key
+    absent from older stored data.
     """
 
     image = ImageChooserBlock(label=_("Image"))
@@ -1622,6 +1671,12 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
         default="image-left",
         label=_("Image alignment"),
         help_text=_("Which side the image sits on — the text sits on the opposite side."),
+    )
+    size = ChoiceBlock(
+        choices=IMAGE_TEXT_SIZE_CHOICES,
+        default="default",
+        label=_("Image size"),
+        help_text=_("How wide the image column is."),
     )
 
     class Meta:
@@ -1870,6 +1925,9 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
                 )
             for child in children:
                 card = page_as_card(child)
+                get_card_image = getattr(child, "get_card_image", None)
+                if get_card_image is not None:
+                    card["image"] = get_card_image()
                 card["date"] = getattr(child, "published_at", None) or child.first_published_at
                 cards.append(card)
         context["cards"] = cards
@@ -2037,7 +2095,7 @@ class CalloutBlock(ContentPreviewMixin, StructBlock):
         label=_("Content"),
         help_text=_(
             "Optional heading (H2) and/or subheading (H3) at the top, "
-            "followed by an optional paragraph."
+            "followed by an optional paragraph and/or bulleted or numbered list."
         ),
     )
     link_text = CharBlock(
@@ -2108,13 +2166,21 @@ class DonateBlock(StructBlock):
     richtext field, same convention as ImageTextBlock. Migration
     0047_condense_more_heading_text_blocks folded every existing page's
     heading/description pair into this field's HTML on upgrade.
+
+    Uses RICHTEXT_FEATURES_HEADINGS_H2_H3 (same as CalloutBlock) so editors
+    can add an optional H3 subheading below the H2 heading — the list
+    support (ol/ul) that comes bundled with it is a reasonable extra for a
+    donate ask (e.g. "your gift helps: X, Y, Z"), not scope creep.
     """
 
     content = RichTextBlock(
-        features=RICHTEXT_FEATURES_HEADING_H2,
+        features=RICHTEXT_FEATURES_HEADINGS_H2_H3,
         required=False,
         label=_("Content"),
-        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
+        help_text=_(
+            "Type your heading as an H2 at the top, optionally followed by "
+            "an H3 subheading, then optional supporting copy."
+        ),
     )
     button_text = CharBlock(
         required=False,
@@ -2216,13 +2282,19 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
     why it has to be client-side on this cached site). A block author who
     wants a single fixed element regardless of region has no override here —
     that was a deliberate product decision, not an oversight.
+
+    Uses RICHTEXT_FEATURES_HEADINGS_H2_H3 (same as CalloutBlock/DonateBlock)
+    so editors can add an optional H3 subheading below the H2 heading.
     """
 
     content = RichTextBlock(
-        features=RICHTEXT_FEATURES_HEADING_H2,
+        features=RICHTEXT_FEATURES_HEADINGS_H2_H3,
         required=False,
         label=_("Content"),
-        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
+        help_text=_(
+            "Type your heading as an H2 at the top, optionally followed by "
+            "an H3 subheading, then optional supporting copy."
+        ),
     )
     image = ImageChooserBlock(
         required=False,
@@ -2807,62 +2879,6 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
         template = "wtrx/components/streamfield/blocks/signup_actionkit_hero_block.html"
 
 
-class SignupLinkBlock(StructBlock):
-    """
-    A simple link-out signup CTA.
-
-    Renders a heading, optional description, and a button that links to an
-    external signup URL. Use when the signup form is hosted elsewhere.
-
-    `content` used to be two fields — `heading` (CharBlock) and
-    `description` (RichTextBlock), both optional — condensed into this one
-    richtext field, same convention as ImageTextBlock. Migration
-    0047_condense_more_heading_text_blocks folded every existing page's
-    heading/description pair into this field's HTML on upgrade.
-    """
-
-    content = RichTextBlock(
-        features=RICHTEXT_FEATURES_HEADING_H2,
-        required=False,
-        label=_("Content"),
-        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
-    )
-    button_text = CharBlock(
-        required=False,
-        default=_("Sign Up"),
-        label=_("Button text"),
-        help_text=_("Leave blank to use the site default button label."),
-    )
-    external_url = URLBlock(
-        label=_("External URL"),
-        help_text=_("The external signup URL."),
-    )
-    anchor_id = CharBlock(
-        required=False,
-        label=_("Anchor ID"),
-        help_text=_(
-            "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
-        ),
-    )
-
-    class Meta:
-        icon = "link"
-        label = _("Sign Up (Link)")
-        template = "wtrx/components/streamfield/blocks/signup_link_block.html"
-        description = _(
-            "A short sign-up prompt with a button that sends people to a form "
-            "hosted elsewhere, rather than embedding one."
-        )
-        preview_value = {
-            "content": (
-                "<h2>Join the movement</h2>"
-                "<p>Get campaign updates and ways to take action, straight to your inbox.</p>"
-            ),
-            "button_text": _("Sign up"),
-            "external_url": "https://example.com/signup",
-        }
-
-
 # ---------------------------------------------------------------------------
 # Layout blocks continued — AnnouncementBarBlock, HeroCTABlock, HeroBlock, and
 # SectionBlock are defined here (after action blocks) so their nested/optional
@@ -2980,7 +2996,6 @@ class HeroBlock(StructBlock):
             "copy_is_block": False,
             "image": value.get("image"),
             "video": None,  # HeroBlock does not support video; key kept for template contract
-            "layout": None,  # banner variant ignores layout; key kept for template contract
             "banner_color": value.get("banner_color"),
             "cta": [],  # banner variant never renders a cta; key kept for template contract
             # Mid-page HeroBlock, not a page-level HeroMixin hero. Only the
@@ -3004,7 +3019,77 @@ class HeroBlock(StructBlock):
         preview_value = staticmethod(_hero_preview_value)
 
 
-class SectionContentBlock(StreamBlock):
+def _hidden_block_names_for_current_request():
+    """
+    Block type names to exclude from the "Add block" picker for the site
+    currently being edited, per IntegrationSettings.
+
+    Reads wtrx.request_context.get_current_request() because Wagtail's
+    StreamBlockAdapter.js_args() -- which grouped_child_blocks()/
+    sorted_child_blocks() ultimately feed -- is called with no request
+    argument. See IntegrationGatedStreamBlockMixin below and
+    wtrx/request_context.py.
+
+    Deliberately returns an empty set (show everything) rather than raising
+    whenever there's no usable request/site context -- a management command
+    or test rendering a block with no request in scope should never crash
+    or silently hide content; per AGENTS.md's Error Handling conventions,
+    "nothing configured" degrades to "show everything," not an error.
+    """
+    from wagtail.models import Site
+
+    from wtrx.integrations.registry import all_integrations
+    from wtrx.request_context import get_current_request
+    from wtrx.site_settings import IntegrationSettings
+
+    request = get_current_request()
+    if request is None:
+        return frozenset()
+    try:
+        integration = IntegrationSettings.for_request(request)
+    except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+        return frozenset()
+    return frozenset(
+        block_name
+        for integration_type in all_integrations()
+        if not integration.is_integration_enabled(integration_type.slug)
+        for block_name in integration_type.content_block_names
+    )
+
+
+class IntegrationGatedStreamBlockMixin:
+    """
+    Mixin for BodyStreamBlock/SectionContentBlock: filters the "Add block"
+    picker to exclude block types gated by a disabled integration.
+
+    sorted_child_blocks()/grouped_child_blocks() are used by Wagtail core in
+    exactly one place -- StreamBlockAdapter.js_args(), which builds the
+    picker's block-type list -- and nowhere else (verified against the
+    installed wagtail package). child_blocks itself, which every other
+    path (value_from_datadict, deserialization, rendering an
+    already-placed block) reads directly, is never touched. That's what
+    lets a block placed while its integration was enabled keep working
+    correctly forever after, even if that integration is later disabled —
+    the same "always registered, only hidden from being added" contract
+    architecture rule #4 already requires, just enforced natively instead
+    of by injecting CSS that has to keep guessing Wagtail's admin DOM.
+
+    Must appear before StreamBlock in the MRO so this plain method isn't
+    shadowed, but declares no Block-type class attributes itself, so it
+    plays no part in DeclarativeSubBlocksMetaclass's field collection
+    (architecture rule #9) — a fork subclassing BodyStreamBlock/
+    SectionContentBlock doesn't need to know this mixin exists.
+    """
+
+    def sorted_child_blocks(self):
+        blocks = super().sorted_child_blocks()
+        hidden = _hidden_block_names_for_current_request()
+        if not hidden:
+            return blocks
+        return [b for b in blocks if b.name not in hidden]
+
+
+class SectionContentBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     """
     StreamBlock used inside SectionBlock.
 
@@ -3047,7 +3132,6 @@ class SectionContentBlock(StreamBlock):
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
     signup_actionkit = SignupActionKitBlock()
-    signup_link = SignupLinkBlock()
 
     class Meta:
         label = _("Content")
@@ -3109,15 +3193,18 @@ class SectionBlock(ContentPreviewMixin, StructBlock):
 # ---------------------------------------------------------------------------
 
 
-class BodyStreamBlock(StreamBlock):
+class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     """
     The main StreamField block used on all page types.
 
     All block types — including all SignupBlock variants — are always
     registered here. Hiding irrelevant variants from editors is controlled
-    via wagtail_hooks.py, which reads IntegrationSettings at request time
-    and injects CSS to hide the block-type buttons. Never omit a block
-    here to hide it.
+    by IntegrationGatedStreamBlockMixin (above), which reads
+    IntegrationSettings at request time and filters the "Add block" picker
+    accordingly. Never omit a block here to hide it — child_blocks (used
+    for parsing/rendering/validating StreamField values) must always
+    contain every block type, or a page that already has one placed will
+    break the moment its integration is disabled.
     """
 
     text = TextBlock()
@@ -3149,7 +3236,6 @@ class BodyStreamBlock(StreamBlock):
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
     signup_actionkit = SignupActionKitBlock()
-    signup_link = SignupLinkBlock()
 
     class Meta:
         icon = "list-ul"

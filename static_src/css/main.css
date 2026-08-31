@@ -52,7 +52,6 @@
  *
  * Usage in templates:
  *   <a class="wtr-btn hover:bg-primary-500">Label</a>
- *   <a class="wtr-btn wtr-btn-sm hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-lg hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-outline hover:bg-primary-50">Label</a>
  *   <a class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">Label</a>
@@ -109,11 +108,6 @@ html {
     background-color: transparent;
     color: var(--color-light);
     border-color: var(--color-light);
-}
-
-@utility wtr-btn-sm {
-    padding: 0.375rem 0.875rem;
-    font-size: 0.875rem;
 }
 
 @utility wtr-btn-lg {
@@ -726,20 +720,37 @@ html {
     margin: 0;
 }
 
+/* Matches the homepage hero's own AK signup button
+ * (.wtr-actionkit-embed-inline, further up this file) — same type scale,
+ * min-height, letter-spacing and trailing arrow, so the two don't read as
+ * two different components. width:100%/text-align:left (not inline's
+ * inline-flex/its own content width) because a stacked submit spans the
+ * full field column instead of sitting beside its fields in one row. */
 .wtr-actionkit-embed-stacked button[type='submit'],
 .wtr-actionkit-embed-stacked input[type='submit'] {
     width: 100%;
-    padding: 1rem;
+    min-height: 58px;
+    padding: 1rem 3rem 1rem 1.5rem;
     font-family: var(--font-heading);
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: var(--font-weight-bold);
+    line-height: 1.125;
     letter-spacing: 0.3px;
-    text-align: center;
+    text-align: left;
     color: var(--color-light);
     background-color: var(--color-primary);
+    background-image: var(--icon-arrow-right);
+    background-repeat: no-repeat;
+    background-position: right 1.5rem center;
     border: 2px solid transparent;
     border-radius: var(--radius-button);
     cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.wtr-actionkit-embed-stacked button[type='submit']:hover,
+.wtr-actionkit-embed-stacked input[type='submit']:hover {
+    background-color: var(--color-primary-700);
 }
 
 /* Fine print sits in its own dark box below the button, per Figma — the
@@ -1034,6 +1045,28 @@ h3, h4, h5, h6 {
 }
 
 /* ============================================================
+ * Mobile / collapsed-desktop nav menu — .wtr-scroll-locked
+ * ============================================================
+ * mobile-menu.js adds this to <body> while the mobile nav panel (or the
+ * collapsed-desktop dropdown that shares its markup, see AGENTS.md
+ * pitfall #18) is open, and removes it on close. It goes on <body>, not
+ * the panel itself: the standard mobile panel is a normal in-flow
+ * element that pushes the rest of the page down rather than an overlay,
+ * so there's no single element whose own scroll to lock — the page
+ * itself is what must stop scrolling out from under an open menu, for
+ * both panel variants.
+ *
+ * Plain `overflow: hidden` rather than the position:fixed
+ * scroll-position-freeze trick some sites use — this is a short,
+ * single-purpose panel, not a full-screen takeover, so preserving the
+ * user's exact scroll offset across open/close matters more here than
+ * eliminating iOS rubber-banding at the very top/bottom of the page.
+ * ============================================================ */
+body.wtr-scroll-locked {
+    overflow: hidden;
+}
+
+/* ============================================================
  * Inverted rich text body color — .prose-invert
  * ============================================================
  * Tailwind Typography's prose-invert defaults body text (paragraphs, list
@@ -1250,7 +1283,15 @@ h3, h4, h5, h6 {
  * SignupLinkBlock and PageCardsBlock each had a heading (+ PageCardsBlock's
  * "subheading", itself a plain paragraph despite the name) CharBlock/
  * RichTextBlock pair, condensed the same way (see migration
- * 0047_condense_more_heading_text_blocks). */
+ * 0047_condense_more_heading_text_blocks).
+ *
+ * DonateBlock and DonateFundraiseUpBlock later gained an optional H3
+ * subheading (RICHTEXT_FEATURES_HEADINGS_H2_H3, same as CalloutBlock). No
+ * .wtr-donate-content/-fundraiseup-content h3 rule is needed here: both
+ * containers carry the plain `prose` class, so the unscoped `.prose h3`
+ * rule above already pins the site-wide 28px h3 size for them. Only h2
+ * needs a per-block override, because these panels want it larger than
+ * `.prose h2`'s default. */
 .wtr-donate-content h2 {
     font-family: var(--font-heading);
     font-size: var(--text-2xl);
@@ -1280,8 +1321,8 @@ h3, h4, h5, h6 {
     }
 }
 
-/* Shared by signup_wagtail_forms_block.html, signup_action_network_block.html
- * and signup_link_block.html, which render this identically. */
+/* Shared by signup_wagtail_forms_block.html and signup_action_network_block.html,
+ * which render this identically. */
 .wtr-signup-panel-content h2 {
     font-family: var(--font-heading);
     font-size: var(--text-2xl);

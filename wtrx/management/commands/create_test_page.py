@@ -535,16 +535,17 @@ def _image_card_list_block(image_id):
     )
 
 
-def _image_text_block(image_id):
+def _image_text_block(image_id, size="default"):
     return _sb(
         "image_text",
         {
             "image": image_id,
             "content": (
-                "<h2>Image + Text</h2><p>Freeform paragraph copy beside an "
-                "image at its natural aspect ratio. The heading sits inline "
-                "in the text column, not above both columns.</p>"
+                f"<h2>Image + Text ({size})</h2><p>Freeform paragraph copy "
+                "beside a square, cropped image. The heading sits inline in "
+                "the text column, not above both columns.</p>"
             ),
+            "size": size,
         },
     )
 
@@ -789,21 +790,6 @@ def _signup_actionkit_block(image_id, background, with_success=False, layout="co
     )
 
 
-def _signup_link_block():
-    return _sb(
-        "signup_link",
-        {
-            "content": (
-                "<h2>Sign Up (Link)</h2>"
-                "<p>Sign up to stay informed and take action.</p>"
-            ),
-            "button_text": "Sign Up",
-            "external_url": "https://actionnetwork.org/forms/example",
-            "anchor_id": "signup-link",
-        },
-    )
-
-
 def _section_block(background, padding, width, anchor_id, content):
     return _sb(
         "section",
@@ -908,7 +894,14 @@ def _content_blocks(image_id, index_page_id, form_page_id):
 
     blocks += [_label("image_card_list"), _image_card_list_block(image_id)]
 
-    blocks += [_label("image_text"), _image_text_block(image_id)]
+    blocks += [
+        _label("image_text", "small"),
+        _image_text_block(image_id, size="small"),
+        _label("image_text", "default"),
+        _image_text_block(image_id, size="default"),
+        _label("image_text", "large"),
+        _image_text_block(image_id, size="large"),
+    ]
 
     blocks += [
         _label("feature_panel", "image left, light, with eyebrow"),
@@ -972,8 +965,6 @@ def _content_blocks(image_id, index_page_id, form_page_id):
         _label("signup_actionkit", "stacked vertically layout"),
         _signup_actionkit_block(image_id, "dark-grey", layout="vertical"),
     ]
-
-    blocks += [_label("signup_link"), _signup_link_block()]
 
     return blocks
 

@@ -8,10 +8,19 @@ flex rows. Buttons size to their own content in both layouts -- unlike
 those other blocks' items, a button stretched to fill a row would look
 wrong, so there's no flex-1/max-w wrapper here.
 {% endcomment %}
+{% comment %}
+Each button's size is "regular"/"large" (BUTTON_SIZE_CHOICES); button.html's
+own size= param only distinguishes "lg" from everything else, so "large" is
+the only value translated on the way through -- same as button_block.html.
+{% endcomment %}
 {% if value.layout == "vertical" %}
     <div class="wtr-button-group flex flex-col items-center gap-4">
         {% for button in value.buttons %}
-            {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
+            {% if button.size == "large" %}
+                {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style size="lg" %}
+            {% else %}
+                {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
+            {% endif %}
         {% endfor %}
     </div>
 {% else %}
@@ -19,7 +28,11 @@ wrong, so there's no flex-1/max-w wrapper here.
         {% for row in rows %}
             <div class="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
                 {% for button in row %}
-                    {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
+                    {% if button.size == "large" %}
+                        {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style size="lg" %}
+                    {% else %}
+                        {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style %}
+                    {% endif %}
                 {% endfor %}
             </div>
         {% endfor %}

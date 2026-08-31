@@ -39,6 +39,19 @@ class IntegrationType:
         whose value should be rendered verbatim into the site's <head> when
         the integration is enabled (e.g. FundraiseUp's installation script).
         None for integrations that don't inject site-wide markup.
+    default_enabled: whether this integration/feature should read as
+        *enabled* when no entry for it exists yet in
+        IntegrationSettings.integrations at all. False (the default) is
+        correct for every genuine third-party integration — ActionKit,
+        Fundraise Up, ActBlue, Action Network all require an editor to
+        explicitly add and configure an entry before their content block(s)
+        make sense to show. Set True only for a built-in CMS feature that
+        works with zero external configuration (e.g. Wagtail Forms, see
+        wtrx/integrations/wagtail_forms.py) and should therefore stay visible
+        in the editor out of the box, hideable only by an editor adding an
+        explicit entry with enabled=False. An explicit entry always wins over
+        this default in either direction — see
+        IntegrationSettings.is_integration_enabled().
 
     Reserved for future use (not implemented yet, see PLAN.md): hero-section
     and navigation/footer contribution hooks. Adding those later means adding
@@ -50,6 +63,7 @@ class IntegrationType:
     category: str
     content_block_names: tuple[str, ...] = field(default_factory=tuple)
     head_html_field: str | None = None
+    default_enabled: bool = False
 
 
 _REGISTRY: dict[str, IntegrationType] = {}

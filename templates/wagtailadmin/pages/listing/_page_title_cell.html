@@ -1,0 +1,19 @@
+{% load i18n l10n wagtailadmin_tags %}
+{# Full override (not extends) of Wagtail's own template of the same name:  #}
+{# the upstream file defines no {% block %} regions, so there is nothing to #}
+{# hook into via {% extends %} -- this copies its content verbatim and adds #}
+{# one addition, the page owner ("Created by ...") line, at the bottom.     #}
+{# See wtrx page-listing "who created this page" feature.                  #}
+<td {% if column.classname %}class="{{ column.classname }}"{% endif %} data-listing-page-title>
+    {% include "wagtailadmin/pages/listing/_page_title_explore.html" with page=instance show_locale_labels=show_locale_labels actions_next_url=actions_next_url %}
+    {% if parent_page %}
+        <div>
+            <a href="{% url 'wagtailadmin_explore' parent_page.id %}">{% icon name="arrow-right" classname="default" %}{{ parent_page.get_admin_display_title }}</a>
+        </div>
+    {% endif %}
+    {% if instance.owner_id %}
+        <div class="wtrx-page-owner w-help-text w-text-grey-400">
+            {% blocktrans trimmed with owner_name=instance.owner.get_full_name|default:instance.owner.get_username %}Created by {{ owner_name }}{% endblocktrans %}
+        </div>
+    {% endif %}
+</td>
