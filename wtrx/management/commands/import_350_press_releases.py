@@ -24,6 +24,11 @@ Field mapping:
                                 (also first_published_at, which Wagtail
                                 only sets on an admin publish)
     <article class="clearfix"> content  -> Post.body (StreamField)
+    Yoast SEO <title>/<meta name="description"> -> Post.seo_title /
+                                Post.search_description. The " - <Site
+                                Name>" suffix Yoast's title template adds is
+                                stripped. Left blank if Yoast has none set
+                                (common for older press releases).
 
 Post's author/categories/hero_image are all optional (see wtrx.models) and
 deliberately left unset here — a press release has no byline or category,
@@ -42,7 +47,11 @@ from bs4 import BeautifulSoup
 from django.core.management.base import BaseCommand
 from django.utils import timezone as dj_timezone
 
-from wtrx.management.commands._wp_content_utils import convert_body, resolve_blogs_target
+from wtrx.management.commands._wp_content_utils import (
+    convert_body,
+    resolve_blogs_target,
+    yoast_seo_fields_from_page,
+)
 
 SITEMAP_INDEX_URL = "https://350.org/sitemap_index.xml"
 USER_AGENT = "350-wagtail-press-release-import/1.0 (+https://github.com/)"
@@ -87,8 +96,9 @@ def fetch_press_release(session, url):
     """
     Fetch and parse a single press release page.
 
-    Returns (title, published_at, body_blocks), or None if the page is
-    missing the expected structure (title or article content).
+    Returns (title, published_at, body_blocks, seo_title,
+    search_description), or None if the page is missing the expected
+    structure (title or article content).
     """
     resp = session.get(url, timeout=30)
     resp.raise_for_status()
@@ -113,7 +123,9 @@ def fetch_press_release(session, url):
     if article is None:
         return None
 
-    return title, published_at, str(article)
+    seo_title, search_description = yoast_seo_fields_from_page(soup)
+
+    return title, published_at, str(article), seo_title, search_description
 
 
 class Command(BaseCommand):
@@ -189,7 +201,7 @@ class Command(BaseCommand):
             if parsed is None:
                 self.stdout.write(self.style.WARNING(f"  skip (unrecognized page structure): {url}"))
                 continue
-            title, published_at, content_html = parsed
+            title, published_at, content_html, seo_title, search_description = parsed
 
             if since_date and published_at.date() < since_date:
                 self.stdout.write(f"  reached --since cutoff at: {slug}")
@@ -203,6 +215,7 @@ class Command(BaseCommand):
             if dry_run:
                 self.stdout.write(
                     f"    [dry-run] title={title!r} slug={slug!r} published_at={published_at} "
+                    f"seo_title={seo_title!r} search_description={search_description!r} "
                     f"blocks={len(body)}"
                 )
                 continue
@@ -217,12 +230,16 @@ class Command(BaseCommand):
                     existing.first_published_at or published_at
                 )
                 existing.body = body
+                existing.seo_title = seo_title
+                existing.search_description = search_description
                 existing.save()
                 updated += 1
             else:
                 page = Post(
                     title=title,
                     slug=slug,
+                    seo_title=seo_title,
+                    search_description=search_description,
                     published_at=published_at,
                     # Wagtail only sets first_published_at when a page is
                     # published through the admin, so an imported page would

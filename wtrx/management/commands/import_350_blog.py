@@ -25,6 +25,10 @@ Field mapping:
                                  preferred over the REST API's embedded author,
                                  since guest-contributor posts show a byline
                                  there that differs from the API's WP user.
+    Yoast SEO title/description (yoast_head_json) -> Post.seo_title /
+                                 Post.search_description. The " - <Site
+                                 Name>" suffix Yoast's title template adds is
+                                 stripped. Left blank if Yoast has none set.
 
 CATEGORY_SLUG_MAP is a deliberately narrow allowlist: only WordPress category
 slugs listed here are mapped onto wtrx.BlogCategory. Anything else is ignored,
@@ -44,6 +48,7 @@ from wtrx.management.commands._wp_content_utils import (
     convert_body,
     download_image,
     resolve_blogs_target,
+    yoast_seo_fields_from_api_post,
 )
 
 WP_API_URL = "https://350.org/wp-json/wp/v2/posts"
@@ -225,6 +230,7 @@ class Command(BaseCommand):
             categories = get_categories(_category_names(post))
             body = convert_body(post["content"]["rendered"], session, self.stdout, dry_run=dry_run)
             author_name = _author_name(post, session)
+            seo_title, search_description = yoast_seo_fields_from_api_post(post)
 
             hero_image = None
             featured_url = _featured_image_url(post)
@@ -235,6 +241,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"    [dry-run] title={title!r} slug={slug!r} published_at={published_at} "
                     f"author_name={author_name!r} categories={[c.name for c in categories]} "
+                    f"seo_title={seo_title!r} search_description={search_description!r} "
                     f"blocks={len(body)}"
                 )
                 continue
@@ -251,6 +258,8 @@ class Command(BaseCommand):
                 existing.hero_image = hero_image
                 existing.body = body
                 existing.author_name = author_name
+                existing.seo_title = seo_title
+                existing.search_description = search_description
                 existing.save()
                 existing.categories.set(categories)
                 updated += 1
@@ -259,6 +268,8 @@ class Command(BaseCommand):
                     title=title,
                     slug=slug,
                     author_name=author_name,
+                    seo_title=seo_title,
+                    search_description=search_description,
                     published_at=published_at,
                     # Wagtail only sets first_published_at when a page is
                     # published through the admin, so an imported page would

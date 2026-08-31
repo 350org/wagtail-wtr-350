@@ -8,6 +8,7 @@ plain helper module, not itself a command. Used by both
 import_350_blog.py and import_350_press_releases.py.
 """
 
+import html
 import os
 import re
 import uuid
@@ -31,6 +32,55 @@ def _full_size_wp_image_url(url):
     if not match:
         return url
     return parsed._replace(path=match.group("base") + match.group("ext")).geturl()
+
+
+def _strip_site_name_suffix(title, site_name):
+    """
+    Yoast's default title template appends " - <Site Name>" to every page's
+    <title>/og:title (e.g. "Chokepoints: The Global Oil Supply's Weak Links
+    - 350"). Strip it so the imported SEO title matches what an editor
+    would type by hand, not the browser-tab rendering of it.
+    """
+    if not title or not site_name:
+        return title
+    suffix = f" - {site_name}"
+    if title.endswith(suffix):
+        return title[: -len(suffix)]
+    return title
+
+
+def yoast_seo_fields_from_api_post(post):
+    """
+    Extract (seo_title, search_description) from a WP REST API post's
+    embedded Yoast SEO data.
+
+    ``yoast_head_json`` is added to every post/page response by the Yoast
+    SEO plugin's REST API integration whenever the plugin is active -- no
+    ``_embed`` or other special request param needed, unlike the
+    featured-media/author embeds this module also reads.
+    """
+    yoast = post.get("yoast_head_json") or {}
+    title = html.unescape(yoast.get("title") or "")
+    description = html.unescape(yoast.get("description") or "")
+    site_name = yoast.get("og_site_name") or ""
+    return _strip_site_name_suffix(title, site_name), description
+
+
+def yoast_seo_fields_from_page(soup):
+    """
+    Extract (seo_title, search_description) from a scraped page's <head>.
+
+    Used for content not exposed via the WP REST API (press releases --
+    see that command's module docstring), where Yoast's SEO data only
+    exists as the rendered <title>/<meta name="description"> tags.
+    """
+    title_tag = soup.find("title")
+    title = html.unescape(title_tag.get_text(strip=True)) if title_tag else ""
+    meta_desc = soup.find("meta", attrs={"name": "description"})
+    description = html.unescape(meta_desc.get("content", "")) if meta_desc else ""
+    site_tag = soup.find("meta", attrs={"property": "og:site_name"})
+    site_name = site_tag.get("content", "") if site_tag else ""
+    return _strip_site_name_suffix(title, site_name), description
 
 
 def resolve_blogs_target(stderr, style, target_slug):
