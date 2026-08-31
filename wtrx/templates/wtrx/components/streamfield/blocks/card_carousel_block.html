@@ -120,7 +120,7 @@ row without wrapping oddly.
         {% if value.link_page or value.link_url %}
             <div class="mt-2">
                 {% trans "Take action" as default_link_text %}
-                {% include "wtrx/components/button.html" with text=value.link_text|default:default_link_text link_page=value.link_page link_url=value.link_url style="primary" %}
+                {% include "wtrx/components/button.html" with text=value.link_text|default:default_link_text link_page=value.link_page link_url=value.link_url style="primary" size="lg" %}
             </div>
         {% endif %}
     </div>

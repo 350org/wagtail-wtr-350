@@ -290,12 +290,24 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
 3. **Settings over hardcoding**: Platform-specific behavior (ActBlue, Action Network,
    ActionKit, Fundraise Up) is driven by `IntegrationSettings.integrations`, not
    hardcoded in blocks or templates. See "Integrations Framework" below.
-4. **Block visibility via hooks, not import-time DB reads**: All SignupBlock
-   and DonateBlock variants are always registered in `BodyStreamBlock` /
-   `SectionContentBlock`. Variants for integrations that aren't enabled are
-   hidden in the Wagtail editor via `wagtail_hooks.py`, which reads
-   `IntegrationSettings` at request time. Never read the database at
-   class-definition or import time — Django's ORM is not available then.
+4. **Block visibility via native picker filtering, not import-time DB reads**:
+   All SignupBlock and DonateBlock variants are always registered in
+   `BodyStreamBlock` / `SectionContentBlock`. Variants for integrations that
+   aren't enabled are hidden from the "Add block" picker by
+   `IntegrationGatedStreamBlockMixin` (`wtrx/blocks/__init__.py`), which
+   overrides `sorted_child_blocks()` — the one place Wagtail core uses it,
+   solely to build the picker list — to filter by `IntegrationSettings` at
+   request time. It never touches `child_blocks` itself, so a block placed
+   on a page while its integration was enabled keeps parsing/rendering
+   correctly forever after, even once that integration is disabled. Reading
+   the current request from inside a block (which Wagtail's Telepath
+   adapter calls with no request argument) goes through the `ContextVar` in
+   `wtrx/request_context.py`, populated by
+   `CurrentRequestMiddleware`. An earlier version of this hid blocks by
+   injecting CSS keyed to Wagtail's admin DOM structure — that approach was
+   replaced for being too fragile across Wagtail upgrades; don't reintroduce
+   it. Never read the database at class-definition or import time —
+   Django's ORM is not available then.
 5. **No raw columns/grids in blocks**: Layout control is through opinionated
    composite blocks (SectionBlock, CardGridBlock, CalloutBlock). Editors should
    not be able to create arbitrary column layouts.
@@ -394,6 +406,62 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
     - Hero-section and nav/footer contribution hooks are reserved for future
       `IntegrationType` fields — not implemented yet, since no current
       integration needs them.
+    - **`IntegrationType.default_enabled` gates built-in, non-third-party
+      block variants the same way, without changing their default
+      visibility.** `wtrx/integrations/wagtail_forms.py` registers
+      `wagtail_forms` (gating `signup_wagtail_forms`) with
+      `default_enabled=True` — the only registration that sets it. Every
+      genuine third-party integration leaves it at the default `False`:
+      `IntegrationSettings.is_integration_enabled(slug)` returns
+      `IntegrationType.default_enabled` only when **no entry at all** exists
+      for that slug in `integrations`; an explicit entry (enabled or not)
+      always wins over the registry default in either direction. This is
+      what lets Wagtail Forms — which needs no external config and should
+      stay visible out of the box — become hideable per site (an editor adds
+      a "Wagtail Forms" entry with Enabled unchecked) without regressing to
+      "hidden until configured" like a real integration.
+
+      **A `default_enabled=True` slug with no entry of its own also yields
+      to any *genuine third-party* integration in the same `category`
+      that's been explicitly enabled** — turning on ActionKit or Action
+      Network (both `category="signup"`) hides Wagtail Forms automatically,
+      without it needing its own disabled entry, on the assumption a site
+      that's wired up a real signup integration doesn't also want the
+      built-in option cluttering the picker. This lives in
+      `IntegrationSettings._explicit_entry_enabled()`/`is_integration_enabled()`
+      (`site_settings.py`) — the sibling check calls
+      `_explicit_entry_enabled()`, not `is_integration_enabled()` itself,
+      and explicitly skips any sibling that is *also* `default_enabled=True`
+      (guards against two such built-ins ever yielding to each other, even
+      given a redundant explicit "enabled=True" entry on one of them —
+      otherwise an editor re-confirming one as enabled, which changes
+      nothing under its own default, would have the surprising side effect
+      of hiding the other; there's only one such slug today, but this also
+      means two `default_enabled=True` slugs in one category could never
+      trigger mutual recursion through this check if a second one is ever
+      added). An explicit entry for the built-in block itself (enabled or
+      not) still always overrides this, same as the paragraph above.
+
+      **`SignupLinkBlock` (a plain link-out signup CTA) was removed
+      entirely** — block class, `signup_link` pseudo-integration module,
+      template, and its `IntegrationsStreamBlock`/`BodyStreamBlock`/
+      `SectionContentBlock` registrations — once `CalloutBlock` and
+      `FeaturePanelBlock` made it redundant (both already offer a heading +
+      copy + CTA button shape). Confirmed via the live imported DB that no
+      page or `IntegrationSettings` row referenced it before removing it —
+      a StreamField block registered in `child_blocks` for real content
+      must never be un-registered (rule #4), so check for existing usage
+      first if this pattern comes up again. The generic `DonateBlock`
+      (`donate`) is intentionally left gated by the existing `actblue`
+      integration rather than given its own toggle: `DonateBlock.get_context()`
+      already sources its URL/suggested-amounts from that same config entry
+      (see `wtrx/integrations/actblue.py` — "generic hosted donation page, no
+      API calls"), so a separate toggle would let the block show while having
+      no working destination URL. `actblue`'s own name is a historical
+      artifact of it being the most common hosted-donate-page provider;
+      functionally it already **is** the generic/URL-based donate
+      integration, distinct from the true third-party-API integration
+      `DonateFundraiseUpBlock`/`fundraiseup`.
 11. **wagtail-ai integration**: AI-assist buttons are opt-in per field, via
     drop-in panel replacements from `wagtail_ai.panels` —
     `AITitleFieldPanel`/`AIDescriptionFieldPanel`/`AIFieldPanel` swap in for

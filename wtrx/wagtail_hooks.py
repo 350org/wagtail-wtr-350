@@ -2,15 +2,18 @@
 Wagtail hooks for the wtrx app.
 
 Hooks registered here:
-- register_admin_urls: adds the block-visibility JS endpoint
-- insert_global_admin_js: loads the block-visibility script and the
-  wagtail-ai context-handler fix in the admin
+- insert_global_admin_js: loads the wagtail-ai context-handler fix and the
+  pinned-Draftail-toolbar default in the admin
+
+Block-type visibility (hiding irrelevant SignupBlock/DonateBlock variants
+per IntegrationSettings) is NOT a hook — it lives in
+IntegrationGatedStreamBlockMixin in wtrx/blocks/__init__.py, which filters
+BodyStreamBlock/SectionContentBlock's "Add block" picker natively via
+sorted_child_blocks(). See wtrx/request_context.py for how block code
+accesses the current request.
 """
 
-import json
-
-from django.http import HttpResponse
-from django.urls import path, reverse
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
@@ -18,105 +21,6 @@ from wagtail import hooks
 from wagtail.admin.menu import MenuItem
 from wagtail.admin.staticfiles import versioned_static
 from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
-
-
-# ---------------------------------------------------------------------------
-# Block visibility — hide irrelevant block types in the StreamField editor
-# ---------------------------------------------------------------------------
-#
-# All SignupBlock and DonateBlock variants are always registered in
-# BodyStreamBlock (see blocks/__init__.py). This hook hides the block-type
-# picker buttons for integrations that aren't enabled in the site's
-# IntegrationSettings. Which content block(s) each integration gates is
-# metadata on its IntegrationType (wtrx/integrations/registry.py) —
-# adding a new integration type never requires touching this file.
-#
-# signup_wagtail_forms and signup_link are not gated by any integration —
-# they're always visible (the built-in form and a plain CTA link work
-# regardless of which integrations are enabled).
-#
-# How it works:
-#   1. register_admin_urls adds a lightweight JS endpoint at
-#      /admin/wtrx/block-visibility.js that reads IntegrationSettings
-#      for the current request's site and returns a script that hides
-#      the irrelevant block-chooser buttons via CSS.
-#   2. insert_global_admin_js injects a <script> tag loading that endpoint
-#      on every admin page.
-#
-# This approach avoids reading the database at import time (architecture
-# rule #4 in AGENTS.md) — the DB is only queried when the admin page is
-# actually loaded.
-# ---------------------------------------------------------------------------
-
-
-def _block_visibility_js(request):
-    """
-    Return a JS snippet that hides block-type buttons in the StreamField
-    block chooser for disabled integrations.
-
-    The script injects a <style> element with CSS rules that hide the
-    block-chooser buttons for disabled block types. CSS injection works
-    reliably with Wagtail's dynamic Telepath/React rendering because
-    the style rules apply whenever matching DOM elements appear.
-    """
-    # Import here to avoid import-time DB access
-    from wagtail.models import Site
-
-    from wtrx.integrations.registry import all_integrations
-    from wtrx.site_settings import IntegrationSettings
-
-    try:
-        integration = IntegrationSettings.for_request(request)
-        hidden_blocks = [
-            block_name
-            for integration_type in all_integrations()
-            if not integration.is_integration_enabled(integration_type.slug)
-            for block_name in integration_type.content_block_names
-        ]
-    except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
-        # If settings aren't configured yet (fresh install), show all blocks
-        hidden_blocks = []
-
-    if not hidden_blocks:
-        # Nothing to hide — return a no-op script
-        js = "/* wtrx: all block types visible */"
-    else:
-        # Build CSS selectors that target the block-type buttons.
-        # [data-contentpath="<name>"] targets existing block instances in the
-        # StreamField editor. button[data-type="<name>"] targets the block-type
-        # buttons in the add-block chooser panel.
-        selectors = []
-        for name in hidden_blocks:
-            selectors.append(f'[data-contentpath="{name}"]')
-            selectors.append(f'button[data-type="{name}"]')
-        css_text = ", ".join(selectors) + " { display: none !important; }"
-
-        js = f"""
-(function() {{
-    var style = document.createElement('style');
-    style.textContent = {json.dumps(css_text)};
-    document.head.appendChild(style);
-}})();
-"""
-
-    return HttpResponse(js, content_type="application/javascript")
-
-
-@hooks.register("register_admin_urls")
-def register_block_visibility_url():
-    return [
-        path(
-            "wtrx/block-visibility.js",
-            _block_visibility_js,
-            name="wtrx_block_visibility_js",
-        ),
-    ]
-
-
-@hooks.register("insert_global_admin_js")
-def insert_block_visibility_js():
-    url = reverse("wtrx_block_visibility_js")
-    return format_html('<script src="{}"></script>', url)
 
 
 # ---------------------------------------------------------------------------

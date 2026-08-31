@@ -70,6 +70,11 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "wagtail_wtr.middleware.ScopedVerifyUserMiddleware",
+    # Stashes the current request for wtrx.blocks — BodyStreamBlock/
+    # SectionContentBlock need it to filter the "Add block" picker by
+    # IntegrationSettings, and Wagtail's Telepath adapter that builds that
+    # picker is called with no request argument (see wtrx/request_context.py).
+    "wtrx.request_context.CurrentRequestMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

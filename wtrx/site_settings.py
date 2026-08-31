@@ -26,7 +26,8 @@ from .integrations.actblue import (
 from .integrations.action_network import ActionNetworkConfigBlock
 from .integrations.actionkit import ActionKitConfigBlock
 from .integrations.fundraiseup import FundraiseUpConfigBlock
-from .integrations.registry import all_integrations
+from .integrations.registry import all_integrations, get_integration
+from .integrations.wagtail_forms import WagtailFormsConfigBlock
 
 
 # ---------------------------------------------------------------------------
@@ -838,6 +839,7 @@ class IntegrationsStreamBlock(StreamBlock):
     fundraiseup = FundraiseUpConfigBlock()
     actblue = ActBlueConfigBlock()
     action_network = ActionNetworkConfigBlock()
+    wagtail_forms = WagtailFormsConfigBlock()
 
     class Meta:
         label = _("Integrations")
@@ -878,21 +880,84 @@ class IntegrationSettings(BaseSiteSetting):
                 return block.value
         return None
 
+    def _explicit_entry_enabled(self, slug):
+        """
+        Return the `enabled` value of this slug's own entry in
+        `integrations`, or None if no entry exists at all.
+
+        Split out of is_integration_enabled() so the category-yielding check
+        below can ask "did an editor explicitly turn this sibling on"
+        without going through that sibling's own default_enabled fallback —
+        calling is_integration_enabled() recursively there would be fine
+        today (only one slug has default_enabled=True) but would risk
+        infinite recursion the day a second one does, since each would ask
+        the other to resolve its own default first.
+        """
+        for block in self.integrations:
+            if block.block_type == slug:
+                return bool(block.value.get("enabled", True))
+        return None
+
     def is_integration_enabled(self, slug):
-        return self.get_integration_config(slug) is not None
+        """
+        Return whether this integration/feature should be treated as active.
+
+        An explicit entry in `integrations` always wins, in either direction:
+        if one exists for this slug, its own `enabled` value is the answer,
+        regardless of the registry default or the category-yielding rule
+        below. Only when there's no entry at all do we fall back to
+        IntegrationType.default_enabled — True for a built-in,
+        zero-configuration feature like Wagtail Forms (which should read as
+        "on" until a site explicitly disables it), False for every genuine
+        third-party integration (which should stay hidden until a site
+        explicitly configures and enables it). See
+        IntegrationType.default_enabled for the full rationale.
+
+        A default_enabled=True slug (a built-in, zero-configuration option
+        like Wagtail Forms) with no entry of its own additionally yields to
+        any *genuine third-party* integration in the same category that has
+        been explicitly enabled: turning on ActionKit or Action Network
+        (both category="signup") hides Wagtail Forms by default, on the
+        assumption a site that has wired up a real signup integration
+        doesn't also want the built-in option cluttering the "Add block"
+        picker. Add an explicit entry for the built-in block itself
+        (enabled or not) to override this either way.
+
+        Only a sibling with its own default_enabled=False can trigger this
+        — two built-in, default_enabled=True options in the same category
+        would never yield to each other, even given a redundant explicit
+        "enabled=True" entry on one of them (there's only one such slug
+        today, Wagtail Forms, but this guards against the surprising
+        side effect a second one would otherwise create: an editor
+        re-confirming one built-in as enabled — which changes nothing under
+        its own default — silently hiding the other).
+        """
+        explicit = self._explicit_entry_enabled(slug)
+        if explicit is not None:
+            return explicit
+
+        integration_type = get_integration(slug)
+        if not integration_type or not integration_type.default_enabled:
+            return False
+
+        for other in all_integrations():
+            if other.slug == slug or other.category != integration_type.category:
+                continue
+            if other.default_enabled:
+                continue
+            if self._explicit_entry_enabled(other.slug):
+                return False
+
+        return True
 
     def enabled_slugs_by_category(self, category):
         """Return the slugs of all enabled integrations in the given category."""
-        from .integrations.registry import get_integration
-
-        slugs = []
-        for block in self.integrations:
-            if not block.value.get("enabled", True):
-                continue
-            integration_type = get_integration(block.block_type)
-            if integration_type and integration_type.category == category:
-                slugs.append(block.block_type)
-        return slugs
+        return [
+            integration_type.slug
+            for integration_type in all_integrations()
+            if integration_type.category == category
+            and self.is_integration_enabled(integration_type.slug)
+        ]
 
     def get_action_network_api_key(self):
         """

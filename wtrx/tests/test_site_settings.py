@@ -14,6 +14,11 @@ Tests for wtrx.site_settings.
   plus the logo lockup's link target.
 - TestHeaderLogoRendering: the header logo's hover treatment, a CSS filter
   that works on any logo format.
+- TestIsIntegrationEnabled: IntegrationSettings.is_integration_enabled()'s
+  default_enabled fallback — the mechanism that lets a built-in,
+  non-third-party block variant (Wagtail Forms) stay visible with zero
+  configuration while every genuine third-party integration stays hidden
+  until explicitly configured.
 """
 
 import base64
@@ -118,6 +123,158 @@ class TestDonateBlockSuggestedAmounts(TestCase):
         value = self.block.to_python({})
         ctx = self.block.get_context(value, parent_context=None)
         self.assertEqual(ctx["donation_suggested_amounts_list"], [])
+
+
+class TestIsIntegrationEnabled(TestCase):
+    """
+    IntegrationSettings.is_integration_enabled() drives block visibility in
+    the editor (wagtail_hooks.py). Its default_enabled fallback is what makes
+    a built-in feature (Wagtail Forms) independently hideable per site
+    without being hidden by default the way a real third-party integration is.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+        cls.integration, _ = IntegrationSettings.objects.get_or_create(
+            site=cls.site,
+        )
+
+    def _set_integrations(self, data):
+        self.integration.integrations = data
+        self.integration.save()
+
+    def test_no_entry_and_default_enabled_false_is_disabled(self):
+        """A genuine third-party integration with no entry reads as disabled."""
+        self._set_integrations([])
+        self.assertFalse(self.integration.is_integration_enabled("actblue"))
+        self.assertFalse(self.integration.is_integration_enabled("actionkit"))
+        self.assertFalse(self.integration.is_integration_enabled("fundraiseup"))
+        self.assertFalse(self.integration.is_integration_enabled("action_network"))
+
+    def test_no_entry_and_default_enabled_true_is_enabled(self):
+        """Wagtail Forms reads as enabled with no entry at all — it's built-in."""
+        self._set_integrations([])
+        self.assertTrue(self.integration.is_integration_enabled("wagtail_forms"))
+
+    def test_explicit_disabled_entry_overrides_default_enabled_true(self):
+        self._set_integrations([("wagtail_forms", {"enabled": False})])
+        self.assertFalse(self.integration.is_integration_enabled("wagtail_forms"))
+
+    def test_explicit_enabled_entry_overrides_default_enabled_false(self):
+        self._set_integrations(
+            [
+                (
+                    "actblue",
+                    {
+                        "enabled": True,
+                        "base_url": "",
+                        "suggested_amounts": "",
+                        "default_recurring": False,
+                    },
+                )
+            ]
+        )
+        self.assertTrue(self.integration.is_integration_enabled("actblue"))
+
+    def test_unknown_slug_is_disabled(self):
+        """A slug with no registered IntegrationType at all is never enabled."""
+        self._set_integrations([])
+        self.assertFalse(self.integration.is_integration_enabled("not-a-real-slug"))
+
+    def test_enabled_slugs_by_category_includes_default_enabled_with_no_entry(self):
+        """wagtail_forms shows up in the 'signup' category with no entry needed."""
+        self._set_integrations([])
+        self.assertIn(
+            "wagtail_forms", self.integration.enabled_slugs_by_category("signup")
+        )
+
+    def test_enabled_slugs_by_category_excludes_explicitly_disabled(self):
+        self._set_integrations([("wagtail_forms", {"enabled": False})])
+        self.assertNotIn(
+            "wagtail_forms", self.integration.enabled_slugs_by_category("signup")
+        )
+
+    def test_enabling_actionkit_hides_wagtail_forms_by_default(self):
+        """
+        A default_enabled=True slug with no entry of its own yields to a
+        sibling in the same category that's been explicitly enabled — a
+        site that's wired up a real signup integration shouldn't also see
+        the built-in form option in the picker with zero effort.
+        """
+        self._set_integrations(
+            [
+                (
+                    "actionkit",
+                    {
+                        "enabled": True,
+                        "hostname": "x.actionkit.com",
+                        "api_username": "u",
+                        "api_password": "",
+                    },
+                )
+            ]
+        )
+        self.assertFalse(self.integration.is_integration_enabled("wagtail_forms"))
+
+    def test_enabling_action_network_hides_wagtail_forms_by_default(self):
+        self._set_integrations([("action_network", {"enabled": True, "api_key": ""})])
+        self.assertFalse(self.integration.is_integration_enabled("wagtail_forms"))
+
+    def test_explicit_wagtail_forms_entry_overrides_category_yielding(self):
+        """An explicit entry for Wagtail Forms itself always wins, even with
+        a sibling signup integration enabled."""
+        self._set_integrations(
+            [
+                (
+                    "actionkit",
+                    {
+                        "enabled": True,
+                        "hostname": "x.actionkit.com",
+                        "api_username": "u",
+                        "api_password": "",
+                    },
+                ),
+                ("wagtail_forms", {"enabled": True}),
+            ]
+        )
+        self.assertTrue(self.integration.is_integration_enabled("wagtail_forms"))
+
+    def test_enabling_a_donation_integration_does_not_hide_wagtail_forms(self):
+        """Category-yielding is scoped to the same category — a donation
+        integration is unrelated to the signup category Wagtail Forms is in."""
+        self._set_integrations(
+            [
+                (
+                    "actblue",
+                    {
+                        "enabled": True,
+                        "base_url": "",
+                        "suggested_amounts": "",
+                        "default_recurring": False,
+                    },
+                )
+            ]
+        )
+        self.assertTrue(self.integration.is_integration_enabled("wagtail_forms"))
+
+    def test_disabled_sibling_entry_does_not_hide_wagtail_forms(self):
+        """An entry that exists but is itself disabled doesn't count as
+        "explicitly enabled" for the purposes of yielding."""
+        self._set_integrations(
+            [
+                (
+                    "actionkit",
+                    {
+                        "enabled": False,
+                        "hostname": "x.actionkit.com",
+                        "api_username": "u",
+                        "api_password": "",
+                    },
+                )
+            ]
+        )
+        self.assertTrue(self.integration.is_integration_enabled("wagtail_forms"))
 
 
 class TestNavigationSettingsResolvedForPage(TestCase):

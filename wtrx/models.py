@@ -18,6 +18,8 @@ from wagtail.admin.panels import (
     ObjectList,
     TabbedInterface,
 )
+from wagtail.blocks import StreamValue, StructValue
+from wagtail.blocks.list_block import ListValue
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
@@ -25,7 +27,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail_ai.panels import AIDescriptionFieldPanel, AITitleFieldPanel
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
-from .blocks import BACKGROUND_COLOR_CHOICES, HERO_LAYOUT_CHOICES, BodyStreamBlock, HeroCTABlock
+from .blocks import BACKGROUND_COLOR_CHOICES, BodyStreamBlock, HeroCTABlock
 from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
@@ -100,14 +102,12 @@ class BasePage(Page):
             ],
             heading=_("For search engines"),
         ),
-        # "For site menus" — spelled out explicitly rather than indexing into
-        # Page.promote_panels (a positional index into a third-party list
-        # would silently pick up the wrong panel if Wagtail ever reorders or
-        # extends its own default promote_panels in a future release).
-        MultiFieldPanel(
-            [FieldPanel("show_in_menus")],
-            heading=_("For site menus"),
-        ),
+        # "For site menus" is intentionally omitted — this project doesn't
+        # use Wagtail's automatic page-tree menu APIs (navigation is driven
+        # entirely by NavigationSettings, a hand-curated StreamField), so
+        # editors never need to see the show_in_menus checkbox. The field
+        # itself is untouched (Wagtail core still reads/writes it, default
+        # False), only the editor UI panel is dropped.
         MultiFieldPanel(
             [
                 FieldPanel("meta_image"),
@@ -154,13 +154,14 @@ class HeroMixin(models.Model):
     Mixin adding a hero section to any page type.
 
     Renders as one of two variants (see components/hero.html): "full" — the
-    original full-viewport hero, background image or video, centered/left
-    text, optional cta — or "banner" — a compact rounded panel, solid/
-    gradient color background (reusing CalloutBlock's 5-color system) beside
-    an image, no cta. Which variant a page gets is fixed per page type via
-    the hero_variant class attribute, not editor-controlled: HomePage
-    overrides it to "full"; every other HeroMixin page type (ContentPage,
-    IndexPage) uses the "banner" default.
+    original full-viewport hero, background image or video, left-aligned
+    text anchored toward the bottom, optional cta — or "banner" — a compact
+    rounded panel, solid/gradient color background (reusing CalloutBlock's
+    5-color system) beside an image, no cta. Which variant a page gets is
+    fixed per page type via the hero_variant class attribute, not
+    editor-controlled: HomePage overrides it to "full"; every other
+    HeroMixin page type (ContentPage, IndexPage, Blogs) uses the "banner"
+    default.
 
     Fields:
     - hero_headline: optional override for the page title as the displayed h1
@@ -172,12 +173,28 @@ class HeroMixin(models.Model):
       custom pause/play toggle in the corner. Takes over from hero_image as
       the background/image area on both variants; hero_image is still used
       as the poster fallback if the video has none.
-    - hero_layout: centered or left-aligned text. "full" variant only —
-      "banner" has a fixed text-left/image-right structure.
     - hero_banner_color: background color/gradient. "banner" variant only —
       "full" never shows a solid color background.
     - hero_cta: optional signup/donate/announcement widget (HeroCTABlock, at
-      most one). "full" variant only — "banner" never renders one.
+      most one). "full" variant renders whichever choice is set; "banner"
+      variant only renders the plain `button` choice (see
+      components/hero.html), silently skipping signup/donate/announcement.
+
+    There used to be an editable hero_layout field (centered vs. left-
+    aligned text, "full" variant only) — removed in favor of a single fixed
+    layout (left-aligned, matching what every real "full"-variant page
+    already used in practice: Home and every regional homepage). See
+    components/hero.html — it no longer branches on layout at all.
+
+    hero_video only matters for the "full" variant, so a "banner"-only page
+    type should use banner_hero_panels (defined below, next to hero_panels)
+    instead of hero_panels — it exposes headline/copy/image/banner_color
+    plus hero_cta (restricted in practice to its `button` choice, per
+    above), the fields "banner" actually renders. hero_video stays a real
+    model field on every HeroMixin subclass (including "banner"-only ones)
+    rather than being split into a separate mixin, so this is a panel-only
+    choice with no schema difference between page types — see
+    banner_hero_panels' own docstring for why.
 
     Use: include `components/hero.html` in the page template.
     """
@@ -226,17 +243,6 @@ class HeroMixin(models.Model):
             "falls back to the hero image above if no thumbnail is set."
         ),
     )
-    hero_layout = models.CharField(
-        max_length=20,
-        choices=HERO_LAYOUT_CHOICES,
-        default="centered",
-        verbose_name=_("hero layout"),
-        help_text=_(
-            "Centered text over the image, or left-aligned and anchored toward the bottom. "
-            "Only affects the homepage's full-viewport hero — every other page's hero "
-            "renders as a compact banner with a fixed layout."
-        ),
-    )
     hero_banner_color = models.CharField(
         max_length=20,
         choices=BACKGROUND_COLOR_CHOICES,
@@ -265,7 +271,34 @@ class HeroMixin(models.Model):
                 FieldPanel("hero_copy"),
                 FieldPanel("hero_image"),
                 MediaChooserPanel("hero_video", media_type="video"),
-                FieldPanel("hero_layout"),
+                FieldPanel("hero_banner_color"),
+                FieldPanel("hero_cta"),
+            ],
+            heading=_("Hero"),
+        ),
+    ]
+
+    # Panel-only subset for HeroMixin page types that never leave the
+    # "banner" variant (ContentPage, IndexPage, Blogs — every HeroMixin page
+    # except HomePage). hero_video stays a real model field (so no
+    # migration, and no risk to any content already saved on existing
+    # pages) but sits inert on "banner" per this class's own docstring, so
+    # offering it as an editable option is misleading rather than merely
+    # unused.
+    #
+    # hero_cta IS included here, unlike hero_video — components/hero.html's
+    # "banner" variant rendering already only ever renders the plain
+    # `button` choice from a hero_cta StreamField value (the signup/donate/
+    # announcement choices are silently skipped there; see the comment
+    # above that `{% for cta_block in hero.cta %}` loop), so a banner-hero
+    # page editor adding a Button gets a real, working back/CTA link, not a
+    # dead field.
+    banner_hero_panels = [
+        MultiFieldPanel(
+            [
+                FieldPanel("hero_headline"),
+                FieldPanel("hero_copy"),
+                FieldPanel("hero_image"),
                 FieldPanel("hero_banner_color"),
                 FieldPanel("hero_cta"),
             ],
@@ -289,7 +322,6 @@ class HeroMixin(models.Model):
             "copy_is_block": False,
             "image": self.hero_image,
             "video": self.hero_video,
-            "layout": self.hero_layout,
             "banner_color": self.hero_banner_color,
             "cta": self.hero_cta,
         }
@@ -329,16 +361,18 @@ class PublishedDateMixin(models.Model):
 class BannerHeroMixin(models.Model):
     """
     A small header for page types that always render hero.html's "banner"
-    variant and don't need HeroMixin's video/layout/cta options — currently
+    variant and don't need HeroMixin's video/cta options — currently
     just Post. See HeroMixin for the full page-hero field set used by
-    HomePage/ContentPage/IndexPage, and hero.html for the "banner" variant
-    itself (same rendering, same 5-color system).
+    HomePage, and hero.html for the "banner" variant itself (same
+    rendering, same 5-color system).
 
-    Deliberately not built on top of HeroMixin: HeroMixin's hero_video,
-    hero_layout, and hero_cta fields would just sit inert here (as they
-    already do for ContentPage/IndexPage's "banner" variant), and per
-    product decision a blog post's header shouldn't offer them as editable
-    options at all, not merely ignore them silently.
+    Deliberately not built on top of HeroMixin: unlike ContentPage/IndexPage/
+    Blogs (which already have HeroMixin's hero_video and hero_cta columns
+    from before HeroMixin.banner_hero_panels existed, and keep them —
+    unused — to avoid a schema change), Post has never had those columns at
+    all. Per product decision a blog post's header shouldn't offer them as
+    editable options, so there's no reason for Post to carry the unused
+    database columns HeroMixin would add.
     """
 
     hero_headline = models.CharField(
@@ -398,7 +432,6 @@ class BannerHeroMixin(models.Model):
             "copy_is_block": False,
             "image": self.hero_image,
             "video": None,
-            "layout": None,
             "banner_color": self.hero_banner_color,
             "cta": [],
         }
@@ -583,7 +616,7 @@ class ContentPage(BasePage, HeroMixin):
 
     content_panels = (
         BasePage.title_panels
-        + HeroMixin.hero_panels
+        + HeroMixin.banner_hero_panels
         + [
             FieldPanel("body"),
         ]
@@ -651,7 +684,7 @@ class IndexPage(BasePage, HeroMixin):
 
     content_panels = (
         BasePage.title_panels
-        + HeroMixin.hero_panels
+        + HeroMixin.banner_hero_panels
         + [
             FieldPanel("intro"),
             FieldPanel("body"),
@@ -712,6 +745,58 @@ class IndexPage(BasePage, HeroMixin):
         ctx["children"] = children
         ctx["paginator"] = paginator
         return ctx
+
+
+def _first_image_in_body(value):
+    """
+    Depth-first search for the first real image anywhere inside a body
+    StreamField value. Backs Post.get_card_image()'s fallback for a post
+    with no explicit header image.
+
+    Recurses through every StreamValue/StructValue/ListValue container
+    Wagtail can produce here -- the same three-type walk
+    harvest_block_previews._richness() already uses to score a whole
+    StreamField, just short-circuiting on the first hit instead of summing
+    everything. That means it reaches into SectionBlock's own nested
+    content stream and into every card/image/logo/person grid's list
+    items with no hardcoded list of "blocks that might contain an image",
+    and needs no changes when a new block type is added later.
+
+    Every image-carrying block in this codebase names its ImageChooserBlock
+    field `image` (ImageBlock, ImageTextBlock, FeaturePanelBlock, HeroBlock,
+    QuoteBlock, CalloutBlock, DonateFundraiseUpBlock, SignupActionKitBlock/
+    HeroSignupActionKitBlock, CardBlock, PersonCardBlock, ImageGridItemBlock,
+    LogoGridItemBlock -- CardBlock's separate `icon` field is deliberately
+    not matched), so this looks for that one field name rather than
+    branching on block type. It returns the first one found in document
+    order and stops there: this is a "better than a blank card" fallback,
+    not a curated "best photo in the post" pick, so it makes no attempt to
+    skip a more decorative image (e.g. CalloutBlock's background wash) in
+    favor of a later, more "content" one.
+    """
+    if isinstance(value, StreamValue):
+        for child in value:
+            found = _first_image_in_body(child.value)
+            if found:
+                return found
+        return None
+    if isinstance(value, StructValue):
+        for key, sub_value in value.items():
+            if key == "image":
+                if sub_value:
+                    return sub_value
+                continue
+            found = _first_image_in_body(sub_value)
+            if found:
+                return found
+        return None
+    if isinstance(value, ListValue):
+        for item in value:
+            found = _first_image_in_body(item)
+            if found:
+                return found
+        return None
+    return None
 
 
 class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
@@ -821,6 +906,24 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             return self.author_name
         return None
 
+    def get_card_image(self):
+        """
+        This post's card/listing image, used wherever it's shown as a card
+        (the Blogs index, PageCardsBlock, and its own "Related posts" panel
+        on other posts -- see get_context() below and Blogs.get_context()).
+
+        Prefers the explicit header image (hero_image, from BannerHeroMixin);
+        falls back to the first image found anywhere in this post's body
+        StreamField (see _first_image_in_body() for the search rules), so a
+        post an editor never set a header image on still gets a
+        representative thumbnail instead of a blank card. Returns None --
+        not an error -- if neither is set; post_card.html already degrades
+        gracefully with no image (AGENTS.md Error Handling).
+        """
+        if self.hero_image_id:
+            return self.hero_image
+        return _first_image_in_body(self.body)
+
     def get_context(self, request, *args, **kwargs):
         from wtrx.templatetags.wtrx_tags import page_as_card
 
@@ -852,6 +955,7 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
         related_posts = []
         for post in related:
             card = page_as_card(post)
+            card["image"] = post.get_card_image()
             card["date"] = post.published_at
             related_posts.append(card)
         ctx["related_posts"] = related_posts
@@ -901,7 +1005,7 @@ class Blogs(BasePage, HeroMixin):
         ),
     )
 
-    content_panels = BasePage.title_panels + HeroMixin.hero_panels + [FieldPanel("related_intro")]
+    content_panels = BasePage.title_panels + HeroMixin.banner_hero_panels + [FieldPanel("related_intro")]
 
     promote_panels = BasePage.promote_panels
     settings_panels = BasePage.settings_panels
@@ -1001,6 +1105,7 @@ class Blogs(BasePage, HeroMixin):
         cards = []
         for post in posts:
             card = page_as_card(post)
+            card["image"] = post.get_card_image()
             card["date"] = post.published_at
             cards.append(card)
 
@@ -1128,7 +1233,6 @@ class FormPage(BasePage, AbstractEmailForm):
             "copy_is_block": False,
             "image": None,
             "video": None,
-            "layout": "centered",
             "cta": [],
         }
         return ctx
