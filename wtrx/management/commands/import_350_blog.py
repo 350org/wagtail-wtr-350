@@ -17,7 +17,10 @@ Field mapping:
                                 only sets on an admin publish)
     WP content.rendered      -> Post.body (StreamField: text + image blocks)
     WP featured media        -> Post.hero_image
-    WP categories (subset)   -> Post.categories (see CATEGORY_SLUG_MAP)
+    WP categories (subset)   -> Post.categories (see CATEGORY_SLUG_MAP,
+                                 falling back to title-keyword matching --
+                                 see TITLE_CATEGORY_KEYWORDS)
+    WP "Hide from main blogroll" category -> Post.hide_from_blogroll
     WP author name           -> Post.author_name (Post.author, the FK to a
                                  site login user, is left blank — imported posts
                                  aren't written by staff accounts). The live
@@ -30,9 +33,14 @@ Field mapping:
                                  Name>" suffix Yoast's title template adds is
                                  stripped. Left blank if Yoast has none set.
 
-CATEGORY_SLUG_MAP is a deliberately narrow allowlist: only WordPress category
-slugs listed here are mapped onto wtrx.BlogCategory. Anything else is ignored,
-so imported posts may have zero categories rather than a guessed one.
+CATEGORY_SLUG_MAP is a deliberately narrow allowlist mapping specific
+WordPress category slugs directly onto wtrx.BlogCategory names -- these are
+exact/known equivalents (e.g. WP's "kiitg" category *is* our "Fossil Fuels"
+category), not a guess. A post carrying none of these WP categories falls
+back to TITLE_CATEGORY_KEYWORDS: a simple case-insensitive substring match
+of the post title against each of the 5 target categories' keyword list. A
+post can end up in more than one category, from either source, and a title
+that matches nothing keeps zero categories rather than a forced guess.
 """
 
 import html
@@ -54,12 +62,51 @@ from wtrx.management.commands._wp_content_utils import (
 WP_API_URL = "https://350.org/wp-json/wp/v2/posts"
 USER_AGENT = "350-wagtail-blog-import/1.0 (+https://github.com/)"
 
-# WordPress category slug -> wtrx.BlogCategory name. Only these are imported;
-# every other WP category is ignored.
+# WordPress category slug -> wtrx.BlogCategory name. Only known direct
+# equivalents belong here -- "justice" is WP's own literal "Climate Justice"
+# category, not a guess. "impacts" (WP's "Climate Impacts") is deliberately
+# excluded: it's broader than Extreme Weather (sea-level rise, biodiversity,
+# etc. all live under it too), so posts carrying it fall through to the
+# title-keyword match instead of being assumed to be about extreme weather.
 CATEGORY_SLUG_MAP = {
-    "kiitg": "stop fossil fuels",
-    "finance": "fossil finance",
-    "solutions": "renewable solutions",
+    "kiitg": "Fossil Fuels",
+    "finance": "Climate Finance",
+    "solutions": "Renewable Energy",
+    "justice": "Climate Justice",
+}
+
+# WP category slug flagging a post to be hidden from the main blog listing
+# (WP's own "Hide from main blogroll" category) -> Post.hide_from_blogroll.
+HIDE_FROM_BLOGROLL_SLUG = "hide-from-main-blogroll"
+
+# Fallback for posts with none of CATEGORY_SLUG_MAP's WP categories: a
+# case-insensitive substring match of the post title against each target
+# category's keyword list. Order doesn't matter -- every matching category
+# is applied, same as a post carrying multiple WP categories would be.
+TITLE_CATEGORY_KEYWORDS = {
+    "Fossil Fuels": [
+        "fossil fuel", "oil ", "coal", "pipeline", "drilling", "fracking",
+        "petroleum", "lng", "keep it in the ground", "gas company", "gas companies",
+        "gas field", "gas project", "refinery",
+    ],
+    "Renewable Energy": [
+        "renewable", "solar", "wind power", "wind energy", "wind farm",
+        "clean energy", "green energy", "electric vehicle", "battery storage",
+    ],
+    "Climate Finance": [
+        "divest", "divestment", "bank", "insurer", "insurance", "world bank",
+        "imf", "climate finance", "fossil fuel finance", "loan", "investor",
+        "investment", "funding",
+    ],
+    "Climate Justice": [
+        "justice", "equity", "indigenous", "frontline communities",
+        "human rights", "reparations", "just transition", "colonial",
+    ],
+    "Extreme Weather": [
+        "flood", "wildfire", "hurricane", "typhoon", "cyclone", "drought",
+        "heatwave", "heat wave", "extreme heat", "extreme weather", "climate disaster",
+        "monsoon", "landslide", "tornado", "storm",
+    ],
 }
 
 
@@ -72,15 +119,35 @@ def _parse_published_at(post):
     return dt
 
 
-def _category_names(post):
+def _wp_category_slugs(post):
     embedded_terms = post.get("_embedded", {}).get("wp:term", [])
     slugs = set()
     for group in embedded_terms:
         for term in group:
             if term.get("taxonomy") == "category":
                 slugs.add(term.get("slug"))
+    return slugs
+
+
+def _categorize_by_title(title):
+    lowered = title.lower()
+    return {
+        name
+        for name, keywords in TITLE_CATEGORY_KEYWORDS.items()
+        if any(keyword in lowered for keyword in keywords)
+    }
+
+
+def _category_names(post, title):
+    slugs = _wp_category_slugs(post)
     names = {CATEGORY_SLUG_MAP[slug] for slug in slugs if slug in CATEGORY_SLUG_MAP}
-    return names
+    if names:
+        return names
+    return _categorize_by_title(title)
+
+
+def _is_hidden_from_blogroll(post):
+    return HIDE_FROM_BLOGROLL_SLUG in _wp_category_slugs(post)
 
 
 def _author_name(post, session):
@@ -227,7 +294,8 @@ class Command(BaseCommand):
             self.stdout.write(f"{'updating' if existing else 'importing'}: {title}")
 
             published_at = _parse_published_at(post)
-            categories = get_categories(_category_names(post))
+            categories = get_categories(_category_names(post, title))
+            hide_from_blogroll = _is_hidden_from_blogroll(post)
             body = convert_body(post["content"]["rendered"], session, self.stdout, dry_run=dry_run)
             author_name = _author_name(post, session)
             seo_title, search_description = yoast_seo_fields_from_api_post(post)
@@ -241,6 +309,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"    [dry-run] title={title!r} slug={slug!r} published_at={published_at} "
                     f"author_name={author_name!r} categories={[c.name for c in categories]} "
+                    f"hide_from_blogroll={hide_from_blogroll} "
                     f"seo_title={seo_title!r} search_description={search_description!r} "
                     f"blocks={len(body)}"
                 )
@@ -258,10 +327,15 @@ class Command(BaseCommand):
                 existing.hero_image = hero_image
                 existing.body = body
                 existing.author_name = author_name
+                existing.hide_from_blogroll = hide_from_blogroll
                 existing.seo_title = seo_title
                 existing.search_description = search_description
-                existing.save()
+                # categories is a ParentalManyToManyField (django-modelcluster):
+                # .set() only caches the change in memory -- it's flushed to the
+                # DB by the *next* .save() call (ClusterableModel.commit()), so
+                # it must be called before save(), not after.
                 existing.categories.set(categories)
+                existing.save()
                 updated += 1
             else:
                 page = Post(
@@ -281,10 +355,16 @@ class Command(BaseCommand):
                     # repairs content imported before this was set here.
                     first_published_at=published_at,
                     hero_image=hero_image,
+                    hide_from_blogroll=hide_from_blogroll,
                     body=body,
                 )
                 blogs_index.add_child(instance=page)
+                # Same ParentalManyToManyField deferred-write behavior as
+                # above: add_child() already saved the page once (to assign
+                # its tree position), but categories still needs a save()
+                # after set() to actually commit to the DB.
                 page.categories.set(categories)
+                page.save()
                 created += 1
 
         if dry_run:

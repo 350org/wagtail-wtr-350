@@ -851,6 +851,16 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
         related_name="posts",
         verbose_name=_("categories"),
     )
+    hide_from_blogroll = models.BooleanField(
+        default=False,
+        verbose_name=_("hide from blogroll"),
+        help_text=_(
+            "Exclude this post from the Blogs page listing and from any "
+            "\"latest posts\" cards elsewhere on the site (e.g. Page Cards "
+            "on the home page). The post is still directly accessible and "
+            "still appears in search."
+        ),
+    )
     body = StreamField(
         BodyStreamBlock(),
         blank=True,
@@ -868,6 +878,7 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             FieldPanel("author_name"),
             FieldPanel("author_title"),
             FieldPanel("categories", widget=forms.CheckboxSelectMultiple),
+            FieldPanel("hide_from_blogroll"),
             FieldPanel("body"),
         ]
     )
@@ -1068,8 +1079,18 @@ class Blogs(BasePage, HeroMixin):
         same posts in the same order this page's own listing uses; a card
         row on the home page and the index it links to must never disagree
         about which posts are the most recent.
+
+        Excludes posts with hide_from_blogroll set — this is the single
+        place both the Blogs page listing and PageCardsBlock's home page
+        cards draw from, so a hidden post disappears from both at once.
         """
-        return Post.objects.child_of(self).live().public().order_by("-published_at")
+        return (
+            Post.objects.child_of(self)
+            .live()
+            .public()
+            .filter(hide_from_blogroll=False)
+            .order_by("-published_at")
+        )
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
