@@ -336,6 +336,7 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
        "link_page": Page | None,     # CTA internal page link
        "link_url": str | None,       # CTA external URL
        "in_body": bool,              # True only for a mid-page HeroBlock (see below)
+       "minimal": bool,              # headline-only (optionally +image) "banner" hero — shrinks it
    }
    ```
 

@@ -69,6 +69,7 @@ from wtrx.blocks import (
     _balanced_rows,
     _validate_at_most_one_link,
     background_is_light,
+    hero_is_minimal,
     parse_action_network_url,
     resolve_background,
 )
@@ -524,6 +525,27 @@ class TestHeroBlockFields(SimpleTestCase):
         self.assertEqual(ctx["hero"]["cta"], [])
         self.assertIsNone(ctx["hero"]["video"])
 
+    def test_get_context_minimal_true_when_headline_only(self):
+        block = HeroBlock()
+        value = block.to_python(
+            {"headline": "Take Action", "content": "", "image": None, "banner_color": "red"}
+        )
+        ctx = block.get_context(value)
+        self.assertTrue(ctx["hero"]["minimal"])
+
+    def test_get_context_minimal_false_when_content_present(self):
+        block = HeroBlock()
+        value = block.to_python(
+            {
+                "headline": "Take Action",
+                "content": "<p>Some supporting copy.</p>",
+                "image": None,
+                "banner_color": "red",
+            }
+        )
+        ctx = block.get_context(value)
+        self.assertFalse(ctx["hero"]["minimal"])
+
 
 class TestHeroCTABlock(SimpleTestCase):
     """
@@ -927,6 +949,48 @@ class TestLogoGridBlockFields(SimpleTestCase):
         value = {"heading": "", "logos": [1, 2, 3, 4, 5, 6]}
         ctx = block.get_context(value, parent_context={})
         self.assertEqual([len(r) for r in ctx["rows"]], [3, 3])
+
+
+class TestHeroIsMinimal(SimpleTestCase):
+    """
+    hero_is_minimal() drives components/hero.html's compact "banner"
+    treatment (see its docstring in wtrx/blocks) -- True only when a hero
+    has nothing but a headline (image doesn't count against it).
+    """
+
+    def test_true_when_only_headline(self):
+        self.assertTrue(hero_is_minimal(copy="", video=None, cta=[]))
+
+    def test_image_is_not_a_parameter(self):
+        """The function has no `image` argument -- image presence never affects minimal."""
+        import inspect
+
+        self.assertNotIn("image", inspect.signature(hero_is_minimal).parameters)
+
+    def test_false_when_copy_present(self):
+        self.assertFalse(hero_is_minimal(copy="<p>Some text</p>", video=None, cta=[]))
+
+    def test_true_when_copy_is_empty_paragraph_tag(self):
+        """
+        Draftail can persist "<p></p>" for a "cleared" richtext field -- that
+        string is truthy in Python but visually empty, so it must not count
+        as real copy (same strip_tags pattern as Blogs.get_related_intro()).
+        """
+        self.assertTrue(hero_is_minimal(copy="<p></p>", video=None, cta=[]))
+
+    def test_false_when_video_present(self):
+        self.assertFalse(hero_is_minimal(copy="", video=object(), cta=[]))
+
+    def test_false_when_cta_present(self):
+        self.assertFalse(hero_is_minimal(copy="", video=None, cta=[{"type": "button"}]))
+
+    def test_false_when_tag_present(self):
+        self.assertFalse(hero_is_minimal(copy="", video=None, cta=[], tag="Blog"))
+
+    def test_false_when_published_at_present(self):
+        self.assertFalse(
+            hero_is_minimal(copy="", video=None, cta=[], published_at=timezone.now())
+        )
 
 
 class TestBalancedRows(SimpleTestCase):

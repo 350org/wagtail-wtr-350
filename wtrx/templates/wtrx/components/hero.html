@@ -31,6 +31,11 @@
                     author name below it,
                     per Figma's "Content Hero" instance on the Blog Post
                     mockups vs. the larger plain instance on About/etc.
+    minimal       — bool, computed by hero_is_minimal() (wtrx/blocks). True
+                    when the "banner" variant has nothing but a headline
+                    (and optionally an image) — no copy/video/cta/tag/
+                    published_at. Shrinks the panel's height and text-column
+                    padding; "full" variant ignores it.
 
   variant switch:
     - "full": the original full-viewport hero — background video/image
@@ -98,24 +103,45 @@
     rendered 1024px wide against the image block's 1500px.
     {% endcomment %}
     <div class="mx-auto max-w-[1500px] pb-4 {% if hero.in_body %}px-4 sm:px-6 lg:px-8{% else %}px-4{% endif %}">
-        <div class="wtr-hero wtr-hero-banner wtr-bg-{{ hero.banner_color|background_key }} relative flex flex-col overflow-hidden rounded-lg md:min-h-[385px]"
+        {% comment %}
+        Height is normally a flat md:min-h-[385px], sized for two columns of
+        real content. `minimal` (headline, and optionally an image, but no
+        copy/video/cta/tag/date — see hero_is_minimal() in wtrx/blocks) drops
+        that to md:min-h-[300px] instead. That holds whether or not an image
+        is set: with no image, there's no second column to size against (see
+        the grid below) so this is the panel's only height signal; with an
+        image, md:items-stretch/flex-1 below stretch the media column (whose
+        own min-h-[220px] is just its floor) to match.
+        {% endcomment %}
+        <div class="wtr-hero wtr-hero-banner wtr-bg-{{ hero.banner_color|background_key }} relative flex flex-col overflow-hidden rounded-lg
+                    {% if hero.minimal %}md:min-h-[300px]{% else %}md:min-h-[385px]{% endif %}"
              {% if hero.video %}data-hero{% endif %}>
-            {% comment %}flex-1 makes this grid (and via md:items-stretch, both its columns) fill the
-               parent's full md:min-h-[385px] — a block child doesn't stretch to a min-height
-               parent on its own, so without flex on the parent the columns would only be as
-               tall as their own content (leaving a gap under a shorter image/video).{% endcomment %}
-            <div class="grid flex-1 grid-cols-1 md:grid-cols-2 md:items-stretch">
+            {% comment %}flex-1 makes this grid (and via md:items-stretch, both its columns) fill
+               whatever height the parent ends up with above — a block child doesn't stretch to
+               a min-height parent on its own, so without flex on the parent the columns would
+               only be as tall as their own content (leaving a gap under a shorter image/video).
+               md:grid-cols-2 only applies when there's an image or video: with neither, a second
+               column has nothing to render (see the media column below) and would otherwise sit
+               as a blank, half-width box next to the text.{% endcomment %}
+            <div class="grid flex-1 grid-cols-1 {% if hero.image or hero.video %}md:grid-cols-2 md:items-stretch{% endif %}">
 
                 {# Left column — text content #}
                 {% comment %}
-                Padding is left-only from lg up (lg:pl-32 lg:pr-0), not symmetric —
-                Figma's Content Hero gives this panel pl-[128px] py-[64px] and no
-                right padding at all, so the text column measures the full 612px
-                between the 128px inset and the panel's own half-width edge. With
-                lg:px-32 the headline lost 128px of that and wrapped a line early.
-                gap-4 is Figma's 16px between headline, copy and CTA.
+                Padding is left-only from lg up (lg:pl-32 lg:pr-0) only when a
+                media column shares the row — Figma's Content Hero gives this
+                panel pl-[128px] py-[64px] and no right padding at all, so the
+                text column measures the full 612px between the 128px inset
+                and the panel's own half-width edge. With lg:px-32 there the
+                headline lost 128px of that and wrapped a line early. With no
+                media column, the text column is genuinely full-width, so
+                lg:px-32 (symmetric) is correct instead.
+                gap-4 is Figma's 16px between headline, copy and CTA. Vertical
+                padding shrinks (py-8/sm:py-10/lg:py-12) when `minimal`, to
+                match the shorter panel above.
                 {% endcomment %}
-                <div class="relative z-10 flex flex-col justify-center gap-4 px-6 py-10 sm:px-10 sm:py-12 lg:pl-32 lg:pr-0 lg:py-16
+                <div class="relative z-10 flex flex-col justify-center gap-4 px-6 sm:px-10
+                            {% if hero.minimal %}py-8 sm:py-10 lg:py-12{% else %}py-10 sm:py-12 lg:py-16{% endif %}
+                            {% if hero.image or hero.video %}lg:pl-32 lg:pr-0{% else %}lg:px-32{% endif %}
                             {% if on_light %}text-dark{% else %}text-light{% endif %}">
                     {% if hero.tag %}
                         {# tag_url links back to the parent Blogs page — Post is the only current "banner" hero producer that sets tag (and tag_url). #}
@@ -196,19 +222,22 @@
                 </div>
 
                 {% comment %}Right column — image or video, min-height keeps it visible on mobile
-                   where the grid stacks to one column.{% endcomment %}
-                <div class="relative min-h-[220px]">
-                    {% if hero.video %}
-                        {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1000x800" %}
-                        {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-3 right-3" %}
-                    {% elif hero.image %}
-                        {% image hero.image fill-1000x800 as bg %}
-                        <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
-                             alt="{{ hero.image.description }}"{% if not hero.image.description %} role="presentation"{% endif %}
-                             class="absolute inset-0 h-full w-full object-cover"
-                             style="{{ hero.image.object_position_style }}" loading="lazy">
-                    {% endif %}
-                    {% if hero.video or hero.image %}
+                   where the grid stacks to one column. Omitted entirely with neither: an empty
+                   column here would render as a blank box (no image content, and the fade overlay
+                   below already required hero.video/hero.image), and pairs with grid-cols-1-only
+                   above — no orphaned second cell.{% endcomment %}
+                {% if hero.image or hero.video %}
+                    <div class="relative min-h-[220px]">
+                        {% if hero.video %}
+                            {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1000x800" %}
+                            {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-3 right-3" %}
+                        {% elif hero.image %}
+                            {% image hero.image fill-1000x800 as bg %}
+                            <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
+                                 alt="{{ hero.image.description }}"{% if not hero.image.description %} role="presentation"{% endif %}
+                                 class="absolute inset-0 h-full w-full object-cover"
+                                 style="{{ hero.image.object_position_style }}" loading="lazy">
+                        {% endif %}
                         {% comment %}Blends the color panel into the media — see main.css; picks the
                            matching-color fade class so the seam between panel and media
                            reads as one continuous surface rather than a hard vertical edge.
@@ -220,8 +249,8 @@
                            same overlay is just an unexplained vertical stripe down the
                            left third of the image — there is no seam there to soften.{% endcomment %}
                         <div class="wtr-bg-fade-{{ hero.banner_color|background_key }} absolute inset-y-0 left-0 hidden w-1/3 md:block" aria-hidden="true"></div>
-                    {% endif %}
-                </div>
+                    </div>
+                {% endif %}
 
             </div>
         </div>

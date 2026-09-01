@@ -33,6 +33,7 @@ from urllib.parse import urlparse
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.functional import cached_property
+from django.utils.html import strip_tags
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import (
     CharBlock,
@@ -208,6 +209,32 @@ def resolve_background(value, default="white"):
 def background_is_light(value):
     """True when `value` names a fill that needs dark text rather than light."""
     return resolve_background(value) in LIGHT_BACKGROUND_COLORS
+
+
+def hero_is_minimal(*, copy, video, cta, tag="", published_at=None):
+    """
+    True when a "banner" hero has nothing but a headline (and optionally an
+    image) -- no copy, video, cta, tag or published_at. Drives components/
+    hero.html's compact treatment (shorter or no explicit min-height,
+    reduced text-column padding) -- see the "banner" variant's docstring
+    there. Independent of `image`: a heading+image-only hero still counts
+    as minimal but keeps the two-column grid, since there's still something
+    for the second column.
+
+    `copy` is checked via strip_tags(...).strip(), not bare truthiness --
+    Draftail can persist "<p></p>" for a "cleared" richtext field, which is
+    truthy as a raw string but visually empty. Same pattern as
+    Blogs.get_related_intro() in wtrx/models.py.
+
+    tag/published_at are only ever passed by BannerHeroMixin.
+    get_banner_hero_context()'s **extra (currently just Post, which always
+    sets published_at via PublishedDateMixin's non-blank default) -- they
+    exist here so a hero showing a tag pill or date/author above the
+    headline is never treated as minimal, without hardcoding a
+    Post-specific exclusion.
+    """
+    has_copy = bool(strip_tags(copy or "").strip())
+    return not has_copy and not video and not cta and not tag and not published_at
 
 
 def parse_action_network_url(url):
@@ -2999,6 +3026,7 @@ class HeroBlock(StructBlock):
             "video": None,  # HeroBlock does not support video; key kept for template contract
             "banner_color": value.get("banner_color"),
             "cta": [],  # banner variant never renders a cta; key kept for template contract
+            "minimal": hero_is_minimal(copy=value.get("content"), video=None, cta=[]),
             # Mid-page HeroBlock, not a page-level HeroMixin hero. Only the
             # gutter differs: in the body this block sits in a stack with
             # image/image_text/callout and has to line its edges up with
