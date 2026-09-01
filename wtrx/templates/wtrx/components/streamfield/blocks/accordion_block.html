@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags %}
+{% load i18n wagtailcore_tags wagtailimages_tags wagtailembeds_tags %}
 {% comment %}
 Per Figma's "Get the full picture." (node 1:1273): each item is its own
 filled, bordered card — not rows sharing one outer border with hairline
@@ -55,6 +55,50 @@ fight the card fill.
                         [&>:first-child>:first-child]:mt-0 [&>:last-child>:last-child]:mb-0"
                  data-accordion-content>
                 {% include_block item.content %}
+                {% comment %}
+                Rendered directly here rather than via {% include_block
+                item.image/item.video %} — ImageBlock/VideoBlock's own
+                templates are built for full-bleed page-level placement
+                (image_block.html's max-w-[1500px] wrapper), which would
+                misalign inside this narrow, padded card. not-prose keeps
+                Typography's own `.prose img` margins from fighting the
+                explicit mt-6 here.
+                {% endcomment %}
+                {% if item.image.image %}
+                    {% image item.image.image width-1200 as img %}
+                    <img
+                        src="{{ img.url }}"
+                        width="{{ img.width }}"
+                        height="{{ img.height }}"
+                        alt="{{ item.image.alt_text|default:img.alt }}"
+                        class="not-prose mt-6 w-full rounded-lg"
+                        loading="lazy"
+                    />
+                    {% if item.image.caption %}
+                        <p class="not-prose mt-2 text-sm opacity-60">{{ item.image.caption }}</p>
+                    {% endif %}
+                {% endif %}
+                {% if item.video.embed_url or item.video.media_file %}
+                    <div class="not-prose relative mt-6 aspect-video w-full overflow-hidden rounded-lg [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full">
+                        {% if item.video.embed_url %}
+                            {% embed item.video.embed_url %}
+                        {% else %}
+                            <video
+                                controls
+                                class="h-full w-full"
+                                {% if item.video.media_file.thumbnail %}poster="{{ item.video.media_file.thumbnail.url }}"{% endif %}
+                            >
+                                {% for source in item.video.media_file.sources %}
+                                    <source src="{{ source.src }}" type="{{ source.type }}">
+                                {% endfor %}
+                                {% trans "Your browser does not support the video tag." %}
+                            </video>
+                        {% endif %}
+                    </div>
+                    {% if item.video.caption %}
+                        <p class="not-prose mt-2 text-sm opacity-60">{{ item.video.caption }}</p>
+                    {% endif %}
+                {% endif %}
             </div>
         </div>
     {% endfor %}

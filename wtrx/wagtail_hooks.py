@@ -4,6 +4,8 @@ Wagtail hooks for the wtrx app.
 Hooks registered here:
 - insert_global_admin_js: loads the wagtail-ai context-handler fix and the
   pinned-Draftail-toolbar default in the admin
+- insert_global_admin_css: loads the 350.org admin theme colours (see
+  wtrx/static/wtrx/admin/branding.css)
 
 Block-type visibility (hiding irrelevant SignupBlock/DonateBlock variants
 per IntegrationSettings) is NOT a hook — it lives in
@@ -49,6 +51,22 @@ def insert_pin_draftail_toolbar_js():
     return format_html(
         '<script src="{}"></script>',
         versioned_static("wtrx/admin/pin-draftail-toolbar.js"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Admin theme colours — 350.org brand blue/navy in place of Wagtail's
+# defaults, via the CSS custom properties Wagtail documents for this
+# (https://docs.wagtail.org/en/stable/advanced_topics/customization/admin_templates.html#custom-colours).
+# See the file itself for the exact values and where they come from.
+# ---------------------------------------------------------------------------
+
+
+@hooks.register("insert_global_admin_css")
+def insert_admin_branding_css():
+    return format_html(
+        '<link rel="stylesheet" href="{}">',
+        versioned_static("wtrx/admin/branding.css"),
     )
 
 

@@ -14,7 +14,7 @@ own size= param only distinguishes "lg" from everything else, so "large" is
 the only value translated on the way through -- same as button_block.html.
 {% endcomment %}
 {% if value.layout == "vertical" %}
-    <div class="wtr-button-group flex flex-col items-center gap-4">
+    <div class="wtr-button-group flex flex-col items-stretch gap-4 sm:items-center">
         {% for button in value.buttons %}
             {% if button.size == "large" %}
                 {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style size="lg" %}
@@ -26,7 +26,7 @@ the only value translated on the way through -- same as button_block.html.
 {% else %}
     <div class="wtr-button-group flex flex-col gap-4">
         {% for row in rows %}
-            <div class="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-center">
                 {% for button in row %}
                     {% if button.size == "large" %}
                         {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style size="lg" %}

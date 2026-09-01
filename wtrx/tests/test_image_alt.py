@@ -14,6 +14,7 @@ write descriptions, not to second-guess the title in the templates.
 from django.template.loader import render_to_string
 from django.test import TestCase
 
+from wagtail.images.forms import get_image_form
 from wagtail.images.tests.utils import get_test_image_file
 
 from wtrx.blocks import (
@@ -142,4 +143,25 @@ class ImageAltTextTest(TestCase):
         )
         self.assertIn('role="presentation"', html)
         self.assertNotIn(f'alt="{FILENAME_TITLE}"', html)
+
+
+class ImageDescriptionRequiredTest(TestCase):
+    """
+    description is now blank=False on CustomImage (see wtrx/images.py) so the
+    Images admin can't publish a new filename-shaped alt text going forward.
+    Existing rows created outside a form (import scripts, .objects.create())
+    are unaffected -- see backfill_image_descriptions for those.
+    """
+
+    def test_admin_image_form_requires_description(self):
+        form_class = get_image_form(CustomImage)
+        self.assertTrue(form_class.base_fields["description"].required)
+
+    def test_creating_an_image_directly_still_allows_a_blank_description(self):
+        # .objects.create() bypasses form/full_clean() validation, same as
+        # the existing import management commands rely on.
+        image = CustomImage.objects.create(
+            title=FILENAME_TITLE, file=get_test_image_file(size=(1200, 800))
+        )
+        self.assertEqual(image.description, "")
 

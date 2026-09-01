@@ -27,7 +27,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail_ai.panels import AIDescriptionFieldPanel, AITitleFieldPanel
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
-from .blocks import BACKGROUND_COLOR_CHOICES, BodyStreamBlock, HeroCTABlock
+from .blocks import BACKGROUND_COLOR_CHOICES, BodyStreamBlock, HeroCTABlock, hero_is_minimal
 from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
@@ -314,6 +314,10 @@ class HeroMixin(models.Model):
 
         copy_is_block=False because hero_copy is a RichTextField (string),
         not a StreamField block value — the template renders it with |richtext.
+
+        minimal is only meaningful for the "banner" variant (see hero.html)
+        but is computed unconditionally here, same as banner_color/cta —
+        the "full" variant's template simply ignores it.
         """
         return {
             "variant": self.hero_variant,
@@ -324,6 +328,7 @@ class HeroMixin(models.Model):
             "video": self.hero_video,
             "banner_color": self.hero_banner_color,
             "cta": self.hero_cta,
+            "minimal": hero_is_minimal(copy=self.hero_copy, video=self.hero_video, cta=self.hero_cta),
         }
 
     class Meta:
@@ -424,6 +429,11 @@ class BannerHeroMixin(models.Model):
         hero.html doesn't otherwise know about but the "banner" variant
         renders anyway when present — Post uses this for author/
         published_at.
+
+        minimal is computed from **extra's tag/published_at (before they're
+        merged in) as well as this mixin's own fields, so a hero showing a
+        tag pill or date/author is never treated as minimal — see
+        hero_is_minimal()'s docstring.
         """
         context = {
             "variant": "banner",
@@ -434,6 +444,13 @@ class BannerHeroMixin(models.Model):
             "video": None,
             "banner_color": self.hero_banner_color,
             "cta": [],
+            "minimal": hero_is_minimal(
+                copy=self.hero_copy,
+                video=None,
+                cta=[],
+                tag=extra.get("tag", ""),
+                published_at=extra.get("published_at"),
+            ),
         }
         context.update(extra)
         return context

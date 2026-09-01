@@ -33,6 +33,7 @@ from urllib.parse import urlparse
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.functional import cached_property
+from django.utils.html import strip_tags
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import (
     CharBlock,
@@ -73,6 +74,7 @@ BUTTON_STYLE_CHOICES = [
     ("primary", _("Primary")),
     ("secondary", _("Secondary")),
     ("outline", _("Outline")),
+    ("urgent", _("Urgent")),
 ]
 
 # Only two tiers exist: "large" is the handful of hardcoded, non-editor-
@@ -207,6 +209,32 @@ def resolve_background(value, default="white"):
 def background_is_light(value):
     """True when `value` names a fill that needs dark text rather than light."""
     return resolve_background(value) in LIGHT_BACKGROUND_COLORS
+
+
+def hero_is_minimal(*, copy, video, cta, tag="", published_at=None):
+    """
+    True when a "banner" hero has nothing but a headline (and optionally an
+    image) -- no copy, video, cta, tag or published_at. Drives components/
+    hero.html's compact treatment (shorter or no explicit min-height,
+    reduced text-column padding) -- see the "banner" variant's docstring
+    there. Independent of `image`: a heading+image-only hero still counts
+    as minimal but keeps the two-column grid, since there's still something
+    for the second column.
+
+    `copy` is checked via strip_tags(...).strip(), not bare truthiness --
+    Draftail can persist "<p></p>" for a "cleared" richtext field, which is
+    truthy as a raw string but visually empty. Same pattern as
+    Blogs.get_related_intro() in wtrx/models.py.
+
+    tag/published_at are only ever passed by BannerHeroMixin.
+    get_banner_hero_context()'s **extra (currently just Post, which always
+    sets published_at via PublishedDateMixin's non-blank default) -- they
+    exist here so a hero showing a tag pill or date/author above the
+    headline is never treated as minimal, without hardcoding a
+    Post-specific exclusion.
+    """
+    has_copy = bool(strip_tags(copy or "").strip())
+    return not has_copy and not video and not cta and not tag and not published_at
 
 
 def parse_action_network_url(url):
@@ -1254,7 +1282,8 @@ class PersonCardBlock(StructBlock):
 
 class AccordionItemBlock(StructBlock):
     """
-    A single item in an AccordionBlock: a title and rich-text content.
+    A single item in an AccordionBlock: a title, rich-text content, and an
+    optional image or video.
 
     Explicitly named (not anonymous) so Django migration serialization can
     reference it by dotted path.
@@ -1262,6 +1291,14 @@ class AccordionItemBlock(StructBlock):
     This is an internal sub-block rendered by accordion_block.html — it is
     never rendered standalone via include_block and intentionally has
     no template in its Meta.
+
+    image/video are dedicated fields rather than inline richtext because no
+    RICHTEXT_FEATURES_* set in this codebase enables inline images/embeds —
+    every other block keeps media in its own field, and this one follows
+    suit. Both are optional and independent (an item may set neither, either,
+    but the admin doesn't need to enforce "not both" the way VideoBlock does
+    for its own embed_url/media_file — an accordion item pairing an image
+    with a video is unusual but not actually broken to render).
     """
 
     title = CharBlock(label=_("Title"))
@@ -1269,6 +1306,8 @@ class AccordionItemBlock(StructBlock):
         features=RICHTEXT_FEATURES_FULL,
         label=_("Content"),
     )
+    image = ImageBlock(required=False, label=_("Image"))
+    video = VideoBlock(required=False, label=_("Video"))
 
     class Meta:
         icon = "collapse-down"
@@ -2998,6 +3037,7 @@ class HeroBlock(StructBlock):
             "video": None,  # HeroBlock does not support video; key kept for template contract
             "banner_color": value.get("banner_color"),
             "cta": [],  # banner variant never renders a cta; key kept for template contract
+            "minimal": hero_is_minimal(copy=value.get("content"), video=None, cta=[]),
             # Mid-page HeroBlock, not a page-level HeroMixin hero. Only the
             # gutter differs: in the body this block sits in a stack with
             # image/image_text/callout and has to line its edges up with
@@ -3188,6 +3228,121 @@ class SectionBlock(ContentPreviewMixin, StructBlock):
         template = "wtrx/components/streamfield/blocks/section_block.html"
 
 
+class TimelineYearContentBlock(SectionContentBlock):
+    """
+    StreamBlock used inside one TimelineYearBlock.
+
+    A named subclass (not a direct reuse of SectionContentBlock) so a fork
+    can override a child block inside a timeline year independently of
+    SectionBlock's own content list — same DeclarativeSubBlocksMetaclass
+    MRO-merge pattern as SectionContentBlock itself (architecture rule #9).
+    Starts out identical: every block type a Section can hold, a timeline
+    year can hold too, including `accordion` — that's what a "victory" list
+    (see import_350_our_impact.py) becomes.
+
+    `timeline` is deliberately NOT one of those block types — TimelineBlock
+    is registered only on BodyStreamBlock, the same "prevent infinite
+    nesting" treatment SectionContentBlock already gives `section` itself
+    (rule #9), and the only way to break the class-definition-order cycle
+    this file would otherwise have (TimelineYearContentBlock needs
+    SectionContentBlock defined first; SectionContentBlock would need
+    TimelineBlock defined first to reference it back).
+    """
+
+    class Meta:
+        label = _("Content")
+
+
+class TimelineYearBlock(StructBlock):
+    """
+    One year in a TimelineBlock. No separate heading field — the editor
+    types the year's thematic title as an h2 inside `content`, same
+    condensed-heading convention every other block in this file now follows
+    (AGENTS.md pitfall #46).
+    """
+
+    year = CharBlock(
+        max_length=9,
+        label=_("Year"),
+        help_text=_("E.g. '2019'. Used to build the year-jump navigation and this year's anchor link."),
+    )
+    content = TimelineYearContentBlock()
+
+    class Meta:
+        icon = "date"
+        label = _("Year")
+
+
+def _timeline_preview_value():
+    """
+    Placeholder value for TimelineBlock's picker preview. Not
+    ContentPreviewMixin: no real page uses this brand-new block yet, so
+    there is nothing to harvest (AGENTS.md pitfall #45) — until
+    import_350_our_impact.py has populated a real page and
+    harvest_block_previews has been re-run.
+    """
+    img = preview_image()
+    return {
+        "years": [
+            {
+                "year": "2019",
+                "content": [
+                    (
+                        "text",
+                        "<h2>Millions strike for the climate</h2>"
+                        "<p>A short summary of the year's key milestone.</p>",
+                    ),
+                    ("image", {"image": img, "alt_text": "", "caption": ""}),
+                ],
+            },
+            {
+                "year": "2021",
+                "content": [
+                    (
+                        "text",
+                        "<h2>Keystone XL is cancelled</h2>"
+                        "<p>A short summary of the year's key milestone.</p>",
+                    ),
+                ],
+            },
+        ],
+    }
+
+
+class TimelineBlock(StructBlock):
+    """
+    A chronological timeline: a list of years, each with its own freely
+    composed content (any SectionContentBlock-shaped block, including
+    `accordion` for a "victories at a glance"-style list). The year-jump
+    navigation at the top is derived from `years` in get_context() — it is
+    never a separately edited field, so it can't drift out of sync with the
+    years actually present.
+
+    Not ContentPreviewMixin: no real page uses this brand-new block yet, so
+    there is nothing to harvest — see _timeline_preview_value() and AGENTS.md
+    pitfall #45. Switching to ContentPreviewMixin is a reasonable follow-up
+    once import_350_our_impact.py has populated a real page and
+    harvest_block_previews has been re-run — but don't combine the two on
+    one block (pitfall #31).
+    """
+
+    years = ListBlock(TimelineYearBlock(), min_num=1, label=_("Years"))
+
+    def get_context(self, value, parent_context=None):
+        context = super().get_context(value, parent_context=parent_context)
+        context["year_nav"] = [
+            {"year": item["year"], "anchor": f"timeline-year-{item['year']}"}
+            for item in value["years"]
+        ]
+        return context
+
+    class Meta:
+        icon = "date"
+        label = _("Timeline")
+        template = "wtrx/components/streamfield/blocks/timeline_block.html"
+        preview_value = staticmethod(_timeline_preview_value)
+
+
 # ---------------------------------------------------------------------------
 # BodyStreamBlock
 # ---------------------------------------------------------------------------
@@ -3231,6 +3386,7 @@ class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     callout = CalloutBlock()
     hero = HeroBlock()
     section = SectionBlock()
+    timeline = TimelineBlock()
     donate = DonateBlock()
     donate_fundraiseup = DonateFundraiseUpBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()

@@ -10,10 +10,10 @@ import json
 from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.test import RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase
 from django.utils import timezone
 from wagtail.images.tests.utils import get_test_image_file
-from wagtail.models import Page
+from wagtail.models import Page, Site
 from wagtail.test.utils import WagtailPageTests
 
 from wtrx.images import CustomImage
@@ -213,6 +213,7 @@ class TestHomePageGetContext(TestCase):
             "video",
             "banner_color",
             "cta",
+            "minimal",
         }
         self.assertEqual(set(ctx["hero"].keys()), required_keys)
 
@@ -309,8 +310,111 @@ class TestContentPageGetContext(TestCase):
             "video",
             "banner_color",
             "cta",
+            "minimal",
         }
         self.assertEqual(set(ctx["hero"].keys()), expected)
+
+    def test_hero_minimal_true_when_headline_only(self):
+        """cls.page has only hero_headline set — no copy/image/video/cta."""
+        ctx = self._get_context(self.page)
+        self.assertTrue(ctx["hero"]["minimal"])
+
+    def test_hero_minimal_true_with_image_and_no_copy(self):
+        image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(), description="A description"
+        )
+        self.page.hero_image = image
+        try:
+            ctx = self._get_context(self.page)
+            self.assertTrue(ctx["hero"]["minimal"])
+        finally:
+            self.page.hero_image = None
+
+    def test_hero_minimal_false_when_copy_present(self):
+        self.page.hero_copy = "<p>Some real copy.</p>"
+        try:
+            ctx = self._get_context(self.page)
+            self.assertFalse(ctx["hero"]["minimal"])
+        finally:
+            self.page.hero_copy = ""
+
+    def test_hero_minimal_true_when_copy_is_empty_paragraph(self):
+        """
+        A "cleared" Draftail field can persist "<p></p>" — truthy as a raw
+        string, but visually empty, so it must not count as real copy.
+        """
+        self.page.hero_copy = "<p></p>"
+        try:
+            ctx = self._get_context(self.page)
+            self.assertTrue(ctx["hero"]["minimal"])
+        finally:
+            self.page.hero_copy = ""
+
+
+class TestBannerHeroRendering(TestCase):
+    """
+    End-to-end check that hero.minimal actually changes the rendered
+    "banner" hero markup — not just that get_context() computes the right
+    boolean in isolation. See components/hero.html's `minimal` branching.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="hero-render-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="hero-render-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Hero Render Test",
+        )
+
+        cls.headline_only = ContentPage(
+            title="Headline Only",
+            slug="headline-only",
+            hero_headline="Just a heading",
+        )
+        cls.home.add_child(instance=cls.headline_only)
+
+        cls.image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(), description="A description"
+        )
+        cls.headline_and_image = ContentPage(
+            title="Headline And Image",
+            slug="headline-and-image",
+            hero_headline="Heading with a photo",
+            hero_image=cls.image,
+        )
+        cls.home.add_child(instance=cls.headline_and_image)
+
+        cls.full = ContentPage(
+            title="Full Hero",
+            slug="full-hero",
+            hero_headline="Full content hero",
+            hero_copy="<p>Real supporting copy.</p>",
+        )
+        cls.home.add_child(instance=cls.full)
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="hero-render-test.localhost")
+
+    def test_headline_only_hero_is_compact_single_column(self):
+        content = self.client.get(self.headline_only.url).content.decode()
+        self.assertIn("md:min-h-[300px]", content)
+        self.assertNotIn("md:min-h-[385px]", content)
+        self.assertNotIn("md:grid-cols-2", content)
+
+    def test_headline_and_image_hero_is_compact_two_column(self):
+        content = self.client.get(self.headline_and_image.url).content.decode()
+        self.assertIn("md:min-h-[300px]", content)
+        self.assertNotIn("md:min-h-[385px]", content)
+        self.assertIn("md:grid-cols-2", content)
+
+    def test_full_hero_keeps_original_height_and_columns(self):
+        content = self.client.get(self.full.url).content.decode()
+        self.assertIn("md:min-h-[385px]", content)
+        self.assertNotIn("md:min-h-[300px]", content)
 
 
 class TestContentPageMeta(TestCase):
@@ -507,6 +611,18 @@ class TestPostGetContext(TestCase):
         """Banner variant never renders a cta — see BannerHeroMixin."""
         ctx = self._get_context(self.post)
         self.assertEqual(ctx["hero"]["cta"], [])
+
+    def test_hero_minimal_is_always_false(self):
+        """
+        A Post always sets published_at (PublishedDateMixin's non-blank
+        default), which hero_is_minimal() treats the same as a tag/date —
+        so a Post hero never gets the compact treatment, even one with no
+        other hero content set, without needing a Post-specific exclusion.
+        """
+        ctx = self._get_context(self.post)
+        self.assertFalse(ctx["hero"]["minimal"])
+        ctx_no_author = self._get_context(self.post_no_author)
+        self.assertFalse(ctx_no_author["hero"]["minimal"])
 
     def test_related_headings_follow_parent_title(self):
         ctx = self._get_context(self.post)

@@ -55,6 +55,7 @@
  *   <a class="wtr-btn wtr-btn-lg hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-outline hover:bg-primary-50">Label</a>
  *   <a class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">Label</a>
+ *   <a class="wtr-btn wtr-btn-urgent hover:opacity-90">Label</a>
  * ============================================================ */
 
 @utility wtr-btn {
@@ -70,7 +71,7 @@
     border-radius: var(--radius-button);
     text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, opacity 0.15s ease-in-out;
     white-space: nowrap;
 }
 
@@ -108,6 +109,15 @@ html {
     background-color: transparent;
     color: var(--color-light);
     border-color: var(--color-light);
+}
+
+/* Matches the nav's own red CTA/donate pill exactly (header.html) —
+ * bg-callout-red has no shade ramp of its own (it's a single bespoke
+ * token, not a full color scale like error-*), so hover dims via
+ * opacity rather than stepping to a darker shade. */
+@utility wtr-btn-urgent {
+    background-color: var(--color-callout-red);
+    color: var(--color-light);
 }
 
 @utility wtr-btn-lg {
@@ -1649,6 +1659,61 @@ h3.victories-header {
 .wtr-card-carousel-track .wtr-card p,
 .wtr-card-carousel-track .wtr-card h3 {
     line-height: 1.25;
+}
+
+/* ============================================================
+ * Timeline — .wtr-timeline-year-label
+ * ============================================================
+ * Used by timeline_block.html. Year labels are real <h3> elements (Bold,
+ * 700, for free from the site-wide h3 rule above) but read too light at
+ * this size/prominence, so bumped to Heavy — h1/h2's own weight, not h3's.
+ * `font-heavy` is a real Tailwind utility (--font-weight-heavy) but any
+ * weight utility on a heading silently does nothing (AGENTS.md pitfall
+ * #37) — unlayered always beats layered here regardless of specificity —
+ * so this has to be an unlayered rule too, same as the h1/h2/h3 rules
+ * it's overriding. */
+.wtr-timeline-year-label {
+    font-weight: var(--font-weight-heavy);
+}
+
+/* Appears only once the nav is actually pinned to the viewport top, not
+ * while it still sits in its normal in-flow position — see
+ * timeline_block.html's sentinel/IntersectionObserver script, which is
+ * what toggles this attribute (there's no CSS :stuck selector). Separates
+ * the now-fixed nav from the content scrolling underneath it.
+ *
+ * A background-image gradient sliver, not `border-bottom`: a plain border
+ * can't fade horizontally on its own, and this needs to fade to transparent
+ * at both ends rather than read as a hard-edged rule across the full width.
+ * background-size pins it to a 2px-tall strip; background-position sits it
+ * at the bottom edge; bg-light's own background-color (a separate property,
+ * set on the element via a utility class) still shows through everywhere
+ * else. */
+.wtr-timeline-nav[data-stuck] {
+    background-image: linear-gradient(
+        to right,
+        transparent,
+        var(--color-neutral-200) 15%,
+        var(--color-neutral-200) 85%,
+        transparent
+    );
+    background-repeat: no-repeat;
+    background-position: bottom;
+    background-size: 100% 2px;
+    /* Faint only on purpose — this is meant to read as depth separating the
+     * pinned nav from content scrolling underneath it, not a hard shadow
+     * competing with the gradient line above. */
+    box-shadow: 0 4px 6px -4px rgb(0 0 0 / 0.08);
+}
+
+/* The pill for whichever year the reader has currently scrolled into,
+ * toggled by the same script's scroll-position geometry. Unlayered so it
+ * reliably beats this element's own layered text-dark/hover: utilities
+ * (AGENTS.md pitfall #37) without a specificity fight. */
+.wtr-timeline-nav [data-carousel-item][data-active] {
+    border-color: var(--color-primary-600);
+    background-color: var(--color-primary-600);
+    color: var(--color-light);
 }
 
 .wtr-carousel-arrow {

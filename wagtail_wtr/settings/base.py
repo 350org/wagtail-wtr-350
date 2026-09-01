@@ -154,7 +154,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
 
 # Wagtail settings
-WAGTAIL_SITE_NAME = "My Site"
+WAGTAIL_SITE_NAME = "350.org"
 # WAGTAILADMIN_BASE_URL is set in dev.py and production.py
 WAGTAILIMAGES_IMAGE_MODEL = "wtrx.CustomImage"
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
