@@ -98,6 +98,13 @@ row without wrapping oddly.
     alike (not a fixed width — a short heading/paragraph shouldn't force
     the column out to 400px, only wrap short of it).
 
+    text-right only kicks in at md:, matching the row's own md:flex-row
+    split above: right-aligning only makes sense once the copy column
+    sits beside the cards at a narrower 400px measure, where it reads
+    close to the full column width. Below md: the row is still stacked
+    (text above cards), so it stays text-left to match the neighboring
+    blocks (Callout, FeaturePanel) on mobile/tablet.
+
     md:ml-8 sits on this column, not on the row's own pl-4/6/8: at a
     narrower 400px measure the right-aligned copy still reads close to the
     full column width, so this keeps a little breathing room from the
@@ -113,7 +120,7 @@ row without wrapping oddly.
     h2's font-size/tracking are pinned via .wtr-card-carousel-content in
     main.css, same technique .wtr-text-block uses.
     {% endcomment %}
-    <div class="flex flex-col gap-4 pr-4 text-right sm:pr-6 md:ml-8 md:max-w-[400px] md:shrink-0 md:pr-0">
+    <div class="flex flex-col gap-4 pr-4 text-left md:text-right sm:pr-6 md:ml-8 md:max-w-[400px] md:shrink-0 md:pr-0">
         <div class="wtr-card-carousel-content prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl in-data-[bg-tone=dark]:prose-invert">
             {{ value.content|richtext }}
         </div>

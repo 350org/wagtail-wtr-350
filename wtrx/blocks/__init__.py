@@ -73,6 +73,7 @@ BUTTON_STYLE_CHOICES = [
     ("primary", _("Primary")),
     ("secondary", _("Secondary")),
     ("outline", _("Outline")),
+    ("urgent", _("Urgent")),
 ]
 
 # Only two tiers exist: "large" is the handful of hardcoded, non-editor-

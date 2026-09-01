@@ -55,6 +55,7 @@
  *   <a class="wtr-btn wtr-btn-lg hover:bg-primary-500">Label</a>
  *   <a class="wtr-btn wtr-btn-outline hover:bg-primary-50">Label</a>
  *   <a class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">Label</a>
+ *   <a class="wtr-btn wtr-btn-urgent hover:opacity-90">Label</a>
  * ============================================================ */
 
 @utility wtr-btn {
@@ -70,7 +71,7 @@
     border-radius: var(--radius-button);
     text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, opacity 0.15s ease-in-out;
     white-space: nowrap;
 }
 
@@ -108,6 +109,15 @@ html {
     background-color: transparent;
     color: var(--color-light);
     border-color: var(--color-light);
+}
+
+/* Matches the nav's own red CTA/donate pill exactly (header.html) —
+ * bg-callout-red has no shade ramp of its own (it's a single bespoke
+ * token, not a full color scale like error-*), so hover dims via
+ * opacity rather than stepping to a darker shade. */
+@utility wtr-btn-urgent {
+    background-color: var(--color-callout-red);
+    color: var(--color-light);
 }
 
 @utility wtr-btn-lg {
