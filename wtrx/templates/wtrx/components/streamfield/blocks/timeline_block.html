@@ -1,0 +1,350 @@
+{% load i18n wagtailcore_tags %}
+{% comment %}
+Each year is deliberately given the same shape as SectionBlock ("each year
+is basically a section"): one max-w-[1500px] outer wrapper so the year-jump
+nav and any full-bleed child block (image, card_grid, …) align with
+image_block.html/header.html's own edge, then a narrower max-w-6xl inner
+column for text/accordion content — the same "default" measure
+section_block.html uses. This inherits section_block.html's own documented
+known gap: a full-bleed child block still stacks its own max-w-[1500px]
+wrapper inside this narrower inner column rather than being subsumed by it.
+Not fixed here, same as everywhere else that gap already exists.
+
+year_nav is computed in TimelineBlock.get_context() from `value.years` — it
+is never a stored field, so it can't list a year that isn't actually below it.
+
+The vertical rail + year markers below are a second, separate way of
+marking years, alongside the jump nav above — the nav is for navigation,
+the rail is what actually reads as "a timeline" while scrolling through the
+content. Both come from the same `value.years` list. The rail is one
+continuous absolutely-positioned line behind every year row rather than a
+border-left per row, because a per-row border breaks at each row's own
+padding/margin and reads as segments, not one line; positioning it in a
+`relative` wrapper that spans the whole year list (not just the nav-less
+page) keeps it continuous regardless of how tall any one year's content is.
+The marker dot's column width (w-6/sm:w-8) and the line's left offset
+(left-3/sm:left-4) share the same half-width value on purpose — the dot is
+centered in its column via `items-center`, so the two must match exactly or
+the line drifts off-center from the dots.
+{% endcomment %}
+<div class="wtr-timeline max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+    {% if year_nav %}
+        {% comment %}
+        Capped to max-w-6xl (not the outer max-w-[1500px]) to line up with
+        the rail/content column below. Reuses card_carousel_block.html's
+        exact carousel mechanics wholesale — .wtr-card-carousel-track's
+        hidden-scrollbar/scroll-snap CSS, .wtr-card-carousel-fade,
+        .wtr-carousel-arrow, and the same inline prev/next script at the
+        bottom of this file — rather than reinventing them: a pill row
+        scrolling by "one item's width" is the identical mechanic to cards
+        scrolling by one card's width. data-carousel is scoped per
+        instance (see that file's own comment), so this coexisting with a
+        real CardCarouselBlock elsewhere on the page is already handled.
+        Unlike that block, the arrows flank the track directly in this one
+        row instead of sitting in their own row below it.
+
+        sticky top-0: matches 350.org/our-impact's own behavior — the nav
+        pins to the very top of the viewport once scrolled to, staying
+        reachable while browsing any year, rather than requiring a scroll
+        back to the top of the page. bg-light stops year content from
+        showing through once it's stuck over it; z-20 keeps it above that
+        content but below the mobile nav overlay's z-40 (AGENTS.md pitfall
+        #49). The site header itself is never sticky/fixed in normal flow
+        (only its mobile-overlay panel is), so there's no header height to
+        offset against here. Sticks for the full height of `.wtr-timeline`
+        (its containing block) — i.e. through every year — and releases
+        once the user scrolls past the last one, which is the desired
+        "there's more below" cue as much as a limitation.
+        {% endcomment %}
+        {% comment %}
+        Zero-height marker sitting right where the nav's own normal-flow top
+        edge is. The stuck-detection script below watches this via
+        IntersectionObserver: once it scrolls above the viewport, the nav
+        (now pinned at top-0) is "stuck" rather than in its natural
+        position, which is when the border below should appear -- there's
+        no CSS :stuck selector, this sentinel trick is the standard
+        workaround.
+        {% endcomment %}
+        <div data-timeline-nav-sentinel aria-hidden="true"></div>
+        <nav class="wtr-timeline-nav sticky top-0 z-20 mx-auto mb-16 flex max-w-6xl items-center gap-3 bg-light py-4" aria-label="{% trans "Jump to year" %}" data-carousel>
+            <button type="button" class="wtr-carousel-arrow flex-none" data-carousel-prev aria-label="{% trans 'Previous years' %}">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+            <div class="relative min-w-0 flex-1">
+                <div class="wtr-card-carousel-track flex flex-nowrap gap-2 overflow-x-auto" data-carousel-track>
+                    {% for nav_item in year_nav %}
+                        {% comment %}
+                        data-active is toggled by the scroll-spy script
+                        below, not a template conditional -- which year is
+                        "current" depends on scroll position, not anything
+                        known at render time. See .wtr-timeline-nav
+                        [data-carousel-item][data-active] in main.css for
+                        the highlight style (unlayered, so it reliably beats
+                        this element's own layered hover:/text-dark
+                        utilities -- AGENTS.md pitfall #37's mechanism).
+                        {% endcomment %}
+                        <a
+                            href="#{{ nav_item.anchor }}"
+                            class="flex-none rounded-full border-2 border-neutral-200 px-4 py-2 text-sm font-medium text-dark transition-colors hover:border-primary-600 hover:text-primary-600"
+                            data-carousel-item
+                            data-timeline-nav-year="{{ nav_item.anchor }}"
+                        >
+                            {{ nav_item.year }}
+                        </a>
+                    {% endfor %}
+                </div>
+                <div class="wtr-card-carousel-fade pointer-events-none absolute inset-y-0 right-0 w-12 sm:w-16" data-carousel-fade aria-hidden="true"></div>
+            </div>
+            <button type="button" class="wtr-carousel-arrow flex-none" data-carousel-next aria-label="{% trans 'Next years' %}">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+        </nav>
+    {% endif %}
+    <div class="relative mx-auto max-w-6xl">
+        <div class="wtr-timeline-rail absolute top-0 bottom-0 left-3 w-0.5 bg-neutral-200 sm:left-4" aria-hidden="true"></div>
+        {% comment %}
+        End-of-line marker: gray (neutral-300, not the year markers' own
+        primary-600 blue — this isn't a year, it's "nothing further below").
+        -translate-x-1/2 centers it on the rail's own left-3/sm:left-4
+        (that value is already the intended center line, not a left edge —
+        same reasoning as the per-year marker dot's column width below).
+        translate-y-1/2 centers it vertically ON the bottom-0 boundary
+        itself (the rail's own endpoint passes through its center), rather
+        than sitting entirely below it.
+        {% endcomment %}
+        <div class="absolute bottom-0 left-3 h-3 w-3 -translate-x-1/2 translate-y-1/2 rounded-full bg-neutral-300 sm:left-4" aria-hidden="true"></div>
+        {% for item in value.years %}
+            <section
+                id="timeline-year-{{ item.year }}"
+                {% comment %}
+                scroll-mt-[48px] is a static fallback (works with JS
+                disabled) — the script below overrides this per-section
+                with a runtime-computed value via inline style, which then
+                wins over this class regardless. 48px = the nav's own
+                measured height (76px) plus a small 4px landing gap, minus
+                main.css's global `html { scroll-padding-top: 2rem }`
+                (32px) — that global padding stacks additively on top of
+                whatever a target's own scroll-margin-top says, confirmed
+                directly (a target landed exactly 32px further down than
+                its scroll-margin-top alone accounted for). See the
+                script's own LANDING_GAP/ACTIVE_TOLERANCE comment for why
+                the scroll-spy "is this section current" check deliberately
+                does NOT reuse this same small number as its own threshold.
+                {% endcomment %}
+                class="wtr-timeline-year relative flex scroll-mt-[48px] gap-6 sm:gap-8{% if not forloop.last %} pb-24{% endif %}"
+            >
+                <div class="relative z-10 flex w-6 flex-none flex-col items-center pt-1 sm:w-8">
+                    <span class="h-3 w-3 rounded-full bg-primary-600 ring-4 ring-white"></span>
+                </div>
+                <div class="min-w-0 flex-1">
+                    {% comment %}
+                    text-32/leading-[1.2]: bigger than a standard h3's own
+                    28px step (this is a prominent per-year marker, not a
+                    body heading, so it doesn't need to match that step).
+                    Still a real <h3> element for the weight rule below,
+                    just sized off-step deliberately.
+                    Weight is Heavy (800, h1/h2's own weight, not h3's usual
+                    Bold) via the unlayered .wtr-timeline-year-label rule in
+                    main.css — a `font-heavy` utility here would silently do
+                    nothing (AGENTS.md pitfall #37: unlayered always beats a
+                    layered utility on a heading, regardless of specificity).
+                    text-primary-600 is 350's own blue.
+
+                    mb-3 (not part of the space-y-8 below, which is scoped
+                    to only the content blocks now) keeps the gap under the
+                    year tight — it used to inherit the full 32px inter-block
+                    rhythm from a shared space-y-8, which read as too much
+                    air under a label this size.
+                    {% endcomment %}
+                    <h3 class="wtr-timeline-year-label mb-3 text-32 leading-[1.2] text-primary-600">
+                        {{ item.year }}
+                    </h3>
+                    <div class="space-y-8">
+                        {% for block in item.content %}
+                            {% include_block block %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+</div>
+{% if year_nav %}
+    {% comment %}
+    Verbatim copy of card_carousel_block.html's carousel script — see that
+    file's comment for why this is duplicated inline per block template
+    rather than extracted (each instance guards itself via
+    __wtrCarouselInit, so this coexisting with a real CardCarouselBlock on
+    the same page is safe).
+    {% endcomment %}
+    <script>
+        (function () {
+            document.querySelectorAll("[data-carousel]").forEach(function (root) {
+                if (root.__wtrCarouselInit) { return; }
+                root.__wtrCarouselInit = true;
+
+                var track = root.querySelector("[data-carousel-track]");
+                var prevBtn = root.querySelector("[data-carousel-prev]");
+                var nextBtn = root.querySelector("[data-carousel-next]");
+                var fade = root.querySelector("[data-carousel-fade]");
+                if (!track || !prevBtn || !nextBtn) { return; }
+
+                function itemStep() {
+                    var item = track.querySelector("[data-carousel-item]");
+                    if (!item) { return track.clientWidth; }
+                    var trackStyle = getComputedStyle(track);
+                    var gap = parseFloat(trackStyle.columnGap || trackStyle.gap || "0");
+                    return item.getBoundingClientRect().width + gap;
+                }
+
+                function updateArrows() {
+                    var maxScroll = track.scrollWidth - track.clientWidth;
+                    prevBtn.disabled = track.scrollLeft <= 1;
+                    nextBtn.disabled = track.scrollLeft >= maxScroll - 1;
+                    if (fade) { fade.style.opacity = nextBtn.disabled ? "0" : "1"; }
+                }
+
+                prevBtn.addEventListener("click", function () {
+                    track.scrollBy({left: -itemStep(), behavior: "smooth"});
+                });
+                nextBtn.addEventListener("click", function () {
+                    track.scrollBy({left: itemStep(), behavior: "smooth"});
+                });
+                track.addEventListener("scroll", updateArrows);
+                window.addEventListener("resize", updateArrows);
+                updateArrows();
+            });
+        })();
+    </script>
+    {% comment %}
+    Stuck border (IntersectionObserver + sentinel, see the sentinel's own
+    comment above) and scroll-spy active-year highlight (plain scroll-
+    position geometry, not IntersectionObserver -- a threshold/rootMargin
+    band tuned to "whichever year we're currently inside" is fiddly to get
+    right and to keep right across viewport/nav-height changes; walking
+    the sections in DOM order and keeping the last one whose top has
+    scrolled above the nav's own bottom edge is simple and exactly
+    correct, since sections are already in document order top-to-bottom).
+    Both scoped with a guard the same way the carousel script is, so a
+    second TimelineBlock on one page doesn't double-wire either.
+    {% endcomment %}
+    <script>
+        (function () {
+            var nav = document.querySelector(".wtr-timeline-nav");
+            if (!nav || nav.__wtrTimelineNavInit) { return; }
+            nav.__wtrTimelineNavInit = true;
+
+            var sentinel = document.querySelector("[data-timeline-nav-sentinel]");
+            if (sentinel && "IntersectionObserver" in window) {
+                new IntersectionObserver(function (entries) {
+                    nav.toggleAttribute("data-stuck", !entries[0].isIntersecting);
+                }, {threshold: 0}).observe(sentinel);
+            }
+
+            var sections = Array.prototype.slice.call(document.querySelectorAll(".wtr-timeline-year[id]"));
+            var pills = {};
+            document.querySelectorAll("[data-timeline-nav-year]").forEach(function (a) {
+                pills[a.getAttribute("data-timeline-nav-year")] = a;
+            });
+            if (!sections.length || !Object.keys(pills).length) { return; }
+
+            // LANDING_GAP controls how far below the nav a clicked year
+            // lands (small, so it reads as "just above the heading").
+            // ACTIVE_TOLERANCE controls the *separate* "is this section
+            // current" check below and is deliberately much larger.
+            //
+            // Coupling these into one shared number was the first version
+            // of this and it was wrong: scroll-margin-top math makes the
+            // post-landing gap land at *approximately* LANDING_GAP by
+            // construction (see applyScrollMargins() below), so a "current"
+            // check using that same number as its threshold is always a
+            // knife-edge decision -- real measurements landed at 1.78px,
+            // 2.47px, 5.66px, 5.78px, 6.09px, 6.12px, 6.19px, 6.47px across
+            // different years in the same run (cumulative subpixel drift
+            // from all the image/video/accordion content above each one),
+            // and *any* single shared threshold gets beaten by roughly half
+            // of them. A generous, decoupled ACTIVE_TOLERANCE has real
+            // margin against that; LANDING_GAP stays small on its own axis.
+            var LANDING_GAP = 4;
+            var ACTIVE_TOLERANCE = 24;
+
+            // main.css's `html { scroll-padding-top: 2rem }` (a generic
+            // site-wide anchor-link offset, unrelated to this block) adds
+            // on top of whatever scroll-margin-top a target sets -- the two
+            // are additive, confirmed directly (a target landed ~32px
+            // further down than its own scroll-margin-top alone accounts
+            // for). Without subtracting it back out here, every year would
+            // land 32px past where the nav actually ends. If that global
+            // value ever changes, this needs updating to match.
+            var GLOBAL_SCROLL_PADDING_TOP = 32;
+
+            function applyScrollMargins() {
+                var navHeight = Math.ceil(nav.getBoundingClientRect().height);
+                var margin = Math.max(0, navHeight + LANDING_GAP - GLOBAL_SCROLL_PADDING_TOP);
+                sections.forEach(function (section) {
+                    section.style.scrollMarginTop = margin + "px";
+                });
+            }
+
+            // Brings the active pill into view within the nav's own
+            // horizontal track only -- deliberately NOT Element.scrollIntoView(),
+            // which would also scroll every other scrollable ancestor
+            // (the page itself) to satisfy visibility, fighting the very
+            // scroll that triggered this in the first place. scrollBy() on
+            // just the track can't touch the page's vertical position.
+            // Reuses the track's existing scroll listener (wired up by the
+            // carousel script above) to keep the arrow disabled-states and
+            // edge fade in sync for free.
+            function scrollPillIntoView(pill) {
+                var trackEl = pill.closest("[data-carousel-track]");
+                if (!trackEl) { return; }
+                var trackRect = trackEl.getBoundingClientRect();
+                var pillRect = pill.getBoundingClientRect();
+                var edgeGap = 16;
+                if (pillRect.left < trackRect.left) {
+                    trackEl.scrollBy({left: pillRect.left - trackRect.left - edgeGap, behavior: "smooth"});
+                } else if (pillRect.right > trackRect.right) {
+                    trackEl.scrollBy({left: pillRect.right - trackRect.right + edgeGap, behavior: "smooth"});
+                }
+            }
+
+            var activeId = null;
+            var ticking = false;
+
+            function updateActiveYear() {
+                ticking = false;
+                var navBottom = nav.getBoundingClientRect().bottom;
+                var current = null;
+                sections.forEach(function (section) {
+                    if (section.getBoundingClientRect().top - navBottom <= ACTIVE_TOLERANCE) {
+                        current = section;
+                    }
+                });
+                var nextId = current ? current.id : null;
+                if (nextId === activeId) { return; }
+                if (activeId && pills[activeId]) { pills[activeId].removeAttribute("data-active"); }
+                if (nextId && pills[nextId]) {
+                    pills[nextId].setAttribute("data-active", "");
+                    scrollPillIntoView(pills[nextId]);
+                }
+                activeId = nextId;
+            }
+
+            function requestUpdate() {
+                if (ticking) { return; }
+                ticking = true;
+                window.requestAnimationFrame(updateActiveYear);
+            }
+
+            applyScrollMargins();
+            window.addEventListener("resize", applyScrollMargins);
+            window.addEventListener("scroll", requestUpdate, {passive: true});
+            window.addEventListener("resize", requestUpdate);
+            updateActiveYear();
+        })();
+    </script>
+{% endif %}

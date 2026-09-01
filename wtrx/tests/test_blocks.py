@@ -35,6 +35,8 @@ from wtrx.blocks import (
     IMAGE_ALIGNMENT_CHOICES,
     LEGACY_BACKGROUND_VALUES,
     LIGHT_BACKGROUND_COLORS,
+    AccordionBlock,
+    AccordionItemBlock,
     BodyStreamBlock,
     ButtonBlock,
     ButtonGroupBlock,
@@ -65,6 +67,9 @@ from wtrx.blocks import (
     SignupActionKitBlock,
     SignupActionNetworkBlock,
     SuccessMessageBlock,
+    TimelineBlock,
+    TimelineYearBlock,
+    TimelineYearContentBlock,
     VideoBlock,
     _balanced_rows,
     _validate_at_most_one_link,
@@ -1736,12 +1741,105 @@ class TestSectionContentBlockExtensibility(SimpleTestCase):
         self.assertIn("donate", block.child_blocks)
 
     def test_body_stream_block_matches_section_content_plus_section(self):
-        """BodyStreamBlock should have all SectionContentBlock types plus 'section'."""
+        """
+        BodyStreamBlock should have all SectionContentBlock types plus
+        'section' and 'timeline' — both are deliberately excluded from
+        SectionContentBlock (and so from TimelineYearContentBlock, which
+        subclasses it) to prevent infinite self-nesting, same reasoning for
+        both.
+        """
         body = BodyStreamBlock()
         section_content = SectionContentBlock()
         body_names = set(body.child_blocks.keys())
         section_names = set(section_content.child_blocks.keys())
-        self.assertEqual(body_names - section_names, {"section"})
+        self.assertEqual(body_names - section_names, {"section", "timeline"})
+
+
+class TestAccordionItemBlockMediaFields(SimpleTestCase):
+    """
+    AccordionItemBlock.image/video (added for the "victories" ->
+    AccordionBlock conversion — see TimelineBlock/import_350_our_impact.py).
+    Both are optional and independent.
+    """
+
+    def test_has_expected_fields(self):
+        block = AccordionItemBlock()
+        self.assertEqual(
+            set(block.declared_blocks.keys()), {"title", "content", "image", "video"}
+        )
+
+    def test_image_is_not_required(self):
+        block = AccordionItemBlock()
+        self.assertFalse(block.declared_blocks["image"].required)
+
+    def test_video_is_not_required(self):
+        block = AccordionItemBlock()
+        self.assertFalse(block.declared_blocks["video"].required)
+
+    def test_accordion_block_items_child_block_is_accordion_item_block(self):
+        block = AccordionBlock()
+        self.assertIsInstance(block.declared_blocks["items"].child_block, AccordionItemBlock)
+
+
+class TestTimelineBlock(SimpleTestCase):
+    """
+    TimelineBlock: a list of years, each with a freely composed
+    TimelineYearContentBlock stream, plus a year-jump nav computed in
+    get_context() from whichever years are actually present (AGENTS.md
+    pitfall #44's derived-context pattern, same as CardGridBlock's rows).
+    """
+
+    def test_has_expected_fields(self):
+        block = TimelineBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"years"})
+
+    def test_years_min_num_is_one(self):
+        block = TimelineBlock()
+        self.assertEqual(block.declared_blocks["years"].meta.min_num, 1)
+
+    def test_years_child_block_is_timeline_year_block(self):
+        block = TimelineBlock()
+        self.assertIsInstance(block.declared_blocks["years"].child_block, TimelineYearBlock)
+
+    def test_year_block_has_expected_fields(self):
+        block = TimelineYearBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"year", "content"})
+
+    def test_year_content_is_timeline_year_content_block(self):
+        block = TimelineYearBlock()
+        self.assertIsInstance(block.declared_blocks["content"], TimelineYearContentBlock)
+
+    def test_timeline_year_content_block_matches_section_content_block(self):
+        """
+        TimelineYearContentBlock starts identical to SectionContentBlock
+        (same DeclarativeSubBlocksMetaclass pattern, rule #9) and must not
+        include 'timeline' itself -- that would let a year's content embed
+        another timeline, which is exactly the self-nesting SectionContentBlock
+        already avoids by excluding 'section'.
+        """
+        year_content = TimelineYearContentBlock()
+        section_content = SectionContentBlock()
+        self.assertEqual(
+            set(year_content.child_blocks.keys()), set(section_content.child_blocks.keys())
+        )
+        self.assertNotIn("timeline", year_content.child_blocks)
+
+    def test_get_context_builds_year_nav_from_years_in_order(self):
+        block = TimelineBlock()
+        value = {
+            "years": [
+                {"year": "2019", "content": []},
+                {"year": "2021", "content": []},
+            ]
+        }
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual(
+            ctx["year_nav"],
+            [
+                {"year": "2019", "anchor": "timeline-year-2019"},
+                {"year": "2021", "anchor": "timeline-year-2021"},
+            ],
+        )
 
 
 # ---------------------------------------------------------------------------

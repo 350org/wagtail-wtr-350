@@ -1661,6 +1661,61 @@ h3.victories-header {
     line-height: 1.25;
 }
 
+/* ============================================================
+ * Timeline — .wtr-timeline-year-label
+ * ============================================================
+ * Used by timeline_block.html. Year labels are real <h3> elements (Bold,
+ * 700, for free from the site-wide h3 rule above) but read too light at
+ * this size/prominence, so bumped to Heavy — h1/h2's own weight, not h3's.
+ * `font-heavy` is a real Tailwind utility (--font-weight-heavy) but any
+ * weight utility on a heading silently does nothing (AGENTS.md pitfall
+ * #37) — unlayered always beats layered here regardless of specificity —
+ * so this has to be an unlayered rule too, same as the h1/h2/h3 rules
+ * it's overriding. */
+.wtr-timeline-year-label {
+    font-weight: var(--font-weight-heavy);
+}
+
+/* Appears only once the nav is actually pinned to the viewport top, not
+ * while it still sits in its normal in-flow position — see
+ * timeline_block.html's sentinel/IntersectionObserver script, which is
+ * what toggles this attribute (there's no CSS :stuck selector). Separates
+ * the now-fixed nav from the content scrolling underneath it.
+ *
+ * A background-image gradient sliver, not `border-bottom`: a plain border
+ * can't fade horizontally on its own, and this needs to fade to transparent
+ * at both ends rather than read as a hard-edged rule across the full width.
+ * background-size pins it to a 2px-tall strip; background-position sits it
+ * at the bottom edge; bg-light's own background-color (a separate property,
+ * set on the element via a utility class) still shows through everywhere
+ * else. */
+.wtr-timeline-nav[data-stuck] {
+    background-image: linear-gradient(
+        to right,
+        transparent,
+        var(--color-neutral-200) 15%,
+        var(--color-neutral-200) 85%,
+        transparent
+    );
+    background-repeat: no-repeat;
+    background-position: bottom;
+    background-size: 100% 2px;
+    /* Faint only on purpose — this is meant to read as depth separating the
+     * pinned nav from content scrolling underneath it, not a hard shadow
+     * competing with the gradient line above. */
+    box-shadow: 0 4px 6px -4px rgb(0 0 0 / 0.08);
+}
+
+/* The pill for whichever year the reader has currently scrolled into,
+ * toggled by the same script's scroll-position geometry. Unlayered so it
+ * reliably beats this element's own layered text-dark/hover: utilities
+ * (AGENTS.md pitfall #37) without a specificity fight. */
+.wtr-timeline-nav [data-carousel-item][data-active] {
+    border-color: var(--color-primary-600);
+    background-color: var(--color-primary-600);
+    color: var(--color-light);
+}
+
 .wtr-carousel-arrow {
     display: flex;
     align-items: center;

@@ -2023,6 +2023,91 @@ Two practical notes for agents:
       an already-saved image to fetch a rendition from, and at this stage
       there isn't one yet.
 
+51. **`/our-impact` is now a structured `TimelineBlock` page, not a raw-HTML
+    embed** — the page used to be a deliberate raw-HTML embed (a
+    `migrate_impact_images.py` command did two string-level rewrites on it:
+    legacy image URLs → real `CustomImage` uploads, and "victories" expando
+    lists → static accordion-shaped markup with no real block data behind
+    it). `wtrx/management/commands/import_350_our_impact.py` replaces that
+    entirely: it scrapes https://350.org/our-impact/ directly (own HTML
+    parsing, not `convert_body()` — the page's year-sections/"victories"
+    expando structure doesn't fit that helper's generic top-level-block-
+    splitting design) and writes a real `TimelineBlock` instance instead.
+    `migrate_impact_images.py` has been removed — once this page moved off
+    raw HTML entirely, there was no other page left using it, and a
+    generic raw-HTML-rewrite tool with zero callers isn't worth keeping
+    around; its logic is still in git history (`ca0aea4` introduced it) if
+    a future raw-HTML page ever needs the same pattern again.
+    - **`TimelineBlock`** (`wtrx/blocks/__init__.py`): `years =
+      ListBlock(TimelineYearBlock())`, each year a `{year, content}` pair
+      where `content` is `TimelineYearContentBlock` — a named
+      `SectionContentBlock` subclass (rule #9's MRO-merge pattern), so a
+      year is deliberately "basically a section": any block type a
+      `SectionBlock` can hold, a timeline year can hold too. No separate
+      heading field on the year — the editor types it as a real `<h2>`
+      inside the content, same condensed-heading convention as pitfall #46.
+      The year-jump nav at the top is computed in `get_context()` from
+      `value["years"]` (pitfall #44's derived-context pattern) — never a
+      stored field, so it can't list a year that isn't actually below it.
+    - **`timeline` is registered only on `BodyStreamBlock`, not
+      `SectionContentBlock`** (and so not on `TimelineYearContentBlock`,
+      which subclasses it) — same "prevent infinite nesting" treatment
+      `SectionContentBlock` already gives `section` itself. This is also
+      the only way to avoid a class-definition-order cycle:
+      `TimelineYearContentBlock` needs `SectionContentBlock` defined first,
+      so `SectionContentBlock` can't also need `TimelineBlock` defined
+      first to reference it back.
+    - **`AccordionItemBlock` gained optional `image`/`video` fields**
+      (`ImageBlock`/`VideoBlock`, both already-existing block types reused
+      as-is) so a "victory" item survives conversion to real accordion
+      data. Before this, `AccordionItemBlock.content` was a bare
+      `RichTextBlock` with no image/embed feature — true of *every*
+      `RICHTEXT_FEATURES_*` set in this codebase, checked directly, not
+      assumed — which is exactly why the old raw-HTML approach existed:
+      67 of 83 victory items carry an image, 15 a video, only 1 neither.
+      Additive change, no data migration needed (old accordion content
+      with no `image`/`video` key just gets `None`).
+    - **The scraper's own video-URL handling is non-obvious**: the source
+      page's `<iframe src>` values are YouTube's `/embed/<id>` form (and
+      the `youtube-nocookie.com` privacy-enhanced domain), which Wagtail's
+      default `OEmbedFinder` does **not** recognise — confirmed directly,
+      `.accept()` returns `False` for `/embed/` and `True` for the
+      canonical `/watch?v=<id>` form. `_normalize_video_url()` rewrites
+      the embed form to canonical before checking. Vimeo's
+      `player.vimeo.com/video/<id>` embed src is already accepted as-is.
+      A handful of items link to video hosted on 350's own
+      `350org.widen.net` CDN, which has no oEmbed provider at all — left
+      without a video, logged as a warning, not an error (same per-item
+      failure tolerance as `download_image()`).
+    - **`download_image()` needed a local, broader exception wrapper for
+      this command specifically** (`_safe_download_image()` in
+      `import_350_our_impact.py`, not a change to the shared helper): this
+      page's images span a dozen+ third-party domains (350.org's own CDN,
+      Cloudfront, other news/NGO sites), unlike the two existing importers
+      which only ever fetch from 350.org's own WordPress uploads, and one
+      of those third-party URLs returned content Willow couldn't decode as
+      an image at all (`ElementTree.ParseError`, not a
+      `requests.exceptions.RequestException` — so `download_image()`'s own
+      exception handling didn't catch it). Widening the shared helper's
+      contract for every caller over one page's worth of messy third-party
+      URLs would be the wrong fix; catching it locally isn't.
+    - **In-page "scroll down to `<year>`" links needed rewriting.** Several
+      victory items link to another year via `<a href="#year-2021">` —
+      the source page's own anchor scheme. `TimelineBlock`'s anchors are
+      `id="timeline-year-2021"`, so a naive copy silently breaks that link
+      (no error, it just does nothing on click — caught only by actually
+      clicking a rendered link, not by any structural check).
+      `_clean_fragment()` rewrites `href="#year-(\d+)"` to
+      `href="#timeline-year-\1"` after cleaning.
+    - Source markup has a real bug on 350.org's own page: a few `<img
+      alt="...">` values contain unescaped literal quote characters, which
+      can shift `html.parser`'s attribute-boundary detection for whatever
+      tag follows and leave a stray trailing punctuation character on that
+      next image's imported title (cosmetic only — the title field, not
+      the file). Confirmed by reading the raw source HTML directly, not
+      guessed. Not worth a bespoke repair pass for a page that isn't ours
+      to fix; worth a glance at Settings > Images after a real import.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive branch names: `feature/signup-block`,

@@ -1029,11 +1029,84 @@ def _section_blocks(image_id):
     return blocks
 
 
+def _timeline_accordion_block(image_id):
+    """
+    A "victories at a glance"-style accordion, one item per new
+    AccordionItemBlock media field so both are exercised: an image item and
+    a video item, plus a plain text-only item (the real /our-impact data's
+    83 items split 67/15/1 across image/video/neither).
+    """
+    return _sb(
+        "accordion",
+        {
+            "items": [
+                {
+                    "title": "A victory with an image",
+                    "content": "<p>Short description of what happened.</p>",
+                    "image": {"image": image_id, "alt_text": "", "caption": ""},
+                    "video": {"embed_url": "", "media_file": None, "caption": ""},
+                },
+                {
+                    "title": "A victory with a video",
+                    "content": "<p>Short description of what happened.</p>",
+                    "image": {"image": None, "alt_text": "", "caption": ""},
+                    "video": {
+                        "embed_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                        "media_file": None,
+                        "caption": "",
+                    },
+                },
+                {
+                    "title": "A text-only victory",
+                    "content": _RICHTEXT_PARAGRAPH,
+                    "image": {"image": None, "alt_text": "", "caption": ""},
+                    "video": {"embed_url": "", "media_file": None, "caption": ""},
+                },
+            ]
+        },
+    )
+
+
+def _timeline_block(image_id):
+    """
+    TimelineBlock: two years, each "basically a section" — a freely
+    composed TimelineYearContentBlock stream, per the block's own design.
+    The year-jump nav at the top is derived from these years at render
+    time, not built here.
+    """
+    return _sb(
+        "timeline",
+        {
+            "years": [
+                {
+                    "year": "2019",
+                    "content": [
+                        _sb("text", "<h2>Millions strike for the climate</h2>" + _RICHTEXT_PARAGRAPH),
+                        _image_block_minimal(image_id),
+                        _timeline_accordion_block(image_id),
+                    ],
+                },
+                {
+                    "year": "2021",
+                    "content": [
+                        _sb("text", "<h2>Keystone XL is cancelled</h2>" + _RICHTEXT_PARAGRAPH),
+                    ],
+                },
+            ]
+        },
+    )
+
+
+def _timeline_blocks(image_id):
+    return [_label("timeline"), _timeline_block(image_id)]
+
+
 def _build_body(image_id, index_page_id, form_page_id):
     return (
         _typography_blocks()
         + _content_blocks(image_id, index_page_id, form_page_id)
         + _section_blocks(image_id)
+        + _timeline_blocks(image_id)
     )
 
 
