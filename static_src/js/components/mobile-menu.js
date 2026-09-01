@@ -9,6 +9,14 @@
  *
  * Behaviour:
  * - Toggles aria-expanded and the panel's `hidden` class.
+ * - Fades and slides the panel in/out (opacity-0/-translate-y-2 base
+ *   classes on the panel, removed on open) rather than an instant
+ *   show/hide. `hidden` can't itself be transitioned (display:none has
+ *   no intermediate state), so open() removes `hidden` first, forces a
+ *   reflow, then removes the opacity/translate classes so the browser
+ *   has a real "before" state to animate from; close() reverses that and
+ *   only re-adds `hidden` after the transition's duration, guarded so a
+ *   reopen during that window doesn't get hidden out from under it.
  * - Swaps the hamburger icon for a close (X) icon while open, via
  *   [data-mobile-menu-icon-open] / [data-mobile-menu-icon-close] — the
  *   same instant class-toggle idiom accordion.js already uses.
@@ -19,7 +27,17 @@
  *   click/tap outside both the panel and the toggle button.
  * - Closes when an anchor link inside the panel is clicked, so the user
  *   can see the target section after the smooth scroll.
+ * - For the fixed full-screen mobile overlay (not the compact, absolutely
+ *   positioned collapsed-desktop dropdown, which already tracks the
+ *   header via top-full in CSS) — pins the panel's `top` to the actual
+ *   rendered bottom edge of [data-mobile-menu-header-row] every time it
+ *   opens, rather than trusting the top-[65px] Tailwind class alone. That
+ *   class is a reasonable no-JS fallback, but the header's real height
+ *   drifts with content (a long regional label, font load timing, text
+ *   wrapping at odd widths) — measuring it at open time is what actually
+ *   keeps the overlay from drifting under/over the header row.
  */
+const TRANSITION_MS = 200;
 class MobileMenu {
     static init() {
         const toggleButtons = document.querySelectorAll('[data-mobile-menu-toggle]');
@@ -37,7 +55,23 @@ class MobileMenu {
 
             const open = () => {
                 button.setAttribute('aria-expanded', 'true');
+                // Only the fixed full-screen overlay needs this — the
+                // absolute collapsed-desktop dropdown already tracks the
+                // header's true height via top-full in CSS with no JS
+                // measurement needed.
+                if (getComputedStyle(menu).position === 'fixed') {
+                    const headerRow = document.querySelector('[data-mobile-menu-header-row]');
+                    if (headerRow) {
+                        menu.style.top = headerRow.getBoundingClientRect().bottom + 'px';
+                    }
+                }
                 menu.classList.remove('hidden');
+                // Force a reflow so the browser registers the opacity-0/
+                // -translate-y-2 starting state before it's removed below —
+                // without this the two class changes coalesce into one
+                // frame and there's nothing to transition from.
+                void menu.offsetHeight;
+                menu.classList.remove('opacity-0', '-translate-y-2');
                 if (openIcon) { openIcon.classList.add('hidden'); }
                 if (closeIcon) { closeIcon.classList.remove('hidden'); }
                 document.body.classList.add('wtr-scroll-locked');
@@ -45,10 +79,17 @@ class MobileMenu {
 
             const close = () => {
                 button.setAttribute('aria-expanded', 'false');
-                menu.classList.add('hidden');
+                menu.classList.add('opacity-0', '-translate-y-2');
                 if (openIcon) { openIcon.classList.remove('hidden'); }
                 if (closeIcon) { closeIcon.classList.add('hidden'); }
                 document.body.classList.remove('wtr-scroll-locked');
+                window.setTimeout(() => {
+                    // Don't hide it out from under a reopen that happened
+                    // during the closing transition.
+                    if (button.getAttribute('aria-expanded') !== 'true') {
+                        menu.classList.add('hidden');
+                    }
+                }, TRANSITION_MS);
             };
 
             button.addEventListener('click', () => {

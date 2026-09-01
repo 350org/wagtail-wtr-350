@@ -30,10 +30,17 @@ class names as plain text, so the literal here is enough for JIT.
 transparent_header is set in context by HomePage.get_context() when use_transparent_header is True.
 When transparent: header is position:absolute over the hero, bg is transparent, text switches to light,
 and the dark_logo variant is used if available.
+
+border-b-0 by default; the has-[...] variant below adds a light-gray
+border-bottom only while the mobile/collapsed-desktop toggle is expanded
+(aria-expanded="true" on [data-mobile-menu-toggle]), so the header only
+shows a divider under logo/CTA/hamburger while its menu is actually open.
+This is pure CSS (:has() reacting to the aria-expanded attribute
+mobile-menu.js already toggles) — no separate JS hook needed.
 {% endcomment %}
-<header class="wtr-header {% if transparent_header %}absolute inset-x-0 top-0 z-30 bg-transparent{% else %}relative bg-light{% endif %} border-b-0">
+<header class="wtr-header {% if transparent_header %}absolute inset-x-0 top-0 z-30 bg-transparent{% else %}relative bg-light{% endif %} border-b-0 has-[[data-mobile-menu-toggle][aria-expanded=true]]:border-b has-[[data-mobile-menu-toggle][aria-expanded=true]]:border-neutral-200">
     <div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between" data-mobile-menu-header-row>
 
             {% comment %}
             Logo lockup — logo plus, on a section with a regional label, the
@@ -92,7 +99,7 @@ and the dark_logo variant is used if available.
                     was sized for an auto-height chip and now only fights that
                     centring.
                     {% endcomment %}
-                    <span class="wtr-regional-label inline-flex h-10 items-center justify-center rounded bg-primary-600 px-3 font-heading text-base font-semibold uppercase leading-none tracking-[1px] text-white transition-colors {% if transparent_header %}group-hover:bg-primary-400{% else %}group-hover:bg-navy{% endif %}">{{ nav.regional_label }}</span>
+                    <span class="wtr-regional-label inline-flex h-10 items-center justify-center rounded bg-primary-600 px-2 sm:px-3 font-heading text-sm sm:text-base font-semibold uppercase leading-none tracking-normal sm:tracking-[1px] text-white transition-colors {% if transparent_header %}group-hover:bg-primary-400{% else %}group-hover:bg-navy{% endif %}">{{ nav.regional_label }}</span>
                 {% endif %}
             </a>
 
@@ -101,57 +108,70 @@ and the dark_logo variant is used if available.
             Each item is an InternalLinkBlock, ExternalLinkBlock, or AnchorLinkBlock.
             {% endcomment %}
             {% if not nav.collapse_desktop_menu %}
-                <nav class="hidden md:flex items-center space-x-6 ml-auto" aria-label="{% trans 'Primary navigation' %}">
+                <nav class="hidden md:flex items-center space-x-1 ml-auto" aria-label="{% trans 'Primary navigation' %}">
+                    {% comment %}
+                    Hover — text color only (primary-600, #0f81e8). No background
+                    pill, no shadow, no underline, no font-weight change — the
+                    underline + font-semibold combo (nav_active_link) is reserved
+                    for the active-page indicator, so hovering a non-active item
+                    never reads as "this is now the current page."
+                    {% endcomment %}
                     {% for item in nav.primary_navigation %}
                         {% nav_item_is_active item as is_active %}
                         {% if item.block_type == "internal" and item.value.page %}
                             <a href="{% pageurl item.value.page %}"
-                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 {% if transparent_header %}text-neutral-200{% else %}text-dark{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "external" %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
-                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 {% if transparent_header %}text-neutral-200{% else %}text-dark{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "anchor" %}
                             <a href="#{{ item.value.anchor }}"
-                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 {% if transparent_header %}text-neutral-200{% else %}text-dark{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "submenu" %}
                             {% comment %}
                             Dropdown menu. Opens on hover (group-hover) and on keyboard focus
                             (group-focus-within) so it is reachable without JavaScript.
-                            Text color only on hover — no background fill.
+                            Single column only for now.
                             {% endcomment %}
                             <div class="relative group">
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-medium uppercase tracking-[1px] whitespace-nowrap cursor-pointer {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-dark hover:text-navy{% endif %} transition-colors"
+                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-medium uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 {% if transparent_header %}text-neutral-200{% else %}text-dark{% endif %} transition-colors"
                                         aria-haspopup="true">
                                     <span class="{% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">{{ item.value.text }}</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    {% comment %}
+                                    Solid triangle, not an outline chevron — fill plus a
+                                    matching stroke with stroke-linejoin="round" is what
+                                    softens the triangle's corners; fill alone would give
+                                    sharp points.
+                                    {% endcomment %}
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M5 9L19 9L12 16Z" />
                                     </svg>
                                 </button>
                                 <div class="hidden group-hover:block group-focus-within:block absolute left-0 top-full pt-2 z-40 min-w-48">
-                                    <div class="rounded-lg shadow-lg py-2 {% if transparent_header %}bg-dark border border-neutral-700{% else %}bg-light border border-neutral-200{% endif %}">
+                                    <div class="rounded-lg border-2 border-neutral-200 shadow-lg bg-light p-4 flex flex-col gap-1">
                                         {% for child in item.value.links %}
                                             {% if child.block_type == "internal" and child.value.page %}
                                                 <a href="{% pageurl child.value.page %}"
-                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-navy hover:bg-neutral-100{% endif %} transition-colors">
+                                                   class="block rounded-lg p-3 text-base font-medium text-neutral-700 hover:bg-primary-50 hover:text-primary-600 transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "external" %}
                                                 <a href="{{ child.value.url }}"
                                                    rel="noopener noreferrer"
-                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-navy hover:bg-neutral-100{% endif %} transition-colors">
+                                                   class="block rounded-lg p-3 text-base font-medium text-neutral-700 hover:bg-primary-50 hover:text-primary-600 transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "anchor" %}
                                                 <a href="#{{ child.value.anchor }}"
-                                                   class="block px-4 py-2 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light hover:bg-neutral-800{% else %}text-neutral-700 hover:text-navy hover:bg-neutral-100{% endif %} transition-colors">
+                                                   class="block rounded-lg p-3 text-base font-medium text-neutral-700 hover:bg-primary-50 hover:text-primary-600 transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% endif %}
@@ -282,11 +302,11 @@ and the dark_logo variant is used if available.
                 {% if nav.collapse_desktop_menu %}
                     {% if transparent_header %}
                         <div id="mobile-menu"
-                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-700 bg-dark rounded-lg shadow-lg"
+                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-700 bg-dark rounded-lg shadow-lg opacity-0 -translate-y-2 transition duration-200 ease-out"
                              aria-label="{% trans 'Mobile navigation' %}">
                     {% else %}
                         <div id="mobile-menu"
-                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-200 bg-light rounded-lg shadow-lg"
+                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-200 bg-light rounded-lg shadow-lg opacity-0 -translate-y-2 transition duration-200 ease-out"
                              aria-label="{% trans 'Mobile navigation' %}">
                     {% endif %}
                         <div class="px-4 py-4 space-y-2 text-right">
@@ -294,41 +314,41 @@ and the dark_logo variant is used if available.
                                 {% nav_item_is_active item as is_active %}
                                 {% if item.block_type == "internal" and item.value.page %}
                                     <a href="{% pageurl item.value.page %}"
-                                       class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
+                                       class="block py-2 text-lg {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "external" %}
                                     <a href="{{ item.value.url }}"
                                        rel="noopener noreferrer"
-                                       class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
+                                       class="block py-2 text-lg {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "anchor" %}
                                     <a href="#{{ item.value.anchor }}"
-                                       class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
+                                       class="block py-2 text-lg {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "submenu" %}
                                     {% comment %}In the collapsed vertical menu a dropdown becomes a labelled, indented sub-group.{% endcomment %}
-                                    <p class="pt-2 pb-1 text-xs uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">
+                                    <p class="pt-2 pb-1 text-base uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">
                                         {{ item.value.text }}
                                     </p>
-                                    <div class="pr-3 space-y-1">
+                                    <div class="space-y-1">
                                         {% for child in item.value.links %}
                                             {% if child.block_type == "internal" and child.value.page %}
                                                 <a href="{% pageurl child.value.page %}"
-                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
+                                                   class="block py-1.5 text-lg font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "external" %}
                                                 <a href="{{ child.value.url }}"
                                                    rel="noopener noreferrer"
-                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
+                                                   class="block py-1.5 text-lg font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% elif child.block_type == "anchor" %}
                                                 <a href="#{{ child.value.anchor }}"
-                                                   class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
+                                                   class="block py-1.5 text-lg font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
                                                     {{ child.value.text }}
                                                 </a>
                                             {% endif %}
@@ -358,81 +378,158 @@ and the dark_logo variant is used if available.
     </div>
 
     {% comment %}
-    Standard mobile-only panel — only rendered when collapse_desktop_menu is False.
-    Lives outside max-w-7xl as a direct child of <header> so it spans the full header
-    width at mobile breakpoints. md:hidden keeps it off desktop.
+    Standard mobile-only panel — a full-screen overlay takeover, not the
+    old in-flow strip. Fixed below the header's visible row content,
+    filling the rest of the viewport with its own internal scroll
+    (overflow-y-auto). top-[65px] below (the header's own pt-6 (24px)
+    plus the ~41px logo/CTA row — NOT the header's full ~89px box, which
+    also includes its own pb-6 (24px) bottom padding) is a no-JS
+    fallback only: mobile-menu.js measures
+    [data-mobile-menu-header-row]'s actual rendered bottom edge every
+    time the overlay opens and overrides this with an inline style.top,
+    because the header's true height drifts with content (a long
+    regional label, font-load timing, text wrapping) — a hardcoded
+    pixel guess alone has already caused a visible overlap with the CTA
+    button once. The toggle button (showing the close/X icon while open)
+    and the CTA both live in the header above this overlay, not inside
+    it — so there's no separate close button or duplicate CTA here; both
+    stay reachable the whole time the overlay is open.
+
+    The outer #mobile-menu is the per-variant bg-light/bg-dark fill with a
+    p-4 inset gap; the inner div (no background, no border, no rounded
+    corners — flat, on purpose) is only a flex/padding wrapper around
+    every element — nav list, submenu sub-items, and the trailing
+    social/language group.
+
+    top-[65px] (not 89px) is what keeps that p-4 gap actually equal on
+    all four sides: the overlay's own bg-light/bg-dark matches the
+    header's, so the overlay overlapping the header's last 24px of
+    bottom padding is invisible (same color, seamless) — and it means
+    the overlay's own p-4 top padding is the ONLY gap between the visible
+    row and the content below it, same 16px the sides get. Starting the
+    overlay at the full 89px instead would stack the header's own 24px
+    bottom padding underneath the overlay's 16px top padding, giving a
+    40px top gap against 16px on the sides — the mismatch this was
+    written to fix.
+
+    The inner div's own padding is px-6 pt-3 pb-6, not a uniform p-6 —
+    every nav item is `block` with its own py-3 (for touch-target height
+    and inter-item spacing) but no horizontal padding, so a top-level
+    item's py-3 stacks with this div's own top padding while nothing
+    stacks with its side padding. pt-3 (12px) plus the first item's own
+    top py-3
+    (12px) equals 24px, matching the 24px px-6 gives the sides; a uniform
+    p-6 here left 36px above the first item against 24px on the sides.
+
+    Left-aligned, large (text-2xl) touch targets. Submenus are
+    tap-to-expand accordion sections via data-accordion /
+    data-accordion-toggle / data-accordion-content — the same
+    instant-hidden-toggle + rotate-180-chevron idiom AccordionBlock
+    already uses (accordion_block.html), not a new mechanism. Children
+    stay flush-left with no indent, matching the flat hierarchy used
+    elsewhere in this panel.
+
+    No card chrome here — no background fill, no border, no rounded
+    corners. The only visual separation between the header and this
+    content is the header's own has-[...]:border-b (see the <header>
+    tag's class list), which shows a light-gray border only while a
+    toggle in it is aria-expanded="true".
+
+    Only rendered when collapse_desktop_menu is False; md:hidden keeps
+    it off desktop. mobile-menu.js drives the open/close fade+slide via
+    the opacity-0/-translate-y-2 base classes below.
     {% endcomment %}
     {% if not nav.collapse_desktop_menu %}
         {% if transparent_header %}
             <div id="mobile-menu"
-                 class="hidden md:hidden border-t border-neutral-700 bg-dark"
+                 class="hidden md:hidden fixed inset-x-0 top-[65px] bottom-0 z-40 overflow-y-auto p-4 bg-dark opacity-0 -translate-y-2 transition duration-200 ease-out"
                  aria-label="{% trans 'Mobile navigation' %}">
         {% else %}
             <div id="mobile-menu"
-                 class="hidden md:hidden border-t border-neutral-200 bg-light"
+                 class="hidden md:hidden fixed inset-x-0 top-[65px] bottom-0 z-40 overflow-y-auto p-4 bg-light opacity-0 -translate-y-2 transition duration-200 ease-out"
                  aria-label="{% trans 'Mobile navigation' %}">
         {% endif %}
-            <div class="px-4 py-4 space-y-2 text-right">
-                {% for item in nav.primary_navigation %}
-                    {% nav_item_is_active item as is_active %}
-                    {% if item.block_type == "internal" and item.value.page %}
-                        <a href="{% pageurl item.value.page %}"
-                           class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
-                            {{ item.value.text }}
-                        </a>
-                    {% elif item.block_type == "external" %}
-                        <a href="{{ item.value.url }}"
-                           rel="noopener noreferrer"
-                           class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
-                            {{ item.value.text }}
-                        </a>
-                    {% elif item.block_type == "anchor" %}
-                        <a href="#{{ item.value.anchor }}"
-                           class="block py-2 text-sm {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
-                            {{ item.value.text }}
-                        </a>
-                    {% elif item.block_type == "submenu" %}
-                        {% comment %}In the mobile panel a dropdown becomes a labelled, indented sub-group.{% endcomment %}
-                        <p class="pt-2 pb-1 text-xs uppercase tracking-wide {% if transparent_header %}text-neutral-400{% else %}text-neutral-500{% endif %} {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">
-                            {{ item.value.text }}
-                        </p>
-                        <div class="pr-3 space-y-1">
-                            {% for child in item.value.links %}
-                                {% if child.block_type == "internal" and child.value.page %}
-                                    <a href="{% pageurl child.value.page %}"
-                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
-                                        {{ child.value.text }}
-                                    </a>
-                                {% elif child.block_type == "external" %}
-                                    <a href="{{ child.value.url }}"
-                                       rel="noopener noreferrer"
-                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
-                                        {{ child.value.text }}
-                                    </a>
-                                {% elif child.block_type == "anchor" %}
-                                    <a href="#{{ child.value.anchor }}"
-                                       class="block py-1.5 text-sm font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
-                                        {{ child.value.text }}
-                                    </a>
-                                {% endif %}
+            <div class="flex min-h-full flex-col px-6 pt-3 pb-6" data-accordion>
+                <nav class="flex flex-col gap-1" aria-label="{% trans 'Primary navigation' %}">
+                    {% for item in nav.primary_navigation %}
+                        {% nav_item_is_active item as is_active %}
+                        {% if item.block_type == "internal" and item.value.page %}
+                            <a href="{% pageurl item.value.page %}"
+                               class="block py-3 text-2xl font-heavy {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "external" %}
+                            <a href="{{ item.value.url }}"
+                               rel="noopener noreferrer"
+                               class="block py-3 text-2xl font-heavy {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "anchor" %}
+                            <a href="#{{ item.value.anchor }}"
+                               class="block py-3 text-2xl font-heavy {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} {% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "submenu" %}
+                            {% comment %}
+                            Tap-to-expand accordion, reusing accordion.js's
+                            data-accordion-toggle / data-accordion-content
+                            pattern (the same instant hidden-toggle +
+                            rotate-180 chevron idiom accordion_block.html
+                            uses) — one data-accordion container wraps the
+                            whole nav list above.
+                            {% endcomment %}
+                            <div>
+                                <button type="button"
+                                        class="flex w-full items-center justify-between gap-4 py-3 text-2xl font-heavy {% if transparent_header %}text-neutral-200{% else %}text-neutral-700{% endif %} transition-colors"
+                                        aria-expanded="false"
+                                        data-accordion-toggle>
+                                    <span class="{% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %}">{{ item.value.text }}</span>
+                                    <svg class="h-3 w-3 shrink-0 transition-transform duration-200" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M5 9L19 9L12 16Z" />
+                                    </svg>
+                                </button>
+                                <div class="hidden flex-col gap-1 pb-2" data-accordion-content>
+                                    {% for child in item.value.links %}
+                                        {% if child.block_type == "internal" and child.value.page %}
+                                            <a href="{% pageurl child.value.page %}"
+                                               class="block py-2 text-xl font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
+                                                {{ child.value.text }}
+                                            </a>
+                                        {% elif child.block_type == "external" %}
+                                            <a href="{{ child.value.url }}"
+                                               rel="noopener noreferrer"
+                                               class="block py-2 text-xl font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
+                                                {{ child.value.text }}
+                                            </a>
+                                        {% elif child.block_type == "anchor" %}
+                                            <a href="#{{ child.value.anchor }}"
+                                               class="block py-2 text-xl font-medium {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-navy{% endif %} transition-colors">
+                                                {{ child.value.text }}
+                                            </a>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </nav>
+
+                <div class="mt-auto flex flex-col gap-6 pt-8">
+                    {% if social.show_in_header and social.social_links %}
+                        <div class="wtr-social-links flex items-center gap-4">
+                            {% for item in social.social_links %}
+                                <a href="{{ item.value.url }}"
+                                   rel="noopener noreferrer"
+                                   aria-label="{{ item.value.platform|social_platform_label }}"
+                                   class="{% if transparent_header %}text-neutral-400 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
+                                    {% social_icon item.value.platform %}
+                                </a>
                             {% endfor %}
                         </div>
                     {% endif %}
-                {% endfor %}
-                {% if social.show_in_header and social.social_links %}
-                    <div class="wtr-social-links md:hidden pt-2 border-t {% if transparent_header %}border-neutral-700{% else %}border-neutral-200{% endif %} flex items-center justify-end gap-4">
-                        {% for item in social.social_links %}
-                            <a href="{{ item.value.url }}"
-                               rel="noopener noreferrer"
-                               aria-label="{{ item.value.platform|social_platform_label }}"
-                               class="{% if transparent_header %}text-neutral-400 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
-                                {% social_icon item.value.platform %}
-                            </a>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-                {% include "wtrx/components/language_switcher.html" %}
-                {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+                    {% include "wtrx/components/language_switcher.html" %}
+                    {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+                </div>
             </div>
         </div>
     {% endif %}

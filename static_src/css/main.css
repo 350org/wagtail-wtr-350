@@ -1047,20 +1047,20 @@ h3, h4, h5, h6 {
 /* ============================================================
  * Mobile / collapsed-desktop nav menu — .wtr-scroll-locked
  * ============================================================
- * mobile-menu.js adds this to <body> while the mobile nav panel (or the
- * collapsed-desktop dropdown that shares its markup, see AGENTS.md
+ * mobile-menu.js adds this to <body> while the mobile nav panel (now a
+ * fixed full-screen overlay below the header, not an in-flow strip) or
+ * the collapsed-desktop dropdown that shares its markup (see AGENTS.md
  * pitfall #18) is open, and removes it on close. It goes on <body>, not
- * the panel itself: the standard mobile panel is a normal in-flow
- * element that pushes the rest of the page down rather than an overlay,
- * so there's no single element whose own scroll to lock — the page
- * itself is what must stop scrolling out from under an open menu, for
- * both panel variants.
+ * the panel itself, so one rule covers both variants — the compact
+ * collapsed-desktop dropdown has no full-viewport surface of its own to
+ * lock.
  *
  * Plain `overflow: hidden` rather than the position:fixed
- * scroll-position-freeze trick some sites use — this is a short,
- * single-purpose panel, not a full-screen takeover, so preserving the
- * user's exact scroll offset across open/close matters more here than
- * eliminating iOS rubber-banding at the very top/bottom of the page.
+ * scroll-position-freeze trick some sites use for a full-screen
+ * takeover — this keeps the collapsed-desktop dropdown's behavior
+ * (preserving the page's exact scroll offset across open/close) intact
+ * for both variants, at the cost of some iOS rubber-banding bleed-through
+ * at the very top/bottom of the page while the mobile overlay is open.
  * ============================================================ */
 body.wtr-scroll-locked {
     overflow: hidden;
