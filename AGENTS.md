@@ -1947,6 +1947,81 @@ Two practical notes for agents:
       rubber-banding bleed-through at the very top/bottom of the page
       while the mobile overlay is open.
 
+50. **`CustomImage.description` is required (`blank=False`) — it's the only
+    thing standing between real alt text and a filename** (pitfall #38's
+    `default_alt_text` chain: description, then title). `wtrx/images.py`
+    redeclares the field (inherited `blank=True` from Wagtail's
+    `AbstractImage`) rather than adding a custom form — overriding a field
+    declared on an *abstract* base is normal Django (only overriding a field
+    from a *concrete* parent is disallowed), and Wagtail's Images admin form
+    is built via `modelform_factory` off `admin_form_fields` (already
+    includes `description`, per pitfall #9 — don't re-add it), so a
+    ModelForm field's `required` follows the model field's `blank`
+    automatically. No custom form class was needed.
+    - This only tightens *form* validation (`full_clean()`), not `.save()`.
+      Programmatic image creation — the blog/press-release/our-impact
+      importers — still works with a blank description; the requirement
+      only bites in the Images admin (single upload, bulk upload, and
+      edit-existing).
+    - `ImageBlock.alt_text` (`wtrx/blocks/__init__.py`) is deliberately
+      **not** also required — it's a per-placement override on top of a now-
+      guaranteed description, not a second gate. Don't add a `required=True`
+      there; it would fight the field's own help text ("leave blank to use
+      the description set on the image itself").
+    - Decorative-only image slots (the card icon in `components/card.html`,
+      the callout background wash) still render `alt=""` unconditionally —
+      requiring a description doesn't change their rendered output, it just
+      means every media-library entry carries real text (useful for search/
+      reuse regardless of where an image ends up being placed).
+    - **Legacy images that predate this requirement** (blank description
+      already in the database) are unaffected until next edited through the
+      admin. `wtrx/management/commands/backfill_image_descriptions.py`
+      bulk-fixes them, reusing the exact same generation path the "Generate
+      description" wand button already uses in the Images admin
+      (`wagtail_ai.agents.basic_prompt.BasicPromptAgent`, driven by
+      `AgentSettings.image_description_prompt`) rather than reimplementing
+      prompt/LLM logic. It caches generated text to a JSON file
+      (`--cache-file`, default `image_description_backfill_cache.json` at
+      the repo root — gitignored) keyed by image ID, and only writes to the
+      database when `--apply` is passed:
+      ```
+      python manage.py backfill_image_descriptions --limit 5           # generate + cache only
+      python manage.py backfill_image_descriptions --limit 5 --apply   # generate/reuse cache, then save
+      python manage.py backfill_image_descriptions --apply             # apply everything already cached
+      ```
+      A cached entry is never regenerated (no repeat LLM spend on re-runs),
+      the JSON is plain text so a bad generated description can be hand-
+      corrected before `--apply`, and it's idempotent — only ever targets
+      rows still blank, so `--limit`, Ctrl-C, or a per-image API failure
+      (caught individually; one bad image never kills the batch) are all
+      safe to re-run. Tests for it (`test_backfill_image_descriptions.py`)
+      mock `BasicPromptAgent.execute` — never call a real LLM from a test.
+    - **The bulk "Add images" uploader (`/admin/images/multiple/add/`) looks
+      like it silently fails when you leave the description blank — this is
+      stock Wagtail behavior, not a bug in this change, and is left as-is.**
+      Wagtail's own multi-upload view (`wagtail/admin/views/generic/
+      multiple_upload.py` `AddView.post()`) already has a designed fallback
+      for exactly this case ("a required metadata field on a custom image
+      model"): the initial file drop can't save a real row (blank
+      description), so it stashes the file as a temporary `UploadedFile`
+      and returns `success: true` for *that* AJAX call anyway — which is
+      what flips the thumbnail to a green "success" state before anything
+      is actually saved. The inline form shown below it (asking for Title/
+      Description) is what has to be completed before a real `CustomImage`
+      exists. Submitting it blank correctly re-renders the form with a
+      proper "This field is required" error (confirmed in the raw HTML
+      response), but the bundled frontend (`wagtailimages/js/add-multiple.js`,
+      not something this repo overrides) never clears the earlier
+      `upload-success` class on a failed retry — so the row keeps its
+      "succeeded" styling while the form underneath says it didn't, which
+      reads as "it looks like it worked, then failed." Nothing is corrupted
+      either way (no orphaned `CustomImage` row — only an `UploadedFile`
+      staging record, which stock Wagtail already accounts for), and this
+      is also why the AI "generate description" wand button (pitfall #11)
+      doesn't appear in this panel — the wand's image-generation call needs
+      an already-saved image to fetch a rendition from, and at this stage
+      there isn't one yet.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive branch names: `feature/signup-block`,
