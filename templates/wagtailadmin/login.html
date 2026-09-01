@@ -1,5 +1,5 @@
 {% extends "wagtailadmin/login.html" %}
-{% load i18n socialaccount %}
+{% load i18n socialaccount static wagtailadmin_tags %}
 
 {% block above_login %}
     {{ block.super }}
@@ -27,4 +27,10 @@
     {% if not google_sso_only %}
         {{ block.super }}
     {% endif %}
+{% endblock %}
+
+{% block branding_logo %}
+    <div class="login-logo">
+        <img src="{% versioned_static 'wtrx/admin/logo.svg' %}" alt="350" width="95" height="41">
+    </div>
 {% endblock %}
