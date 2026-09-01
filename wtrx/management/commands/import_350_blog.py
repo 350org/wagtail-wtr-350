@@ -15,8 +15,15 @@ Field mapping:
     WP title/slug/date_gmt   -> Post title/slug/published_at
                                 (also first_published_at, which Wagtail
                                 only sets on an admin publish)
-    WP content.rendered      -> Post.body (StreamField: text + image blocks)
-    WP featured media        -> Post.hero_image
+    WP content.rendered      -> Post.body (StreamField: text + image blocks;
+                                 each <img>'s alt attribute -> that image
+                                 block's own alt_text, and (see
+                                 download_image() in _wp_content_utils.py)
+                                 CustomImage.description, so the same alt
+                                 text still applies if the image is later
+                                 reused elsewhere, e.g. as a card thumbnail)
+    WP featured media        -> Post.hero_image (its own WP alt text, when
+                                 set, -> CustomImage.description the same way)
     WP categories (subset)   -> Post.categories (see CATEGORY_SLUG_MAP,
                                  falling back to title-keyword matching --
                                  see TITLE_CATEGORY_KEYWORDS)
@@ -185,14 +192,24 @@ def _author_name(post, session):
     return fallback
 
 
-def _featured_image_url(post):
+def _featured_media(post):
     embedded_media = post.get("_embedded", {}).get("wp:featuredmedia") or []
     if not embedded_media:
         return None
     media = embedded_media[0]
     if media.get("code"):  # e.g. {"code": "rest_forbidden", ...} when media 404s
         return None
-    return media.get("source_url")
+    return media
+
+
+def _featured_image_url(post):
+    media = _featured_media(post)
+    return media.get("source_url") if media else None
+
+
+def _featured_image_alt(post):
+    media = _featured_media(post)
+    return html.unescape(media.get("alt_text") or "") if media else ""
 
 
 def fetch_posts(session, limit=None, since=None):
@@ -303,7 +320,13 @@ class Command(BaseCommand):
             hero_image = None
             featured_url = _featured_image_url(post)
             if featured_url:
-                hero_image = download_image(session, featured_url, self.stdout, dry_run=dry_run)
+                hero_image = download_image(
+                    session,
+                    featured_url,
+                    self.stdout,
+                    dry_run=dry_run,
+                    alt_text=_featured_image_alt(post),
+                )
 
             if dry_run:
                 self.stdout.write(

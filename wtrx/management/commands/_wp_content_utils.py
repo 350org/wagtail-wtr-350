@@ -229,11 +229,25 @@ def _build_clean(node):
     return [new_tag]
 
 
-def download_image(session, url, stdout, dry_run=False):
+def download_image(session, url, stdout, dry_run=False, alt_text=""):
     """
     Download an image from ``url`` and create a CustomImage, or return an
     existing one whose title already matches the source filename (dedup
     across runs, since CustomImage has no dedicated external-URL field).
+
+    ``alt_text`` (WordPress's own alt text for this image, when the source
+    provides one) is stored on CustomImage.description -- Wagtail's
+    "default_alt_text" fallback (description, else title) used any time this
+    image is rendered somewhere that doesn't carry its own contextual alt
+    (e.g. reused as a post card thumbnail via Post.get_card_image()). Without
+    it, that fallback lands on the filename instead (see AGENTS.md pitfall
+    #38). Left as "" (falls back to title, same as before) when WordPress has
+    no alt text for this image either -- most WP images don't.
+
+    An already-existing image (dedup match) has its description backfilled
+    too, but only if it doesn't already have one -- this fills in alt text
+    for images downloaded before this was tracked (rerun with --update) without
+    ever overwriting a real description an editor has since written by hand.
     """
     if not url:
         return None
@@ -245,6 +259,9 @@ def download_image(session, url, stdout, dry_run=False):
     filename = os.path.basename(urlparse(full_url).path) or "imported-image"
     existing = CustomImage.objects.filter(title=filename).first()
     if existing:
+        if alt_text and not existing.description and not dry_run:
+            existing.description = alt_text
+            existing.save(update_fields=["description"])
         return existing
 
     if dry_run:
@@ -270,7 +287,7 @@ def download_image(session, url, stdout, dry_run=False):
         return None
 
     uploaded = SimpleUploadedFile(filename, resp.content)
-    image = CustomImage(title=filename, file=uploaded)
+    image = CustomImage(title=filename, file=uploaded, description=alt_text)
     image.save()
     stdout.write(f"    downloaded image: {filename}")
     return image
@@ -282,14 +299,15 @@ def _make_image_block(img_tag, caption, session, stdout, dry_run=False):
     src = img_tag.get("src")
     if not src:
         return None
-    image = download_image(session, src, stdout, dry_run=dry_run)
+    alt = img_tag.get("alt", "")
+    image = download_image(session, src, stdout, dry_run=dry_run, alt_text=alt)
     if image is None:
         return None
     return {
         "type": "image",
         "value": {
             "image": image.pk,
-            "alt_text": img_tag.get("alt", ""),
+            "alt_text": alt,
             "caption": caption,
         },
     }
