@@ -1280,10 +1280,48 @@ class PersonCardBlock(StructBlock):
 # ---------------------------------------------------------------------------
 
 
+class AccordionItemContentBlock(StreamBlock):
+    """
+    StreamBlock used inside AccordionItemBlock.content.
+
+    An accordion answer is free-form: any number of text/image/video blocks
+    in any order (a paragraph, then an image, then more text, say), rather
+    than one richtext field plus two bolted-on "optional" image/video
+    struct fields -- the shape this replaced. That struct shape actively
+    lied about being optional: ImageBlock.image is a plain, correctly-
+    required ImageChooserBlock, and VideoBlock.clean() always demands
+    exactly one of embed_url/media_file -- both entirely correct when
+    either block is used standalone in SectionContentBlock (an editor
+    wouldn't deliberately add an empty one there), but wrapping either
+    field="required=False" on the *outer* AccordionItemBlock field did
+    nothing to stop the *inner* block's own clean() from still demanding
+    real content, so any item genuinely missing an image or a video (most
+    of them -- see import_350_our_impact.py) failed validation, even
+    though "an item may set neither, either, or both" was always this
+    block's own documented intent. A StreamBlock expresses "no image" as
+    "no image block in this list" instead of a present-but-blank struct
+    value, which isn't a validation edge case at all.
+
+    Deliberately a small, purpose-built list -- not SectionContentBlock --
+    since an accordion answer is a compact expandable panel, not a general
+    layout region; nesting a CardGrid, Hero, or another Accordion inside
+    one would be a strange editing experience even though nothing here
+    technically prevents adding more block types later if a real need
+    shows up.
+    """
+
+    text = TextBlock()
+    image = ImageBlock()
+    video = VideoBlock()
+
+    class Meta:
+        label = _("Content")
+
+
 class AccordionItemBlock(StructBlock):
     """
-    A single item in an AccordionBlock: a title, rich-text content, and an
-    optional image or video.
+    A single item in an AccordionBlock: a title and freely composed content
+    (AccordionItemContentBlock: text/image/video, in any order/quantity).
 
     Explicitly named (not anonymous) so Django migration serialization can
     reference it by dotted path.
@@ -1291,23 +1329,10 @@ class AccordionItemBlock(StructBlock):
     This is an internal sub-block rendered by accordion_block.html — it is
     never rendered standalone via include_block and intentionally has
     no template in its Meta.
-
-    image/video are dedicated fields rather than inline richtext because no
-    RICHTEXT_FEATURES_* set in this codebase enables inline images/embeds —
-    every other block keeps media in its own field, and this one follows
-    suit. Both are optional and independent (an item may set neither, either,
-    but the admin doesn't need to enforce "not both" the way VideoBlock does
-    for its own embed_url/media_file — an accordion item pairing an image
-    with a video is unusual but not actually broken to render).
     """
 
     title = CharBlock(label=_("Title"))
-    content = RichTextBlock(
-        features=RICHTEXT_FEATURES_FULL,
-        label=_("Content"),
-    )
-    image = ImageBlock(required=False, label=_("Image"))
-    video = VideoBlock(required=False, label=_("Video"))
+    content = AccordionItemContentBlock()
 
     class Meta:
         icon = "collapse-down"

@@ -23,6 +23,7 @@ which SimpleTestCase doesn't have.
 
 from datetime import timedelta
 import json
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
@@ -37,6 +38,7 @@ from wtrx.blocks import (
     LIGHT_BACKGROUND_COLORS,
     AccordionBlock,
     AccordionItemBlock,
+    AccordionItemContentBlock,
     BodyStreamBlock,
     ButtonBlock,
     ButtonGroupBlock,
@@ -1755,30 +1757,87 @@ class TestSectionContentBlockExtensibility(SimpleTestCase):
         self.assertEqual(body_names - section_names, {"section", "timeline"})
 
 
-class TestAccordionItemBlockMediaFields(SimpleTestCase):
+class TestAccordionItemBlockContent(SimpleTestCase):
     """
-    AccordionItemBlock.image/video (added for the "victories" ->
-    AccordionBlock conversion — see TimelineBlock/import_350_our_impact.py).
-    Both are optional and independent.
+    AccordionItemBlock.content (a StreamBlock, AccordionItemContentBlock --
+    see TimelineBlock/import_350_our_impact.py) replaced separate image/
+    video StructBlock fields, since ImageBlock.image (a required
+    ImageChooserBlock) and VideoBlock.clean() (always demands exactly one
+    of embed_url/media_file) each ignored the outer field's own
+    required=False and tripped a validation error on any item genuinely
+    missing an image or video -- most real items, per this class's own
+    documented "an item may set neither, either" intent. A StreamBlock
+    expresses "no image"/"no video" as "no such block in the list", which
+    isn't a validation edge case at all. See AGENTS.md pitfall #51.
     """
 
     def test_has_expected_fields(self):
         block = AccordionItemBlock()
-        self.assertEqual(
-            set(block.declared_blocks.keys()), {"title", "content", "image", "video"}
-        )
+        self.assertEqual(set(block.declared_blocks.keys()), {"title", "content"})
 
-    def test_image_is_not_required(self):
+    def test_content_is_an_accordion_item_content_block(self):
         block = AccordionItemBlock()
-        self.assertFalse(block.declared_blocks["image"].required)
+        self.assertIsInstance(block.declared_blocks["content"], AccordionItemContentBlock)
 
-    def test_video_is_not_required(self):
-        block = AccordionItemBlock()
-        self.assertFalse(block.declared_blocks["video"].required)
+    def test_content_accepts_text_image_and_video_block_types(self):
+        content_block = AccordionItemContentBlock()
+        self.assertEqual(set(content_block.declared_blocks.keys()), {"text", "image", "video"})
 
     def test_accordion_block_items_child_block_is_accordion_item_block(self):
         block = AccordionBlock()
         self.assertIsInstance(block.declared_blocks["items"].child_block, AccordionItemBlock)
+
+    def _clean(self, content_value):
+        block = AccordionItemBlock()
+        value = block.to_python({"title": "Item", "content": content_value})
+        return block.clean(value)
+
+    def test_an_item_with_neither_image_nor_video_is_valid(self):
+        self._clean([{"type": "text", "value": "<p>hello</p>", "id": "1"}])
+
+    def test_an_item_with_no_content_at_all_is_invalid(self):
+        # content itself is still required (StreamBlock's own default) --
+        # only the image/video block types within it are independently
+        # optional. An item needs at least some body content (e.g. a
+        # "text" entry), just not necessarily an image or a video.
+        with self.assertRaises(ValidationError):
+            self._clean([])
+
+    def test_an_item_with_an_embed_url_video_is_valid(self):
+        cleaned = self._clean(
+            [
+                {
+                    "type": "video",
+                    "value": {"embed_url": "https://www.youtube.com/watch?v=abc", "media_file": None, "caption": ""},
+                    "id": "1",
+                }
+            ]
+        )
+        self.assertEqual(cleaned["content"][0].block_type, "video")
+
+    def test_a_video_block_present_in_content_still_goes_through_videoblocks_own_clean(self):
+        # Patches VideoBlock.clean() to fail, rather than constructing a
+        # real invalid (both embed_url + media_file) value -- resolving a
+        # media_file chooser value needs a DB, which SimpleTestCase
+        # disallows. Confirms a "video" entry that IS present in the
+        # content stream still gets validated, i.e. the "skip validation
+        # when the whole item has no image/video" fix isn't accidentally
+        # skipping validation for one that's actually there.
+        with patch.object(VideoBlock, "clean", side_effect=ValidationError("boom")):
+            with self.assertRaises(ValidationError):
+                self._clean(
+                    [
+                        {
+                            "type": "video",
+                            "value": {
+                                "embed_url": "https://www.youtube.com/watch?v=abc",
+                                "media_file": None,
+                                "caption": "",
+                            },
+                            "id": "1",
+                        }
+                    ]
+                )
 
 
 class TestTimelineBlock(SimpleTestCase):

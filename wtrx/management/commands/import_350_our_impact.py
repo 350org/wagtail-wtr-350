@@ -47,17 +47,39 @@ Field mapping, per year:
     <div class="embed-section"> video                    -> one "video" block.
     <h3 class="victories-header"> + <ul class="victories"> -> the header's
         text as a small "text" block, then one "accordion" block: each <li>
-        -> AccordionItemBlock (title from .expando-link, content from
-        .victory-text cleaned to a single richtext string, plus the item's
-        own image/video via the AccordionItemBlock fields added for exactly
-        this — see wtrx/blocks/__init__.py and AGENTS.md).
+        -> AccordionItemBlock (title from .expando-link; content is
+        AccordionItemContentBlock -- a "text" entry from .victory-text
+        cleaned to richtext, then an "image" and/or "video" entry for the
+        item's own media, in that order, each only present when the item
+        actually has one — see wtrx/blocks/__init__.py and AGENTS.md
+        pitfall #51).
+
+Video URL handling: a victory item's or year's video is imported as a real
+"video" StreamField block either way, using VideoBlock's two mutually
+exclusive forms. When Wagtail's own OEmbedFinder recognises the provider
+(checked locally via `.accept()`, no network call) -- YouTube and Vimeo do
+-- it's a plain `embed_url`. Every video URL on the live page that fails
+this check is a 350org.widen.net CDN link whose path looks like a direct
+`.mp4` file but isn't one -- it's an HTML page bootstrapping Widen's own
+video.js player; the real file lives at a different, signed CloudFront URL
+embedded in that page's own JS (see download_video()'s and
+_resolve_widen_video_download_url()'s docstrings for exactly how this is
+detected and resolved). That real file is downloaded and self-hosted as a
+wagtailmedia Media (type="video") via `media_file`, the same
+download-once-and-own-it treatment already given to every image on this
+page (download_image()) -- more durable than embedding the third-party
+player page directly (its own `?u=...` token, and the resolved file's own
+signature, are both presumably expiring), and it reuses VideoBlock's
+existing, already-styled media_file rendering (poster, responsive wrapper)
+in both accordion_block.html and video_block.html, rather than needing any
+raw-HTML fallback. Resulting file sizes vary widely by asset (confirmed
+24MB-396MB across the 8 real videos on this page as of this writing) -- see
+AGENTS.md pitfall #51 if that ever needs revisiting. A video URL matching
+neither oEmbed nor a direct-file extension, or whose resolved Widen source
+still isn't a real video file, is still skipped with a warning.
 
 Known, deliberately accepted gaps (all logged as warnings, never abort the
 run — same per-item failure tolerance as download_image()/rewrite_image_urls()):
-  - A victory item's video is only imported when Wagtail's own OEmbedFinder
-    recognises the provider (checked locally via `.accept()`, no network
-    call) -- YouTube and Vimeo do; the one item on the live page hosted on
-    350's own 350org.widen.net CDN does not, and is left without a video.
   - A handful of victory items with >1 image import only the first
     (AccordionItemBlock.image is a single ImageBlock, same one-value-per-field
     convention as every other block in this codebase).
@@ -92,8 +114,11 @@ Usage:
     python manage.py import_350_our_impact --update --source-file our-impact.html
 """
 
+import json
+import os
 import re
 import uuid
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -109,6 +134,12 @@ _DEFAULT_VICTORIES_LABEL = "Our Victories at a Glance"
 _YOUTUBE_EMBED_RE = re.compile(
     r"^https?://(?:www\.)?youtube(?:-nocookie)?\.com/embed/([A-Za-z0-9_-]+)"
 )
+
+# Matches a direct video-file URL (optionally followed by a "?..." query
+# string) -- every video URL on the live page that OEmbedFinder doesn't
+# recognise is one of these (350.org's own Widen CDN links), not a
+# genuinely unsupported third-party provider.
+_DIRECT_VIDEO_FILE_RE = re.compile(r"\.(?:mp4|webm|mov|ogg)(?:\?.*)?$", re.IGNORECASE)
 
 
 def _normalize_video_url(url):
@@ -149,6 +180,127 @@ def _safe_download_image(session, url, stdout, dry_run):
         return None
 
 
+_WIDEN_BOOTSTRAP_RE = re.compile(r"window\.bootstrapData\s*=\s*(\{.*?\});\s*</script>", re.DOTALL)
+_WIDEN_RESOLUTION_PREFERENCE = ("720p", "480p", "1080p", "360p")
+
+
+def _resolve_widen_video_download_url(html_text):
+    """
+    Widen's own hosted "view/video/<id>/<filename>.mp4?u=..." URL (the one
+    350.org's page embeds in an <iframe src>, and the only case observed on
+    the live page) is not a video file at all, despite the .mp4-looking
+    filename in its path -- it's an HTML page bootstrapping a video.js
+    player, confirmed by fetching one directly: `Content-Type: text/html`,
+    ~5KB. The actual playable file lives at a *different*, signed
+    CloudFront URL embedded in that page's own `window.bootstrapData` JSON
+    (`previews.files[].source`) -- what the player itself fetches to play
+    the video, confirmed by fetching one of those directly:
+    `Content-Type: video/mp4`, tens of MB. This extracts that JSON and
+    picks one resolution's source URL to download instead.
+
+    Prefers a mid-range resolution (720p, falling back down the
+    _WIDEN_RESOLUTION_PREFERENCE list, then whatever's first) over the
+    highest available -- these are supplementary broll clips inside an
+    accordion item, not the main content, so a smaller self-hosted file is
+    a better trade than maximum quality.
+    """
+    match = _WIDEN_BOOTSTRAP_RE.search(html_text)
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(1))
+        files = data["previews"]["files"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    by_label = {f.get("label"): f.get("source") for f in files if isinstance(f, dict)}
+    for label in _WIDEN_RESOLUTION_PREFERENCE:
+        if by_label.get(label):
+            return by_label[label]
+    return files[0].get("source") if files and isinstance(files[0], dict) else None
+
+
+def download_video(session, url, stdout, dry_run=False):
+    """
+    Download a video file from ``url`` and create a wagtailmedia Media
+    (type="video"), or return an existing one whose title already matches
+    the source filename (dedup across runs, same convention as
+    _wp_content_utils.download_image()).
+
+    ``url`` may itself not be a direct file (see
+    _resolve_widen_video_download_url()'s docstring) -- if the response's
+    Content-Type isn't video/*, this treats the response body as an HTML
+    player page and looks for the real file inside it before giving up.
+
+    Unlike CustomImage, wagtailmedia's Media does no file-content processing
+    at all on save() -- no Willow/ffmpeg probing; duration defaults to 0 and
+    thumbnail/width/height are all optional -- so there's no format-detection
+    failure mode to guard against here the way _safe_download_image() does,
+    only the network-level one this already handles the same way
+    download_image() does.
+    """
+    if not url:
+        return None
+
+    from wagtailmedia.models import Media
+
+    filename = os.path.basename(urlparse(url).path) or "imported-video"
+    existing = Media.objects.filter(title=filename, type="video").first()
+    if existing:
+        return existing
+
+    if dry_run:
+        stdout.write(f"    [dry-run] would download video: {url}")
+        return None
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    try:
+        resp = session.get(url, timeout=60)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        stdout.write(f"    WARNING: failed to download video {url} — {exc}")
+        return None
+
+    if not resp.headers.get("Content-Type", "").startswith("video/"):
+        download_url = _resolve_widen_video_download_url(resp.text)
+        if download_url is None:
+            stdout.write(
+                f"    WARNING: {url} did not return a video file and no downloadable "
+                "source could be found on its page, skipping video"
+            )
+            return None
+        try:
+            resp = session.get(download_url, timeout=120)
+            resp.raise_for_status()
+        except requests.exceptions.RequestException as exc:
+            stdout.write(f"    WARNING: failed to download video {download_url} — {exc}")
+            return None
+        if not resp.headers.get("Content-Type", "").startswith("video/"):
+            stdout.write(f"    WARNING: resolved video source {download_url} is not a video file, skipping")
+            return None
+
+    uploaded = SimpleUploadedFile(filename, resp.content)
+    media = Media(title=filename, file=uploaded, type="video")
+    media.save()
+    stdout.write(f"    downloaded video: {filename}")
+    return media
+
+
+def _safe_download_video(session, url, stdout, dry_run):
+    """
+    Wrap download_video() with a broad except, mirroring
+    _safe_download_image() -- Media.save() does no file-content processing,
+    so there's no Willow-style parse failure to guard against, but the same
+    safety net still means one bad video (a write error, a surprising
+    response) can't abort an 80+ item import.
+    """
+    try:
+        return download_video(session, url, stdout, dry_run=dry_run)
+    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see docstring
+        stdout.write(f"    WARNING: failed to process video {url} — {exc!r}")
+        return None
+
+
 def _stream_block(block_type, value):
     """Build one StreamField entry with a stable UUID (matches create_test_page.py's _sb)."""
     return {"type": block_type, "value": value, "id": str(uuid.uuid4())}
@@ -181,16 +333,32 @@ def _clean_fragment(node):
     return _YEAR_ANCHOR_HREF_RE.sub(r'href="#timeline-year-\1"', html)
 
 
-def _embed_url_if_supported(container, stdout, context):
+def _video_value(container, session, stdout, dry_run, context):
     """
-    Return the first <iframe src> inside ``container`` if Wagtail's own
-    OEmbedFinder recognises the provider (a pure local regex match against
-    the provider list -- no network call), else None (with a warning).
+    Return a VideoBlock-shaped {embed_url, media_file, caption} dict for the
+    first <iframe src> inside ``container``, or None if there's no usable
+    video.
 
-    Skips rather than guesses: a URL Wagtail can't resolve would render
-    nothing via {% embed %} anyway (video_block.html/accordion_block.html
-    both branch on embed_url being set), so setting it here would just
-    produce a silently-empty video block later.
+    - embed_url set (media_file None) when Wagtail's own OEmbedFinder
+      recognises the provider (a pure local regex match against the
+      provider list -- no network call) -- YouTube and Vimeo do.
+    - media_file set to a downloaded wagtailmedia Media's pk (embed_url "")
+      when the provider isn't recognised but the src is a direct video-file
+      link. Every such case on the live page is a 350.org's own
+      350org.widen.net CDN link, whose URLs carry a signed, presumably-
+      expiring `?u=...` token -- downloading and self-hosting the file is
+      more durable than embedding that link directly, and it reuses
+      VideoBlock's existing, already-styled media_file rendering (poster,
+      responsive wrapper) with no raw-HTML fallback needed. See
+      download_video().
+    - None (with a printed warning) for anything else -- a URL Wagtail
+      can't resolve and isn't a direct file link either would render
+      nothing via {% embed %} anyway (video_block.html/accordion_block.html
+      both branch on embed_url/media_file being set), so there's nothing
+      useful to do with it. No such case is known on the live page today;
+      this is a safety net in case the source page ever adds one. Also
+      returned (with a warning already printed by _safe_download_video())
+      if a direct-file download fails.
     """
     from wagtail.embeds.finders.oembed import OEmbedFinder
 
@@ -199,7 +367,12 @@ def _embed_url_if_supported(container, stdout, context):
         return None
     src = _normalize_video_url(iframe["src"])
     if OEmbedFinder().accept(src):
-        return src
+        return {"embed_url": src, "media_file": None, "caption": ""}
+    if _DIRECT_VIDEO_FILE_RE.search(src):
+        media = _safe_download_video(session, src, stdout, dry_run=dry_run)
+        if media is not None:
+            return {"embed_url": "", "media_file": media.pk, "caption": ""}
+        return None
     stdout.write(f"    WARNING: unsupported video provider for {context}, skipping video: {src}")
     return None
 
@@ -217,27 +390,33 @@ def _victory_item(li_tag, session, stdout, dry_run):
     title = link.get_text(strip=True)
 
     text_container = inner.find("div", class_="victory-text") or inner
-    content = _clean_fragment(text_container)
+    text = _clean_fragment(text_container)
 
-    image_value = {"image": None, "alt_text": "", "caption": ""}
+    content = []
+    if text:
+        content.append(_stream_block("text", text))
+
     img_tag = inner.find("img")
     if img_tag is not None and img_tag.get("src"):
         image = _safe_download_image(session, img_tag["src"], stdout, dry_run=dry_run)
         if image is not None:
-            image_value = {"image": image.pk, "alt_text": img_tag.get("alt", ""), "caption": ""}
+            content.append(
+                _stream_block(
+                    "image", {"image": image.pk, "alt_text": img_tag.get("alt", ""), "caption": ""}
+                )
+            )
 
-    video_value = {"embed_url": "", "media_file": None, "caption": ""}
     video_container = inner.find("div", class_="video-container")
     if video_container is not None:
-        embed_url = _embed_url_if_supported(video_container, stdout, context=f"victory item {title!r}")
-        if embed_url:
-            video_value = {"embed_url": embed_url, "media_file": None, "caption": ""}
+        video_value = _video_value(
+            video_container, session, stdout, dry_run, context=f"victory item {title!r}"
+        )
+        if video_value is not None:
+            content.append(_stream_block("video", video_value))
 
     return {
         "title": title,
         "content": content,
-        "image": image_value,
-        "video": video_value,
     }
 
 
@@ -298,11 +477,9 @@ def _year_content_blocks(year_content, session, stdout, dry_run):
             continue
 
         if node.name == "div" and "embed-section" in classes:
-            embed_url = _embed_url_if_supported(node, stdout, context="year video")
-            if embed_url:
-                blocks.append(
-                    _stream_block("video", {"embed_url": embed_url, "media_file": None, "caption": ""})
-                )
+            video_value = _video_value(node, session, stdout, dry_run, context="year video")
+            if video_value is not None:
+                blocks.append(_stream_block("video", video_value))
             continue
 
         if node.name == "h3" and "victories-header" in classes:

@@ -8,7 +8,13 @@
           "type": "item",
           "value": {
             "title": "Poem text: Rise By Kathy Jetñil-Kijiner and Aka Niviâna",
-            "content": "<p data-block-key=\"jnthd\">Sister of ice and snow<br/>I’m coming to you<br/>from the land of my ancestors,<br/>from atolls, sunken volcanoes--undersea descent<br/>of sleeping giants</p><p data-block-key=\"28ckp\">Sister of ocean and sand,<br/>I welcome you<br/>to the land of my ancestors<br/>--to the land where they sacrificed their lives<br/>to make mine possible<br/>--to the land<br/>of survivors.</p><p data-block-key=\"ce11t\">I’m coming to you<br/>from the land my ancestors chose.<br/>Aelon Kein Ad,<br/>Marshall Islands,<br/>a country more sea than land.<br/>I welcome you to Kalaallit Nunaat,<br/>Greenland,<br/>the biggest island on earth.</p><p data-block-key=\"7hhnr\">Sister of ice and snow,<br/>I bring with me these shells<br/>that I picked from the shores<br/>of Bikini atoll and Runit Dome</p><p data-block-key=\"cbbnm\">Sister of ocean and sand,<br/>I hold these stones picked from the shores of Nuuk,<br/>the foundation of the land I call my home.</p><p data-block-key=\"a7dn9\">With these shells I bring a story of long ago<br/>two sisters frozen in time on the island of Ujae,<br/>one magically turned into stone<br/>the other who chose that life<br/>to be rooted by her sister’s side.<br/>To this day, the two sisters<br/>can be seen by the edge of the reef,<br/>a lesson in permanence.</p><p data-block-key=\"2aebu\">With these rocks I bring<br/>a story told countless times<br/>a story about Sassuma Arnaa, Mother of the Sea,<br/>who lives in a cave at the bottom of the ocean.</p><p data-block-key=\"4c0hi\">This is a story about<br/>the guardian of the Sea.<br/>She sees the greed in our hearts,<br/>the disrespect in our eyes.<br/>Every whale, every stream,<br/>every iceberg<br/>are her children.</p><p data-block-key=\"3u7in\">When we disrespect them<br/>she gives us what we deserve,<br/>a lesson in respect.</p><p data-block-key=\"3b4nv\">Do we deserve the melting ice?<br/>the hungry polar bears coming to our islands<br/>or the colossal icebergs hitting these waters with rage<br/>Do we deserve<br/>their mother,<br/>coming for our homes<br/>for our lives?</p><p data-block-key=\"brlqg\">From one island to another<br/>I ask for solutions.<br/>From one island to another<br/>I ask for your problems</p><p data-block-key=\"37de8\">Let me show you the tide<br/>that comes for us faster<br/>than we’d like to admit.<br/>Let me show you<br/>airports underwater<br/>bulldozed reefs, blasted sands<br/>and plans to build new atolls<br/>forcing land<br/>from an ancient, rising sea,<br/>forcing us to imagine<br/>turning ourselves to stone.</p><p data-block-key=\"9mp1q\">Sister of ocean and sand,<br/>Can you see our glaciers groaning<br/>with the weight of the world’s heat?<br/>I wait for you, here,<br/>on the land of my ancestors heart heavy with a  thirst<br/>for solutions<br/>as I watch this land<br/>change<br/>while the World remains silent.</p><p data-block-key=\"gh92\">Sister of ice and snow,<br/>I come to you now in grief<br/>mourning landscapes<br/>that are always forced to change</p><p data-block-key=\"cfnn\">first through wars inflicted on us<br/>then through nuclear waste<br/>dumped<br/>in our waters<br/>on our ice<br/>and now this.</p><p data-block-key=\"9mgtb\">Sister of ocean and sand,<br/>I offer you these rocks, the foundation of my home.<br/>On our journey<br/>may the same unshakable foundation<br/>connect us,<br/>make us stronger,<br/>than the colonizing monsters<br/>that to this day devour our lives<br/>for their pleasure.<br/>The very same beasts<br/>that now decide,<br/>who should live<br/>who should die.</p><p data-block-key=\"ekrdq\">Sister of ice and snow,<br/>I offer you this shell<br/>and the story of the two sisters<br/>as testament<br/>as declaration<br/>that despite everything<br/>we will not leave.<br/>Instead<br/>we will choose stone.<br/>We will choose<br/>to be rooted in this reef<br/>forever.</p><p data-block-key=\"bj8nd\">From these islands<br/>we ask for solutions.<br/>From these islands</p><p data-block-key=\"cg94u\">we ask<br/>we demand that the world see beyond<br/>SUV’s, ac’s, their pre-packaged convenience<br/>their oil-slicked dreams, beyond the belief<br/>that tomorrow will never happen, that this<br/>is merely an inconvenient truth.<br/>Let me bring my home to yours.<br/>Let’s watch as Miami, New York,<br/>Shanghai, Amsterdam, London,<br/>Rio de Janeiro, and Osaka<br/>try to breathe underwater.<br/>You think you have decades<br/>before your homes fall beneath tides?<br/>We have years.<br/>We have months<br/>before you sacrifice us again<br/>before you watch from your tv and computer screens waiting<br/>to see if we will still be breathing<br/>while you do nothing.</p><p data-block-key=\"bshjl\">My sister,<br/>From one island to another<br/>I give to you these rocks<br/>as a reminder<br/>that our lives matter more than their power<br/>that life in all forms demands<br/>the same respect we all give to money<br/>that these issues affect each and everyone of us<br/>None of us is immune<br/>And that each and everyone of us has to decide<br/>if we<br/>will<br/>rise</p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"jnthd\">Sister of ice and snow<br/>I’m coming to you<br/>from the land of my ancestors,<br/>from atolls, sunken volcanoes--undersea descent<br/>of sleeping giants</p><p data-block-key=\"28ckp\">Sister of ocean and sand,<br/>I welcome you<br/>to the land of my ancestors<br/>--to the land where they sacrificed their lives<br/>to make mine possible<br/>--to the land<br/>of survivors.</p><p data-block-key=\"ce11t\">I’m coming to you<br/>from the land my ancestors chose.<br/>Aelon Kein Ad,<br/>Marshall Islands,<br/>a country more sea than land.<br/>I welcome you to Kalaallit Nunaat,<br/>Greenland,<br/>the biggest island on earth.</p><p data-block-key=\"7hhnr\">Sister of ice and snow,<br/>I bring with me these shells<br/>that I picked from the shores<br/>of Bikini atoll and Runit Dome</p><p data-block-key=\"cbbnm\">Sister of ocean and sand,<br/>I hold these stones picked from the shores of Nuuk,<br/>the foundation of the land I call my home.</p><p data-block-key=\"a7dn9\">With these shells I bring a story of long ago<br/>two sisters frozen in time on the island of Ujae,<br/>one magically turned into stone<br/>the other who chose that life<br/>to be rooted by her sister’s side.<br/>To this day, the two sisters<br/>can be seen by the edge of the reef,<br/>a lesson in permanence.</p><p data-block-key=\"2aebu\">With these rocks I bring<br/>a story told countless times<br/>a story about Sassuma Arnaa, Mother of the Sea,<br/>who lives in a cave at the bottom of the ocean.</p><p data-block-key=\"4c0hi\">This is a story about<br/>the guardian of the Sea.<br/>She sees the greed in our hearts,<br/>the disrespect in our eyes.<br/>Every whale, every stream,<br/>every iceberg<br/>are her children.</p><p data-block-key=\"3u7in\">When we disrespect them<br/>she gives us what we deserve,<br/>a lesson in respect.</p><p data-block-key=\"3b4nv\">Do we deserve the melting ice?<br/>the hungry polar bears coming to our islands<br/>or the colossal icebergs hitting these waters with rage<br/>Do we deserve<br/>their mother,<br/>coming for our homes<br/>for our lives?</p><p data-block-key=\"brlqg\">From one island to another<br/>I ask for solutions.<br/>From one island to another<br/>I ask for your problems</p><p data-block-key=\"37de8\">Let me show you the tide<br/>that comes for us faster<br/>than we’d like to admit.<br/>Let me show you<br/>airports underwater<br/>bulldozed reefs, blasted sands<br/>and plans to build new atolls<br/>forcing land<br/>from an ancient, rising sea,<br/>forcing us to imagine<br/>turning ourselves to stone.</p><p data-block-key=\"9mp1q\">Sister of ocean and sand,<br/>Can you see our glaciers groaning<br/>with the weight of the world’s heat?<br/>I wait for you, here,<br/>on the land of my ancestors heart heavy with a  thirst<br/>for solutions<br/>as I watch this land<br/>change<br/>while the World remains silent.</p><p data-block-key=\"gh92\">Sister of ice and snow,<br/>I come to you now in grief<br/>mourning landscapes<br/>that are always forced to change</p><p data-block-key=\"cfnn\">first through wars inflicted on us<br/>then through nuclear waste<br/>dumped<br/>in our waters<br/>on our ice<br/>and now this.</p><p data-block-key=\"9mgtb\">Sister of ocean and sand,<br/>I offer you these rocks, the foundation of my home.<br/>On our journey<br/>may the same unshakable foundation<br/>connect us,<br/>make us stronger,<br/>than the colonizing monsters<br/>that to this day devour our lives<br/>for their pleasure.<br/>The very same beasts<br/>that now decide,<br/>who should live<br/>who should die.</p><p data-block-key=\"ekrdq\">Sister of ice and snow,<br/>I offer you this shell<br/>and the story of the two sisters<br/>as testament<br/>as declaration<br/>that despite everything<br/>we will not leave.<br/>Instead<br/>we will choose stone.<br/>We will choose<br/>to be rooted in this reef<br/>forever.</p><p data-block-key=\"bj8nd\">From these islands<br/>we ask for solutions.<br/>From these islands</p><p data-block-key=\"cg94u\">we ask<br/>we demand that the world see beyond<br/>SUV’s, ac’s, their pre-packaged convenience<br/>their oil-slicked dreams, beyond the belief<br/>that tomorrow will never happen, that this<br/>is merely an inconvenient truth.<br/>Let me bring my home to yours.<br/>Let’s watch as Miami, New York,<br/>Shanghai, Amsterdam, London,<br/>Rio de Janeiro, and Osaka<br/>try to breathe underwater.<br/>You think you have decades<br/>before your homes fall beneath tides?<br/>We have years.<br/>We have months<br/>before you sacrifice us again<br/>before you watch from your tv and computer screens waiting<br/>to see if we will still be breathing<br/>while you do nothing.</p><p data-block-key=\"bshjl\">My sister,<br/>From one island to another<br/>I give to you these rocks<br/>as a reminder<br/>that our lives matter more than their power<br/>that life in all forms demands<br/>the same respect we all give to money<br/>that these issues affect each and everyone of us<br/>None of us is immune<br/>And that each and everyone of us has to decide<br/>if we<br/>will<br/>rise</p>",
+                "id": "78d3c71a-68a1-46e3-9a03-028298266d88"
+              }
+            ]
           },
           "id": "96b3cdd1-adfc-43b1-8ab2-2388ab652d61"
         },
@@ -16,7 +22,13 @@
           "type": "item",
           "value": {
             "title": "The Process of the Poem: Selecting the Legend by Kathy Jetñil-Kijiner",
-            "content": "<p data-block-key=\"kdqzd\">Every poet has a different process for the ways in which a poem is a written. Some poems come in a flash of emotion – some require research, a vision, a message, or a specific audience. Lately, my process has begun with one integral aspect: the legend.</p><p data-block-key=\"2kfr3\">With the last few poems I’ve written, I’ve tried to balance the piece by grounding it in some sort of legend – for the poem on nuclear related birth defects, I used the legend of the mejenkwaad, a Marshallese woman demon, to discuss the feeling of horror that I imagined Marshallese women must have felt when giving birth to what came to be called “jellyfish babies.” For the poem I wrote for the Vatican, that had to do with faith, I used the legend of the whale and the bird – a legend that discussed an arrogant whale who was taught a lesson when thousands of birds drank up the ocean and left him beached. This was chosen to discuss faith in collective action.</p><p data-block-key=\"5nkp9\">For this particular poem, I struggled with finding the right legend. In our beginning stages of discussion, Aka had told me her legend would focus on a powerful woman of the sea. So I went on a hunt for a legend about a woman of the sea. Unfortunately, I couldn’t find any concrete ones (save for a few that had to do with more women demons – which wasn’t exactly the vibe I was going for.) I interviewed the elderly scholars at the Customary Language and Law Commission – a commission in Majuro which was made up of experts in our traditions. I asked them if they knew of any legends that featured powerful women. Unfortunately, they said they didn’t know of any, but recommended other people I could speak with. Luckily, around that same time, I received a comprehensive packet of legends transcribed by Marshallese teachers in a workshop with the Curriculum Instruction Assessment team, led by Wilbert Alik. All of these legends were transcribed by teachers from around the Marshalls, and they were written in Marshallese. After slowly reading through a few of them (my reading skills in Marshallese are unfortunately rather slow compared to my English reading skills) I decided on two specific legends. While en route to Greenland in Iceland, I had a skype call with two of the writers of the legends and the Curriculum Assessment Team. We discussed the meaning behind each of the legends, and how they could apply towards our Greenland poem. They were patient with me, and offered up valuable insights.</p><p data-block-key=\"fokf6\"></p><p data-block-key=\"88h4j\">The legend I ultimately chose was “Ao Aorōk In Io̗kwe” a legend from Ujae that was transcribed by Heynes Jeik. The Marshallese version of the legend is below. There is no exact translation at this time, but here is my own (somewhat rough) summary:</p><p data-block-key=\"8buib\"></p><p data-block-key=\"16e7v\">The legend features sisters from Ujae who loved and respected each other very much. One day they decided to have a juggling competition around the entire island. They began their juggling competition – when the eldest reached a certain spot by the edge of the reef, she dropped the shells rock she was juggling, and she suddenly turned into stone. The younger sister, who was following close behind, noticed this strangely shaped rock – when she came closer, she saw that it was her sister. In her grief, she decided to drop the rock she was juggling as well, choosing to turn to stone, so she could stay by her sister’s side. The moral of the story is the love that connected the two sisters.</p><p data-block-key=\"3e59e\"></p><p data-block-key=\"14tc5\">I asked the group I was skyping with a few questions – why did the elder sister turn into a stone at that specific spot? Was that spot magical? They weren’t sure. But one of the members from the Curriculum Assessment Team offered that she noticed we have many stories that featured the creation of stone, or people turning to stone. We reflected on this a bit, and an observation was offered that stones are permanent – they never disappear, and that stones are a part of our culture as well. After our skype session, I received a message from Heynes Jeik: “...Ij bar kakememej iok bwe ekkar nan jar ke roritto ijoke, rej ba deka ej motan manit in ad, em aolep men ko bunnid rej erom deka, ej einwot juon men eo epan jako nan indeio.” Which loosely translates to, “I just want to remind you that according to our elders, stone is a part of our culture, and everything becomes stone, it’s something that will never disappear.”</p><p data-block-key=\"8tj0o\"></p><p data-block-key=\"adefp\">I ultimately chose this legend because it features sisters, which I felt fit nicely into the concept of me and Aka as “sisters of ice and snow/sister of ocean and sand.” I also appreciated the concept of stone – the concept of permanence against the destructive forces of climate change. My friend, Lyz Soto, who regularly edits my work, helped me think it through further “the idea of choosing stone so you can always be a part of your home.” This, ultimately, became the declaration I chose to focus on – choosing stone to always be a part of our home.</p><p data-block-key=\"70hpq\"></p><p data-block-key=\"epb2r\">Aorōk In Io̗kwe</p><p data-block-key=\"806kc\"></p><p data-block-key=\"9qo6r\">Ri-jeje im ri-bwebwenato: Heynes Jeik</p><p data-block-key=\"82scv\"></p><p data-block-key=\"5ug36\">M̗okta ilo aelin ij Ujae, ekar wor ruo leddik raar jokwe im rūttol̗o̗k ilo juon wāto etan Lopinpin. Wāto in ej pād iol̗apl̗ap in Ujae. Ledik rein raar lukkuun em̗m̗an aerro lale doon im jel̗ā n̗ae doon ilo jabdewōt wāween.</p><p data-block-key=\"bckpc\"></p><p data-block-key=\"2ov3n\">Aolep jota ālikin aerro kōn kōm̗m̗ani jerbal ko aerro, erro ej ke arl̗o̗k em ikkure kōn ikkure eo rej ba ekkokowa. Ilo aerro kōn ekkokowa, erro ej ekkokowa im jepool̗e aolepān Ujae en̗ jān arin wāto eo erro ej jokwe ie tak l̗o̗k iar em pool̗e tok likiej im ito ilik to em jepool̗e tok n̄an mo karuk, m̗ween ijabōn tata irilik.</p><p data-block-key=\"6gjb2\"></p><p data-block-key=\"44bkj\">Juon iien ledik eo erūtto eaar l̗ōmn̗ake juon an pepe. Ijoke, eaar jab m̗ōkaj in kwal̗o̗k bwe ejja etale an ledik eo edik l̗ōmn̗ak em̗m̗an ke. Iien eo wōt ak eaar kūr tok ledik eo edik im kwal̗o̗k pepe eo an. Ledik eo erūtto eba, “Jatū, e? Juon e aō pepe.”</p><p data-block-key=\"3kk4h\"></p><p data-block-key=\"228mk\">Ledik eo edik eba, “Ekwe, ta pepe n̗e am̗?”</p><p data-block-key=\"5ki8f\"></p><p data-block-key=\"97om4\">Ledik eo erūtto eba, “Em̗m̗an ke n̄e kōjero kōjjakaak ekkokowa jān āniin n̄an aelōn̄ n̗e ireeaar?”</p><p data-block-key=\"2qgn7\"></p><p data-block-key=\"fmc1n\">Ledik edik eba, “Lae, ke?”</p><p data-block-key=\"en8to\"></p><p data-block-key=\"7gmha\">Ledik eo jein eba, “Aaet.”</p><p data-block-key=\"2g36k\"></p><p data-block-key=\"c4h7h\">Ke ej jiron̄ ledik eo edik kake, ledik eo edik eaar errā kake pepe eo. Bōtaab, eaar kajjitōk ippān ledik eo jein, “Elōn ke juon jem̗l̗o̗k n̄an eo enaaj anjo̗ iaarro kōn l̗ōmn̗ak in am̗ le jeiū?”</p><p data-block-key=\"ai319\"></p><p data-block-key=\"ai21o\">Lio erūtto eaar ba, “Aaet. Eo enaaj anjo̗ enaaj wōnm̗aanl̗o̗k wōt im jolete aelōn̄ kein aolep ruo.”</p><p data-block-key=\"fnh93\"></p><p data-block-key=\"edsnl\">Ledik eo edik eba, “Hmm. Ekwe, em̗ōj kōjero ej jino n̄āāt?”</p><p data-block-key=\"7csjv\"></p><p data-block-key=\"8sv1k\">Ledik eo jein eba, “Kōjero naaj jinoe ālikin jilu raan jān kiio bwe kōjero ejja kappok waarro wa n̄an arro ekkokowa. Kab en l̗ap iien arro kamminene m̗okta jān arro naaj kādon̄e doon. Ālikin an dedel̗o̗k, jero naaj jino kōjjakaak in arro jān arin m̗wiin n̄an arin Lae.”</p><p data-block-key=\"5sr7n\"></p><p data-block-key=\"3go0h\">Ledik ro raar jino kapool̗e Ujae em kappok waerro wa, ak dekā doulul n̄an aerro naaj jino kajjimaron̄ron̄ eo aerro. Ke ej jejjet raan eo, lio erūtto eaar ruj m̗okta em kairuj lio jatin. “Liō, e? Raan eo in. Keememej bwe juon naan an ri-etto ro ej ba ‘Eo ellu, eluuj’.”</p><p data-block-key=\"ftli\"></p><p data-block-key=\"3uno3\">Ak erro jibwi wa ko waerro em ettōr iaar l̗o̗k n̄an iaar. Ledik eo erūtto eaar jino jolōn̄ l̗o̗k wa eo waan juon ak eba, “Jemoot!”</p><p data-block-key=\"alr86\"></p><p data-block-key=\"6lguh\">Lio edik ebaj jolōn̄ eo waan ak eba, “Kōttar ta!”</p><p data-block-key=\"8k77\"></p><p data-block-key=\"bc6k2\">Erro jino ekkokowa l̗o̗k ioon bar eo l̗o̗k, o, erro jino tuwaak im jino etal ioon n̗a en̗ metol̗o̗k n̄an m̗aan baal en̗ iarin Ujae. Ke ledik eo erūtto enan̄in tōpar m̗aan baal ippān mejā ko, ak ewōtlo̗k wa eo juon waan. Iien eo wōt ak eaar oktak em erom̗ dekā, jekjekin ledik. Ak ledik eo edik ej epaak tok wōt. Ke ledik eo edik ej epaake dekā eo jekjekin ledik eo jein eba, “Hmm. Āinwōt iaar jab lo dekā in ilo raan ko l̗o̗k.”</p><p data-block-key=\"87upu\"></p><p data-block-key=\"8npb4\">El̗ak lukkuun mejeke l̗o̗k, ledik eo jein eo. Em̗ōj kōn an būrom̗ōje, eaar make kōwotlo̗k wa eo waan juon bwe en bar oktak em erom̗ dekā āinwōt ledik eo jein. Iien eo wōt, ak eaar bar oktak em erom̗ dekā. Ak lukkuun m̗ool n̄e en kar tōprak an ledik rein ekkokowa n̄an Lae, en kar ejaak juon n̗a jān arin Lopinpin n̄an arin Lae.</p><p data-block-key=\"dj02m\"></p><p data-block-key=\"ca6ra\">Rainin ioon n̗a en̗ iarin Ujae, epād dekā eo im ej kwal̗o̗k jekjekin ledik rein ruo. Juon wōt dekā, ak ruo annan̄in armej ie. Eriab kōnnaan, ak l̗ōmn̗ake juon am̗ iien jam̗bo n̄an Ujae em amen mejam̗.</p><p data-block-key=\"46tfk\"></p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"kdqzd\">Every poet has a different process for the ways in which a poem is a written. Some poems come in a flash of emotion – some require research, a vision, a message, or a specific audience. Lately, my process has begun with one integral aspect: the legend.</p><p data-block-key=\"2kfr3\">With the last few poems I’ve written, I’ve tried to balance the piece by grounding it in some sort of legend – for the poem on nuclear related birth defects, I used the legend of the mejenkwaad, a Marshallese woman demon, to discuss the feeling of horror that I imagined Marshallese women must have felt when giving birth to what came to be called “jellyfish babies.” For the poem I wrote for the Vatican, that had to do with faith, I used the legend of the whale and the bird – a legend that discussed an arrogant whale who was taught a lesson when thousands of birds drank up the ocean and left him beached. This was chosen to discuss faith in collective action.</p><p data-block-key=\"5nkp9\">For this particular poem, I struggled with finding the right legend. In our beginning stages of discussion, Aka had told me her legend would focus on a powerful woman of the sea. So I went on a hunt for a legend about a woman of the sea. Unfortunately, I couldn’t find any concrete ones (save for a few that had to do with more women demons – which wasn’t exactly the vibe I was going for.) I interviewed the elderly scholars at the Customary Language and Law Commission – a commission in Majuro which was made up of experts in our traditions. I asked them if they knew of any legends that featured powerful women. Unfortunately, they said they didn’t know of any, but recommended other people I could speak with. Luckily, around that same time, I received a comprehensive packet of legends transcribed by Marshallese teachers in a workshop with the Curriculum Instruction Assessment team, led by Wilbert Alik. All of these legends were transcribed by teachers from around the Marshalls, and they were written in Marshallese. After slowly reading through a few of them (my reading skills in Marshallese are unfortunately rather slow compared to my English reading skills) I decided on two specific legends. While en route to Greenland in Iceland, I had a skype call with two of the writers of the legends and the Curriculum Assessment Team. We discussed the meaning behind each of the legends, and how they could apply towards our Greenland poem. They were patient with me, and offered up valuable insights.</p><p data-block-key=\"fokf6\"></p><p data-block-key=\"88h4j\">The legend I ultimately chose was “Ao Aorōk In Io̗kwe” a legend from Ujae that was transcribed by Heynes Jeik. The Marshallese version of the legend is below. There is no exact translation at this time, but here is my own (somewhat rough) summary:</p><p data-block-key=\"8buib\"></p><p data-block-key=\"16e7v\">The legend features sisters from Ujae who loved and respected each other very much. One day they decided to have a juggling competition around the entire island. They began their juggling competition – when the eldest reached a certain spot by the edge of the reef, she dropped the shells rock she was juggling, and she suddenly turned into stone. The younger sister, who was following close behind, noticed this strangely shaped rock – when she came closer, she saw that it was her sister. In her grief, she decided to drop the rock she was juggling as well, choosing to turn to stone, so she could stay by her sister’s side. The moral of the story is the love that connected the two sisters.</p><p data-block-key=\"3e59e\"></p><p data-block-key=\"14tc5\">I asked the group I was skyping with a few questions – why did the elder sister turn into a stone at that specific spot? Was that spot magical? They weren’t sure. But one of the members from the Curriculum Assessment Team offered that she noticed we have many stories that featured the creation of stone, or people turning to stone. We reflected on this a bit, and an observation was offered that stones are permanent – they never disappear, and that stones are a part of our culture as well. After our skype session, I received a message from Heynes Jeik: “...Ij bar kakememej iok bwe ekkar nan jar ke roritto ijoke, rej ba deka ej motan manit in ad, em aolep men ko bunnid rej erom deka, ej einwot juon men eo epan jako nan indeio.” Which loosely translates to, “I just want to remind you that according to our elders, stone is a part of our culture, and everything becomes stone, it’s something that will never disappear.”</p><p data-block-key=\"8tj0o\"></p><p data-block-key=\"adefp\">I ultimately chose this legend because it features sisters, which I felt fit nicely into the concept of me and Aka as “sisters of ice and snow/sister of ocean and sand.” I also appreciated the concept of stone – the concept of permanence against the destructive forces of climate change. My friend, Lyz Soto, who regularly edits my work, helped me think it through further “the idea of choosing stone so you can always be a part of your home.” This, ultimately, became the declaration I chose to focus on – choosing stone to always be a part of our home.</p><p data-block-key=\"70hpq\"></p><p data-block-key=\"epb2r\">Aorōk In Io̗kwe</p><p data-block-key=\"806kc\"></p><p data-block-key=\"9qo6r\">Ri-jeje im ri-bwebwenato: Heynes Jeik</p><p data-block-key=\"82scv\"></p><p data-block-key=\"5ug36\">M̗okta ilo aelin ij Ujae, ekar wor ruo leddik raar jokwe im rūttol̗o̗k ilo juon wāto etan Lopinpin. Wāto in ej pād iol̗apl̗ap in Ujae. Ledik rein raar lukkuun em̗m̗an aerro lale doon im jel̗ā n̗ae doon ilo jabdewōt wāween.</p><p data-block-key=\"bckpc\"></p><p data-block-key=\"2ov3n\">Aolep jota ālikin aerro kōn kōm̗m̗ani jerbal ko aerro, erro ej ke arl̗o̗k em ikkure kōn ikkure eo rej ba ekkokowa. Ilo aerro kōn ekkokowa, erro ej ekkokowa im jepool̗e aolepān Ujae en̗ jān arin wāto eo erro ej jokwe ie tak l̗o̗k iar em pool̗e tok likiej im ito ilik to em jepool̗e tok n̄an mo karuk, m̗ween ijabōn tata irilik.</p><p data-block-key=\"6gjb2\"></p><p data-block-key=\"44bkj\">Juon iien ledik eo erūtto eaar l̗ōmn̗ake juon an pepe. Ijoke, eaar jab m̗ōkaj in kwal̗o̗k bwe ejja etale an ledik eo edik l̗ōmn̗ak em̗m̗an ke. Iien eo wōt ak eaar kūr tok ledik eo edik im kwal̗o̗k pepe eo an. Ledik eo erūtto eba, “Jatū, e? Juon e aō pepe.”</p><p data-block-key=\"3kk4h\"></p><p data-block-key=\"228mk\">Ledik eo edik eba, “Ekwe, ta pepe n̗e am̗?”</p><p data-block-key=\"5ki8f\"></p><p data-block-key=\"97om4\">Ledik eo erūtto eba, “Em̗m̗an ke n̄e kōjero kōjjakaak ekkokowa jān āniin n̄an aelōn̄ n̗e ireeaar?”</p><p data-block-key=\"2qgn7\"></p><p data-block-key=\"fmc1n\">Ledik edik eba, “Lae, ke?”</p><p data-block-key=\"en8to\"></p><p data-block-key=\"7gmha\">Ledik eo jein eba, “Aaet.”</p><p data-block-key=\"2g36k\"></p><p data-block-key=\"c4h7h\">Ke ej jiron̄ ledik eo edik kake, ledik eo edik eaar errā kake pepe eo. Bōtaab, eaar kajjitōk ippān ledik eo jein, “Elōn ke juon jem̗l̗o̗k n̄an eo enaaj anjo̗ iaarro kōn l̗ōmn̗ak in am̗ le jeiū?”</p><p data-block-key=\"ai319\"></p><p data-block-key=\"ai21o\">Lio erūtto eaar ba, “Aaet. Eo enaaj anjo̗ enaaj wōnm̗aanl̗o̗k wōt im jolete aelōn̄ kein aolep ruo.”</p><p data-block-key=\"fnh93\"></p><p data-block-key=\"edsnl\">Ledik eo edik eba, “Hmm. Ekwe, em̗ōj kōjero ej jino n̄āāt?”</p><p data-block-key=\"7csjv\"></p><p data-block-key=\"8sv1k\">Ledik eo jein eba, “Kōjero naaj jinoe ālikin jilu raan jān kiio bwe kōjero ejja kappok waarro wa n̄an arro ekkokowa. Kab en l̗ap iien arro kamminene m̗okta jān arro naaj kādon̄e doon. Ālikin an dedel̗o̗k, jero naaj jino kōjjakaak in arro jān arin m̗wiin n̄an arin Lae.”</p><p data-block-key=\"5sr7n\"></p><p data-block-key=\"3go0h\">Ledik ro raar jino kapool̗e Ujae em kappok waerro wa, ak dekā doulul n̄an aerro naaj jino kajjimaron̄ron̄ eo aerro. Ke ej jejjet raan eo, lio erūtto eaar ruj m̗okta em kairuj lio jatin. “Liō, e? Raan eo in. Keememej bwe juon naan an ri-etto ro ej ba ‘Eo ellu, eluuj’.”</p><p data-block-key=\"ftli\"></p><p data-block-key=\"3uno3\">Ak erro jibwi wa ko waerro em ettōr iaar l̗o̗k n̄an iaar. Ledik eo erūtto eaar jino jolōn̄ l̗o̗k wa eo waan juon ak eba, “Jemoot!”</p><p data-block-key=\"alr86\"></p><p data-block-key=\"6lguh\">Lio edik ebaj jolōn̄ eo waan ak eba, “Kōttar ta!”</p><p data-block-key=\"8k77\"></p><p data-block-key=\"bc6k2\">Erro jino ekkokowa l̗o̗k ioon bar eo l̗o̗k, o, erro jino tuwaak im jino etal ioon n̗a en̗ metol̗o̗k n̄an m̗aan baal en̗ iarin Ujae. Ke ledik eo erūtto enan̄in tōpar m̗aan baal ippān mejā ko, ak ewōtlo̗k wa eo juon waan. Iien eo wōt ak eaar oktak em erom̗ dekā, jekjekin ledik. Ak ledik eo edik ej epaak tok wōt. Ke ledik eo edik ej epaake dekā eo jekjekin ledik eo jein eba, “Hmm. Āinwōt iaar jab lo dekā in ilo raan ko l̗o̗k.”</p><p data-block-key=\"87upu\"></p><p data-block-key=\"8npb4\">El̗ak lukkuun mejeke l̗o̗k, ledik eo jein eo. Em̗ōj kōn an būrom̗ōje, eaar make kōwotlo̗k wa eo waan juon bwe en bar oktak em erom̗ dekā āinwōt ledik eo jein. Iien eo wōt, ak eaar bar oktak em erom̗ dekā. Ak lukkuun m̗ool n̄e en kar tōprak an ledik rein ekkokowa n̄an Lae, en kar ejaak juon n̗a jān arin Lopinpin n̄an arin Lae.</p><p data-block-key=\"dj02m\"></p><p data-block-key=\"ca6ra\">Rainin ioon n̗a en̗ iarin Ujae, epād dekā eo im ej kwal̗o̗k jekjekin ledik rein ruo. Juon wōt dekā, ak ruo annan̄in armej ie. Eriab kōnnaan, ak l̗ōmn̗ake juon am̗ iien jam̗bo n̄an Ujae em amen mejam̗.</p><p data-block-key=\"46tfk\"></p>",
+                "id": "3f4b5a36-3cce-4a29-86f0-37af81485186"
+              }
+            ]
           },
           "id": "c0a164c6-ec5f-4e4f-a702-acad28d5f4e6"
         },
@@ -24,7 +36,13 @@
           "type": "item",
           "value": {
             "title": "About the team: Aka Niviâna",
-            "content": "<p data-block-key=\"hyd2s\">Aka Niviâna is a Inuk writer and this is her on-screen debut. Aka started doing poetry with a wish to create nuanced conversations about not only climate change, but also colonialism and indigenous peoples rights. She believes in the importance of representation and the inclusion of black, brown and indigenous peoples.</p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"hyd2s\">Aka Niviâna is a Inuk writer and this is her on-screen debut. Aka started doing poetry with a wish to create nuanced conversations about not only climate change, but also colonialism and indigenous peoples rights. She believes in the importance of representation and the inclusion of black, brown and indigenous peoples.</p>",
+                "id": "32766f6f-52c8-4a9a-ac8f-ba0086d93d40"
+              }
+            ]
           },
           "id": "254f3e06-1ff7-481b-8112-5884feab8490"
         },
@@ -32,7 +50,13 @@
           "type": "item",
           "value": {
             "title": "About the team: Kathy Jetñil-Kijiner",
-            "content": "<p data-block-key=\"hyd2s\">Kathy Jetñil-Kijiner is a poet of Marshallese ancestry. She received international acclaim through her performance at the opening of the United Nations Climate Summit in New York in 2014. Her writing and performances have been featured by CNN, Democracy Now, Huffington Post, and more. In February 2017, the University of Arizona Press published her first collection of poetry, Iep Jāltok: Poems from a Marshallese Daughter. Her work has recently evolved and begun to inhabit gallery and performance art spaces – her work has been curated by the Honolulu Biennial in Hawai’i in February 2017, then the Smithsonian art lab ‘Ae Kai in July of 2017, and most recently the upcoming Asia Pacific Triennial in Australia in November 2018. Kathy also co-founded the non-profit Jo-Jikum, dedicated to empowering Marshallese youth to seek solutions to climate change and other environmental impacts threatening their home island. She has been selected as one of 13 Climate Warriors by Vogue in 2015 and the Impact Hero of the Year by Earth Company in 2016. She received her Master’s in Pacific Island Studies from the University of Hawaiʻi at Mānoa.</p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"hyd2s\">Kathy Jetñil-Kijiner is a poet of Marshallese ancestry. She received international acclaim through her performance at the opening of the United Nations Climate Summit in New York in 2014. Her writing and performances have been featured by CNN, Democracy Now, Huffington Post, and more. In February 2017, the University of Arizona Press published her first collection of poetry, Iep Jāltok: Poems from a Marshallese Daughter. Her work has recently evolved and begun to inhabit gallery and performance art spaces – her work has been curated by the Honolulu Biennial in Hawai’i in February 2017, then the Smithsonian art lab ‘Ae Kai in July of 2017, and most recently the upcoming Asia Pacific Triennial in Australia in November 2018. Kathy also co-founded the non-profit Jo-Jikum, dedicated to empowering Marshallese youth to seek solutions to climate change and other environmental impacts threatening their home island. She has been selected as one of 13 Climate Warriors by Vogue in 2015 and the Impact Hero of the Year by Earth Company in 2016. She received her Master’s in Pacific Island Studies from the University of Hawaiʻi at Mānoa.</p>",
+                "id": "ee02048d-7b11-4a71-9755-61891dc961ff"
+              }
+            ]
           },
           "id": "20329c69-fc58-4702-9c5d-04d4d17a218b"
         },
@@ -40,7 +64,13 @@
           "type": "item",
           "value": {
             "title": "About the team: Dan Lin",
-            "content": "<p data-block-key=\"hyd2s\">This is Dan Lin’s second film project. A professional photographer and photojournalist, Dan entered into the film world as a response to the complexity of issues arising from the Pacific, with a desire to provide a more visceral experience for broader audiences. He is primarily interested in telling stories of indigenous peoples and their connection to the land and sea.</p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"hyd2s\">This is Dan Lin’s second film project. A professional photographer and photojournalist, Dan entered into the film world as a response to the complexity of issues arising from the Pacific, with a desire to provide a more visceral experience for broader audiences. He is primarily interested in telling stories of indigenous peoples and their connection to the land and sea.</p>",
+                "id": "94292741-3806-4a9a-abeb-59470afea03e"
+              }
+            ]
           },
           "id": "24d39ab7-066d-47e7-acd2-e31570da10d6"
         },
@@ -48,7 +78,13 @@
           "type": "item",
           "value": {
             "title": "About the team: Nick Stone",
-            "content": "<p data-block-key=\"hyd2s\">Nick Stone is a graduate of NYU’s Tisch School and has worked as a freelance filmmaker and editor for almost twenty years. His work includes everything from national advertising campaigns to independent films and documentaries. His strengths in storytelling and an ear for sound have won him awards. He continues to pursue new ideas, new projects and new ways of telling a story.</p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"hyd2s\">Nick Stone is a graduate of NYU’s Tisch School and has worked as a freelance filmmaker and editor for almost twenty years. His work includes everything from national advertising campaigns to independent films and documentaries. His strengths in storytelling and an ear for sound have won him awards. He continues to pursue new ideas, new projects and new ways of telling a story.</p>",
+                "id": "db390186-8116-48c2-a9de-760d43d3d92d"
+              }
+            ]
           },
           "id": "878d4136-9e15-489d-8600-47801bc18c5b"
         },
@@ -56,7 +92,13 @@
           "type": "item",
           "value": {
             "title": "About the team: Rob Lau",
-            "content": "<p data-block-key=\"hyd2s\">Rob is a visual storyteller from the island of O'ahu with a B.A. in Human Ecology from College of the Atlantic. Through filmmaking, his work explores themes of social justice, Hawaiian culture, place-based knowledge, and how art can shift mindsets. A social disruptor in the name of transformative media, Rob strives to weave narratives that point to the future of our humanity while celebrating the cultural wisdom of the past.</p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"hyd2s\">Rob is a visual storyteller from the island of O'ahu with a B.A. in Human Ecology from College of the Atlantic. Through filmmaking, his work explores themes of social justice, Hawaiian culture, place-based knowledge, and how art can shift mindsets. A social disruptor in the name of transformative media, Rob strives to weave narratives that point to the future of our humanity while celebrating the cultural wisdom of the past.</p>",
+                "id": "1e1823ff-0c06-42a9-a54b-d9d312c217bf"
+              }
+            ]
           },
           "id": "fde9f7a3-b6a8-46ef-a7fd-534143039a3a"
         },
@@ -64,7 +106,13 @@
           "type": "item",
           "value": {
             "title": "About the team: Oz Go",
-            "content": "<p data-block-key=\"hyd2s\">Oz Go is a filmmaker and the founder of Narrative Lost. This non-profit film studio and artist collective is dedicated to making films that confront the most pressing social issues of our time, and on behalf of deserving organizations worldwide. Oz has also worked on commercial campaigns for Sports Illustrated, Adidas, Four Seasons, and MasterCard. He is a graduate of the University of Hawaii with a major in Anthropology.</p>"
+            "content": [
+              {
+                "type": "text",
+                "value": "<p data-block-key=\"hyd2s\">Oz Go is a filmmaker and the founder of Narrative Lost. This non-profit film studio and artist collective is dedicated to making films that confront the most pressing social issues of our time, and on behalf of deserving organizations worldwide. Oz has also worked on commercial campaigns for Sports Illustrated, Adidas, Four Seasons, and MasterCard. He is a graduate of the University of Hawaii with a major in Anthropology.</p>",
+                "id": "d21b3a7c-5513-4394-9c96-f3260941aade"
+              }
+            ]
           },
           "id": "ba024fa6-8bf1-4dfa-80a2-5d25787ee98e"
         }
@@ -73,9 +121,9 @@
   },
   "callout": {
     "_source": "About Us (page 8)",
-    "_score": 6,
+    "_score": 7,
     "value": {
-      "content": "<h2>Our name is a compass</h2><p data-block-key=\"ia5sy\">350 refers to <a href=\"https://350.org/what-does-our-name-350-mean/\">350 parts per million</a> — the maximum level of carbon (CO2) in the atmosphere safe for people and the planet. Every fraction of carbon pollution we add makes the climate crisis worse. We are currently at 432 ppm, and are working to drive this number back down. Our name is a daily reminder of what's at stake, and why this is the fight of our lives.</p>",
+      "content": "<h2 data-block-key=\"qp8wm\">Our name is a compass</h2><p data-block-key=\"ia5sy\">350 refers to <a href=\"https://350.org/what-does-our-name-350-mean/\">350 parts per million</a> — the maximum level of carbon (CO2) in the atmosphere safe for people and the planet. Every fraction of carbon pollution we add makes the climate crisis worse. We are currently at 432 ppm, and are working to drive this number back down. Our name is a daily reminder of what's at stake, and why this is the fight of our lives.</p>",
       "link_text": "See the change in CO2 since you were born",
       "link_page": null,
       "link_url": "https://350.org",
@@ -89,7 +137,7 @@
     "value": {
       "tag": "Global",
       "icon": null,
-      "content": "<h3>The Great Power Shift</h3><p>We are putting the power back in the hands of people, from polluters.</p>",
+      "content": "<h3 data-block-key=\"dqjpy\">The Great Power Shift</h3><p data-block-key=\"aqqal\">We are putting the power back in the hands of people, from polluters.</p>",
       "image": 6,
       "link_page": 9,
       "link_url": "",
@@ -100,7 +148,7 @@
     "_source": "Home (page 3)",
     "_score": 18,
     "value": {
-      "content": "<h2>Act Now</h2><p data-block-key=\"cgshv\">From mass actions and grassroots organizing to digital pressure, the fight is happening now and we need you.</p>",
+      "content": "<h2 data-block-key=\"siebu\">Act Now</h2><p data-block-key=\"cgshv\">From mass actions and grassroots organizing to digital pressure, the fight is happening now and we need you.</p>",
       "link_text": "Take action",
       "link_page": 10,
       "link_url": "",
@@ -110,7 +158,7 @@
           "value": {
             "tag": "Global",
             "icon": null,
-            "content": "<h3>The Great Power Shift</h3><p>We are putting the power back in the hands of people, from polluters.</p>",
+            "content": "<h3 data-block-key=\"dqjpy\">The Great Power Shift</h3><p data-block-key=\"aqqal\">We are putting the power back in the hands of people, from polluters.</p>",
             "image": 6,
             "link_page": 9,
             "link_url": "",
@@ -123,7 +171,7 @@
           "value": {
             "tag": "Canada",
             "icon": null,
-            "content": "<h3>Powerlines, not Pipelines</h3><p>Support our shift to affordable, renewable energy with an end to fossil fuel volatility and climate chaos.</p>",
+            "content": "<h3 data-block-key=\"rr566\">Powerlines, not Pipelines</h3><p data-block-key=\"a4vdd\">Support our shift to affordable, renewable energy with an end to fossil fuel volatility and climate chaos.</p>",
             "image": 7,
             "link_page": null,
             "link_url": "https://350.org",
@@ -136,7 +184,7 @@
           "value": {
             "tag": "Global",
             "icon": null,
-            "content": "<h3>The Great Power Shift</h3><p>We are putting the power back in the hands of people, from polluters.</p>",
+            "content": "<h3 data-block-key=\"fcl6k\">The Great Power Shift</h3><p data-block-key=\"6qltb\">We are putting the power back in the hands of people, from polluters.</p>",
             "image": 6,
             "link_page": null,
             "link_url": "https://350.org",
@@ -148,71 +196,136 @@
     }
   },
   "card_grid": {
-    "_source": "About Us (page 8)",
-    "_score": 17,
+    "_source": "How to give (page 64)",
+    "_score": 28,
     "value": {
-      "heading": "Areas of work",
+      "heading": "More ways to give",
       "cards": [
         {
           "type": "item",
           "value": {
             "tag": "",
             "icon": null,
-            "content": "<h3>Stop Fossil Fuels</h3><p>We change the rules, policies and financial incentives that keep coal, oil and gas alive.</p>",
-            "image": 13,
+            "content": "<p data-block-key=\"qc0wr\"><b>Donate by Check</b></p><p data-block-key=\"6jser\">Send 350.org a check in any currency.</p>",
+            "image": null,
             "link_page": null,
-            "link_url": "https://350.org",
-            "link_text": "Learn more"
+            "link_url": "https://350.org/how-to-give/#addresses",
+            "link_text": "Check our addresses"
           },
-          "id": "812d1deb-8008-492a-9410-cc8b701688e0"
+          "id": "478bcd53-035e-41d4-ba66-43cf9a26d2f2"
         },
         {
           "type": "item",
           "value": {
             "tag": "",
             "icon": null,
-            "content": "<h3>Deliver Campaign Finance</h3><p>We push decision-makers to make polluters pay and fund a quick shift to renewable energy.</p>",
-            "image": 14,
+            "content": "<p data-block-key=\"d0opv\"><b>Update your monthly gift</b></p><p data-block-key=\"2b8ek\">If you’re a monthly donor, you can view, update or cancel your gift at any time.</p>",
+            "image": null,
             "link_page": null,
-            "link_url": "https://350.org",
-            "link_text": "Learn more"
+            "link_url": "https://350.org/update",
+            "link_text": "Update your donation online"
           },
-          "id": "e5acb53d-f137-413d-a2f8-799eb9ba4f0d"
+          "id": "52b0980c-c974-429f-ab16-fc147174c155"
         },
         {
           "type": "item",
           "value": {
             "tag": "",
             "icon": null,
-            "content": "<h3>Power Renewable Energy</h3><p>We work to guarantee every household, business and community clean, affordable power.</p>",
-            "image": 15,
+            "content": "<p data-block-key=\"d0opv\"><b>Employer Matching Gifts</b></p><p data-block-key=\"8b7p0\">Your employer can double the impact of your gift with a match.</p>",
+            "image": null,
             "link_page": null,
-            "link_url": "https://350.org",
-            "link_text": "Learn more"
+            "link_url": "https://350.org/matching-gifts",
+            "link_text": "Get started"
           },
-          "id": "8065d2d6-7916-4519-a947-161f3153b68b"
+          "id": "d9189080-064a-4e30-889d-171678742ad7"
         },
         {
           "type": "item",
           "value": {
             "tag": "",
             "icon": null,
-            "content": "<h3>Ensure Climate Justice</h3><p>We support frontline communities and leave no one behind in the energy transition</p>",
-            "image": 16,
+            "content": "<p data-block-key=\"d0opv\"><b>Donor Advised Funds/Individual Retirement Account</b></p><p data-block-key=\"dabf5\">Donate to 350.org from your DAF or IRA.</p>",
+            "image": null,
             "link_page": null,
-            "link_url": "https://350.org",
+            "link_url": "https://350.org/how-to-give/#daf",
+            "link_text": "Follow these easy steps"
+          },
+          "id": "43912741-51aa-4c4c-8592-a9587d378c73"
+        },
+        {
+          "type": "item",
+          "value": {
+            "tag": "",
+            "icon": null,
+            "content": "<p data-block-key=\"d0opv\"><b>Wills &amp; Trusts</b></p><p data-block-key=\"dpgek\">You can support 350.org by leaving a legacy gift and including 350.org in your will.</p>",
+            "image": null,
+            "link_page": null,
+            "link_url": "https://350.org/how-to-give/#wills",
+            "link_text": "Check the language you can use"
+          },
+          "id": "165e00aa-a04e-4c22-ba3c-c2485b6f7c74"
+        },
+        {
+          "type": "item",
+          "value": {
+            "tag": "",
+            "icon": null,
+            "content": "<p data-block-key=\"d0opv\"><b>Donate by Stocks</b></p><p data-block-key=\"4nm2o\">You can support 350.org's work with a gift of stocks.</p>",
+            "image": null,
+            "link_page": null,
+            "link_url": "https://350.org/how-to-give/#stock",
+            "link_text": "Here's how"
+          },
+          "id": "1e2cd09e-05fc-4d26-9123-69f80c626695"
+        },
+        {
+          "type": "item",
+          "value": {
+            "tag": "",
+            "icon": null,
+            "content": "<p data-block-key=\"d0opv\"><b>Donate while shopping online</b></p><p data-block-key=\"65vi4\">Support the climate movement when you make online purchases.</p>",
+            "image": null,
+            "link_page": null,
+            "link_url": "https://350.org/how-to-give/#shopping",
+            "link_text": "More info"
+          },
+          "id": "da939739-0189-4d96-88aa-8fe46d023927"
+        },
+        {
+          "type": "item",
+          "value": {
+            "tag": "",
+            "icon": null,
+            "content": "<p data-block-key=\"d0opv\"><b>Join 350 Allies for the Earth</b></p><p data-block-key=\"632ak\">Provide critical resources for our movement and unlock exclusive program benefits.</p>",
+            "image": null,
+            "link_page": null,
+            "link_url": "https://350.org/how-to-give/#allies",
             "link_text": "Learn more"
           },
-          "id": "37325aec-523f-47b9-b681-97aaa51aef76"
+          "id": "d12e4bc4-b1d5-435a-8ee8-430f8f676f97"
+        },
+        {
+          "type": "item",
+          "value": {
+            "tag": "",
+            "icon": null,
+            "content": "<p data-block-key=\"d0opv\"><b>Fundraise for 350.org</b></p><p data-block-key=\"1if1l\">Start your own fundraising campaign for 350.org.</p>",
+            "image": null,
+            "link_page": null,
+            "link_url": "https://350.org/how-to-give/#fundraising",
+            "link_text": "Get started"
+          },
+          "id": "205d7773-808b-4eaa-8d5a-d5784c1b2989"
         }
       ]
     }
   },
   "donate_fundraiseup": {
     "_source": "Home (page 3)",
-    "_score": 5,
+    "_score": 4,
     "value": {
-      "content": "<h2>Support Us</h2><p data-block-key=\"s74ht\">Your gift funds campaigns, local organizers and public pressure to move towards a safe and liveable future, for people and the planet.</p>",
+      "content": "<h2 data-block-key=\"m2l3v\">Support Us</h2><p data-block-key=\"s74ht\">Your gift funds campaigns, local organizers and public pressure to move towards a safe and liveable future, for people and the planet.</p>",
       "image": 4,
       "image_caption": "Organizers demonstrate at Power Up Japan in Tokyo. Photo courtesy Jane Doe",
       "designation_id": "",
@@ -224,18 +337,18 @@
     "_score": 6,
     "value": {
       "eyebrow": "",
-      "content": "<h2>Looking for more?</h2><p data-block-key=\"bxa6h\">Didn't find an option for you? Let us know what you were looking for.</p>",
+      "content": "<h2 data-block-key=\"cqudw\">Looking for more?</h2><p data-block-key=\"bxa6h\">Didn't find an option for you? Let us know what you were looking for.</p>",
       "image": 94,
       "alignment": "image-left",
       "background": "dark-grey",
       "link_text": "Tell Us More",
       "link_page": 3,
       "link_url": "",
-      "anchor": null
+      "anchor": ""
     }
   },
   "image": {
-    "_source": "This UN Tax Conference might sound boring (page 26)",
+    "_source": "This UN Tax Conference might sound boring but we all have a stake in it (page 26)",
     "_score": 3,
     "value": {
       "image": 75,
@@ -245,7 +358,7 @@
   },
   "image_card_list": {
     "_source": "About Us (page 8)",
-    "_score": 11,
+    "_score": 12,
     "value": {
       "heading": "Our Values",
       "image": 6,
@@ -253,35 +366,35 @@
         {
           "type": "item",
           "value": {
-            "content": "<h3>We are bold and strategic.</h3><p>We set visionary goals and pursue them pragmatically. We challenge conventional thinking, experiment without fear of failure, and act with courage — because the scale of this crisis demands it.</p>"
+            "content": "<h3 data-block-key=\"v54cq\">We are bold and strategic.</h3><p data-block-key=\"nai0r\">We set visionary goals and pursue them pragmatically. We challenge conventional thinking, experiment without fear of failure, and act with courage — because the scale of this crisis demands it.</p>"
           },
           "id": "ad2f270d-05f3-4267-b284-2d4c8e166c8f"
         },
         {
           "type": "item",
           "value": {
-            "content": "<h3>Equality and justice is at the heart of our work.</h3><p>The concentration of power and wealth drives the climate crisis, and keeps its costs falling on those least responsible. We work to protect the climate, reduce inequality, and put real power back in people&#x27;s hands.</p>"
+            "content": "<h3 data-block-key=\"cwbih\">Equality and justice is at the heart of our work.</h3><p data-block-key=\"2zq0d\">The concentration of power and wealth drives the climate crisis, and keeps its costs falling on those least responsible. We work to protect the climate, reduce inequality, and put real power back in people's hands.</p>"
           },
           "id": "c72cd78b-e881-4b7f-922d-227f7efe8339"
         },
         {
           "type": "item",
           "value": {
-            "content": "<h3>We care for and trust each other.</h3><p>No one has all the answers. We value the knowledge of our teams, partners and communities, honor each other through nonviolence, learn and grow together.</p>"
+            "content": "<h3 data-block-key=\"ifw4c\">We care for and trust each other.</h3><p data-block-key=\"sltbx\">No one has all the answers. We value the knowledge of our teams, partners and communities, honor each other through nonviolence, learn and grow together.</p>"
           },
           "id": "5577819b-5287-4b26-b3fc-726703f57735"
         },
         {
           "type": "item",
           "value": {
-            "content": "<h3>Collaboration is our strength.</h3><p>We cannot win alone. Standing up to fossil fuel interests requires everyone — students, unions, faith groups, businesses and communities. We build diverse coalitions across movements, sectors and borders to create transformational change.</p>"
+            "content": "<h3 data-block-key=\"hzf2t\">Collaboration is our strength.</h3><p data-block-key=\"zomsj\">We cannot win alone. Standing up to fossil fuel interests requires everyone — students, unions, faith groups, businesses and communities. We build diverse coalitions across movements, sectors and borders to create transformational change.</p>"
           },
           "id": "7f7f8e10-f110-46cc-a2b0-844972f208a4"
         },
         {
           "type": "item",
           "value": {
-            "content": "<h3>We are open and accountable.</h3><p>We work with integrity and transparency. We are accountable to our partners and the communities we organize with, committed to protecting everyone&#x27;s privacy and safety, and to honouring the relationships we build along the way.</p>"
+            "content": "<h3 data-block-key=\"aerde\">We are open and accountable.</h3><p data-block-key=\"amscs\">We work with integrity and transparency. We are accountable to our partners and the communities we organize with, committed to protecting everyone's privacy and safety, and to honouring the relationships we build along the way.</p>"
           },
           "id": "6aa55492-cff2-42b9-9274-729444226a1d"
         }
@@ -291,31 +404,80 @@
   },
   "image_text": {
     "_source": "The Great Power Shift (page 9)",
-    "_score": 6,
+    "_score": 7,
     "value": {
       "image": 22,
       "content": "<h2>We pay. They profit. This needs to change.</h2><p data-block-key=\"rpkww\">Soaring energy bills. Skyrocketing food prices. Worsening climate disasters. These aren’t separate problems. They share the same root: a world still hooked on oil, gas and coal – and governments choosing to support fossil fuel companies with public money.<br/>But this isn’t inevitable. It’s a political choice.<br/>Join us for The Great Power Shift, 350.org’s 2026 global campaign to shift the power away from polluters and back to people.</p><p data-block-key=\"390pv\">Together, we can demand a different, a better future – where people come before polluters, and clean, affordable energy is within reach for everyone.<br/><br/><b>The Great Power Shift starts now, are you in?</b></p>",
-      "alignment": "image-left"
+      "alignment": "image-left",
+      "size": "default"
     }
   },
   "page_cards": {
     "_source": "Home (page 3)",
     "_score": 3,
     "value": {
-      "content": "<h2>Latest Updates</h2><p data-block-key=\"hznbi\">News, stories and insights from the global climate movement.</p>",
+      "content": "<h2 data-block-key=\"c1ayz\">Latest Updates</h2><p data-block-key=\"hznbi\">News, stories and insights from the global climate movement.</p>",
       "index_page": 12,
       "link_text": "Read more blogs"
     }
   },
   "section": {
     "_source": "Our Team (page 58)",
-    "_score": 61,
+    "_score": 79,
     "value": {
       "content": [
         {
           "type": "text",
           "value": "<h2 data-block-key=\"fyke1\">Our Board</h2>",
           "id": "5020e34c-c023-4fb4-a074-93dee0830c40"
+        },
+        {
+          "type": "person_card_grid",
+          "value": {
+            "heading": "",
+            "people": [
+              {
+                "type": "item",
+                "value": {
+                  "name": "Rashmi Mistry",
+                  "role": "",
+                  "image": 142,
+                  "bio": "Rashmi is a campaign strategist who has been involved in the climate movement for over 15 years and is now a co-founder at a participatory design collective Better by Codesign working with partners on climate, human rights and new economy.\r\n\r\nPrior to this Rashmi was the global head of the GROW campaign for food and climate justice at Oxfam International, which included all of Oxfam’s global public and policy campaigns on climate, land rights, sustainable agriculture, food value chains and rights of women small scale producers. Her career began in the private sector in media and communications working with well known brands, before transferring her strategic and influencing skills to social and environmental justice, first with CAFOD, then Civicus, before joining Oxfam in South Africa where she worked with communities of women and activists to influence national to global food and climate policies. Rashmi is a passionate advocate for ensuring the voices of women and people most affected by the climate crisis are at the heart of policy and decision making. Rashmi describes herself as a global citizen being a Kenyan born Indian, brought up in the UK, lived in South Africa for 12 years and is now living in rural France.",
+                  "email": "",
+                  "phone": "",
+                  "website": ""
+                },
+                "id": "fbdc33c3-515d-4ad7-a5b3-2d05ef7d25fd"
+              },
+              {
+                "type": "item",
+                "value": {
+                  "name": "China Brotsky",
+                  "role": "Vice Chair and Treasurer",
+                  "image": null,
+                  "bio": "China Brotsky is an active leader in the global social justice movement who uses her skills in finance, operations and governance to support organizations in the environmental justice, climate, anti-corporate power and immigrant rights movements. She served most recently as a senior leader at SumOfUs, a global online corporate accountability organization.\r\n\r\nBesides 350.org, she currently serves on the Board of Directors of the ACLU of Northern California and Oasis Legal Services, a nonprofit law firm providing asylum services to LGBTQIA+ refugees. China spent over 20 years on the executive leadership of Tides. Her work included building a bi-national peer-learning network on collaborative space and an online donation application for social justice organizations. She was also a founding member of the Political Ecology Group, a Bay Area environmental justice organization and served on the boards of CorpWatch, Global Greengrants Fund and Greenpeace US. In 2020, she also worked with Seed The Vote to support the election work of grassroots organizations in AZ, FL, GA and PA.",
+                  "email": "",
+                  "phone": "",
+                  "website": ""
+                },
+                "id": "68b2fd29-34ce-4a3f-93dd-e4d8983cad5b"
+              },
+              {
+                "type": "item",
+                "value": {
+                  "name": "Daniela Costa",
+                  "role": "Secretary",
+                  "image": null,
+                  "bio": "Daniela Costa is based in Sao Paulo. Daniela Pais Costa is currently the Americas Senior Development Manager at Greenpeace International. She has over 15 years of experience advancing human rights and social justice at the global, regional and national level. She was part of and led one of the most pioneering organizational changes in the development sector at the time: the internationalization of ActionAid and later on, she led the transition of multi-affiliated Oxfam to one Oxfam in the Southern Africa region.\r\n\r\nPrevious to Greenpeace, she worked at Making all Voices Count, an innovative programme that tests and documents learning on whether technology can foster transparency and accountability. She has worked with organizations from over 20 countries supporting organizations and their leadership in their development with focus on strategy development, programme development, board leadership and change processes.",
+                  "email": "",
+                  "phone": "",
+                  "website": ""
+                },
+                "id": "9b87248e-4d4f-4876-a2d1-957dc5757447"
+              }
+            ]
+          },
+          "id": "3597a3b1-7430-45bf-ad37-b8b071e3c082"
         },
         {
           "type": "person_card",
@@ -449,8 +611,8 @@
         }
       ],
       "background": "light-grey",
-      "padding": "md",
-      "width": "default",
+      "padding": "sm",
+      "width": "wide",
       "anchor_id": ""
     }
   },
@@ -458,8 +620,8 @@
     "_source": "Home (page 3)",
     "_score": 7,
     "value": {
-      "eyebrow": null,
-      "content": "<h2>Sign up for climate news, action alerts, and ways to make a difference.</h2>",
+      "eyebrow": "",
+      "content": "<h2 data-block-key=\"bzlz3\">Sign up for climate news, action alerts, and ways to make a difference.</h2>",
       "background": "dark-grey",
       "layout": "columns",
       "image": 3,
@@ -473,13 +635,12 @@
           "id": "38ed0a04-bb9f-4033-988a-8e48c5d10ebb"
         }
       ]
-    },
-    "form_html": "\r\n\r\n\r\n\r\n<section id=\"action-lead\"\r\n\tclass=\"section action-lead title-section width-medium padding-medium bg-blue-fade\">\r\n\t<div class=\"section-inner\">\r\n\t\t<div id=\"action-header\" class=\"c6 ct10 cm10 c-wide\">\r\n\t\t\t<a id=\"jump-to-form\" href=\"#action-form\" class=\"tablet-hide desktop-hide mobile-hide bg-orange text-underline-none text-center arrow-down text-large2\">Join Us</a>\r\n\r\n\t\t\t<h2 id=\"action-title\" class=\"title3 text-style-title3\">\r\n\r\n\t<p><span class=\"text-underline-thick-orange\">Join</span> the Climate Movement:</p>\r\n\r\n\t\t\t</h2>\r\n\r\n\r\n\r\n\r\n\t\t<div id=\"action-description\" class=\"text-large margin-top-none margin-bottom-huge \" data-read-more-after=\"7\">\r\n\r\n\t\t\t<!-- ak.wysiwyg=code -->\r\n\r\n\t\t</div>\r\n\r\n\t</div>\r\n\r\n\r\n\t\t<form id=\"action-form\" class=\"c4 ct7_5 cm10 c-wide form-changeorg form-style-labelabove ak-form action_form text-black\" name=\"act\" method=\"POST\" action=\"https://act.350.org/act/\" accept-charset=\"utf-8\">\r\n\t\r\n\t\t\t<div id=\"t\" class=\"p text-large text-lineheight-small strong\">\r\n\t\t\r\n\t\t\t\t&nbsp;\r\n\t\t\r\n\t\t\t</div>\r\n\t\t\t\r\n\r\n\t\t\t<input type=\"hidden\" name=\"utf8\" value=\"&#x2714;\">\r\n\t\t\t<input type=\"hidden\" name=\"page\" value=\"web_join_dev_copy\" />\r\n\r\n      \r\n\r\n\t\t\t\r\n\r\n\r\n\r\n\r\n<div id=\"known_user\">\r\n <div id=\"known_user_welcome\" class=\"padding-small bg-white margin-bottom-none\">\r\n  <p id=\"known-user-greeting\" class=\"text-large strong margin-bottom-small\">Hi <span id=\"known_user_name\"></span>!</p>\r\n  <p class=\"text-small\">We have your contact info saved from last time, just click the button below to continue.</p>\r\n  <div id=\"known_user_logout\" class=\"text-small2\">\r\n    <span class=\"user-logout-link\"><strong>Not <span id=\"known_user_name\"></span>?</strong>\r\n    <a href=\"https://act.350.org?\" onclick=\"return actionkit.forms.logOut()\" class=\"icon-before icon-faded text-underline-none text-blue\" data-icon=\"&#xE904;\">Sign out</a></span>\r\n  </div>\r\n </div>\r\n</div>\r\n\r\n<div id=\"unknown_user\" class=\"user-form ak-user-form ak-errs-below form-style-labelabove text-black\">\r\n \r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n  \r\n  \t\r\n\t<div id=\"ak-fieldbox-email\" class=\"email_box input-text ak-input-type-user required\">\r\n\t\t<label for=\"id_email\">Email Address<span class=\"ak-required-flag\">*</span></label>\r\n\t\t<input type=\"text\" name=\"email\" id=\"id_email\" class=\"ak-userfield-input\">\r\n\t</div>\r\n    \r\n  \r\n  \t\r\n\t\t<div id=\"ak-fieldbox-country\" class=\"country_box input-select ak-input-type-user required\">\r\n\t\t\t<label for=\"id_country\">Country<span class=\"ak-required-flag\">*</span></label>\r\n\t\t\t\r\n<select name=\"country\" id=\"country\"  >\r\n<option selected></option>\r\n\r\n\r\n<option value=\"Afghanistan\">Afghanistan</option>\r\n\r\n\r\n\r\n<option value=\"Aland Islands\">Aland Islands</option>\r\n\r\n\r\n\r\n<option value=\"Albania\">Albania</option>\r\n\r\n\r\n\r\n<option value=\"Algeria\">Algeria</option>\r\n\r\n\r\n\r\n<option value=\"American Samoa\">American Samoa</option>\r\n\r\n\r\n\r\n<option value=\"Andorra\">Andorra</option>\r\n\r\n\r\n\r\n<option value=\"Angola\">Angola</option>\r\n\r\n\r\n\r\n<option value=\"Anguilla\">Anguilla</option>\r\n\r\n\r\n\r\n<option value=\"Antarctica\">Antarctica</option>\r\n\r\n\r\n\r\n<option value=\"Antigua and Barbuda\">Antigua and Barbuda</option>\r\n\r\n\r\n\r\n<option value=\"Argentina\">Argentina</option>\r\n\r\n\r\n\r\n<option value=\"Armenia\">Armenia</option>\r\n\r\n\r\n\r\n<option value=\"Aruba\">Aruba</option>\r\n\r\n\r\n\r\n<option value=\"Australia\">Australia</option>\r\n\r\n\r\n\r\n<option value=\"Austria\">Austria</option>\r\n\r\n\r\n\r\n<option value=\"Azerbaijan\">Azerbaijan</option>\r\n\r\n\r\n\r\n<option value=\"Bahamas\">Bahamas</option>\r\n\r\n\r\n\r\n<option value=\"Bahrain\">Bahrain</option>\r\n\r\n\r\n\r\n<option value=\"Bangladesh\">Bangladesh</option>\r\n\r\n\r\n\r\n<option value=\"Barbados\">Barbados</option>\r\n\r\n\r\n\r\n<option value=\"Belarus\">Belarus</option>\r\n\r\n\r\n\r\n<option value=\"Belgium\">Belgium</option>\r\n\r\n\r\n\r\n<option value=\"Belize\">Belize</option>\r\n\r\n\r\n\r\n<option value=\"Benin\">Benin</option>\r\n\r\n\r\n\r\n<option value=\"Bermuda\">Bermuda</option>\r\n\r\n\r\n\r\n<option value=\"Bhutan\">Bhutan</option>\r\n\r\n\r\n\r\n<option value=\"Bolivia\">Bolivia</option>\r\n\r\n\r\n\r\n<option value=\"Bonaire, Saint Eustatius and Saba \">Bonaire, Saint Eustatius and Saba </option>\r\n\r\n\r\n\r\n<option value=\"Bosnia and Herzegovina\">Bosnia and Herzegovina</option>\r\n\r\n\r\n\r\n<option value=\"Botswana\">Botswana</option>\r\n\r\n\r\n\r\n<option value=\"Bouvet Island\">Bouvet Island</option>\r\n\r\n\r\n\r\n<option value=\"Brazil\">Brazil</option>\r\n\r\n\r\n\r\n<option value=\"British Indian Ocean Territory\">British Indian Ocean Territory</option>\r\n\r\n\r\n\r\n<option value=\"British Virgin Islands\">British Virgin Islands</option>\r\n\r\n\r\n\r\n<option value=\"Brunei\">Brunei</option>\r\n\r\n\r\n\r\n<option value=\"Bulgaria\">Bulgaria</option>\r\n\r\n\r\n\r\n<option value=\"Burkina Faso\">Burkina Faso</option>\r\n\r\n\r\n\r\n<option value=\"Burundi\">Burundi</option>\r\n\r\n\r\n\r\n<option value=\"Cabo Verde\">Cabo Verde</option>\r\n\r\n\r\n\r\n<option value=\"Cambodia\">Cambodia</option>\r\n\r\n\r\n\r\n<option value=\"Cameroon\">Cameroon</option>\r\n\r\n\r\n\r\n<option value=\"Canada\">Canada</option>\r\n\r\n\r\n\r\n<option value=\"Cayman Islands\">Cayman Islands</option>\r\n\r\n\r\n\r\n<option value=\"Central African Republic\">Central African Republic</option>\r\n\r\n\r\n\r\n<option value=\"Chad\">Chad</option>\r\n\r\n\r\n\r\n<option value=\"Chile\">Chile</option>\r\n\r\n\r\n\r\n<option value=\"China\">China</option>\r\n\r\n\r\n\r\n<option value=\"Christmas Island\">Christmas Island</option>\r\n\r\n\r\n\r\n<option value=\"Cocos Islands\">Cocos Islands</option>\r\n\r\n\r\n\r\n<option value=\"Colombia\">Colombia</option>\r\n\r\n\r\n\r\n<option value=\"Comoros\">Comoros</option>\r\n\r\n\r\n\r\n<option value=\"Cook Islands\">Cook Islands</option>\r\n\r\n\r\n\r\n<option value=\"Costa Rica\">Costa Rica</option>\r\n\r\n\r\n\r\n<option value=\"Croatia\">Croatia</option>\r\n\r\n\r\n\r\n<option value=\"Cuba\">Cuba</option>\r\n\r\n\r\n\r\n<option value=\"Curacao\">Curacao</option>\r\n\r\n\r\n\r\n<option value=\"Cyprus\">Cyprus</option>\r\n\r\n\r\n\r\n<option value=\"Czechia\">Czechia</option>\r\n\r\n\r\n\r\n<option value=\"Democratic Republic of the Congo\">Democratic Republic of the Congo</option>\r\n\r\n\r\n\r\n<option value=\"Denmark\">Denmark</option>\r\n\r\n\r\n\r\n<option value=\"Djibouti\">Djibouti</option>\r\n\r\n\r\n\r\n<option value=\"Dominica\">Dominica</option>\r\n\r\n\r\n\r\n<option value=\"Dominican Republic\">Dominican Republic</option>\r\n\r\n\r\n\r\n<option value=\"Ecuador\">Ecuador</option>\r\n\r\n\r\n\r\n<option value=\"Egypt\">Egypt</option>\r\n\r\n\r\n\r\n<option value=\"El Salvador\">El Salvador</option>\r\n\r\n\r\n\r\n<option value=\"Equatorial Guinea\">Equatorial Guinea</option>\r\n\r\n\r\n\r\n<option value=\"Eritrea\">Eritrea</option>\r\n\r\n\r\n\r\n<option value=\"Estonia\">Estonia</option>\r\n\r\n\r\n\r\n<option value=\"Eswatini\">Eswatini</option>\r\n\r\n\r\n\r\n<option value=\"Ethiopia\">Ethiopia</option>\r\n\r\n\r\n\r\n<option value=\"Falkland Islands\">Falkland Islands</option>\r\n\r\n\r\n\r\n<option value=\"Faroe Islands\">Faroe Islands</option>\r\n\r\n\r\n\r\n<option value=\"Fiji\">Fiji</option>\r\n\r\n\r\n\r\n<option value=\"Finland\">Finland</option>\r\n\r\n\r\n\r\n<option value=\"France\">France</option>\r\n\r\n\r\n\r\n<option value=\"French Guiana\">French Guiana</option>\r\n\r\n\r\n\r\n<option value=\"French Polynesia\">French Polynesia</option>\r\n\r\n\r\n\r\n<option value=\"French Southern Territories\">French Southern Territories</option>\r\n\r\n\r\n\r\n<option value=\"Gabon\">Gabon</option>\r\n\r\n\r\n\r\n<option value=\"Gambia\">Gambia</option>\r\n\r\n\r\n\r\n<option value=\"Georgia\">Georgia</option>\r\n\r\n\r\n\r\n<option value=\"Germany\">Germany</option>\r\n\r\n\r\n\r\n<option value=\"Ghana\">Ghana</option>\r\n\r\n\r\n\r\n<option value=\"Gibraltar\">Gibraltar</option>\r\n\r\n\r\n\r\n<option value=\"Greece\">Greece</option>\r\n\r\n\r\n\r\n<option value=\"Greenland\">Greenland</option>\r\n\r\n\r\n\r\n<option value=\"Grenada\">Grenada</option>\r\n\r\n\r\n\r\n<option value=\"Guadeloupe\">Guadeloupe</option>\r\n\r\n\r\n\r\n<option value=\"Guam\">Guam</option>\r\n\r\n\r\n\r\n<option value=\"Guatemala\">Guatemala</option>\r\n\r\n\r\n\r\n<option value=\"Guernsey\">Guernsey</option>\r\n\r\n\r\n\r\n<option value=\"Guinea\">Guinea</option>\r\n\r\n\r\n\r\n<option value=\"Guinea-Bissau\">Guinea-Bissau</option>\r\n\r\n\r\n\r\n<option value=\"Guyana\">Guyana</option>\r\n\r\n\r\n\r\n<option value=\"Haiti\">Haiti</option>\r\n\r\n\r\n\r\n<option value=\"Heard Island and McDonald Islands\">Heard Island and McDonald Islands</option>\r\n\r\n\r\n\r\n<option value=\"Honduras\">Honduras</option>\r\n\r\n\r\n\r\n<option value=\"Hong Kong\">Hong Kong</option>\r\n\r\n\r\n\r\n<option value=\"Hungary\">Hungary</option>\r\n\r\n\r\n\r\n<option value=\"Iceland\">Iceland</option>\r\n\r\n\r\n\r\n<option value=\"India\">India</option>\r\n\r\n\r\n\r\n<option value=\"Indonesia\">Indonesia</option>\r\n\r\n\r\n\r\n<option value=\"Iran\">Iran</option>\r\n\r\n\r\n\r\n<option value=\"Iraq\">Iraq</option>\r\n\r\n\r\n\r\n<option value=\"Ireland\">Ireland</option>\r\n\r\n\r\n\r\n<option value=\"Isle of Man\">Isle of Man</option>\r\n\r\n\r\n\r\n<option value=\"Israel\">Israel</option>\r\n\r\n\r\n\r\n<option value=\"Italy\">Italy</option>\r\n\r\n\r\n\r\n<option value=\"Ivory Coast\">Ivory Coast</option>\r\n\r\n\r\n\r\n<option value=\"Jamaica\">Jamaica</option>\r\n\r\n\r\n\r\n<option value=\"Japan\">Japan</option>\r\n\r\n\r\n\r\n<option value=\"Jersey\">Jersey</option>\r\n\r\n\r\n\r\n<option value=\"Jordan\">Jordan</option>\r\n\r\n\r\n\r\n<option value=\"Kazakhstan\">Kazakhstan</option>\r\n\r\n\r\n\r\n<option value=\"Kenya\">Kenya</option>\r\n\r\n\r\n\r\n<option value=\"Kiribati\">Kiribati</option>\r\n\r\n\r\n\r\n<option value=\"Kosovo\">Kosovo</option>\r\n\r\n\r\n\r\n<option value=\"Kuwait\">Kuwait</option>\r\n\r\n\r\n\r\n<option value=\"Kyrgyzstan\">Kyrgyzstan</option>\r\n\r\n\r\n\r\n<option value=\"Laos\">Laos</option>\r\n\r\n\r\n\r\n<option value=\"Latvia\">Latvia</option>\r\n\r\n\r\n\r\n<option value=\"Lebanon\">Lebanon</option>\r\n\r\n\r\n\r\n<option value=\"Lesotho\">Lesotho</option>\r\n\r\n\r\n\r\n<option value=\"Liberia\">Liberia</option>\r\n\r\n\r\n\r\n<option value=\"Libya\">Libya</option>\r\n\r\n\r\n\r\n<option value=\"Liechtenstein\">Liechtenstein</option>\r\n\r\n\r\n\r\n<option value=\"Lithuania\">Lithuania</option>\r\n\r\n\r\n\r\n<option value=\"Luxembourg\">Luxembourg</option>\r\n\r\n\r\n\r\n<option value=\"Macao\">Macao</option>\r\n\r\n\r\n\r\n<option value=\"Madagascar\">Madagascar</option>\r\n\r\n\r\n\r\n<option value=\"Malawi\">Malawi</option>\r\n\r\n\r\n\r\n<option value=\"Malaysia\">Malaysia</option>\r\n\r\n\r\n\r\n<option value=\"Maldives\">Maldives</option>\r\n\r\n\r\n\r\n<option value=\"Mali\">Mali</option>\r\n\r\n\r\n\r\n<option value=\"Malta\">Malta</option>\r\n\r\n\r\n\r\n<option value=\"Marshall Islands\">Marshall Islands</option>\r\n\r\n\r\n\r\n<option value=\"Martinique\">Martinique</option>\r\n\r\n\r\n\r\n<option value=\"Mauritania\">Mauritania</option>\r\n\r\n\r\n\r\n<option value=\"Mauritius\">Mauritius</option>\r\n\r\n\r\n\r\n<option value=\"Mayotte\">Mayotte</option>\r\n\r\n\r\n\r\n<option value=\"Mexico\">Mexico</option>\r\n\r\n\r\n\r\n<option value=\"Micronesia\">Micronesia</option>\r\n\r\n\r\n\r\n<option value=\"Moldova\">Moldova</option>\r\n\r\n\r\n\r\n<option value=\"Monaco\">Monaco</option>\r\n\r\n\r\n\r\n<option value=\"Mongolia\">Mongolia</option>\r\n\r\n\r\n\r\n<option value=\"Montenegro\">Montenegro</option>\r\n\r\n\r\n\r\n<option value=\"Montserrat\">Montserrat</option>\r\n\r\n\r\n\r\n<option value=\"Morocco\">Morocco</option>\r\n\r\n\r\n\r\n<option value=\"Mozambique\">Mozambique</option>\r\n\r\n\r\n\r\n<option value=\"Myanmar\">Myanmar</option>\r\n\r\n\r\n\r\n<option value=\"Namibia\">Namibia</option>\r\n\r\n\r\n\r\n<option value=\"Nauru\">Nauru</option>\r\n\r\n\r\n\r\n<option value=\"Nepal\">Nepal</option>\r\n\r\n\r\n\r\n<option value=\"Netherlands\">Netherlands</option>\r\n\r\n\r\n\r\n<option value=\"Netherlands Antilles\">Netherlands Antilles</option>\r\n\r\n\r\n\r\n<option value=\"New Caledonia\">New Caledonia</option>\r\n\r\n\r\n\r\n<option value=\"New Zealand\">New Zealand</option>\r\n\r\n\r\n\r\n<option value=\"Nicaragua\">Nicaragua</option>\r\n\r\n\r\n\r\n<option value=\"Niger\">Niger</option>\r\n\r\n\r\n\r\n<option value=\"Nigeria\">Nigeria</option>\r\n\r\n\r\n\r\n<option value=\"Niue\">Niue</option>\r\n\r\n\r\n\r\n<option value=\"Norfolk Island\">Norfolk Island</option>\r\n\r\n\r\n\r\n<option value=\"North Korea\">North Korea</option>\r\n\r\n\r\n\r\n<option value=\"North Macedonia\">North Macedonia</option>\r\n\r\n\r\n\r\n<option value=\"Northern Mariana Islands\">Northern Mariana Islands</option>\r\n\r\n\r\n\r\n<option value=\"Norway\">Norway</option>\r\n\r\n\r\n\r\n<option value=\"Oman\">Oman</option>\r\n\r\n\r\n\r\n<option value=\"Pakistan\">Pakistan</option>\r\n\r\n\r\n\r\n<option value=\"Palau\">Palau</option>\r\n\r\n\r\n\r\n<option value=\"Palestinian Territory\">Palestinian Territory</option>\r\n\r\n\r\n\r\n<option value=\"Panama\">Panama</option>\r\n\r\n\r\n\r\n<option value=\"Papua New Guinea\">Papua New Guinea</option>\r\n\r\n\r\n\r\n<option value=\"Paraguay\">Paraguay</option>\r\n\r\n\r\n\r\n<option value=\"Peru\">Peru</option>\r\n\r\n\r\n\r\n<option value=\"Philippines\">Philippines</option>\r\n\r\n\r\n\r\n<option value=\"Pitcairn\">Pitcairn</option>\r\n\r\n\r\n\r\n<option value=\"Poland\">Poland</option>\r\n\r\n\r\n\r\n<option value=\"Portugal\">Portugal</option>\r\n\r\n\r\n\r\n<option value=\"Puerto Rico\">Puerto Rico</option>\r\n\r\n\r\n\r\n<option value=\"Qatar\">Qatar</option>\r\n\r\n\r\n\r\n<option value=\"Republic of the Congo\">Republic of the Congo</option>\r\n\r\n\r\n\r\n<option value=\"Reunion\">Reunion</option>\r\n\r\n\r\n\r\n<option value=\"Romania\">Romania</option>\r\n\r\n\r\n\r\n<option value=\"Russia\">Russia</option>\r\n\r\n\r\n\r\n<option value=\"Rwanda\">Rwanda</option>\r\n\r\n\r\n\r\n<option value=\"Saint Barthelemy\">Saint Barthelemy</option>\r\n\r\n\r\n\r\n<option value=\"Saint Helena\">Saint Helena</option>\r\n\r\n\r\n\r\n<option value=\"Saint Kitts and Nevis\">Saint Kitts and Nevis</option>\r\n\r\n\r\n\r\n<option value=\"Saint Lucia\">Saint Lucia</option>\r\n\r\n\r\n\r\n<option value=\"Saint Martin\">Saint Martin</option>\r\n\r\n\r\n\r\n<option value=\"Saint Pierre and Miquelon\">Saint Pierre and Miquelon</option>\r\n\r\n\r\n\r\n<option value=\"Saint Vincent and the Grenadines\">Saint Vincent and the Grenadines</option>\r\n\r\n\r\n\r\n<option value=\"Samoa\">Samoa</option>\r\n\r\n\r\n\r\n<option value=\"San Marino\">San Marino</option>\r\n\r\n\r\n\r\n<option value=\"Sao Tome and Principe\">Sao Tome and Principe</option>\r\n\r\n\r\n\r\n<option value=\"Saudi Arabia\">Saudi Arabia</option>\r\n\r\n\r\n\r\n<option value=\"Senegal\">Senegal</option>\r\n\r\n\r\n\r\n<option value=\"Serbia\">Serbia</option>\r\n\r\n\r\n\r\n<option value=\"Serbia and Montenegro\">Serbia and Montenegro</option>\r\n\r\n\r\n\r\n<option value=\"Seychelles\">Seychelles</option>\r\n\r\n\r\n\r\n<option value=\"Sierra Leone\">Sierra Leone</option>\r\n\r\n\r\n\r\n<option value=\"Singapore\">Singapore</option>\r\n\r\n\r\n\r\n<option value=\"Sint Maarten\">Sint Maarten</option>\r\n\r\n\r\n\r\n<option value=\"Slovakia\">Slovakia</option>\r\n\r\n\r\n\r\n<option value=\"Slovenia\">Slovenia</option>\r\n\r\n\r\n\r\n<option value=\"Solomon Islands\">Solomon Islands</option>\r\n\r\n\r\n\r\n<option value=\"Somalia\">Somalia</option>\r\n\r\n\r\n\r\n<option value=\"South Africa\">South Africa</option>\r\n\r\n\r\n\r\n<option value=\"South Georgia and the South Sandwich Islands\">South Georgia and the South Sandwich Islands</option>\r\n\r\n\r\n\r\n<option value=\"South Korea\">South Korea</option>\r\n\r\n\r\n\r\n<option value=\"South Sudan\">South Sudan</option>\r\n\r\n\r\n\r\n<option value=\"Spain\">Spain</option>\r\n\r\n\r\n\r\n<option value=\"Sri Lanka\">Sri Lanka</option>\r\n\r\n\r\n\r\n<option value=\"Sudan\">Sudan</option>\r\n\r\n\r\n\r\n<option value=\"Suriname\">Suriname</option>\r\n\r\n\r\n\r\n<option value=\"Svalbard and Jan Mayen\">Svalbard and Jan Mayen</option>\r\n\r\n\r\n\r\n<option value=\"Sweden\">Sweden</option>\r\n\r\n\r\n\r\n<option value=\"Switzerland\">Switzerland</option>\r\n\r\n\r\n\r\n<option value=\"Syria\">Syria</option>\r\n\r\n\r\n\r\n<option value=\"Taiwan\">Taiwan</option>\r\n\r\n\r\n\r\n<option value=\"Tajikistan\">Tajikistan</option>\r\n\r\n\r\n\r\n<option value=\"Tanzania\">Tanzania</option>\r\n\r\n\r\n\r\n<option value=\"Thailand\">Thailand</option>\r\n\r\n\r\n\r\n<option value=\"Timor Leste\">Timor Leste</option>\r\n\r\n\r\n\r\n<option value=\"Togo\">Togo</option>\r\n\r\n\r\n\r\n<option value=\"Tokelau\">Tokelau</option>\r\n\r\n\r\n\r\n<option value=\"Tonga\">Tonga</option>\r\n\r\n\r\n\r\n<option value=\"Trinidad and Tobago\">Trinidad and Tobago</option>\r\n\r\n\r\n\r\n<option value=\"Tunisia\">Tunisia</option>\r\n\r\n\r\n\r\n<option value=\"Turkey\">Turkey</option>\r\n\r\n\r\n\r\n<option value=\"Turkmenistan\">Turkmenistan</option>\r\n\r\n\r\n\r\n<option value=\"Turks and Caicos Islands\">Turks and Caicos Islands</option>\r\n\r\n\r\n\r\n<option value=\"Tuvalu\">Tuvalu</option>\r\n\r\n\r\n\r\n<option value=\"U.S. Virgin Islands\">U.S. Virgin Islands</option>\r\n\r\n\r\n\r\n<option value=\"Uganda\">Uganda</option>\r\n\r\n\r\n\r\n<option value=\"Ukraine\">Ukraine</option>\r\n\r\n\r\n\r\n<option value=\"United Arab Emirates\">United Arab Emirates</option>\r\n\r\n\r\n\r\n<option value=\"United Kingdom\">United Kingdom</option>\r\n\r\n\r\n\r\n<option value=\"United States\">United States</option>\r\n\r\n\r\n\r\n<option value=\"United States Minor Outlying Islands\">United States Minor Outlying Islands</option>\r\n\r\n\r\n\r\n<option value=\"Uruguay\">Uruguay</option>\r\n\r\n\r\n\r\n<option value=\"Uzbekistan\">Uzbekistan</option>\r\n\r\n\r\n\r\n<option value=\"Vanuatu\">Vanuatu</option>\r\n\r\n\r\n\r\n<option value=\"Vatican\">Vatican</option>\r\n\r\n\r\n\r\n<option value=\"Venezuela\">Venezuela</option>\r\n\r\n\r\n\r\n<option value=\"Vietnam\">Vietnam</option>\r\n\r\n\r\n\r\n<option value=\"Wallis and Futuna\">Wallis and Futuna</option>\r\n\r\n\r\n\r\n<option value=\"Western Sahara\">Western Sahara</option>\r\n\r\n\r\n\r\n<option value=\"Yemen\">Yemen</option>\r\n\r\n\r\n\r\n<option value=\"Zambia\">Zambia</option>\r\n\r\n\r\n\r\n<option value=\"Zimbabwe\">Zimbabwe</option>\r\n\r\n\r\n<!-- in case we need manual override\r\n\t<option value=\"Åland Islands\">\r\n\t\tÅland Islands\r\n\t</option>\r\n\t<option value=\"Afghanistan\">\r\n\t\tAfghanistan\r\n\t</option>\r\n\t<option value=\"Albania\">\r\n\t\tAlbania\r\n\t</option>\r\n\t<option value=\"Algeria\">\r\n\t\tAlgeria\r\n\t</option>\r\n\t<option value=\"American Samoa\">\r\n\t\tAmerican Samoa\r\n\t</option>\r\n\t<option value=\"Andorra\">\r\n\t\tAndorra\r\n\t</option>\r\n\t<option value=\"Angola\">\r\n\t\tAngola\r\n\t</option>\r\n\t<option value=\"Anguilla\">\r\n\t\tAnguilla\r\n\t</option>\r\n\t<option value=\"Antarctica\">\r\n\t\tAntarctica\r\n\t</option>\r\n\t<option value=\"Antigua and Barbuda\">\r\n\t\tAntigua and Barbuda\r\n\t</option>\r\n\t<option value=\"Argentina\">\r\n\t\tArgentina\r\n\t</option>\r\n\t<option value=\"Armenia\">\r\n\t\tArmenia\r\n\t</option>\r\n\t<option value=\"Aruba\">\r\n\t\tAruba\r\n\t</option>\r\n\t<option value=\"Australia\">\r\n\t\tAustralia\r\n\t</option>\r\n\t<option value=\"Austria\">\r\n\t\tAustria\r\n\t</option>\r\n\t<option value=\"Azerbaijan\">\r\n\t\tAzerbaijan\r\n\t</option>\r\n\t<option value=\"Bahamas\">\r\n\t\tBahamas\r\n\t</option>\r\n\t<option value=\"Bahrain\">\r\n\t\tBahrain\r\n\t</option>\r\n\t<option value=\"Bangladesh\">\r\n\t\tBangladesh\r\n\t</option>\r\n\t<option value=\"Barbados\">\r\n\t\tBarbados\r\n\t</option>\r\n\t<option value=\"Belarus\">\r\n\t\tBelarus\r\n\t</option>\r\n\t<option value=\"Belgium\">\r\n\t\tBelgium\r\n\t</option>\r\n\t<option value=\"Belize\">\r\n\t\tBelize\r\n\t</option>\r\n\t<option value=\"Benin\">\r\n\t\tBenin\r\n\t</option>\r\n\t<option value=\"Bermuda\">\r\n\t\tBermuda\r\n\t</option>\r\n\t<option value=\"Bhutan\">\r\n\t\tBhutan\r\n\t</option>\r\n\t<option value=\"Bolivia\">\r\n\t\tBolivia\r\n\t</option>\r\n\t<option value=\"Bonaire\">\r\n\t\tBonaire\r\n\t</option>\r\n\t<option value=\"Bosnia and Herzegovina\">\r\n\t\tBosnia and Herzegovina\r\n\t</option>\r\n\t<option value=\"Botswana\">\r\n\t\tBotswana\r\n\t</option>\r\n\t<option value=\"Bouvet Island\">\r\n\t\tBouvet Island\r\n\t</option>\r\n\t<option value=\"Brazil\">\r\n\t\tBrazil\r\n\t</option>\r\n\t<option value=\"British Indian Ocean Territory\">\r\n\t\tBritish Indian Ocean Territory\r\n\t</option>\r\n\t<option value=\"British Virgin Islands\">\r\n\t\tBritish Virgin Islands\r\n\t</option>\r\n\t<option value=\"Brunei\">\r\n\t\tBrunei\r\n\t</option>\r\n\t<option value=\"Bulgaria\">\r\n\t\tBulgaria\r\n\t</option>\r\n\t<option value=\"Burkina Faso\">\r\n\t\tBurkina Faso\r\n\t</option>\r\n\t<option value=\"Burundi\">\r\n\t\tBurundi\r\n\t</option>\r\n\t<option value=\"Cabo Verde\">\r\n\t\tCabo Verde\r\n\t</option>\r\n\t<option value=\"Cambodia\">\r\n\t\tCambodia\r\n\t</option>\r\n\t<option value=\"Cameroon\">\r\n\t\tCameroon\r\n\t</option>\r\n\t<option value=\"Canada\">\r\n\t\tCanada\r\n\t</option>\r\n\t<option value=\"Cayman Islands\">\r\n\t\tCayman Islands\r\n\t</option>\r\n\t<option value=\"Central African Republic\">\r\n\t\tCentral African Republic\r\n\t</option>\r\n\t<option value=\"Chad\">\r\n\t\tChad\r\n\t</option>\r\n\t<option value=\"Chile\">\r\n\t\tChile\r\n\t</option>\r\n\t<option value=\"China\">\r\n\t\tChina\r\n\t</option>\r\n\t<option value=\"Christmas Island\">\r\n\t\tChristmas Island\r\n\t</option>\r\n\t<option value=\"Cocos [Keeling] Islands\">\r\n\t\tCocos [Keeling] Islands\r\n\t</option>\r\n\t<option value=\"Colombia\">\r\n\t\tColombia\r\n\t</option>\r\n\t<option value=\"Comoros\">\r\n\t\tComoros\r\n\t</option>\r\n\t<option value=\"Cook Islands\">\r\n\t\tCook Islands\r\n\t</option>\r\n\t<option value=\"Costa Rica\">\r\n\t\tCosta Rica\r\n\t</option>\r\n\t<option value=\"Croatia\">\r\n\t\tCroatia\r\n\t</option>\r\n\t<option value=\"Cuba\">\r\n\t\tCuba\r\n\t</option>\r\n\t<option value=\"Curacao\">\r\n\t\tCuracao\r\n\t</option>\r\n\t<option value=\"Cyprus\">\r\n\t\tCyprus\r\n\t</option>\r\n\t<option value=\"Czechia\">\r\n\t\tCzechia\r\n\t</option>\r\n\t<option value=\"Democratic Republic of the Congo\">\r\n\t\tDemocratic Republic of the Congo\r\n\t</option>\r\n\t<option value=\"Denmark\">\r\n\t\tDenmark\r\n\t</option>\r\n\t<option value=\"Djibouti\">\r\n\t\tDjibouti\r\n\t</option>\r\n\t<option value=\"Dominica\">\r\n\t\tDominica\r\n\t</option>\r\n\t<option value=\"Dominican Republic\">\r\n\t\tDominican Republic\r\n\t</option>\r\n\t<option value=\"Ecuador\">\r\n\t\tEcuador\r\n\t</option>\r\n\t<option value=\"Egypt\">\r\n\t\tEgypt\r\n\t</option>\r\n\t<option value=\"El Salvador\">\r\n\t\tEl Salvador\r\n\t</option>\r\n\t<option value=\"Equatorial Guinea\">\r\n\t\tEquatorial Guinea\r\n\t</option>\r\n\t<option value=\"Eritrea\">\r\n\t\tEritrea\r\n\t</option>\r\n\t<option value=\"Estonia\">\r\n\t\tEstonia\r\n\t</option>\r\n\t<option value=\"Eswatini\">\r\n\t\tEswatini\r\n\t</option>\r\n\t<option value=\"Ethiopia\">\r\n\t\tEthiopia\r\n\t</option>\r\n\t<option value=\"Falkland Islands\">\r\n\t\tFalkland Islands\r\n\t</option>\r\n\t<option value=\"Faroe Islands\">\r\n\t\tFaroe Islands\r\n\t</option>\r\n\t<option value=\"Fiji\">\r\n\t\tFiji\r\n\t</option>\r\n\t<option value=\"Finland\">\r\n\t\tFinland\r\n\t</option>\r\n\t<option value=\"France\">\r\n\t\tFrance\r\n\t</option>\r\n\t<option value=\"French Guiana\">\r\n\t\tFrench Guiana\r\n\t</option>\r\n\t<option value=\"French Polynesia\">\r\n\t\tFrench Polynesia\r\n\t</option>\r\n\t<option value=\"French Southern Territories\">\r\n\t\tFrench Southern Territories\r\n\t</option>\r\n\t<option value=\"Gabon\">\r\n\t\tGabon\r\n\t</option>\r\n\t<option value=\"Gambia\">\r\n\t\tGambia\r\n\t</option>\r\n\t<option value=\"Georgia\">\r\n\t\tGeorgia\r\n\t</option>\r\n\t<option value=\"Germany\">\r\n\t\tGermany\r\n\t</option>\r\n\t<option value=\"Ghana\">\r\n\t\tGhana\r\n\t</option>\r\n\t<option value=\"Gibraltar\">\r\n\t\tGibraltar\r\n\t</option>\r\n\t<option value=\"Greece\">\r\n\t\tGreece\r\n\t</option>\r\n\t<option value=\"Greenland\">\r\n\t\tGreenland\r\n\t</option>\r\n\t<option value=\"Grenada\">\r\n\t\tGrenada\r\n\t</option>\r\n\t<option value=\"Guadeloupe\">\r\n\t\tGuadeloupe\r\n\t</option>\r\n\t<option value=\"Guam\">\r\n\t\tGuam\r\n\t</option>\r\n\t<option value=\"Guatemala\">\r\n\t\tGuatemala\r\n\t</option>\r\n\t<option value=\"Guernsey\">\r\n\t\tGuernsey\r\n\t</option>\r\n\t<option value=\"Guinea\">\r\n\t\tGuinea\r\n\t</option>\r\n\t<option value=\"Guinea-Bissau\">\r\n\t\tGuinea-Bissau\r\n\t</option>\r\n\t<option value=\"Guyana\">\r\n\t\tGuyana\r\n\t</option>\r\n\t<option value=\"Haiti\">\r\n\t\tHaiti\r\n\t</option>\r\n\t<option value=\"Heard Island and McDonald Islands\">\r\n\t\tHeard Island and McDonald Islands\r\n\t</option>\r\n\t<option value=\"Honduras\">\r\n\t\tHonduras\r\n\t</option>\r\n\t<option value=\"Hong Kong\">\r\n\t\tHong Kong\r\n\t</option>\r\n\t<option value=\"Hungary\">\r\n\t\tHungary\r\n\t</option>\r\n\t<option value=\"Iceland\">\r\n\t\tIceland\r\n\t</option>\r\n\t<option value=\"India\">\r\n\t\tIndia\r\n\t</option>\r\n\t<option value=\"Indonesia\">\r\n\t\tIndonesia\r\n\t</option>\r\n\t<option value=\"Iran\">\r\n\t\tIran\r\n\t</option>\r\n\t<option value=\"Iraq\">\r\n\t\tIraq\r\n\t</option>\r\n\t<option value=\"Ireland\">\r\n\t\tIreland\r\n\t</option>\r\n\t<option value=\"Isle of Man\">\r\n\t\tIsle of Man\r\n\t</option>\r\n\t<option value=\"Israel\">\r\n\t\tIsrael\r\n\t</option>\r\n\t<option value=\"Italy\">\r\n\t\tItaly\r\n\t</option>\r\n\t<option value=\"Ivory Coast\">\r\n\t\tIvory Coast\r\n\t</option>\r\n\t<option value=\"Jamaica\">\r\n\t\tJamaica\r\n\t</option>\r\n\t<option value=\"Japan\">\r\n\t\tJapan\r\n\t</option>\r\n\t<option value=\"Jersey\">\r\n\t\tJersey\r\n\t</option>\r\n\t<option value=\"Jordan\">\r\n\t\tJordan\r\n\t</option>\r\n\t<option value=\"Kazakhstan\">\r\n\t\tKazakhstan\r\n\t</option>\r\n\t<option value=\"Kenya\">\r\n\t\tKenya\r\n\t</option>\r\n\t<option value=\"Kiribati\">\r\n\t\tKiribati\r\n\t</option>\r\n\t<option value=\"Kosovo\">\r\n\t\tKosovo\r\n\t</option>\r\n\t<option value=\"Kuwait\">\r\n\t\tKuwait\r\n\t</option>\r\n\t<option value=\"Kyrgyzstan\">\r\n\t\tKyrgyzstan\r\n\t</option>\r\n\t<option value=\"Laos\">\r\n\t\tLaos\r\n\t</option>\r\n\t<option value=\"Latvia\">\r\n\t\tLatvia\r\n\t</option>\r\n\t<option value=\"Lebanon\">\r\n\t\tLebanon\r\n\t</option>\r\n\t<option value=\"Lesotho\">\r\n\t\tLesotho\r\n\t</option>\r\n\t<option value=\"Liberia\">\r\n\t\tLiberia\r\n\t</option>\r\n\t<option value=\"Libya\">\r\n\t\tLibya\r\n\t</option>\r\n\t<option value=\"Liechtenstein\">\r\n\t\tLiechtenstein\r\n\t</option>\r\n\t<option value=\"Lithuania\">\r\n\t\tLithuania\r\n\t</option>\r\n\t<option value=\"Luxembourg\">\r\n\t\tLuxembourg\r\n\t</option>\r\n\t<option value=\"Macao\">\r\n\t\tMacao\r\n\t</option>\r\n\t<option value=\"Madagascar\">\r\n\t\tMadagascar\r\n\t</option>\r\n\t<option value=\"Malawi\">\r\n\t\tMalawi\r\n\t</option>\r\n\t<option value=\"Malaysia\">\r\n\t\tMalaysia\r\n\t</option>\r\n\t<option value=\"Maldives\">\r\n\t\tMaldives\r\n\t</option>\r\n\t<option value=\"Mali\">\r\n\t\tMali\r\n\t</option>\r\n\t<option value=\"Malta\">\r\n\t\tMalta\r\n\t</option>\r\n\t<option value=\"Marshall Islands\">\r\n\t\tMarshall Islands\r\n\t</option>\r\n\t<option value=\"Martinique\">\r\n\t\tMartinique\r\n\t</option>\r\n\t<option value=\"Mauritania\">\r\n\t\tMauritania\r\n\t</option>\r\n\t<option value=\"Mauritius\">\r\n\t\tMauritius\r\n\t</option>\r\n\t<option value=\"Mayotte\">\r\n\t\tMayotte\r\n\t</option>\r\n\t<option value=\"Mexico\">\r\n\t\tMexico\r\n\t</option>\r\n\t<option value=\"Micronesia\">\r\n\t\tMicronesia\r\n\t</option>\r\n\t<option value=\"Moldova\">\r\n\t\tMoldova\r\n\t</option>\r\n\t<option value=\"Monaco\">\r\n\t\tMonaco\r\n\t</option>\r\n\t<option value=\"Mongolia\">\r\n\t\tMongolia\r\n\t</option>\r\n\t<option value=\"Montenegro\">\r\n\t\tMontenegro\r\n\t</option>\r\n\t<option value=\"Montserrat\">\r\n\t\tMontserrat\r\n\t</option>\r\n\t<option value=\"Morocco\">\r\n\t\tMorocco\r\n\t</option>\r\n\t<option value=\"Mozambique\">\r\n\t\tMozambique\r\n\t</option>\r\n\t<option value=\"Myanmar [Burma]\">\r\n\t\tMyanmar [Burma]\r\n\t</option>\r\n\t<option value=\"Namibia\">\r\n\t\tNamibia\r\n\t</option>\r\n\t<option value=\"Nauru\">\r\n\t\tNauru\r\n\t</option>\r\n\t<option value=\"Nepal\">\r\n\t\tNepal\r\n\t</option>\r\n\t<option value=\"Netherlands\">\r\n\t\tNetherlands\r\n\t</option>\r\n\t<option value=\"New Caledonia\">\r\n\t\tNew Caledonia\r\n\t</option>\r\n\t<option value=\"New Zealand\">\r\n\t\tNew Zealand\r\n\t</option>\r\n\t<option value=\"Nicaragua\">\r\n\t\tNicaragua\r\n\t</option>\r\n\t<option value=\"Niger\">\r\n\t\tNiger\r\n\t</option>\r\n\t<option value=\"Nigeria\">\r\n\t\tNigeria\r\n\t</option>\r\n\t<option value=\"Niue\">\r\n\t\tNiue\r\n\t</option>\r\n\t<option value=\"Norfolk Island\">\r\n\t\tNorfolk Island\r\n\t</option>\r\n\t<option value=\"North Korea\">\r\n\t\tNorth Korea\r\n\t</option>\r\n\t<option value=\"North Macedonia\">\r\n\t\tNorth Macedonia\r\n\t</option>\r\n\t<option value=\"Northern Mariana Islands\">\r\n\t\tNorthern Mariana Islands\r\n\t</option>\r\n\t<option value=\"Norway\">\r\n\t\tNorway\r\n\t</option>\r\n\t<option value=\"Oman\">\r\n\t\tOman\r\n\t</option>\r\n\t<option value=\"Pakistan\">\r\n\t\tPakistan\r\n\t</option>\r\n\t<option value=\"Palau\">\r\n\t\tPalau\r\n\t</option>\r\n\t<option value=\"Palestine\">\r\n\t\tPalestine\r\n\t</option>\r\n\t<option value=\"Panama\">\r\n\t\tPanama\r\n\t</option>\r\n\t<option value=\"Papua New Guinea\">\r\n\t\tPapua New Guinea\r\n\t</option>\r\n\t<option value=\"Paraguay\">\r\n\t\tParaguay\r\n\t</option>\r\n\t<option value=\"Peru\">\r\n\t\tPeru\r\n\t</option>\r\n\t<option value=\"Philippines\">\r\n\t\tPhilippines\r\n\t</option>\r\n\t<option value=\"Pitcairn Islands\">\r\n\t\tPitcairn Islands\r\n\t</option>\r\n\t<option value=\"Poland\">\r\n\t\tPoland\r\n\t</option>\r\n\t<option value=\"Portugal\">\r\n\t\tPortugal\r\n\t</option>\r\n\t<option value=\"Puerto Rico\">\r\n\t\tPuerto Rico\r\n\t</option>\r\n\t<option value=\"Qatar\">\r\n\t\tQatar\r\n\t</option>\r\n\t<option value=\"Republic of the Congo\">\r\n\t\tRepublic of the Congo\r\n\t</option>\r\n\t<option value=\"Romania\">\r\n\t\tRomania\r\n\t</option>\r\n\t<option value=\"Russia\">\r\n\t\tRussia\r\n\t</option>\r\n\t<option value=\"Rwanda\">\r\n\t\tRwanda\r\n\t</option>\r\n\t<option value=\"Réunion\">\r\n\t\tRéunion\r\n\t</option>\r\n\t<option value=\"Saint Barthélemy\">\r\n\t\tSaint Barthélemy\r\n\t</option>\r\n\t<option value=\"Saint Helena\">\r\n\t\tSaint Helena\r\n\t</option>\r\n\t<option value=\"Saint Kitts and Nevis\">\r\n\t\tSaint Kitts and Nevis\r\n\t</option>\r\n\t<option value=\"Saint Lucia\">\r\n\t\tSaint Lucia\r\n\t</option>\r\n\t<option value=\"Saint Martin\">\r\n\t\tSaint Martin\r\n\t</option>\r\n\t<option value=\"Saint Pierre and Miquelon\">\r\n\t\tSaint Pierre and Miquelon\r\n\t</option>\r\n\t<option value=\"Saint Vincent and the Grenadines\">\r\n\t\tSaint Vincent and the Grenadines\r\n\t</option>\r\n\t<option value=\"Samoa\">\r\n\t\tSamoa\r\n\t</option>\r\n\t<option value=\"San Marino\">\r\n\t\tSan Marino\r\n\t</option>\r\n\t<option value=\"Saudi Arabia\">\r\n\t\tSaudi Arabia\r\n\t</option>\r\n\t<option value=\"Senegal\">\r\n\t\tSenegal\r\n\t</option>\r\n\t<option value=\"Serbia\">\r\n\t\tSerbia\r\n\t</option>\r\n\t<option value=\"Seychelles\">\r\n\t\tSeychelles\r\n\t</option>\r\n\t<option value=\"Sierra Leone\">\r\n\t\tSierra Leone\r\n\t</option>\r\n\t<option value=\"Singapore\">\r\n\t\tSingapore\r\n\t</option>\r\n\t<option value=\"Sint Maarten\">\r\n\t\tSint Maarten\r\n\t</option>\r\n\t<option value=\"Slovakia\">\r\n\t\tSlovakia\r\n\t</option>\r\n\t<option value=\"Slovenia\">\r\n\t\tSlovenia\r\n\t</option>\r\n\t<option value=\"Solomon Islands\">\r\n\t\tSolomon Islands\r\n\t</option>\r\n\t<option value=\"Somalia\">\r\n\t\tSomalia\r\n\t</option>\r\n\t<option value=\"South Africa\">\r\n\t\tSouth Africa\r\n\t</option>\r\n\t<option value=\"South Georgia and the South Sandwich Islands\">\r\n\t\tSouth Georgia and the South Sandwich Islands\r\n\t</option>\r\n\t<option value=\"South Korea\">\r\n\t\tSouth Korea\r\n\t</option>\r\n\t<option value=\"South Sudan\">\r\n\t\tSouth Sudan\r\n\t</option>\r\n\t<option value=\"Spain\">\r\n\t\tSpain\r\n\t</option>\r\n\t<option value=\"Sri Lanka\">\r\n\t\tSri Lanka\r\n\t</option>\r\n\t<option value=\"Sudan\">\r\n\t\tSudan\r\n\t</option>\r\n\t<option value=\"Suriname\">\r\n\t\tSuriname\r\n\t</option>\r\n\t<option value=\"Svalbard and Jan Mayen\">\r\n\t\tSvalbard and Jan Mayen\r\n\t</option>\r\n\t<option value=\"Sweden\">\r\n\t\tSweden\r\n\t</option>\r\n\t<option value=\"Switzerland\">\r\n\t\tSwitzerland\r\n\t</option>\r\n\t<option value=\"Syria\">\r\n\t\tSyria\r\n\t</option>\r\n\t<option value=\"São Tomé and Príncipe\">\r\n\t\tSão Tomé and Príncipe\r\n\t</option>\r\n\t<option value=\"Taiwan\">\r\n\t\tTaiwan\r\n\t</option>\r\n\t<option value=\"Tajikistan\">\r\n\t\tTajikistan\r\n\t</option>\r\n\t<option value=\"Tanzania\">\r\n\t\tTanzania\r\n\t</option>\r\n\t<option value=\"Thailand\">\r\n\t\tThailand\r\n\t</option>\r\n\t<option value=\"Timor-Leste\">\r\n\t\tTimor-Leste\r\n\t</option>\r\n\t<option value=\"Togo\">\r\n\t\tTogo\r\n\t</option>\r\n\t<option value=\"Tokelau\">\r\n\t\tTokelau\r\n\t</option>\r\n\t<option value=\"Tonga\">\r\n\t\tTonga\r\n\t</option>\r\n\t<option value=\"Trinidad and Tobago\">\r\n\t\tTrinidad and Tobago\r\n\t</option>\r\n\t<option value=\"Tunisia\">\r\n\t\tTunisia\r\n\t</option>\r\n\t<option value=\"Turkey\">\r\n\t\tTurkey\r\n\t</option>\r\n\t<option value=\"Turkmenistan\">\r\n\t\tTurkmenistan\r\n\t</option>\r\n\t<option value=\"Turks and Caicos Islands\">\r\n\t\tTurks and Caicos Islands\r\n\t</option>\r\n\t<option value=\"Tuvalu\">\r\n\t\tTuvalu\r\n\t</option>\r\n\t<option value=\"U.S. Minor Outlying Islands\">\r\n\t\tU.S. Minor Outlying Islands\r\n\t</option>\r\n\t<option value=\"U.S. Virgin Islands\">\r\n\t\tU.S. Virgin Islands\r\n\t</option>\r\n\t<option value=\"Uganda\">\r\n\t\tUganda\r\n\t</option>\r\n\t<option value=\"Ukraine\">\r\n\t\tUkraine\r\n\t</option>\r\n\t<option value=\"United Arab Emirates\">\r\n\t\tUnited Arab Emirates\r\n\t</option>\r\n\t<option value=\"United Kingdom\">\r\n\t\tUnited Kingdom\r\n\t</option>\r\n\t<option value=\"United States\">\r\n\t\tUnited States\r\n\t</option>\r\n\t<option value=\"Uruguay\">\r\n\t\tUruguay\r\n\t</option>\r\n\t<option value=\"Uzbekistan\">\r\n\t\tUzbekistan\r\n\t</option>\r\n\t<option value=\"Vanuatu\">\r\n\t\tVanuatu\r\n\t</option>\r\n\t<option value=\"Vatican City\">\r\n\t\tVatican City\r\n\t</option>\r\n\t<option value=\"Venezuela\">\r\n\t\tVenezuela\r\n\t</option>\r\n\t<option value=\"Vietnam\">\r\n\t\tVietnam\r\n\t</option>\r\n\t<option value=\"Wallis and Futuna\">\r\n\t\tWallis and Futuna\r\n\t</option>\r\n\t<option value=\"Western Sahara\">\r\n\t\tWestern Sahara\r\n\t</option>\r\n\t<option value=\"Yemen\">\r\n\t\tYemen\r\n\t</option>\r\n\t<option value=\"Zambia\">\r\n\t\tZambia\r\n\t</option>\r\n\t<option value=\"Zimbabwe\">\r\n\t\tZimbabwe\r\n\t</option>\r\n-->\r\n</select>\r\n\r\n\t\t</div>\r\n\t\r\n  \r\n\r\n<div class=\"honey\" style=\"display: none\">\r\n  <input name=\"action_honey\">\r\n</div>\r\n\r\n<input type=\"hidden\" name=\"action_utm_source\" value=\"\">\r\n<input type=\"hidden\" name=\"action_utm_campaign\" value=\"\">\r\n<input type=\"hidden\" name=\"action_utm_medium\" value=\"\">\r\n<input type=\"hidden\" name=\"action_utm_term\" value=\"\">\r\n<input type=\"hidden\" name=\"action_utm_content\" value=\"\">\r\n<input type=\"hidden\" name=\"action_referring_element\" value=\"\">\r\n\r\n  \r\n  <input type=\"hidden\" name=\"auto_country\" value=\"1\">\r\n  <style type=\"text/css\">\r\n    /* Ensure that, if there's no JavaScript, the global-friendly fields show\r\n     * rather than the US-only ones */\r\n    #id_zip_box, #id_state_box { display: none; }\r\n  </style>\r\n  \r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n <div style=\"display: none\">\r\n  <input name=\"user_honey\">\r\n </div>\r\n\r\n</div>\r\n\r\n\r\n\r\n\r\n\r\n\r\n  \r\n    \r\n      \r\n<div class=\"input-wrapper input-submit margin-bottom-normal\">\r\n  <button type=\"submit\" class=\"submit button-primary\">\r\n  \r\n    Join Us\r\n  \r\n  </button>\r\n</div>\r\n      \r\n    \r\n  \r\n\r\n\r\n<div class=\"general-privacy-notice text-small2\">\r\n\r\n\t<p>You'll receive emails about our campaigns and ways you can take action. You can <a href=\"https://act.350.org/unsubscribe/unsubscribe/\">unsubscribe</a> at any time (<a href=\"https://350.org/tos\">terms of service</a> and <a href=\"https://350.org/privacy\">privacy policy</a>)</p>\r\n\r\n<!-- ak.wysiwyg=code -->\r\n\r\n</div>\r\n\r\n\r\n<!--<input name=\"lists\" value=\"1\" type=\"hidden\"/>-->\r\n\r\n\r\n\r\n\r\n\r\n<!-- add page types to the condition below if you want to allow sms opt ins for those pages -->\r\n<!-- be sure to test the styling doesn't break when adding new page types -->\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\t\r\n\t\t\t<ul style=\"display:none;\" id=\"ak-errors\"><li></li></ul>\r\n\t\t</form>\r\n\r\n\r\n\r\n\r\n\t\t<div id=\"recent-actions\" class=\"c6 ct6 cm10 c-wide text-small\">\r\n\t\t\t\r\n\r\n\r\n\t\t</div>\r\n\r\n\t</div>\r\n</section>\r\n\r\n\r\n\r\n\r\n<!-- (web_join_dev_copy, 25533) Join the Climate Movement (Testing new CMS - Sukhada Aug 26) -->\r\n\r\n\r\n\r\n"
+    }
   },
   "text": {
-    "_source": "Our Own Power (page 49)",
+    "_source": "Work With Us (page 53)",
     "_score": 4,
-    "value": "<h2 data-block-key=\"wkbfg\"><a href=\"https://community.350.org/efforts/our-own-power/targets/creating?_gl=1*97vaen*_gcl_au*ODAyOTUyMTMzLjE3Mjg5MDQ2MjQ.*_ga*NTY4NzQ5Nzc0LjE3MDI0OTcyMzY.*_ga_V7QV8EHFVY*MTcyODkxMTI4OS40MS4xLjE3Mjg5MTE0ODguMC4wLjA.*_ga_K4J4PKYMK4*MTcyODkxMTI4OS4zMy4xLjE3Mjg5MTE0ODguMC4wLjA.\">Start a Petition Campaign</a></h2><p data-block-key=\"5uod2\"><i>Clicking this link will take you to our citizen-led petitions platform.</i></p><p data-block-key=\"9g0sj\"><b>Why should I make a petition?</b></p><ol><li data-block-key=\"daq7\">To <b>apply pressure </b>on a campaign target by demonstrating public support for your campaign and;</li><li data-block-key=\"au8gb\">To <b>grow your campaign</b> and build a list of supporters for recruitment and future activities.</li></ol><p data-block-key=\"63lbp\"><b>What should I campaign on?</b></p><p data-block-key=\"8a56i\">Everyone is at a different stage in their journey to creating community-led renewable energy. Here are some issues you could take on in your petition:</p><p data-block-key=\"76t2k\">Here are four suggestions for petition campaigns <b>to help address a hurdle in your community-led renewable energy project</b> – whether it is about space, funding, regulations, or getting high-quality products. Each example has suggestions for a Title, Decision Makers, What it could be about, and Why you’re doing it. You will have to adapt the examples to your needs!</p>"
+    "value": "<p data-block-key=\"9o8fo\">350.org is building a global grassroots climate movement to hold our leaders accountable to the realities of science and the principles of justice. <b>It's a big job, and we're looking for super smart, strategic, driven people to get it done.</b></p><p data-block-key=\"30t3\">That movement is rising from the bottom up all over the world, and is uniting to create the solutions that will ensure a better future for all. Our online campaigns, grassroots organizing, and mass public actions bring together a global network active in over 188 countries.</p><p data-block-key=\"3b9os\">At 350.org, you'll work with a team of brilliant, fierce colleagues, tackling one of the greatest issues of our time, in a flexible and collaborative environment. Learn more about <a href=\"https://350.org/about\">who we are, what we stand for, and where we're going</a>.</p>"
   },
   "video": {
     "_source": "Rise: From One Island to Another (page 54)",

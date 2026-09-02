@@ -153,6 +153,18 @@ STATIC_URL = "/static/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
 
+# Django's default (1000) is too low for a content-heavy StreamField page --
+# each classic (non-Telepath-consolidated) sub-field of every block in a
+# StreamField becomes its own POST field when the admin edit form is
+# submitted (Save/Publish, and the live Preview panel's own background POST).
+# A single large accordion of ~80 items (title/content/image/video fields
+# each) alone accounts for several hundred fields; a page like this can
+# exceed 1000 easily and every full-form POST -- including Preview -- then
+# fails with django.core.exceptions.TooManyFieldsSent before the view even
+# runs (raised while Django's CSRF middleware first parses request.POST).
+# Confirmed directly against the imported "Our Impact" TimelineBlock page.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
 # Wagtail settings
 WAGTAIL_SITE_NAME = "350.org"
 # WAGTAILADMIN_BASE_URL is set in dev.py and production.py

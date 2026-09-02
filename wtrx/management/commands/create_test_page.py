@@ -608,14 +608,14 @@ def _accordion_block():
         "accordion",
         {
             "items": [
-                {"title": "What is this accordion?", "content": _RICHTEXT_PARAGRAPH},
+                {"title": "What is this accordion?", "content": [_sb("text", _RICHTEXT_PARAGRAPH)]},
                 {
                     "title": "How do I use it?",
-                    "content": "<p>Click a title to expand or collapse the panel.</p>",
+                    "content": [_sb("text", "<p>Click a title to expand or collapse the panel.</p>")],
                 },
                 {
                     "title": "Does it support rich text?",
-                    "content": _RICHTEXT_KITCHEN_SINK,
+                    "content": [_sb("text", _RICHTEXT_KITCHEN_SINK)],
                 },
             ]
         },
@@ -1031,10 +1031,12 @@ def _section_blocks(image_id):
 
 def _timeline_accordion_block(image_id):
     """
-    A "victories at a glance"-style accordion, one item per new
-    AccordionItemBlock media field so both are exercised: an image item and
-    a video item, plus a plain text-only item (the real /our-impact data's
-    83 items split 67/15/1 across image/video/neither).
+    A "victories at a glance"-style accordion, one item per
+    AccordionItemContentBlock block type so all are exercised: an image
+    item and a video item, plus a plain text-only item (the real
+    /our-impact data's 83 items split 67/15/1 across image/video/neither --
+    AccordionItemContentBlock expresses "neither" as simply having no such
+    block in the content list, not a present-but-blank field).
     """
     return _sb(
         "accordion",
@@ -1042,25 +1044,28 @@ def _timeline_accordion_block(image_id):
             "items": [
                 {
                     "title": "A victory with an image",
-                    "content": "<p>Short description of what happened.</p>",
-                    "image": {"image": image_id, "alt_text": "", "caption": ""},
-                    "video": {"embed_url": "", "media_file": None, "caption": ""},
+                    "content": [
+                        _sb("text", "<p>Short description of what happened.</p>"),
+                        _sb("image", {"image": image_id, "alt_text": "", "caption": ""}),
+                    ],
                 },
                 {
                     "title": "A victory with a video",
-                    "content": "<p>Short description of what happened.</p>",
-                    "image": {"image": None, "alt_text": "", "caption": ""},
-                    "video": {
-                        "embed_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                        "media_file": None,
-                        "caption": "",
-                    },
+                    "content": [
+                        _sb("text", "<p>Short description of what happened.</p>"),
+                        _sb(
+                            "video",
+                            {
+                                "embed_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                                "media_file": None,
+                                "caption": "",
+                            },
+                        ),
+                    ],
                 },
                 {
                     "title": "A text-only victory",
-                    "content": _RICHTEXT_PARAGRAPH,
-                    "image": {"image": None, "alt_text": "", "caption": ""},
-                    "video": {"embed_url": "", "media_file": None, "caption": ""},
+                    "content": [_sb("text", _RICHTEXT_PARAGRAPH)],
                 },
             ]
         },

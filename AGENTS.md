@@ -2057,16 +2057,66 @@ Two practical notes for agents:
       `TimelineYearContentBlock` needs `SectionContentBlock` defined first,
       so `SectionContentBlock` can't also need `TimelineBlock` defined
       first to reference it back.
-    - **`AccordionItemBlock` gained optional `image`/`video` fields**
-      (`ImageBlock`/`VideoBlock`, both already-existing block types reused
-      as-is) so a "victory" item survives conversion to real accordion
-      data. Before this, `AccordionItemBlock.content` was a bare
-      `RichTextBlock` with no image/embed feature — true of *every*
-      `RICHTEXT_FEATURES_*` set in this codebase, checked directly, not
-      assumed — which is exactly why the old raw-HTML approach existed:
-      67 of 83 victory items carry an image, 15 a video, only 1 neither.
-      Additive change, no data migration needed (old accordion content
-      with no `image`/`video` key just gets `None`).
+    - **`AccordionItemBlock.content` is `AccordionItemContentBlock`, a small
+      StreamBlock (`text`/`image`/`video`) — not a richtext field plus two
+      bolted-on "optional" `image`/`video` StructBlock fields**, which is
+      what a "victory" item first got when this conversion needed
+      `AccordionItemBlock` to carry media at all (before this,
+      `AccordionItemBlock.content` was a bare `RichTextBlock` with no
+      image/embed feature — true of *every* `RICHTEXT_FEATURES_*` set in
+      this codebase, checked directly, not assumed). That first shape was a
+      real, live bug, not just an inelegant one: `field=ImageBlock(required=False)`/
+      `field=VideoBlock(required=False)` on the *outer* `AccordionItemBlock`
+      field controls only the admin form widget — `StructBlock.clean()`
+      always calls every child block's own `clean()` regardless, and
+      neither child tolerates being left blank on its own terms
+      (`ImageBlock.image` is a plain, correctly-required `ImageChooserBlock`;
+      `VideoBlock.clean()` always demands exactly one of
+      `embed_url`/`media_file` — both entirely correct when either block is
+      used standalone in `SectionContentBlock`, where an editor wouldn't
+      deliberately add an empty one). So any item genuinely missing an
+      image or a video — most of them: 67 of 83 victory items carry an
+      image, 15 a video, only 1 neither, meaning most items are missing
+      *one* of the two — failed validation on save, surfacing as "many
+      video blocks and images throwing validation errors" the first time
+      this content was actually saved through the admin (never caught
+      earlier because nothing had populated a real `AccordionItemBlock`
+      with a genuinely blank image or video before this import did, at
+      scale). A StreamBlock expresses "no image"/"no video" as "no such
+      block in the content list" instead of a present-but-blank struct
+      value, which isn't a validation edge case at all — the `content`
+      field itself is still required (StreamBlock's own default: an item
+      needs *some* body content), just not any particular block type
+      within it. `AccordionItemContentBlock` is deliberately a small,
+      purpose-built list rather than reusing `SectionContentBlock` (an
+      accordion answer is a compact expandable panel, not a general layout
+      region — nesting a CardGrid or another Accordion inside one would be
+      a strange editing experience). `accordion_block.html` renders `text`
+      entries via `{% include_block %}` but `image`/`video` entries with
+      hand-written markup instead, for the same reason the original
+      image/video fields were: `ImageBlock`'s/`VideoBlock`'s own templates
+      are built for full-bleed page-level placement and would misalign
+      inside this narrow, padded card.
+
+      This was a genuine (non-additive) schema change, since `content`'s
+      value type itself changed from a richtext string to a StreamBlock
+      list — every existing accordion anywhere on the site (not just this
+      import's) needed a data migration
+      (`0063_condense_accordion_item_media_fields.py`, same recursive
+      `_rewrite()`-walks-any-nesting-depth technique as 0045/0047/0051,
+      handling both `ListBlock` item shapes per pitfall #48) to wrap its
+      existing `content` string into a single `"text"` stream entry, and
+      to fold any existing non-blank `image`/`video` StructBlock values
+      (only ever present in this project's own not-yet-published import
+      draft, since those fields existed for all of one same-day commit)
+      into additional `"image"`/`"video"` entries. **`ContentPreviewMixin`
+      harvested preview data also needed re-harvesting**
+      (`python manage.py harvest_block_previews`) after this migration —
+      the harvested JSON is a separate, independent snapshot the migration
+      doesn't touch, and `AccordionItemContentBlock.to_python()` given the
+      old string shape doesn't error, it silently returns an *empty*
+      StreamValue (confirmed directly), which would have made the
+      "Accordion" block-picker preview look blank rather than broken.
     - **The scraper's own video-URL handling is non-obvious**: the source
       page's `<iframe src>` values are YouTube's `/embed/<id>` form (and
       the `youtube-nocookie.com` privacy-enhanced domain), which Wagtail's
@@ -2076,9 +2126,66 @@ Two practical notes for agents:
       the embed form to canonical before checking. Vimeo's
       `player.vimeo.com/video/<id>` embed src is already accepted as-is.
       A handful of items link to video hosted on 350's own
-      `350org.widen.net` CDN, which has no oEmbed provider at all — left
-      without a video, logged as a warning, not an error (same per-item
-      failure tolerance as `download_image()`).
+      `350org.widen.net` CDN — its `/view/video/<id>/<name>.mp4?u=...` URL
+      has no oEmbed provider, and despite the `.mp4`-looking path, **is not
+      a video file at all**: it's an HTML page bootstrapping Widen's own
+      `video.js` player (confirmed by fetching one directly:
+      `Content-Type: text/html`, ~5KB). Naively saving that response body
+      as a `.mp4` produces a tiny, unplayable file that browsers report as
+      "unsupported mime type" — this is exactly what an earlier version of
+      this fix did, silently, since a 200 response with `raise_for_status()`
+      passing gives no signal that anything went wrong. The real file lives
+      at a *different*, signed CloudFront URL embedded in that page's own
+      `window.bootstrapData` JS (`previews.files[].source`) — what the
+      player itself fetches to actually play the video. `download_video()`
+      checks the first response's `Content-Type`; if it isn't `video/*`, it
+      hands the body to `_resolve_widen_video_download_url()` (regex +
+      `json.loads()` on the `bootstrapData` object) to extract that real
+      URL, preferring a mid-range resolution (720p, falling down
+      `_WIDEN_RESOLUTION_PREFERENCE`) since these are supplementary broll
+      clips rather than the main content — then downloads *that*, verifying
+      its `Content-Type` too before accepting it. Rather than dropping
+      these videos (or embedding a raw, unstyled `<iframe>` pointing at the
+      player page, an approach tried and abandoned before the mime-type bug
+      was found), `_video_value()` (renamed from `_embed_url_if_supported()`)
+      self-hosts the resolved file as a `wagtailmedia` `Media`
+      (`type="video"`) via `download_video()`, the same
+      download-once-and-own-it treatment already given to every image on
+      this page — and durable against the signed URL's own eventual
+      expiry, since the bytes are already ours once downloaded. The result
+      is a normal `VideoBlock` value with `media_file` set instead of
+      `embed_url` — identical in shape to a YouTube/Vimeo video, so it gets
+      the same already-styled rendering (poster, responsive wrapper) in
+      both `accordion_block.html` and `video_block.html`, with no schema
+      change or raw-HTML fallback needed anywhere. **Resulting file sizes
+      vary widely by source asset (confirmed 24MB–396MB across the 8 real
+      videos on this page) — 720p isn't a fixed target size, just whatever
+      Widen labels that way for a given asset (a full-length "documentary"
+      item ends up far larger than a short broll clip at the same nominal
+      resolution)** — worth a quick look at Settings > Media file sizes
+      after a real import if hosting/bandwidth cost matters, since nothing
+      here caps it automatically. `wagtailmedia`'s `Media.save()` does no
+      file-content processing (no Willow/ffmpeg probing — confirmed
+      directly), so `download_video()` needs no `_safe_download_image()`-style
+      broad exception wrapper for a format-detection failure, only the same
+      network-level one `download_image()` already has (`_safe_download_video()`
+      still wraps it for the same "one bad item can't abort the whole
+      import" reason). A video URL matching neither oEmbed nor a direct
+      video-file extension (`.mp4`/`.webm`/`.mov`/`.ogg`), or whose resolved
+      Widen source still isn't a real video file, is still skipped with a
+      warning.
+
+      **The dedup-by-title check trusts an existing `Media` row's title
+      unconditionally — it does not re-verify the file itself is valid.**
+      The first version of this fix downloaded the tiny HTML player pages
+      as if they were the real files; re-running `--update` afterward
+      would have kept reusing those same broken rows forever, since
+      `download_video()`'s dedup lookup (`Media.objects.filter(title=...,
+      type="video").first()`) matches on title alone and returns early
+      before any content check. Recovering from a bad import of this kind
+      means deleting the affected `Media` rows first, then re-running —
+      there's no self-healing re-check built in, on purpose, matching
+      `download_image()`'s own identical trust-by-title dedup convention.
     - **`download_image()` needed a local, broader exception wrapper for
       this command specifically** (`_safe_download_image()` in
       `import_350_our_impact.py`, not a change to the shared helper): this
