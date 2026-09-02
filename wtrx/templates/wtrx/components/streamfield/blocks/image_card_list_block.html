@@ -49,7 +49,12 @@ page templates' space-y-32 on the block loop.
             </div>
             <div class="flex flex-col gap-4">
                 {% for card in value.cards %}
-                    <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-6">
+                    {% comment %}
+                    border-2, matching every other card-shaped component
+                    (components/card.html, post_card.html, person_card.html)
+                    -- one border weight across the site.
+                    {% endcomment %}
+                    <div class="rounded-lg border-2 border-neutral-200 bg-neutral-50 p-6">
                         {% comment %}
                         No scoped CSS needed for the H3: the unscoped
                         .prose h3 rule (AGENTS.md pitfall #34) already pins

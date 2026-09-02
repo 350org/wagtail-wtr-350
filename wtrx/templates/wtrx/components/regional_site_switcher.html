@@ -14,7 +14,9 @@ the trigger, the close button, and a backdrop click.
 Full-bleed layout (centered title, grid of pin-marker cards, large corner
 close button) rather than a small anchored popover — modelled on a
 location-switcher reference the design gave, minus the region groupings
-that reference has.
+that reference has. border-2 on both card grids below, matching every
+other card-shaped component on the site (components/card.html,
+post_card.html, person_card.html, image_card_list_block.html).
 
 Most entries are plain regional sites (just a region name) and render in
 the dense 4-column grid. An entry with `description` set (e.g. "350
@@ -79,7 +81,7 @@ Expects `regional_sites` (a StreamField of RegionalSiteLinkBlock) in context.
                             {% if not item.value.description %}
                                 <a href="{{ item.value.url }}"
                                    rel="noopener noreferrer"
-                                   class="flex items-center gap-2 rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
+                                   class="flex items-center gap-2 rounded-lg border-2 border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
@@ -104,7 +106,7 @@ Expects `regional_sites` (a StreamField of RegionalSiteLinkBlock) in context.
                             {% if item.value.description %}
                                 <a href="{{ item.value.url }}"
                                    rel="noopener noreferrer"
-                                   class="flex items-start gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
+                                   class="flex items-start gap-3 rounded-lg border-2 border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:border-navy hover:text-navy transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />

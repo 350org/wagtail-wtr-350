@@ -1525,8 +1525,16 @@ h3.victories-header {
  *   white         --color-light. The plain page background; what a Section
  *                 with no colour looks like, and previously Section's
  *                 "light" and FeaturePanel's "light".
- *   light-grey    --color-neutral-200, already labelled "Figma: gray
- *                 callout" in theme.css and predating the callout block.
+ *   light-grey    --color-neutral-100 (#f5f5f5) — one step darker than
+ *                 card fills (--color-neutral-50, #f9f9f9), not
+ *                 --color-neutral-200 (#eaeaea, "Figma: gray callout" in
+ *                 theme.css): that value is now spoken for as the shared
+ *                 card border colour (components/card.html and every
+ *                 other card-shaped component), so reusing it here too
+ *                 read as barely distinct from a card sitting on this
+ *                 fill — light-grey is meant to be a subtly darker page
+ *                 background, not the same value as what outlines the
+ *                 cards on it.
  *   dark-grey     --color-dark exactly — this *is* 350's dark colour, also
  *                 offered as a fill rather than given a second token.
  *   navy          --color-callout-navy, an alias of the --color-navy brand
@@ -1552,7 +1560,7 @@ h3.victories-header {
 }
 
 .wtr-bg-light-grey {
-    background-color: var(--color-neutral-200);
+    background-color: var(--color-neutral-100);
 }
 
 .wtr-bg-dark-grey {
@@ -1581,7 +1589,7 @@ h3.victories-header {
 }
 
 .wtr-bg-fade-light-grey {
-    background: linear-gradient(to right, var(--color-neutral-200), transparent);
+    background: linear-gradient(to right, var(--color-neutral-100), transparent);
 }
 
 .wtr-bg-fade-dark-grey {

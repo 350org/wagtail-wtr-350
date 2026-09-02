@@ -1,2 +1,31 @@
 {% load i18n %}
-{% include "wtrx/components/person_card.html" with person=value %}
+{% comment %}
+Same self-contained full-bleed outer width as PersonCardGridBlock
+(person_card_grid_block.html: `w-full px-4 sm:px-6 lg:px-8` outer +
+`mx-auto max-w-[1218px]` inner), so a standalone card's row starts from
+the same total container width as a 3-card grid row above/below it. That
+alone isn't enough for the two rows' edges to actually line up, though:
+person_card_grid_block.html's own row is `flex ... sm:justify-center`
+around per-card items capped at `sm:max-w-[360px]` (PersonCardGridBlock.
+MAX_PER_ROW=3), and 3 of those plus 2 `gap-8` (32px) gaps between them
+only add up to 1144px — narrower than the 1218px container once you
+subtract its own padding — so justify-center insets that row by the
+leftover space on both sides. A single card just set to `w-full` fills
+the entire container instead, with no such inset, so its left edge sat
+~29px further left than the grid row's actual first card. Wrapping this
+card the same way (justify-center + the same 1144px cap: 3 × 360px +
+2 × 32px, i.e. exactly what 3 grid cards and their gaps measure) centers
+it the same way, landing on the same edges as the grid row above/below it
+— still reads as "as wide as 3 cards together" (the request this
+originally implemented), just centered like the grid instead of flush
+against the outer padding. If PersonCardGridBlock.MAX_PER_ROW, its
+per-card max-w, or its row gap ever change, this 1144 needs to move with
+them.
+{% endcomment %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto flex max-w-[1218px] justify-center">
+        <div class="w-full sm:max-w-[1144px]">
+            {% include "wtrx/components/person_card.html" with person=value %}
+        </div>
+    </div>
+</div>

@@ -126,7 +126,7 @@ Static UI images (textures, illustrations, icons) live in `static_src/images/`
 and are copied verbatim to `static_compiled/images/` by `make build-images`
 (called automatically by `make build`).
 
-JavaScript source lives in `static_src/javascript/` and is copied verbatim to
+JavaScript source lives in `static_src/js/` and is copied verbatim to
 `static_compiled/js/` during `make build`. JS uses ES module syntax and is loaded
 via `<script type="module">` in `base.html`. No bundler is needed.
 
@@ -295,11 +295,15 @@ make load-data                  # migrate + loaddata fixtures/demo.json + collec
    `BodyStreamBlock` / `SectionContentBlock`. Variants for integrations that
    aren't enabled are hidden from the "Add block" picker by
    `IntegrationGatedStreamBlockMixin` (`wtrx/blocks/__init__.py`), which
-   overrides `sorted_child_blocks()` — the one place Wagtail core uses it,
-   solely to build the picker list — to filter by `IntegrationSettings` at
+   overrides `sorted_child_blocks()` to filter by `IntegrationSettings` at
    request time. It never touches `child_blocks` itself, so a block placed
    on a page while its integration was enabled keeps parsing/rendering
-   correctly forever after, even once that integration is disabled. Reading
+   correctly forever after, even once that integration is disabled — but
+   getting the *editor* to agree also took a companion telepath `Adapter`
+   (`GatedStreamBlockAdapter`), not just this mixin; see pitfall #52 for why
+   filtering `sorted_child_blocks()` alone silently broke the admin editor
+   for already-placed gated blocks, and don't assume "filters the picker" is
+   the whole story before checking that pitfall. Reading
    the current request from inside a block (which Wagtail's Telepath
    adapter calls with no request argument) goes through the `ContextVar` in
    `wtrx/request_context.py`, populated by
@@ -1609,28 +1613,68 @@ Two practical notes for agents:
     - No migration is needed for this change — `clean()` logic isn't part
       of a StreamField block's serialized/deconstructed definition.
 
-44. **`_balanced_rows()` is the one row-layout algorithm shared by
-    `CardGridBlock`, `ImageGridBlock`, `LogoGridBlock` and
-    `PersonCardGridBlock` — don't reintroduce a per-block special case
-    instead of reusing it.** A single global row size (uniformly `k` or
-    `k - 1` items per row for the whole grid — e.g. CardGridBlock's old
-    CSS-only rule, `lg:grid-cols-2` for exactly 2 or 4 cards and
-    `lg:grid-cols-3` for everything else) cannot avoid a trailing row of
-    exactly 1 item for every possible count. That old CardGridBlock rule
-    genuinely broke at 7 cards — `lg:grid-cols-3` left an unbalanced
-    `[3, 3, 1]`, the exact orphan-row bug this function exists to prevent.
-    - `_balanced_rows(items, max_per_row)` (`wtrx/blocks/__init__.py`,
-      defined just above `ImageGridBlock`) takes the minimum number of
-      rows needed to respect the cap — `rows_count = ceil(n / max_per_row)`
-      — then distributes `n` items across those rows as evenly as
-      possible via `divmod(n, rows_count)`, rather than always preferring
-      the largest row size first. This is provably safe (every row has
-      2+ items, never 1) for any `n > max_per_row` as long as
-      `max_per_row >= 3` — see the function's docstring for the short
-      derivation, and `TestBalancedRows` for the executable property test
-      (asserts no row of length 1 across a spread of `(n, max_per_row)`
-      combinations). `n <= max_per_row` is simply one centered row of
-      everything — no splitting needed.
+44. **`_full_rows_with_balanced_tail()` and `_full_rows_merging_lone_remainder()`
+    are the row-layout algorithms behind `CardGridBlock`, `ImageGridBlock`,
+    `LogoGridBlock` and `PersonCardGridBlock` — don't reintroduce a
+    per-block special case instead of reusing the right one.** A single
+    global row size (uniformly `k` or `k - 1` items per row for the whole
+    grid — e.g. CardGridBlock's old CSS-only rule, `lg:grid-cols-2` for
+    exactly 2 or 4 cards and `lg:grid-cols-3` for everything else) cannot
+    avoid a trailing row of exactly 1 item for every possible count. That
+    old CardGridBlock rule genuinely broke at 7 cards — `lg:grid-cols-3`
+    left an unbalanced `[3, 3, 1]`, the exact orphan-row bug both
+    functions below exist to prevent.
+    - `_full_rows_with_balanced_tail(items, max_per_row)`
+      (`wtrx/blocks/__init__.py`) — used by `CardGridBlock`,
+      `ImageGridBlock` and `PersonCardGridBlock` — fills every row to
+      `max_per_row` except the last, which holds whatever's left — full
+      rows read better for a grid of many rows than spreading every row
+      evenly does. A remainder of exactly 1 (which alone would leave one
+      item alone on its own row) is handled as a special case: the final
+      full row plus that one leftover item are balanced across two rows
+      instead, via the older `_balanced_rows()` helper (below), rather
+      than ever leaving a lone item. This is provably safe (every row has
+      2+ items, never 1) for any `n > max_per_row` — see the function's
+      own docstring, and `TestFullRowsWithBalancedTail` for the
+      executable property test (asserts no row of length 1 across a
+      spread of `(n, max_per_row)` combinations). `n <= max_per_row` is
+      simply one centered row of everything — no splitting needed.
+    - `_full_rows_merging_lone_remainder(items, max_per_row)` — used only
+      by `LogoGridBlock` — is the same "full rows at the cap" idea, but
+      handles a remainder of exactly 1 differently: rather than balancing
+      the final full row plus the leftover across two rows, it folds the
+      leftover into the last row instead, giving one row of
+      `max_per_row + 1` (26 logos at cap 5 → `5, 5, 5, 5, 6`, not
+      `5, 5, 5, 5, 3, 3`). Deliberately logo-specific, not folded into
+      `_full_rows_with_balanced_tail()` (e.g. via a flag): logos are
+      small, dense marks, so one extra logo in an otherwise-full row
+      barely changes how it reads — the same rule applied to
+      `CardGridBlock` (cap 3) would turn 4 cards into one cramped row of
+      4 instead of a cleaner `2, 2`, which is a real design tradeoff, not
+      a strict improvement, for content that carries much more per item.
+      See `TestFullRowsMergingLoneRemainder` for its own property tests.
+    - `_balanced_rows(items, max_per_row)` (defined just above
+      `_full_rows_with_balanced_tail()`) is the older sibling both of the
+      above are built on top of for tail-balancing: it distributes `n`
+      items across the minimum number of rows needed
+      (`ceil(n / max_per_row)`) as evenly as possible via `divmod`,
+      rather than keeping earlier rows full. It's what all four grid
+      blocks originally used, and reads wrong for a many-row grid (e.g. 8
+      logos at cap 5 read as 4+4, not a full 5 then a shorter 3) — that's
+      why `_full_rows_with_balanced_tail()` exists and why
+      `CardGridBlock`/`ImageGridBlock`/`PersonCardGridBlock` moved to it.
+      `_balanced_rows()` is still very much alive, though:
+      `ButtonGroupBlock` (a row of buttons, not a card grid,
+      `MAX_PER_ROW = 3`) still calls it directly, and
+      `_full_rows_with_balanced_tail()` itself calls it internally to
+      balance its own tail. At `max_per_row = 3` (`CardGridBlock`,
+      `PersonCardGridBlock`) `_balanced_rows()` and
+      `_full_rows_with_balanced_tail()` always produce the same rows —
+      the divergence only shows up at a wider cap like `ImageGridBlock`'s
+      4 — so switching those two blocks over was behavior-preserving, not
+      a visible layout change. `TestBalancedRows` still pins
+      `_balanced_rows()`'s own "spread evenly, no row of 1" property
+      directly.
     - Each block picks its own cap, matching how dense that content reads:
       `PersonCardGridBlock.MAX_PER_ROW = 3` (the original, most detailed
       content), `CardGridBlock.MAX_PER_ROW = 3`, `ImageGridBlock.MAX_PER_ROW = 4`
@@ -1670,23 +1714,26 @@ Two practical notes for agents:
       `ImageGridBlock`/`LogoGridBlock` don't need this: their items are
       fixed-aspect-ratio images (`aspect-square`/`object-contain`), not
       variable-height content, so there's no mismatch to fix.
-    - `_balanced_rows()` converts its input to a real Python `list`
-      before slicing (`items = list(items)`). This is load-bearing, not
-      defensive boilerplate: Wagtail's real `ListValue` (what
-      `value["people"]`/`value["cards"]`/etc. actually is at render time,
-      versus a plain list in a unit test) only implements integer-indexed
-      `__getitem__`, and slicing it (`items[i:j]`) does not raise — it
-      silently returns `self.bound_blocks[slice].value`, which is a plain
-      `list` object with no `.value` attribute, so it fails with a
-      confusing `AttributeError` deep inside Wagtail's own code instead of
-      at the call site. `TestBalancedRows` pins this with a stand-in
-      object that only supports integer indexing, specifically because an
-      all-plain-list test suite cannot catch it.
-    - This logic has real Python test coverage (`TestBalancedRows`,
-      including a property test asserting no row has length 1 across a
-      spread of counts and caps) — prefer computing layout decisions like
-      this in Python over template `{% if %}` conditionals once the logic
-      gets more complex than one binary special case; it's what made this
+    - Both `_balanced_rows()` and `_full_rows_with_balanced_tail()`
+      convert their input to a real Python `list` before slicing (`items
+      = list(items)`). This is load-bearing, not defensive boilerplate:
+      Wagtail's real `ListValue` (what `value["people"]`/`value["cards"]`/
+      etc. actually is at render time, versus a plain list in a unit
+      test) only implements integer-indexed `__getitem__`, and slicing it
+      (`items[i:j]`) does not raise — it silently returns
+      `self.bound_blocks[slice].value`, which is a plain `list` object
+      with no `.value` attribute, so it fails with a confusing
+      `AttributeError` deep inside Wagtail's own code instead of at the
+      call site. `TestBalancedRows`/`TestFullRowsWithBalancedTail` each
+      pin this with a stand-in object that only supports integer
+      indexing, specifically because an all-plain-list test suite cannot
+      catch it.
+    - This logic has real Python test coverage
+      (`TestBalancedRows`/`TestFullRowsWithBalancedTail`, each including a
+      property test asserting no row has length 1 across a spread of
+      counts and caps) — prefer computing layout decisions like this in
+      Python over template `{% if %}` conditionals once the logic gets
+      more complex than one binary special case; it's what made this
       class of bug provable and testable in the first place, and what let
       the CardGridBlock regression above get caught before it shipped
       rather than after.
@@ -2214,6 +2261,61 @@ Two practical notes for agents:
       the file). Confirmed by reading the raw source HTML directly, not
       guessed. Not worth a bespoke repair pass for a page that isn't ours
       to fix; worth a glance at Settings > Images after a real import.
+
+52. **Gating a StreamField block type from the "Add block" picker
+    (`IntegrationGatedStreamBlockMixin`, rule #4) used to also break editing
+    of any page that already had one placed.** `sorted_child_blocks()`/
+    `grouped_child_blocks()` really are read server-side in exactly one
+    place — `StreamBlockAdapter.js_args()` — but that Python method's
+    return value has *two* separate client-side consumers, not one: the
+    "Add block" picker (`StreamBlock.getBlockGroups()`, which just reads
+    `groupedChildBlockDefs` back) **and** the JS `StreamBlockDefinition`
+    constructor itself, which builds its `childBlockDefsByName` lookup —
+    what an *already-placed* block's own hydration/`insert()` looks itself
+    up in when the StreamField widget loads a page's existing value — from
+    that same (gated) `groupedChildBlockDefs` argument. Filtering it to hide
+    a disabled integration's block from the picker therefore also made the
+    widget crash (`TypeError: Cannot read properties of undefined (reading
+    'name')`) the moment it tried to hydrate an *existing* instance of that
+    block type, silently discarding it and everything after it in the
+    stream — and the next save wrote that truncated value back permanently.
+    This is exactly what happened to `/info/how-to-give/` (page 64) on
+    2026-09-01: disabling ActBlue truncated a `donate` block and the
+    `card_grid`/`feature_panel` blocks after it from every revision saved
+    from that point on, though the already-published revision (and
+    therefore the live page) was unaffected, since publishing doesn't
+    re-run the widget.
+    - **Fix**: `GatedStreamBlockAdapter` (`wtrx/blocks/__init__.py`,
+      registered against `SectionContentBlock`/`BodyStreamBlock`
+      specifically — telepath's `AdapterRegistry.find_adapter()` walks the
+      MRO, so a more specific registration beats the base
+      `StreamBlockAdapter` registered for `StreamBlock` itself) sends the
+      JS layer the **full, ungated** `groupedChildBlockDefs` (computed via
+      `StreamBlock.sorted_child_blocks(block)` called directly on the base
+      class, bypassing the mixin's own override) so `childBlockDefsByName`
+      is always complete, plus a separate list of currently-hidden block
+      names as a 5th `js_args()` element. A small client-side subclass,
+      `wtrx/static/wtrx/admin/gated-stream-block.js` (loaded via the
+      adapter's own `media` property, the same mechanism
+      `StreamBlockAdapter.media` itself uses to load
+      `telepath/blocks.js`), builds on the *full* list first via the normal
+      constructor — so hydration always works — then narrows
+      `this.groupedChildBlockDefs` afterward to exclude the hidden names,
+      since that property is the only thing the picker itself reads.
+    - **Why this had to be a telepath `Adapter`, not more Python-only
+      filtering**: the picker and the hydration lookup are the same
+      client-side property on the same object; there's no way to serve one
+      filtered and the other full without a custom class on the JS side to
+      receive them as two distinct arguments and split them apart itself.
+    - **General lesson**: when overriding a Wagtail block/adapter method
+      whose docstring or upstream comment says "used in exactly one place,"
+      that claim is about server-side Python call sites only — the compiled
+      admin JS bundle (`wagtailadmin/js/telepath/blocks.js`) can, and here
+      does, read the same serialized payload for more than one purpose.
+      Before relying on "filtering X only affects Y," grep the actual
+      minified JS bundle in the installed `wagtail` package for how the
+      corresponding JS class uses each constructor argument — don't just
+      trust the Python-side docstring.
 
 ## Git Conventions
 

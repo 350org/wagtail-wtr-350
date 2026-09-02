@@ -6,16 +6,16 @@ Single column on mobile (image, then heading/text, in that DOM order).
 
 Per Figma's The Great Power Shift (node 1:1234): a 1186px row, 128px gutter
 between the columns, an image column that does NOT grow, and a text column
-that takes the rest. The image is always force-cropped to a square
-(`aspect-square object-cover`, `rounded-lg`) — the same treatment
-ImageCardListBlock's and ImageGridBlock's images already use — rather than
-letterboxed via `object-contain` inside a fixed non-square box: there's no
-mechanism in this codebase for detecting a specific image's actual aspect
-ratio at render time, so the rounding rides along unconditionally with the
-crop, matching that precedent (AGENTS.md rule #35, ImageTextBlock's own
-docstring). No background is applied to the image or its wrapper. The image
-column's fixed width comes from the editor-controlled `size` field
-(IMAGE_TEXT_SIZE_CHOICES) — "Default" is 378px, matching Figma.
+that takes the rest. The image force-crops to a square (`aspect-square
+object-cover`, `rounded-lg`) by default — the same treatment
+ImageCardListBlock's and ImageGridBlock's images already use — unless the
+editor unchecks `value.crop`, in which case it renders at its natural
+aspect ratio instead (`max-...` resize spec + `h-auto`, no
+`aspect-square`/`object-cover`) — for an image that reads as wrong force-
+cropped, e.g. a wide logo. `rounded-lg` applies either way. No background
+is applied to the image or its wrapper. The image column's fixed width
+comes from the editor-controlled `size` field (IMAGE_TEXT_SIZE_CHOICES) —
+"Default" is 378px, matching Figma.
 
 Type scale follows Figma's proportions one notch down: 40px heading
 (lg:text-40, 64px in Figma), 24px body, 1.2 leading on both. See the type
@@ -32,9 +32,13 @@ comes from the page templates' space-y-32 on the block loop.
 {% endcomment %}
 <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="mx-auto flex max-w-[1186px] flex-col gap-8 md:flex-row md:items-center md:justify-center lg:gap-32">
-        {% image value.image fill-960x960 as img %}
+        {% if value.crop %}
+            {% image value.image fill-960x960 as img %}
+        {% else %}
+            {% image value.image max-960x960 as img %}
+        {% endif %}
         <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
-             class="aspect-square w-full shrink-0 rounded-lg object-cover{% if value.size == 'small' %} md:w-[280px]{% elif value.size == 'large' %} md:w-[480px]{% else %} md:w-[378px]{% endif %}{% if value.alignment == 'image-right' %} md:order-2{% endif %}"
+             class="w-full shrink-0 rounded-lg{% if value.crop %} aspect-square object-cover{% else %} h-auto{% endif %}{% if value.size == 'small' %} md:w-[280px]{% elif value.size == 'large' %} md:w-[480px]{% else %} md:w-[378px]{% endif %}{% if value.alignment == 'image-right' %} md:order-2{% endif %}"
              loading="lazy">
         <div class="flex min-w-0 flex-1 flex-col">
             {% comment %}

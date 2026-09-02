@@ -122,9 +122,12 @@
 
   /* CalloutBlock-only solid colors (Figma) — not part of the general brand
    * ramp above, used only for the callout's color choice field. Dark grey
-   * and light grey reuse --color-neutral-800/200 instead of a dedicated
-   * token, per Figma's own callout swatches matching those exactly.
-   * Navy is an alias so the callout and the nav can never drift apart. */
+   * reuses --color-dark and light grey reuses --color-neutral-100 (see
+   * main.css's .wtr-bg-light-grey/.wtr-bg-dark-grey — this is the same
+   * shared BACKGROUND_COLOR_CHOICES palette every block with a background
+   * field draws from, not callout-specific) rather than a dedicated
+   * token. Navy is an alias so the callout and the nav can never drift
+   * apart. */
   --color-callout-navy: var(--color-navy);
   --color-callout-red:  #ed4b0c;
 

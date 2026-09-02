@@ -13,9 +13,9 @@ Block categories (in definition order):
             CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock
-  Layout²:  AnnouncementBarBlock, HeroCTABlock, HeroBlock, SectionBlock
-            (defined after action blocks so their nested/optional fields
-            can instantiate the action block classes)
+  Layout²:  AnnouncementBarBlock, HeroCTABlock, BannerHeroCTABlock,
+            HeroBlock, SectionBlock (defined after action blocks so their
+            nested/optional fields can instantiate the action block classes)
 
 All blocks are assembled into BodyStreamBlock at the bottom of this file.
 """
@@ -24,18 +24,23 @@ import copy
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from html.parser import HTMLParser
+import itertools
 import json
 import math
 from pathlib import Path
 import re
 from urllib.parse import urlparse
 
+from django import forms
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.functional import cached_property
 from django.utils.html import strip_tags
 from django.utils.translation import gettext_lazy as _
+from wagtail.admin.staticfiles import versioned_static
+from wagtail.admin.telepath import register
 from wagtail.blocks import (
+    BooleanBlock,
     CharBlock,
     ChoiceBlock,
     DecimalBlock,
@@ -50,6 +55,7 @@ from wagtail.blocks import (
     URLBlock,
 )
 from wagtail.blocks import RawHTMLBlock as WagtailRawHTMLBlock
+from wagtail.blocks.stream_block import StreamBlockAdapter
 from wagtail.contrib.table_block.blocks import TableBlock as WagtailTableBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Site
@@ -921,11 +927,15 @@ class ButtonGroupBlock(StructBlock):
     one CTA and for backward compatibility with existing content.
 
     `layout` picks between two arrangements:
-      - "horizontal" (default): the same dynamic-centering row layout as
-        CardGridBlock/ImageGridBlock/LogoGridBlock/PersonCardGridBlock —
-        _balanced_rows() (max_per_row=3), rendered as centered flex rows.
-        Buttons themselves size to their own content, unlike those other
-        blocks' items — a button stretched to fill a row would look wrong.
+      - "horizontal" (default): the same dynamic-centering row rendering
+        (centered flex rows) as CardGridBlock/ImageGridBlock/LogoGridBlock/
+        PersonCardGridBlock use, computed here via _balanced_rows()
+        (max_per_row=3) directly — the only remaining direct caller of
+        that function; those four grid blocks now use
+        _full_rows_with_balanced_tail()/_full_rows_merging_lone_remainder()
+        instead (see either's docstring for why). Buttons themselves size
+        to their own content, unlike those other blocks' items — a button
+        stretched to fill a row would look wrong.
       - "vertical": a single centered column, no row-balancing needed.
 
     NOTE: inline mid-paragraph buttons in rich text (a button embedded in
@@ -1343,19 +1353,24 @@ class CardGridBlock(ContentPreviewMixin, StructBlock):
     """
     An auto-responsive grid of content cards.
 
-    Minimum 2, maximum 12 cards. Same dynamic-centering layout as
-    PersonCardGridBlock/ImageGridBlock/LogoGridBlock (`_balanced_rows()`,
-    max_per_row=3, defined further down this file before
-    ImageGridBlock — Python doesn't care about definition order across a
-    module for a call inside a method body, only that the name exists by
-    the time the method actually runs). No column-count controls — editors
-    cannot break the layout.
+    Minimum 2, maximum 12 cards. Same full-rows-plus-balanced-tail layout
+    as PersonCardGridBlock/ImageGridBlock (`_full_rows_with_balanced_tail()`,
+    max_per_row=3, defined further down this file before ImageGridBlock —
+    Python doesn't care about definition order across a module for a call
+    inside a method body, only that the name exists by the time the
+    method actually runs). LogoGridBlock uses a different helper of its
+    own — see `_full_rows_merging_lone_remainder()`. No column-count
+    controls — editors cannot break the layout.
 
     This replaced an earlier CSS-only special case (2 or 4 cards get
     lg:grid-cols-2, everything else lg:grid-cols-3) that only handled one
     bad count: 7 cards under that scheme rendered as an unbalanced 3+3+1,
-    the exact orphan-row bug PersonCardGridBlock was built to avoid.
-    `_balanced_rows()` fixes every count, not just 4.
+    the exact orphan-row bug this now avoids by construction (see
+    `_full_rows_with_balanced_tail()`'s own docstring). It briefly used the
+    shared `_balanced_rows()` (evenly spread every row) before switching to
+    `_full_rows_with_balanced_tail()` (full rows at the cap, only the last
+    row or two balanced) to match every other card-shaped grid on the
+    site.
 
     heading is optional (blank renders nothing above the grid), same
     required=False pattern as PageCardsBlock.heading — for consistency with
@@ -1377,12 +1392,12 @@ class CardGridBlock(ContentPreviewMixin, StructBlock):
 
     MAX_PER_ROW = 3
 
-    #: 5 demonstrates the 3+2 balanced-row case in the block picker preview.
+    #: 5 demonstrates the 3+2 balanced-tail case in the block picker preview.
     preview_max_items = {"cards": 5}
 
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
-        ctx["rows"] = _balanced_rows(value["cards"], self.MAX_PER_ROW)
+        ctx["rows"] = _full_rows_with_balanced_tail(value["cards"], self.MAX_PER_ROW)
         return ctx
 
     class Meta:
@@ -1423,10 +1438,19 @@ def _balanced_rows(items, max_per_row):
     """
     Split `items` into rows of `max_per_row` (preferred) and
     `max_per_row - 1`, larger rows first, so a partial trailing row is
-    never a lone item of 1 — the same dynamic-centering technique used by
-    CardGridBlock's spirit (auto layout, no editor column control) but
+    never a lone item of 1 — auto layout, no editor column control,
     generalized to genuinely avoid an orphan row for *every* count, not
     just one special-cased count.
+
+    Used directly by ButtonGroupBlock only. CardGridBlock/ImageGridBlock/
+    LogoGridBlock/PersonCardGridBlock used to call this too, but now use
+    _full_rows_with_balanced_tail() instead (full rows at the cap, only
+    the last row or two balanced) — this function's own "spread every row
+    evenly" behavior reads wrong for a grid of many rows (see that
+    function's docstring); ButtonGroupBlock's row of buttons is a much
+    smaller, always-1-or-2-row case where that distinction rarely shows.
+    This function is still used internally by
+    _full_rows_with_balanced_tail() itself, to balance its own tail.
 
     A single global row size (uniformly `k` or `k - 1` for every row)
     cannot avoid a trailing row of exactly 1 for every possible count —
@@ -1456,13 +1480,110 @@ def _balanced_rows(items, max_per_row):
     return rows
 
 
+def _full_rows_with_balanced_tail(items, max_per_row):
+    """
+    Row layout shared by CardGridBlock, ImageGridBlock and
+    PersonCardGridBlock (each with their own max_per_row) — deliberately
+    different from _balanced_rows() above, whose whole design is to spread
+    every row evenly so no row is ever more than one item bigger than
+    another. A grid with many rows read as "wrong" under that scheme (e.g.
+    8 logos at a 5-per-row cap rendering 4+4 instead of a full 5-row
+    followed by a shorter 3), so this fills every row to `max_per_row`
+    except the last, which simply holds whatever's left over.
+
+    That alone would reintroduce _balanced_rows()'s original problem for
+    a remainder of exactly 1 (e.g. 6 items at cap 5 -> a full row of 5
+    plus one item alone on its own row) — so a remainder of 1 is handled
+    as a special case: the final full row and that one leftover item
+    (max_per_row + 1 items total) are balanced evenly across two rows via
+    _balanced_rows() itself, instead of leaving a lone item. Every row
+    before that pair still stays packed at the cap. A remainder of 2 or
+    more is never a problem on its own (2+ items is never "lone"), so it's
+    left as the final, shorter row.
+
+    Originally built LogoGridBlock-only, then extended to
+    CardGridBlock/ImageGridBlock/PersonCardGridBlock too (same request
+    extended to "every card grid") — so today the only remaining caller of
+    _balanced_rows() itself, besides this function's own internal use, is
+    ButtonGroupBlock. At max_per_row=3 (CardGridBlock, PersonCardGridBlock)
+    this function and _balanced_rows() always agree, so that switch was
+    behavior-preserving for those two; ImageGridBlock's max_per_row=4 is
+    wide enough for them to genuinely diverge (see TestImageGridBlockFields).
+
+    LogoGridBlock itself has since moved to its own
+    _full_rows_merging_lone_remainder() instead of this function — see
+    that function's docstring for why a remainder of 1 needed different
+    handling for logos specifically (fold into the last row) than for
+    cards/photos/people (balance across two rows, as here).
+    """
+    items = list(items)
+    n = len(items)
+    if n <= max_per_row:
+        return [items]
+    remainder = n % max_per_row
+    if remainder == 0:
+        return [items[i : i + max_per_row] for i in range(0, n, max_per_row)]
+    if remainder >= 2:
+        full_rows_count = n // max_per_row
+        rows = [
+            items[i * max_per_row : (i + 1) * max_per_row] for i in range(full_rows_count)
+        ]
+        rows.append(items[full_rows_count * max_per_row :])
+        return rows
+    # remainder == 1: balance the last full row plus the leftover single
+    # item (max_per_row + 1 items) evenly across two rows, rather than
+    # leaving that one item alone on its own row.
+    lead_rows_count = n // max_per_row - 1
+    rows = [items[i * max_per_row : (i + 1) * max_per_row] for i in range(lead_rows_count)]
+    tail = items[lead_rows_count * max_per_row :]
+    rows.extend(_balanced_rows(tail, max_per_row))
+    return rows
+
+
+def _full_rows_merging_lone_remainder(items, max_per_row):
+    """
+    LogoGridBlock's own row layout — like _full_rows_with_balanced_tail()
+    above (full rows at the cap, never a lone item of 1), but handles a
+    remainder of exactly 1 differently: instead of balancing the last
+    full row plus that one leftover logo evenly across two rows (e.g. 26
+    logos at cap 5 -> 5,5,5,5,3,3), it folds the leftover into the last
+    row instead, giving one row of `max_per_row + 1` (5,5,5,5,6).
+
+    Logos are small, dense marks — one extra logo in an otherwise-full
+    row barely changes how that row reads, so a single slightly-fuller
+    last row was preferred over a second, visibly shorter row of 3.
+    Deliberately kept separate from _full_rows_with_balanced_tail()
+    rather than folded into it (e.g. via a flag): CardGridBlock/
+    ImageGridBlock/PersonCardGridBlock's items carry much more content
+    each, where the same rule would read as cramped (e.g. 4 cards at cap
+    3 becoming one row of 4, instead of a cleaner 2+2) rather than barely
+    noticeable — so this is LogoGridBlock's own tweak, not a change to
+    what every other grid does with the same edge case.
+    """
+    items = list(items)
+    n = len(items)
+    if n <= max_per_row:
+        return [items]
+    remainder = n % max_per_row
+    full_rows_count = n // max_per_row
+    if remainder == 1:
+        # Fold the lone leftover into the last row instead of giving it a
+        # row of its own or splitting the tail across two rows.
+        full_rows_count -= 1
+    rows = [items[i * max_per_row : (i + 1) * max_per_row] for i in range(full_rows_count)]
+    if remainder:
+        rows.append(items[full_rows_count * max_per_row :])
+    return rows
+
+
 class ImageGridBlock(StructBlock):
     """
-    An auto-responsive grid of photos, laid out with the same dynamic
-    centering as PersonCardGridBlock (via `_balanced_rows()`, capped at 4
-    per row) rather than CardGridBlock's fixed-breakpoint CSS grid — no
-    count ever leaves a lone photo on its own row, and a small photo count
-    centers as one row instead of stretching thin across the full width.
+    An auto-responsive grid of photos, laid out with the same full-rows-
+    plus-balanced-tail centering as PersonCardGridBlock/CardGridBlock (via
+    `_full_rows_with_balanced_tail()`, capped at 4 per row) rather than
+    CardGridBlock's old fixed-breakpoint CSS grid — no count ever leaves
+    a lone photo on its own row, and a small photo count centers as one
+    row instead of stretching thin across the full width.
     No per-image caption field — this is a grid, not a set of
     individually captioned figures.
 
@@ -1483,12 +1604,13 @@ class ImageGridBlock(StructBlock):
     )
 
     #: Photos are larger than logos, so a lower per-row cap than
-    #: LogoGridBlock's -- see _balanced_rows().
+    #: LogoGridBlock's -- see _full_rows_with_balanced_tail().
+    #: (LogoGridBlock itself now uses _full_rows_merging_lone_remainder().)
     MAX_PER_ROW = 4
 
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
-        ctx["rows"] = _balanced_rows(value["images"], self.MAX_PER_ROW)
+        ctx["rows"] = _full_rows_with_balanced_tail(value["images"], self.MAX_PER_ROW)
         return ctx
 
     class Meta:
@@ -1543,10 +1665,19 @@ class LogoGridItemBlock(StructBlock):
 class LogoGridBlock(StructBlock):
     """
     A grid of partner/funder logos, sized consistently regardless of each
-    logo's own aspect ratio (a fixed-height cell, object-contain). Same
-    dynamic-centering layout as ImageGridBlock/PersonCardGridBlock (via
-    `_balanced_rows()`), capped denser at 5 per row since logos are small
-    marks rather than photos. Logos may optionally link out.
+    logo's own aspect ratio (a fixed-height cell, object-contain). Capped
+    denser than ImageGridBlock/PersonCardGridBlock at 5 per row since logos
+    are small marks rather than photos. Logos may optionally link out.
+
+    Row layout is `_full_rows_merging_lone_remainder()` — full rows at the
+    cap read better for a dense logo wall than evenly-spread rows do (see
+    `_full_rows_with_balanced_tail()`, used by CardGridBlock/
+    ImageGridBlock/PersonCardGridBlock, for that shared reasoning), and a
+    remainder of exactly 1 logo folds into the last row (`max_per_row + 1`
+    logos in it) rather than splitting the tail across two rows — see
+    `_full_rows_merging_lone_remainder()`'s own docstring for why that
+    tweak is logo-specific rather than shared with the other three grids.
+    Still never leaves a single logo alone on its own row.
 
     Not ContentPreviewMixin: no real page uses this block yet, so there is
     nothing to harvest -- see _logo_grid_preview_value().
@@ -1561,12 +1692,12 @@ class LogoGridBlock(StructBlock):
     )
 
     #: Denser than ImageGridBlock's cap -- logos are small marks, not
-    #: photos -- see _balanced_rows().
+    #: photos -- see _full_rows_merging_lone_remainder().
     MAX_PER_ROW = 5
 
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
-        ctx["rows"] = _balanced_rows(value["logos"], self.MAX_PER_ROW)
+        ctx["rows"] = _full_rows_merging_lone_remainder(value["logos"], self.MAX_PER_ROW)
         return ctx
 
     class Meta:
@@ -1583,20 +1714,25 @@ class LogoGridBlock(StructBlock):
 class PersonCardGridBlock(StructBlock):
     """
     A grid of people (staff, spokespeople, board members), laid out so
-    there is never a lone card on its own row — see _balanced_rows(),
-    called here with max_per_row=3.
+    there is never a lone card on its own row — see
+    _full_rows_with_balanced_tail(), called here with max_per_row=3.
 
     Flexbox with justify-center, not CSS Grid like CardGridBlock: rows are
     computed explicitly in Python and each renders as its own small flex
     row, so a partial row (e.g. 2 people) centers naturally. Reuses
     PersonCardBlock as the item block and person_card.html for per-item
     rendering — the standalone `person_card` registration is unchanged,
-    for single-person spotlight use. ImageGridBlock and LogoGridBlock use
-    the same technique (same _balanced_rows() helper, their own caps).
+    for single-person spotlight use. CardGridBlock and ImageGridBlock use
+    the same technique (same _full_rows_with_balanced_tail() helper,
+    their own caps); LogoGridBlock uses its own
+    _full_rows_merging_lone_remainder() instead.
 
     Not ContentPreviewMixin: no real page uses this block yet, so there is
     nothing to harvest -- see _person_card_grid_preview_value(). 5 people
-    in that preview demonstrates the 3+2 row split.
+    in that preview demonstrates the 3+2 row split (unchanged from
+    _balanced_rows(): at max_per_row=3 the two algorithms always agree —
+    see _full_rows_with_balanced_tail()'s own docstring — the visible
+    difference only shows up at a higher cap like ImageGridBlock's 4).
     """
 
     heading = CharBlock(required=False, label=_("Heading"))
@@ -1611,7 +1747,7 @@ class PersonCardGridBlock(StructBlock):
 
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
-        ctx["rows"] = _balanced_rows(value["people"], self.MAX_PER_ROW)
+        ctx["rows"] = _full_rows_with_balanced_tail(value["people"], self.MAX_PER_ROW)
         return ctx
 
     class Meta:
@@ -1693,15 +1829,16 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
     the right, both vertically centered against each other. Single column
     on mobile — see image_text_block.html.
 
-    The image is always force-cropped to a square (`aspect-square
+    The image defaults to force-cropped to a square (`aspect-square
     object-cover`, `rounded-lg`) — the same treatment ImageCardListBlock's
     and ImageGridBlock's images already use — rather than the old
-    `object-contain` letterbox inside a fixed 378x299 box. There is no
-    mechanism anywhere in this codebase for detecting a specific image's
-    actual aspect ratio at render time and conditionally rounding/cropping
-    only when needed, so the corner-rounding rides along unconditionally
-    with the crop, matching that same precedent. No background is applied
-    to the image or its wrapper.
+    `object-contain` letterbox inside a fixed 378x299 box. `crop` (default
+    True, so every existing page keeps today's look unchanged) opts a
+    single instance out of that: with it unchecked, the image renders at
+    its natural aspect ratio instead (a `max-...` resize spec plus
+    `h-auto`, no `aspect-square`/`object-cover`) — for images that read as
+    wrong when force-cropped, e.g. a wide logo. `rounded-lg` still applies
+    either way. No background is applied to the image or its wrapper.
 
     Distinct from ImageCardListBlock: that one has a heading spanning
     above both columns and a fixed list of bordered cards; this one has no
@@ -1741,6 +1878,16 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
         default="default",
         label=_("Image size"),
         help_text=_("How wide the image column is."),
+    )
+    crop = BooleanBlock(
+        default=True,
+        required=False,
+        label=_("Crop to square"),
+        help_text=_(
+            "Uncheck to show the image at its natural aspect ratio instead of "
+            "cropping it to a square — useful for a logo or other image that "
+            "looks wrong cropped."
+        ),
     )
 
     class Meta:
@@ -2665,11 +2812,13 @@ class SignupActionKitFormMixin:
     # The two light fills get *separate* tones even though they share that
     # text inversion, because the field boxes have to move in opposite
     # directions to stay legible as a distinct surface. Their default fill is
-    # --color-neutral-50, which reads against light grey's --color-neutral-200
-    # only barely, so "on-light" lifts the boxes to pure white — but the white
-    # panel *is* pure white, where that same rule would erase the boxes into
-    # the panel and leave only their hairline border. "on-white" therefore
-    # keeps the neutral-50 default and takes the text inversion alone.
+    # --color-neutral-50, which reads against light grey's --color-neutral-100
+    # only barely (the two are one step apart on the same neutral ramp — see
+    # main.css's .wtr-bg-light-grey), so "on-light" lifts the boxes to pure
+    # white — but the white panel *is* pure white, where that same rule would
+    # erase the boxes into the panel and leave only their hairline border.
+    # "on-white" therefore keeps the neutral-50 default and takes the text
+    # inversion alone.
     #
     # Keys are canonical BACKGROUND_COLOR_CHOICES keys — the lookup below
     # runs the stored value through resolve_background() first, so a panel
@@ -2944,16 +3093,18 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
 
 
 # ---------------------------------------------------------------------------
-# Layout blocks continued — AnnouncementBarBlock, HeroCTABlock, HeroBlock, and
-# SectionBlock are defined here (after action blocks) so their nested/optional
-# fields can instantiate DonateBlock and the signup classes.
+# Layout blocks continued — AnnouncementBarBlock, HeroCTABlock, HeroBlock,
+# and SectionBlock are defined here (after action blocks) so their
+# nested/optional fields can instantiate DonateBlock and the signup classes.
 # ---------------------------------------------------------------------------
 
 
 class AnnouncementBarBlock(StructBlock):
     """
     A small badge/pill CTA, e.g. "Help 350.org turn things around for our
-    climate." Used as one of the optional HeroBlock.cta choices.
+    climate." One of HeroCTABlock's choices — currently commented out
+    there (see that class's docstring), so this class has no live callers
+    right now, but is kept defined and ready rather than deleted.
 
     At most one of link_page or link_url may be set; clean() enforces this.
     """
@@ -2985,22 +3136,65 @@ class AnnouncementBarBlock(StructBlock):
 
 class HeroCTABlock(StreamBlock):
     """
-    The hero's optional call-to-action widget: at most one of a plain link
-    button, a signup bar, a donate block, or an announcement bar.
-    min_num=0/max_num=1 make "at most one" a StreamField-level constraint —
-    no clean() needed for it.
+    The homepage's ("full" variant) optional call-to-action widget: at most
+    one of a plain link button or a signup bar. min_num=0/max_num=1 make
+    "at most one" a StreamField-level constraint — no clean() needed for it.
 
-    `button` is the only choice the "banner" hero variant renders (as an
-    outlined button with a trailing arrow, per Figma's Content Hero on The
-    Great Power Shift, node 1:1225) — the other three are embedded widgets
-    sized for the "full" variant's roomier layout and would overflow the
-    banner's half-width text column. See components/hero.html.
+    A donate block and an announcement-bar choice used to be offered here
+    too — commented out below (not deleted) per-page 2026-09 review, until
+    they're properly implemented for the hero. This is deliberately a
+    comment-out, not a removal: a live DB audit at the time confirmed no
+    page anywhere had either saved in a hero, so there was never any stored
+    data to preserve — the point is just to keep both `DonateBlock` and
+    `AnnouncementBarBlock` fully defined and ready, so restoring either
+    choice later is a two-line uncomment, not a rebuild from git history.
+    Uncommenting either line changes HeroCTABlock's block_lookup and needs
+    a fresh `makemigrations` the same as any other block-choice change.
+
+    Every non-homepage HeroMixin page type (ContentPage, IndexPage, Blogs)
+    uses BannerHeroCTABlock instead, not this class — see that class's own
+    docstring for why "banner" needed its own StreamBlock rather than just
+    a template-side restriction of this one.
     """
 
     button = ButtonBlock()
     signup = HeroSignupActionKitBlock()
-    donate = DonateBlock()
-    announcement = AnnouncementBarBlock()
+    # donate = DonateBlock()
+    # announcement = AnnouncementBarBlock()
+
+    class Meta:
+        min_num = 0
+        max_num = 1
+        label = _("Call to action")
+
+
+class BannerHeroCTABlock(StreamBlock):
+    """
+    The "banner" hero variant's call-to-action widget — every HeroMixin
+    page type except HomePage (ContentPage, IndexPage, Blogs) — restricted
+    to a plain link button only.
+
+    Before this class existed, every HeroMixin page type shared one
+    `hero_cta` field/StreamBlock (HeroCTABlock), and the "Add block" picker
+    offered banner pages the same button/signup (formerly also donate/
+    announcement) choices the homepage gets — even though
+    components/hero.html's "banner" branch has only ever rendered the
+    `button` choice, silently no-op'ing anything else an editor picked
+    (see hero.html's own comment). That mismatch is what this class fixes:
+    each concrete HeroMixin subclass gets its own independent `hero_cta`
+    DB column (a normal consequence of HeroMixin being an *abstract* model
+    mixin — overriding a field declared on an abstract base in a concrete
+    subclass is ordinary Django, unlike overriding one from a *concrete*
+    parent), so ContentPage/IndexPage/Blogs can redeclare `hero_cta` to use
+    this restricted StreamBlock instead of HeroMixin's own HeroCTABlock-
+    typed field, and HomePage needs no change at all. A live DB audit
+    before this change confirmed the only hero_cta value ever saved on a
+    banner-variant page was a `button` (or none), so — like removing
+    donate/announcement above — this was a pure schema change, no data
+    migration needed.
+    """
+
+    button = ButtonBlock()
 
     class Meta:
         min_num = 0
@@ -3128,16 +3322,39 @@ class IntegrationGatedStreamBlockMixin:
     picker to exclude block types gated by a disabled integration.
 
     sorted_child_blocks()/grouped_child_blocks() are used by Wagtail core in
-    exactly one place -- StreamBlockAdapter.js_args(), which builds the
-    picker's block-type list -- and nowhere else (verified against the
-    installed wagtail package). child_blocks itself, which every other
-    path (value_from_datadict, deserialization, rendering an
-    already-placed block) reads directly, is never touched. That's what
-    lets a block placed while its integration was enabled keep working
-    correctly forever after, even if that integration is later disabled —
-    the same "always registered, only hidden from being added" contract
-    architecture rule #4 already requires, just enforced natively instead
-    of by injecting CSS that has to keep guessing Wagtail's admin DOM.
+    exactly one place server-side -- StreamBlockAdapter.js_args(), which
+    builds the JS StreamField widget's block-def payload. child_blocks
+    itself, which every other server-side path (value_from_datadict,
+    deserialization, rendering an already-placed block) reads directly, is
+    never touched.
+
+    That was originally believed to be the whole story, but the client-side
+    half of js_args()'s payload has two separate consumers, not one: the
+    "Add block" picker (StreamBlock.getBlockGroups(), which just reads
+    groupedChildBlockDefs back) *and* StreamBlockDefinition's own
+    constructor, which builds its childBlockDefsByName lookup from that same
+    (gated) groupedChildBlockDefs argument -- and childBlockDefsByName is
+    what an *already-placed* block's own hydration/insert() looks itself up
+    in when the widget loads a page's existing value, not just what the
+    picker offers to add. Filtering sorted_child_blocks() therefore also
+    broke loading any existing instance of a gated block once its
+    integration was disabled -- the widget crashed
+    (TypeError: Cannot read properties of undefined (reading 'name')) and
+    silently dropped that block and everything after it in the stream on
+    the next save. This is exactly what happened to /info/how-to-give/
+    (page 64) on 2026-09-01.
+
+    GatedStreamBlockAdapter (registered against SectionContentBlock and
+    BodyStreamBlock specifically, below) is the actual fix for that half —
+    it sends the JS layer the FULL ungated block-def list for
+    childBlockDefsByName, plus a separate hidden-names list a small client-
+    side subclass (wtrx/static/wtrx/admin/gated-stream-block.js) uses to
+    narrow the picker's own view afterwards. This mixin's
+    sorted_child_blocks() override still exists and is still correct for
+    every other server-side purpose (value_from_datadict, deserialization,
+    rendering), and the "always registered, only hidden from being added"
+    contract architecture rule #4 requires is now actually true end to end,
+    not just on the Python side.
 
     Must appear before StreamBlock in the MRO so this plain method isn't
     shadowed, but declares no Block-type class attributes itself, so it
@@ -3152,6 +3369,57 @@ class IntegrationGatedStreamBlockMixin:
         if not hidden:
             return blocks
         return [b for b in blocks if b.name not in hidden]
+
+
+class GatedStreamBlockAdapter(StreamBlockAdapter):
+    """
+    Telepath adapter for BodyStreamBlock/SectionContentBlock, registered
+    below (telepath's registry.find_adapter() walks the MRO, so this takes
+    precedence over the base StreamBlockAdapter registered for StreamBlock
+    itself -- see telepath.AdapterRegistry.find_adapter()).
+
+    Closes a gap IntegrationGatedStreamBlockMixin's own docstring didn't
+    account for: sorted_child_blocks()/grouped_child_blocks() aren't read
+    *only* by the "Add block" picker. StreamBlockAdapter.js_args() (the
+    base class) passes the same gated grouped_child_blocks() as the JS
+    StreamBlockDefinition constructor's groupedChildBlockDefs argument, and
+    that constructor builds its childBlockDefsByName lookup solely from
+    that argument (see the compiled wagtailadmin/js/telepath/blocks.js --
+    class J). childBlockDefsByName is what an *already-placed* block's own
+    insert()/hydration looks itself up in when the StreamField widget loads
+    a page's existing value, not just what the picker offers to add --
+    so a block placed while its integration was enabled crashed the widget
+    (TypeError: Cannot read properties of undefined (reading 'name')) the
+    moment that integration was later disabled, silently discarding that
+    block and everything after it in the stream on the next save. This is
+    exactly what happened to /info/how-to-give/ (page 64) on 2026-09-01.
+
+    Fix: pass the FULL (ungated) grouped child blocks here so
+    childBlockDefsByName is always complete, plus a separate list of
+    currently-hidden block names, and let a small client-side subclass
+    (wtrx/static/wtrx/admin/gated-stream-block.js) filter the picker's own
+    view from that list *after* the full lookup table is built -- see that
+    file for the other half of this fix.
+    """
+
+    js_constructor = "wtrx.blocks.GatedStreamBlock"
+
+    def js_args(self, block):
+        args = super().js_args(block)
+        # StreamBlock.sorted_child_blocks(), called directly on the base
+        # class rather than through `block`'s own (gated) MRO, is the same
+        # "sorted by group" computation grouped_child_blocks() itself does
+        # -- just against every real child block, ungated.
+        full_sorted = StreamBlock.sorted_child_blocks(block)
+        args[1] = itertools.groupby(full_sorted, key=lambda cb: cb.meta.group)
+        args.append(sorted(_hidden_block_names_for_current_request()))
+        return args
+
+    @cached_property
+    def media(self):
+        return super().media + forms.Media(
+            js=[versioned_static("wtrx/admin/gated-stream-block.js")]
+        )
 
 
 class SectionContentBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
@@ -3420,3 +3688,9 @@ class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
 
     class Meta:
         icon = "list-ul"
+
+
+# Registered here, after both classes exist, rather than right below
+# GatedStreamBlockAdapter's own definition -- see that class's docstring.
+register(GatedStreamBlockAdapter(), SectionContentBlock)
+register(GatedStreamBlockAdapter(), BodyStreamBlock)

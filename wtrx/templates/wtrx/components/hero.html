@@ -334,8 +334,10 @@
             {% endif %}
 
             {% comment %}
-            hero.cta — at most one of a signup bar, donate block, or
-            announcement bar.
+            hero.cta — at most one of a button or a signup bar (donate and
+            announcement-bar CTAs are commented out in HeroCTABlock's
+            definition until they're properly implemented — see
+            HeroCTABlock's docstring).
 
             Sizing is Figma's: 20px below the headline (its Content frame's
             gap), and a 677px-wide widget — exactly what the Signup

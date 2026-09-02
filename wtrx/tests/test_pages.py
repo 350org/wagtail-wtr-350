@@ -59,10 +59,14 @@ class TestHeroPanelSelection(TestCase):
     content_panels use HeroMixin.banner_hero_panels instead — same
     underlying model field (no migration), just a smaller edit form.
 
-    hero_cta is exposed on BOTH panel sets: components/hero.html's "banner"
-    rendering already only renders hero_cta's plain `button` choice (see
-    banner_hero_panels' own docstring), so it's a real, working field there
-    too, not an inert one like hero_video.
+    hero_cta is exposed on BOTH panel sets, but is NOT "same underlying
+    model field" the way hero_video is: ContentPage/IndexPage/Blogs each
+    override it to use BannerHeroCTABlock (button only) instead of
+    HeroMixin's own HeroCTABlock (button/signup) — see
+    BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py. This test
+    class only checks panel field *names*, which are identical either way;
+    TestBannerHeroCTABlock/TestHeroCTABlock (test_blocks.py) cover the
+    actual choice-set difference.
 
     hero_layout no longer exists at all (removed rather than hidden) — the
     "full" variant renders a single fixed left-aligned layout now, matching

@@ -27,8 +27,14 @@ stretches that wrapper, not this root — without h-full, cards with
 different content lengths in the same row would have mismatched heights.
 Resolves to plain `auto` (a no-op) wherever no ancestor establishes a
 definite height, e.g. card_block.html's standalone single-card case.
+
+border-2, matching post_card.html/person_card.html/image_card_list_block.html
+— every card-shaped component now shares one border weight (previously
+this was the one card family still on a plain 1px `border`; AGENTS.md
+pitfall #44 used to call the 2px border post_card-specific "shape, not
+fill" — that distinction is gone now that every card uses it).
 {% endcomment %}
-<div class="wtr-card flex h-full flex-col overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 shadow-xs">
+<div class="wtr-card flex h-full flex-col overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50 shadow-xs">
     {% if card.image %}
         {% image card.image fill-640x360 as img %}
         <div class="aspect-video overflow-hidden">

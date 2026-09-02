@@ -228,45 +228,62 @@
             {% endif %}
 
             {% comment %}
-            Bottom bar: social links + inline links (minimal_links, e.g.
-            "Privacy Policy | Terms of Service") on top, copyright full-width
-            below. order-3 on mobile (last, below the newsletter box).
+            Bottom bar: social links (their own row, when present) on top,
+            then disclaimer/copyright (left) + inline links (minimal_links,
+            e.g. "Privacy Policy | Terms of Service", right) sharing one
+            row. order-3 on mobile (last, below the newsletter box).
             Social icons only rendered when SocialSettings.show_in_footer is
             True. minimal_links renders here regardless of `footer.layout`
             — it isn't gated to the minimal layout, since the columns layout
             wants the same links in its own bottom bar.
+
+            The disclaimer+links row needs no empty-placeholder trick for
+            justify-between the way the old social+links row did (see git
+            history) -- copyright always renders something (configured text
+            or the auto-generated © fallback), so the "left" side is never
+            empty the way social conditionally is.
+
+            lg:col-span-2: with a newsletter box present, the parent grid
+            becomes lg:grid-cols-[1fr_368px] (see its own comment above).
+            This div has no explicit column placement of its own, so
+            without col-span-2 it auto-placed into whatever column was
+            next in flow — which, once the newsletter box (explicitly
+            lg:col-start-2/lg:row-span-2) had claimed all of column 2, was
+            column 1 alone. That squeezed the copyright text (and the
+            divider line above it) into the narrower left column instead
+            of the full footer width, wrapping early — e.g. copyright text
+            ending "...MA 02284-3004, USA" broke "USA" onto its own line.
+            col-span-2 is a no-op on the newsletter-less grid (grid-cols-1
+            there), so this is safe either way.
             {% endcomment %}
-            <div class="order-3 lg:order-none min-w-0 border-t border-neutral-700 pt-8 space-y-4">
+            <div class="order-3 lg:order-none lg:col-span-2 min-w-0 border-t border-neutral-700 pt-8 space-y-4">
 
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    {% comment %}Social links{% endcomment %}
-                    {% if social.show_in_footer and social.social_links %}
-                        <div class="wtr-social-links flex items-center gap-4">
-                            {% for item in social.social_links %}
-                                <a href="{{ item.value.url }}"
-                                   rel="noopener noreferrer"
-                                   aria-label="{{ item.value.platform|social_platform_label }}"
-                                   class="text-light hover:text-primary-400 transition-colors">
-                                    {% social_icon item.value.platform %}
-                                </a>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div></div>
-                    {% endif %}
+                {% comment %}Social links{% endcomment %}
+                {% if social.show_in_footer and social.social_links %}
+                    <div class="wtr-social-links flex items-center gap-4">
+                        {% for item in social.social_links %}
+                            <a href="{{ item.value.url }}"
+                               rel="noopener noreferrer"
+                               aria-label="{{ item.value.platform|social_platform_label }}"
+                               class="text-light hover:text-primary-400 transition-colors">
+                                {% social_icon item.value.platform %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
 
+                {% comment %}Disclaimer/copyright (left) + inline links (right){% endcomment %}
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm text-light">
+                        {% if footer.copyright_text %}
+                            {{ footer.copyright_text }}
+                        {% else %}
+                            {% now "Y" as current_year %}
+                            {% blocktrans with year=current_year name=current_site.site_name %}&copy; {{ year }} {{ name }}.{% endblocktrans %}
+                        {% endif %}
+                    </p>
                     {% include "wtrx/components/footer_minimal_links.html" with links=footer.minimal_links %}
                 </div>
-
-                {% comment %}Copyright{% endcomment %}
-                <p class="text-sm text-light">
-                    {% if footer.copyright_text %}
-                        {{ footer.copyright_text }}
-                    {% else %}
-                        {% now "Y" as current_year %}
-                        {% blocktrans with year=current_year name=current_site.site_name %}&copy; {{ year }} {{ name }}.{% endblocktrans %}
-                    {% endif %}
-                </p>
 
             </div>
 

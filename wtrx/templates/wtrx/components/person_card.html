@@ -5,8 +5,22 @@ one level deeper than this root, same reasoning as components/card.html's
 own h-full comment -- without it, people with different bio lengths in
 the same row would have mismatched card heights. No-op wherever no
 ancestor establishes a definite height.
+
+wtr-person-card is also person-bio-modal.js's scoping root -- trigger and
+dialog are looked up via .closest('.wtr-person-card') from the trigger,
+the same per-instance-scoping convention regional_site_switcher.html uses
+(.wtr-regional-site-switcher), needed here because a PersonCardGridBlock
+puts many of these on one page and each needs its own independent dialog.
+
+bg-neutral-50, not bg-light (white) -- matches components/card.html's own
+fill exactly (border-2 border-neutral-200 bg-neutral-50 shadow-xs), the
+"card / light-box background" family per theme.css's own comment on
+--color-neutral-50. A person card is a card-shaped component and should
+read as the same fill/border family as every other one on the site --
+same reason this uses border-2 (2px), not the plain 1px `border` every
+card-shaped component used to default to.
 {% endcomment %}
-<div class="flex h-full flex-col items-center rounded-lg border border-neutral-200 bg-light p-6 text-center shadow-xs">
+<div class="wtr-person-card flex h-full flex-col items-center rounded-lg border-2 border-neutral-200 bg-neutral-50 p-6 text-center shadow-xs">
     {% if person.image %}
         {% image person.image fill-192x192 as img %}
         <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ person.image.description|default:person.name }}" class="mb-4 h-24 w-24 rounded-full object-cover" loading="lazy">
@@ -19,10 +33,89 @@ ancestor establishes a definite height.
     {% endif %}
     <h3 class="font-heading text-28 font-semibold text-dark">{{ person.name }}</h3>
     {% if person.role %}
-        <p class="mt-0.5 text-sm text-primary-600 font-medium">{{ person.role }}</p>
+        <p class="mt-0.5 text-sm text-neutral-600 font-medium">{{ person.role }}</p>
     {% endif %}
     {% if person.bio %}
-        <p class="mt-3 text-sm text-neutral-600 leading-relaxed">{{ person.bio }}</p>
+        {% comment %}
+        line-clamp-3 + the trigger below: a long bio otherwise grows a card
+        taller than its row-mates (person_card_grid_block.html relies on
+        h-full to stretch every card in a row to match). The trigger starts
+        hidden and person-bio-modal.js only reveals it where the clamp
+        actually truncates the text (scrollHeight > clientHeight after
+        layout) -- a short bio that fits in 3 lines gets no trigger at all.
+        mt-3 above it (not tight against the clamped text) matches the
+        bio paragraph's own mt-3 off the role line above, so the trigger
+        reads as its own element rather than crowding the clamped text.
+        {% endcomment %}
+        <p class="mt-3 line-clamp-3 text-sm text-neutral-600 leading-relaxed" data-bio-content>{{ person.bio }}</p>
+        {% trans "Read more" as bio_read_more %}
+        {% comment %}
+        Trailing arrow reuses feature_panel_block.html's glyph (same one
+        hero.html's banner CTA button borrows too, per its own comment) at
+        a much smaller size and no button chrome (no wtr-btn/bg/border) --
+        this stays a plain text link, just with the site's one arrow shape
+        rather than a bespoke icon.
+        {% endcomment %}
+        <button
+            type="button"
+            class="mt-3 hidden cursor-pointer inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
+            aria-haspopup="dialog"
+            data-person-bio-trigger
+        >
+            {{ bio_read_more }}
+            <svg class="h-4 w-4" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+
+        {% comment %}
+        Same native-<dialog> conventions as regional_site_switcher.html's
+        modal (see that file's own comment): p-0 + m-auto to keep the UA
+        stylesheet's own centering, no `relative` on the <dialog> itself
+        (would override the UA's `position: fixed`), `relative` on the
+        inner wrapper instead purely to anchor the close button.
+        No aria-labelledby here (unlike the regional-sites modal) -- this
+        dialog has no single heading id to point to that's guaranteed
+        unique across every card on the page without a per-instance
+        counter, and the dialog's own accessible name falls back
+        acceptably to its text content.
+        {% endcomment %}
+        <dialog class="wtr-person-bio-modal m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-lg border-0 p-0 text-left backdrop:bg-dark/70 backdrop:backdrop-blur-sm"
+                data-person-bio-dialog>
+            <div class="relative px-6 py-10 sm:px-8">
+                <button type="button"
+                        class="absolute right-4 top-4 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-dark text-light cursor-pointer hover:bg-navy transition-colors"
+                        aria-label="{% trans 'Close' %}"
+                        data-person-bio-close>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div class="flex flex-col items-center text-center">
+                    {% if person.image %}
+                        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ person.image.description|default:person.name }}" class="mb-4 h-24 w-24 rounded-full object-cover" loading="lazy">
+                    {% endif %}
+                    <h3 class="font-heading text-28 font-semibold text-dark">{{ person.name }}</h3>
+                    {% if person.role %}
+                        <p class="mt-0.5 text-sm text-neutral-600 font-medium">{{ person.role }}</p>
+                    {% endif %}
+                    <p class="mt-4 text-left text-sm text-neutral-600 leading-relaxed">{{ person.bio }}</p>
+                    {% if person.email or person.phone or person.website %}
+                        <div class="mt-4 flex flex-wrap justify-center gap-3 text-sm">
+                            {% if person.email %}
+                                <a href="mailto:{{ person.email }}" class="text-neutral-500 hover:text-primary-600">{{ person.email }}</a>
+                            {% endif %}
+                            {% if person.phone %}
+                                <a href="tel:{{ person.phone }}" class="text-neutral-500 hover:text-primary-600">{{ person.phone }}</a>
+                            {% endif %}
+                            {% if person.website %}
+                                <a href="{{ person.website }}" rel="noopener noreferrer" class="text-neutral-500 hover:text-primary-600">{% trans "Website" %}</a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </dialog>
     {% endif %}
     {% if person.email or person.phone or person.website %}
         <div class="mt-4 flex flex-wrap justify-center gap-3 text-sm">

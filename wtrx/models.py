@@ -27,7 +27,13 @@ from wagtail.snippets.models import register_snippet
 from wagtail_ai.panels import AIDescriptionFieldPanel, AITitleFieldPanel
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
-from .blocks import BACKGROUND_COLOR_CHOICES, BodyStreamBlock, HeroCTABlock, hero_is_minimal
+from .blocks import (
+    BACKGROUND_COLOR_CHOICES,
+    BannerHeroCTABlock,
+    BodyStreamBlock,
+    HeroCTABlock,
+    hero_is_minimal,
+)
 from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
@@ -175,10 +181,15 @@ class HeroMixin(models.Model):
       as the poster fallback if the video has none.
     - hero_banner_color: background color/gradient. "banner" variant only —
       "full" never shows a solid color background.
-    - hero_cta: optional signup/donate/announcement widget (HeroCTABlock, at
-      most one). "full" variant renders whichever choice is set; "banner"
-      variant only renders the plain `button` choice (see
-      components/hero.html), silently skipping signup/donate/announcement.
+    - hero_cta: optional button/signup widget, at most one. HomePage
+      ("full" variant) uses HeroCTABlock (button or signup); every other
+      HeroMixin page type ("banner" variant) redeclares this field to use
+      BannerHeroCTABlock instead (button only) — see that class's own
+      docstring for why banner needed a genuinely separate StreamBlock
+      rather than a template-side restriction of HeroCTABlock. A donate
+      block and an announcement bar are also possible choices here, but
+      commented out in HeroCTABlock's definition until they're properly
+      implemented for the hero — see HeroCTABlock's docstring.
 
     There used to be an editable hero_layout field (centered vs. left-
     aligned text, "full" variant only) — removed in favor of a single fixed
@@ -189,12 +200,13 @@ class HeroMixin(models.Model):
     hero_video only matters for the "full" variant, so a "banner"-only page
     type should use banner_hero_panels (defined below, next to hero_panels)
     instead of hero_panels — it exposes headline/copy/image/banner_color
-    plus hero_cta (restricted in practice to its `button` choice, per
-    above), the fields "banner" actually renders. hero_video stays a real
-    model field on every HeroMixin subclass (including "banner"-only ones)
-    rather than being split into a separate mixin, so this is a panel-only
-    choice with no schema difference between page types — see
-    banner_hero_panels' own docstring for why.
+    plus hero_cta, the fields "banner" actually renders. hero_video stays a
+    real model field on every HeroMixin subclass (including "banner"-only
+    ones) rather than being split into a separate mixin, so this is a
+    panel-only choice with no schema difference between page types — see
+    banner_hero_panels' own docstring for why. hero_cta itself IS a schema
+    difference between page types, unlike hero_video — see
+    BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
 
     Use: include `components/hero.html` in the page template.
     """
@@ -257,10 +269,7 @@ class HeroMixin(models.Model):
         HeroCTABlock(),
         blank=True,
         verbose_name=_("hero call to action"),
-        help_text=_(
-            "Optional signup bar, donate block, or announcement bar shown "
-            "below the hero copy. At most one."
-        ),
+        help_text=_("Optional button or signup bar shown below the hero copy. At most one."),
         use_json_field=True,
     )
 
@@ -286,13 +295,13 @@ class HeroMixin(models.Model):
     # offering it as an editable option is misleading rather than merely
     # unused.
     #
-    # hero_cta IS included here, unlike hero_video — components/hero.html's
-    # "banner" variant rendering already only ever renders the plain
-    # `button` choice from a hero_cta StreamField value (the signup/donate/
-    # announcement choices are silently skipped there; see the comment
-    # above that `{% for cta_block in hero.cta %}` loop), so a banner-hero
-    # page editor adding a Button gets a real, working back/CTA link, not a
-    # dead field.
+    # hero_cta IS included here, unlike hero_video — but on these page
+    # types it's redeclared below (ContentPage/IndexPage/Blogs) to use
+    # BannerHeroCTABlock instead of HeroCTABlock, so the "Add block"
+    # picker itself only ever offers `button` — see that class's
+    # docstring for why a dead-field mismatch (the picker offering
+    # choices components/hero.html's "banner" variant would have
+    # silently skipped anyway) used to exist here and no longer does.
     banner_hero_panels = [
         MultiFieldPanel(
             [
@@ -623,6 +632,17 @@ class ContentPage(BasePage, HeroMixin):
 
     template = "wtrx/pages/content_page.html"
 
+    # Overrides HeroMixin's own hero_cta (HeroCTABlock) to restrict the
+    # "banner" hero variant's CTA picker to a plain button only — see
+    # BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
+    hero_cta = StreamField(
+        BannerHeroCTABlock(),
+        blank=True,
+        verbose_name=_("hero call to action"),
+        help_text=_("Optional button shown below the hero copy. At most one."),
+        use_json_field=True,
+    )
+
     body = StreamField(
         BodyStreamBlock(),
         blank=True,
@@ -682,6 +702,17 @@ class IndexPage(BasePage, HeroMixin):
     """
 
     template = "wtrx/pages/index_page.html"
+
+    # Overrides HeroMixin's own hero_cta (HeroCTABlock) to restrict the
+    # "banner" hero variant's CTA picker to a plain button only — see
+    # BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
+    hero_cta = StreamField(
+        BannerHeroCTABlock(),
+        blank=True,
+        verbose_name=_("hero call to action"),
+        help_text=_("Optional button shown below the hero copy. At most one."),
+        use_json_field=True,
+    )
 
     intro = RichTextField(
         blank=True,
@@ -1022,6 +1053,17 @@ class Blogs(BasePage, HeroMixin):
     """
 
     template = "wtrx/pages/blogs_page.html"
+
+    # Overrides HeroMixin's own hero_cta (HeroCTABlock) to restrict the
+    # "banner" hero variant's CTA picker to a plain button only — see
+    # BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
+    hero_cta = StreamField(
+        BannerHeroCTABlock(),
+        blank=True,
+        verbose_name=_("hero call to action"),
+        help_text=_("Optional button shown below the hero copy. At most one."),
+        use_json_field=True,
+    )
 
     related_intro = models.TextField(
         blank=True,

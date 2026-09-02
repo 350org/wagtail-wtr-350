@@ -13,9 +13,20 @@ The one exception is "section": its padding field (sm/default/lg) is an
 editor-configurable choice about the section's own internal breathing
 room, not inter-block spacing, so it's left alone and stacks on top of
 (not instead of) this gap.
+
+Below `sm:`, that 128px reads as excess dead space between sections on a
+phone-width viewport, so it steps down to 64px (space-y-16) there and
+reverts to the full 128px from `sm:` up — every other page's own
+space-y-24 (96px, see main.css's "Body-stack spacing" section) is left
+alone, since only the home page's larger 128px was reported as too much
+on mobile. The `main.css` "Body-stack spacing" overrides that tighten
+specific block-type adjacencies (button, text-before-card-row) to a flat
+32px still apply unscoped by breakpoint on top of this — at 64px mobile
+that reads as clearly tighter than the general gap, same as it does
+against 128px on desktop, just a different ratio.
 {% endcomment %}
 {% block content %}
-<div class="wtr-body-stack space-y-32">
+<div class="wtr-body-stack space-y-16 sm:space-y-32">
 {% for block in page.body %}
     <div data-block-type="{{ block.block_type }}"{% if block.block_type == "section" or block.block_type == "card_grid" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "signup_actionkit" or block.block_type == "image" or block.block_type == "hero" or block.block_type == "quote" or block.block_type == "page_cards" or block.block_type == "image_grid" or block.block_type == "logo_grid" or block.block_type == "person_card_grid" or block.block_type == "timeline" %}{% else %} class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8"{% endif %}>
         {% include_block block %}

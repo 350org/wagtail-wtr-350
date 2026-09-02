@@ -9,9 +9,13 @@ of the component, so the outer element carries no chrome at all and each
 The cards are light (neutral-50 fill, neutral-200 border, dark text)
 regardless of what they sit on. Figma draws this stack on a dark section,
 and the cards stay light there — so unlike most blocks there is no
-in-data-[bg=dark] inversion on the item chrome itself. Only the expanded
-answer body inverts, and only because prose's own color would otherwise
-fight the card fill.
+in-data-[bg=dark] inversion on the item chrome itself, and the answer body
+doesn't invert either (see the "text" branch below): the answer panel is
+always bg-white, and `in-data-[bg-tone=dark]:prose-invert` reacts to *any*
+ancestor's data-bg-tone, not the nearest one — CSS descendant selectors
+have no "nearest ancestor wins" concept the way JS's .closest() does — so a
+dark-background SectionBlock several levels up would otherwise invert this
+always-light answer to white-on-white.
 {% endcomment %}
 <div class="wtr-accordion flex flex-col gap-4" data-accordion>
     {% for item in value.items %}
@@ -56,7 +60,18 @@ fight the card fill.
                  data-accordion-content>
                 {% for block in item.content %}
                     {% if block.block_type == "text" %}
-                        {% include_block block %}
+                        {% comment %}
+                        Rendered directly here rather than via {% include_block
+                        block %} -- text_block.html's own markup carries
+                        in-data-[bg-tone=dark]:prose-invert, which this answer
+                        panel must never pick up (see the comment above).
+                        Same wtr-text-block/prose classes otherwise, so a
+                        heading typed here still matches main.css's shared
+                        heading-size rules.
+                        {% endcomment %}
+                        <div class="wtr-text-block prose prose-neutral max-w-none text-lg sm:text-xl">
+                            {{ block.value|richtext }}
+                        </div>
                     {% elif block.block_type == "image" %}
                         {% comment %}
                         Rendered directly here rather than via {% include_block

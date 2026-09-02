@@ -39,6 +39,7 @@ from wtrx.blocks import (
     AccordionBlock,
     AccordionItemBlock,
     AccordionItemContentBlock,
+    BannerHeroCTABlock,
     BodyStreamBlock,
     ButtonBlock,
     ButtonGroupBlock,
@@ -49,6 +50,7 @@ from wtrx.blocks import (
     DonateBlock,
     DonateFundraiseUpBlock,
     FeaturePanelBlock,
+    GatedStreamBlockAdapter,
     HeroBlock,
     HeroCTABlock,
     HeroSignupActionKitBlock,
@@ -74,6 +76,8 @@ from wtrx.blocks import (
     TimelineYearContentBlock,
     VideoBlock,
     _balanced_rows,
+    _full_rows_merging_lone_remainder,
+    _full_rows_with_balanced_tail,
     _validate_at_most_one_link,
     background_is_light,
     hero_is_minimal,
@@ -556,8 +560,12 @@ class TestHeroBlockFields(SimpleTestCase):
 
 class TestHeroCTABlock(SimpleTestCase):
     """
-    HeroCTABlock is HeroBlock.cta / HeroMixin.hero_cta's block type: at most
-    one of button, signup (ActionKit), donate, or announcement.
+    HeroCTABlock is HomePage's ("full" variant) hero_cta block type: at
+    most one of button or signup (ActionKit). donate/announcement are
+    commented out as choices here (not deleted -- see the class's own
+    docstring) until properly implemented; every other HeroMixin page type
+    ("banner" variant) uses BannerHeroCTABlock instead -- see
+    TestBannerHeroCTABlock.
     """
 
     def test_button_choice_is_button_block(self):
@@ -577,15 +585,38 @@ class TestHeroCTABlock(SimpleTestCase):
         block = HeroCTABlock()
         self.assertNotIn("content", block.declared_blocks["signup"].declared_blocks)
 
-    def test_donate_choice_is_donate_block(self):
+    def test_donate_and_announcement_are_not_choices(self):
         block = HeroCTABlock()
-        self.assertIsInstance(block.declared_blocks["donate"], DonateBlock)
+        self.assertEqual(set(block.declared_blocks.keys()), {"button", "signup"})
 
     def test_at_most_one_item(self):
         self.assertEqual(HeroCTABlock().meta.max_num, 1)
 
     def test_zero_items_allowed(self):
         self.assertEqual(HeroCTABlock().meta.min_num, 0)
+
+
+class TestBannerHeroCTABlock(SimpleTestCase):
+    """
+    BannerHeroCTABlock is the "banner" hero variant's hero_cta block type
+    (ContentPage/IndexPage/Blogs, via their own field override) — button
+    only, since components/hero.html's "banner" branch has only ever
+    rendered that one choice. See the class's own docstring.
+    """
+
+    def test_only_choice_is_button(self):
+        block = BannerHeroCTABlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"button"})
+
+    def test_button_choice_is_button_block(self):
+        block = BannerHeroCTABlock()
+        self.assertIsInstance(block.declared_blocks["button"], ButtonBlock)
+
+    def test_at_most_one_item(self):
+        self.assertEqual(BannerHeroCTABlock().meta.max_num, 1)
+
+    def test_zero_items_allowed(self):
+        self.assertEqual(BannerHeroCTABlock().meta.min_num, 0)
 
 
 class TestSectionBlockWidth(SimpleTestCase):
@@ -813,7 +844,11 @@ class TestImageGridItemBlockFields(SimpleTestCase):
 class TestCardGridBlockFields(SimpleTestCase):
     """
     CardGridBlock field structure and its dynamic row-balancing via
-    _balanced_rows() (previously untested -- see AGENTS.md pitfall #44).
+    _full_rows_with_balanced_tail() (previously _balanced_rows() -- see
+    AGENTS.md pitfall #44 and _full_rows_with_balanced_tail()'s own
+    docstring). At max_per_row=3 the two algorithms always agree (see
+    TestPersonCardGridBlockFields), so these assertions are unchanged from
+    when this block used _balanced_rows().
     """
 
     def test_has_expected_fields(self):
@@ -885,6 +920,21 @@ class TestImageGridBlockFields(SimpleTestCase):
         ctx = block.get_context(value, parent_context={})
         self.assertEqual([len(r) for r in ctx["rows"]], [3, 2])
 
+    def test_get_context_full_rows_before_balanced_tail_at_nine(self):
+        """
+        Unlike CardGridBlock/PersonCardGridBlock (max_per_row=3, where
+        _full_rows_with_balanced_tail() and the old _balanced_rows() always
+        agree), ImageGridBlock's max_per_row=4 is wide enough for the two
+        to genuinely diverge: _balanced_rows() would spread 9 images across
+        3 rows evenly as [3, 3, 3]; _full_rows_with_balanced_tail() instead
+        keeps the first row full at the cap and only balances the tail,
+        giving [4, 3, 2].
+        """
+        block = ImageGridBlock()
+        value = {"heading": "", "images": list(range(9))}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [4, 3, 2])
+
 
 class TestLogoGridItemBlockFields(SimpleTestCase):
     def test_has_expected_fields(self):
@@ -952,10 +1002,25 @@ class TestLogoGridBlockFields(SimpleTestCase):
         self.assertEqual(LogoGridBlock.MAX_PER_ROW, 5)
 
     def test_get_context_computes_rows(self):
+        """
+        6 logos at cap 5 folds into one row of 6 (via
+        _full_rows_merging_lone_remainder()), not two rows of 3 --
+        LogoGridBlock's own tweak on top of the shared
+        full-rows-plus-balanced-tail approach; see that function's
+        docstring for why this differs from CardGridBlock/ImageGridBlock/
+        PersonCardGridBlock.
+        """
         block = LogoGridBlock()
         value = {"heading": "", "logos": [1, 2, 3, 4, 5, 6]}
         ctx = block.get_context(value, parent_context={})
-        self.assertEqual([len(r) for r in ctx["rows"]], [3, 3])
+        self.assertEqual([len(r) for r in ctx["rows"]], [6])
+
+    def test_get_context_computes_rows_with_a_lead_full_row(self):
+        """11 logos at cap 5: a full lead row, then the remainder folds into one row of 6."""
+        block = LogoGridBlock()
+        value = {"heading": "", "logos": list(range(11))}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [5, 6])
 
 
 class TestHeroIsMinimal(SimpleTestCase):
@@ -1002,11 +1067,15 @@ class TestHeroIsMinimal(SimpleTestCase):
 
 class TestBalancedRows(SimpleTestCase):
     """
-    _balanced_rows(items, max_per_row) is the row-layout algorithm shared
-    by CardGridBlock, ImageGridBlock, LogoGridBlock and
-    PersonCardGridBlock (each with their own max_per_row) -- never a row
-    of 1 for len(items) > max_per_row, see its docstring for the proof
-    this encodes as an executable check.
+    _balanced_rows(items, max_per_row) -- never a row of 1 for
+    len(items) > max_per_row, see its docstring for the proof this
+    encodes as an executable check. No longer called directly by any grid
+    block's get_context() (CardGridBlock/ImageGridBlock/PersonCardGridBlock
+    use _full_rows_with_balanced_tail(), which calls this internally to
+    balance its own tail; LogoGridBlock uses its own
+    _full_rows_merging_lone_remainder() instead) -- ButtonGroupBlock is
+    the only remaining direct caller. See TestFullRowsWithBalancedTail and
+    TestFullRowsMergingLoneRemainder for those.
     """
 
     def _items(self, n):
@@ -1117,8 +1186,228 @@ class TestBalancedRows(SimpleTestCase):
         self.assertEqual([p for row in rows for p in row], list(range(7)))
 
 
+class TestFullRowsWithBalancedTail(SimpleTestCase):
+    """
+    _full_rows_with_balanced_tail(items, max_per_row) is CardGridBlock/
+    ImageGridBlock/PersonCardGridBlock's shared row-layout algorithm: full
+    rows at the cap, except the last one or two rows, which balance evenly
+    rather than ever leaving a single item alone on its own row. See its
+    docstring for why this is deliberately not folded into the shared
+    _balanced_rows(), and for why LogoGridBlock uses its own
+    _full_rows_merging_lone_remainder() instead (TestFullRowsMergingLoneRemainder)
+    rather than this function.
+
+    Examples below use max_per_row=5 as a convenient round number, not
+    because any current caller uses that cap — CardGridBlock/
+    PersonCardGridBlock are 3, ImageGridBlock is 4 (see
+    TestImageGridBlockFields for max_per_row=4 specifically, where this
+    function's behaviour actually diverges from _balanced_rows()'s).
+    """
+
+    def _items(self, n):
+        return list(range(n))
+
+    def test_count_at_or_under_cap_is_single_row(self):
+        self.assertEqual(_full_rows_with_balanced_tail(self._items(3), 5), [[0, 1, 2]])
+        self.assertEqual(
+            _full_rows_with_balanced_tail(self._items(5), 5), [[0, 1, 2, 3, 4]]
+        )
+
+    def test_exact_multiple_of_cap_is_all_full_rows(self):
+        rows = _full_rows_with_balanced_tail(self._items(10), 5)
+        self.assertEqual([len(r) for r in rows], [5, 5])
+
+    def test_remainder_of_two_or_more_is_a_full_row_plus_a_shorter_last_row(self):
+        """
+        8 items at cap 5: a full first row, then whatever's left -- unlike
+        _balanced_rows(), which would instead spread these evenly as
+        [4, 4].
+        """
+        rows = _full_rows_with_balanced_tail(self._items(8), 5)
+        self.assertEqual([len(r) for r in rows], [5, 3])
+
+    def test_remainder_of_one_balances_the_last_two_rows_instead_of_a_lone_item(self):
+        """
+        The one case this exists to handle: 6 items at cap 5 would naively
+        be [5, 1] -- an item alone on its own row. Instead the final full
+        row and the leftover item balance evenly as [3, 3]. (LogoGridBlock
+        specifically prefers folding this into one row of 6 instead -- see
+        _full_rows_merging_lone_remainder() -- but that's a deliberate
+        logo-specific divergence from this function, not a bug here.)
+        """
+        rows = _full_rows_with_balanced_tail(self._items(6), 5)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+
+    def test_remainder_of_one_with_more_rows_only_rebalances_the_tail(self):
+        """
+        11 items at cap 5 (n // max_per_row == 2, remainder 1): the first
+        row stays full at the cap; only the last two rows -- what would
+        naively have been [5, 1] -- balance evenly instead, per the
+        function's whole point.
+        """
+        rows = _full_rows_with_balanced_tail(self._items(11), 5)
+        self.assertEqual([len(r) for r in rows], [5, 3, 3])
+
+    def test_no_row_of_one_for_a_spread_of_counts_and_caps(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) >= 2 for r in rows))
+
+    def test_no_row_exceeds_the_cap(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) <= max_per_row for r in rows))
+
+    def test_rows_cover_every_item_exactly_once_in_order(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(1, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    flattened = [p for row in rows for p in row]
+                    self.assertEqual(flattened, self._items(n))
+
+    def test_every_row_but_the_last_two_is_full_at_the_cap(self):
+        """
+        The defining difference from _balanced_rows(): every row is
+        packed to max_per_row except (at most) the final one or two.
+        """
+        for max_per_row in (3, 4, 5):
+            for n in range(max_per_row + 1, 60):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    for row in rows[:-2]:
+                        self.assertEqual(len(row), max_per_row)
+
+    def test_works_with_an_object_that_only_supports_int_indexing(self):
+        """Same ListValue-slicing hazard _balanced_rows() guards against."""
+
+        class IntOnlyIndexable:
+            def __init__(self, items):
+                self._items = items
+
+            def __len__(self):
+                return len(self._items)
+
+            def __getitem__(self, i):
+                if not isinstance(i, int):
+                    raise TypeError("only int indices supported")
+                return self._items[i]
+
+        wrapped = IntOnlyIndexable(list(range(6)))
+        rows = _full_rows_with_balanced_tail(wrapped, 5)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+        self.assertEqual([p for row in rows for p in row], list(range(6)))
+
+
+class TestFullRowsMergingLoneRemainder(SimpleTestCase):
+    """
+    _full_rows_merging_lone_remainder(items, max_per_row) is
+    LogoGridBlock's own row-layout algorithm — like
+    _full_rows_with_balanced_tail() (full rows at the cap, never a lone
+    item of 1), but a remainder of exactly 1 folds into the last row
+    (max_per_row + 1 items) instead of balancing across two rows. See its
+    docstring for why this is logo-specific rather than a change to
+    _full_rows_with_balanced_tail() itself.
+    """
+
+    def _items(self, n):
+        return list(range(n))
+
+    def test_count_at_or_under_cap_is_single_row(self):
+        self.assertEqual(
+            _full_rows_merging_lone_remainder(self._items(3), 5), [[0, 1, 2]]
+        )
+        self.assertEqual(
+            _full_rows_merging_lone_remainder(self._items(5), 5), [[0, 1, 2, 3, 4]]
+        )
+
+    def test_exact_multiple_of_cap_is_all_full_rows(self):
+        rows = _full_rows_merging_lone_remainder(self._items(10), 5)
+        self.assertEqual([len(r) for r in rows], [5, 5])
+
+    def test_remainder_of_two_or_more_is_a_full_row_plus_a_shorter_last_row(self):
+        """Same as _full_rows_with_balanced_tail(): unaffected by the tweak."""
+        rows = _full_rows_merging_lone_remainder(self._items(8), 5)
+        self.assertEqual([len(r) for r in rows], [5, 3])
+
+    def test_remainder_of_one_folds_into_a_single_wider_last_row(self):
+        """
+        The defining difference from _full_rows_with_balanced_tail(): 26
+        logos at cap 5 (n // max_per_row == 5, remainder 1) reads as
+        5,5,5,5,6 — one row one logo over the cap — not 5,5,5,5,3,3.
+        """
+        rows = _full_rows_merging_lone_remainder(self._items(26), 5)
+        self.assertEqual([len(r) for r in rows], [5, 5, 5, 5, 6])
+
+    def test_remainder_of_one_just_over_the_cap_is_a_single_row(self):
+        """
+        6 logos at cap 5 (no full row ahead of the remainder at all):
+        one row of 6, not a lone logo split off, and not two rows of 3
+        the way _full_rows_with_balanced_tail() would give.
+        """
+        rows = _full_rows_merging_lone_remainder(self._items(6), 5)
+        self.assertEqual([len(r) for r in rows], [6])
+
+    def test_no_row_of_one_for_a_spread_of_counts_and_caps(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_merging_lone_remainder(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) >= 2 for r in rows))
+
+    def test_no_row_exceeds_the_cap_by_more_than_one(self):
+        """
+        Unlike _full_rows_with_balanced_tail(), a row here can be
+        max_per_row + 1 (the merged-remainder case) but never more.
+        """
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_merging_lone_remainder(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) <= max_per_row + 1 for r in rows))
+
+    def test_rows_cover_every_item_exactly_once_in_order(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(1, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_merging_lone_remainder(self._items(n), max_per_row)
+                    flattened = [p for row in rows for p in row]
+                    self.assertEqual(flattened, self._items(n))
+
+    def test_works_with_an_object_that_only_supports_int_indexing(self):
+        """Same ListValue-slicing hazard _balanced_rows() guards against."""
+
+        class IntOnlyIndexable:
+            def __init__(self, items):
+                self._items = items
+
+            def __len__(self):
+                return len(self._items)
+
+            def __getitem__(self, i):
+                if not isinstance(i, int):
+                    raise TypeError("only int indices supported")
+                return self._items[i]
+
+        wrapped = IntOnlyIndexable(list(range(26)))
+        rows = _full_rows_merging_lone_remainder(wrapped, 5)
+        self.assertEqual([len(r) for r in rows], [5, 5, 5, 5, 6])
+        self.assertEqual([p for row in rows for p in row], list(range(26)))
+
+
 class TestPersonCardGridBlockFields(SimpleTestCase):
-    """PersonCardGridBlock field structure: heading + people (min 1, max 12)."""
+    """
+    PersonCardGridBlock field structure: heading + people (min 1, max 12).
+    Row layout is _full_rows_with_balanced_tail() (max_per_row=3) — same
+    algorithm CardGridBlock/ImageGridBlock/LogoGridBlock use, their own
+    caps. At max_per_row=3 it always agrees with the older _balanced_rows()
+    this block used to call (see TestFullRowsWithBalancedTail), so the
+    below is unchanged from before that switch.
+    """
 
     def test_has_expected_fields(self):
         block = PersonCardGridBlock()
@@ -1204,8 +1493,31 @@ class TestImageTextBlockFields(SimpleTestCase):
     def test_has_expected_fields(self):
         block = ImageTextBlock()
         self.assertEqual(
-            set(block.declared_blocks.keys()), {"image", "content", "alignment", "size"}
+            set(block.declared_blocks.keys()),
+            {"image", "content", "alignment", "size", "crop"},
         )
+
+    def test_crop_defaults_to_true(self):
+        """
+        Defaulting True preserves every existing page's current
+        force-cropped look — see ImageTextBlock's docstring.
+        """
+        block = ImageTextBlock()
+        self.assertTrue(block.declared_blocks["crop"].get_default())
+
+    def test_crop_is_not_required(self):
+        block = ImageTextBlock()
+        self.assertFalse(block.declared_blocks["crop"].required)
+
+    def test_missing_crop_in_stored_value_falls_back_to_true(self):
+        # Same "old data keeps rendering" contract as the size field's own
+        # equivalent test below -- crop didn't exist before this field was
+        # added.
+        block = ImageTextBlock()
+        value = block.to_python(
+            {"image": None, "content": "<p>Hi</p>", "alignment": "image-left", "size": "default"}
+        )
+        self.assertTrue(value["crop"])
 
     def test_image_is_required(self):
         block = ImageTextBlock()
@@ -2398,3 +2710,97 @@ class TestIntegrationGatedStreamBlockVisibility(TestCase):
         self._set_current_request()
         names = {b.name for b in SectionContentBlock().sorted_child_blocks()}
         self.assertNotIn("donate", names)
+
+
+class TestGatedStreamBlockAdapter(TestCase):
+    """
+    GatedStreamBlockAdapter (wtrx/blocks/__init__.py) is the fix for the gap
+    documented in AGENTS.md pitfall #52: the JS StreamField widget uses
+    js_args()'s groupedChildBlockDefs argument for two things, not one --
+    the "Add block" picker AND childBlockDefsByName, which an
+    already-placed block's own hydration looks itself up in. Filtering that
+    argument (what the base StreamBlockAdapter does) hides a gated block
+    from the picker but also breaks loading an existing page that already
+    has one placed.
+
+    These tests can only exercise the Python side (what gets sent to the
+    client) -- the actual hydration crash this fixes happened inside the
+    compiled admin JS bundle and can only be reproduced/verified in a real
+    browser (see AGENTS.md pitfall #52 and the how-to-give workstream in
+    the review-follow-ups plan for the manual verification steps). What's
+    provable here is the contract the JS fix depends on: the full,
+    ungated block-def list must always reach the client, regardless of
+    what's hidden from the picker.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+        self.integration.integrations = []  # actblue, actionkit both disabled
+        self.integration.save()
+        request = RequestFactory().get("/admin/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        token = _current_request.set(request)
+        self.addCleanup(_current_request.reset, token)
+
+    def _flattened_names(self, grouped_child_block_defs):
+        names = set()
+        for _group_name, group in grouped_child_block_defs:
+            for child_block in group:
+                names.add(child_block.name)
+        return names
+
+    def test_js_args_sends_full_ungated_block_defs(self):
+        """
+        The critical safety property this whole adapter exists for: even
+        though `donate` is hidden from the picker (actblue is disabled),
+        it must still be present in the block-def list js_args() sends --
+        that's what childBlockDefsByName gets built from client-side, and
+        what an already-placed `donate` block's hydration depends on.
+        """
+        block = BodyStreamBlock()
+        adapter = GatedStreamBlockAdapter()
+        args = adapter.js_args(block)
+        names = self._flattened_names(args[1])
+        self.assertIn("donate", names)
+        self.assertIn("signup_actionkit", names)
+        # Sanity check against the (correctly filtered) picker, to prove
+        # this isn't just "filtering silently did nothing":
+        picker_names = {b.name for b in block.sorted_child_blocks()}
+        self.assertNotIn("donate", picker_names)
+
+    def test_js_args_appends_hidden_block_names(self):
+        block = BodyStreamBlock()
+        adapter = GatedStreamBlockAdapter()
+        args = adapter.js_args(block)
+        hidden_names = args[4]
+        self.assertIn("donate", hidden_names)
+        self.assertIn("signup_actionkit", hidden_names)
+        self.assertNotIn("signup_wagtail_forms", hidden_names)
+
+    def test_js_constructor_is_the_custom_client_side_class(self):
+        self.assertEqual(
+            GatedStreamBlockAdapter().js_constructor, "wtrx.blocks.GatedStreamBlock"
+        )
+
+    def test_gated_stream_blocks_resolve_to_the_custom_adapter(self):
+        """
+        Telepath's registry walks the MRO (registry.find_adapter()), so
+        registering GatedStreamBlockAdapter against BodyStreamBlock/
+        SectionContentBlock specifically must take precedence over the
+        base StreamBlockAdapter registered for StreamBlock itself -- or
+        this whole fix silently never runs.
+        """
+        from wagtail.admin.telepath import registry
+        from wtrx.blocks import BodyStreamBlock, SectionContentBlock
+
+        self.assertIsInstance(
+            registry.find_adapter(BodyStreamBlock), GatedStreamBlockAdapter
+        )
+        self.assertIsInstance(
+            registry.find_adapter(SectionContentBlock), GatedStreamBlockAdapter
+        )

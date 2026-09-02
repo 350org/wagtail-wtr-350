@@ -11,8 +11,11 @@ Block-type visibility (hiding irrelevant SignupBlock/DonateBlock variants
 per IntegrationSettings) is NOT a hook — it lives in
 IntegrationGatedStreamBlockMixin in wtrx/blocks/__init__.py, which filters
 BodyStreamBlock/SectionContentBlock's "Add block" picker natively via
-sorted_child_blocks(). See wtrx/request_context.py for how block code
-accesses the current request.
+sorted_child_blocks(), plus GatedStreamBlockAdapter (also in
+wtrx/blocks/__init__.py), a telepath Adapter that keeps an already-placed
+instance of a gated block hydrating/rendering correctly in the editor even
+after its integration is later disabled. See wtrx/request_context.py for
+how block code accesses the current request.
 """
 
 from django.urls import reverse
