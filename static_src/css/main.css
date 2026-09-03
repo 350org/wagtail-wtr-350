@@ -963,6 +963,127 @@ html {
 }
 
 /* ============================================================
+ * Raw HTML form embeds — .wtr-raw-html form
+ * ============================================================
+ * RawHTMLBlock (raw_html_block.html) is generic -- it can hold any
+ * fetched/pasted markup, not just forms -- so these rules key off real
+ * <form> structure rather than a form-specific block or wrapper class.
+ * Written for the Salesforce Web-to-Case form on /contact-us (a plain
+ * label/input/select/textarea/submit form, no wrapper divs of its own,
+ * fields separated by bare <br> tags), but deliberately targets elements
+ * by tag/type/attribute only -- never Salesforce's own generated field
+ * ids (e.g. name="00NPj...", which are org- and form-config-specific and
+ * will differ if that form is ever reconfigured) -- so it keeps working
+ * unchanged if fields are added, removed or reordered in Salesforce's own
+ * form builder, or if a future raw-HTML embed from a different vendor
+ * happens to share the same plain-form shape.
+ *
+ * Baseline appearance (border, padding, focus ring) for the text/select/
+ * textarea inputs themselves already comes from @tailwindcss/forms' base
+ * layer plus this file's own [type='text']:focus / select:focus /
+ * textarea:focus rules above -- both apply globally with no class needed,
+ * so only layout, sizing and the two elements that plugin doesn't touch
+ * (bare <br> spacers, input[type='submit']) need rules here.
+ *
+ * A RawHTMLBlock can sit inside a SectionBlock set to any of the shared
+ * palette's colors (AGENTS.md pitfall #33), which inverts its own text via
+ * data-bg-tone (section_block.html) -- the same signal .prose reads
+ * (above). Loose text sitting directly on that background -- the <label>
+ * elements, and Salesforce's ungrouped "Topic:" text node, which isn't
+ * inside any element CSS could otherwise target -- needs to invert with
+ * it too, so `color` is set once on the form itself and left to inherit
+ * rather than hardcoded per element. The field boxes are the one
+ * exception: their background stays a light surface regardless of
+ * section tone (same convention as the ActionKit embed's .input-text),
+ * so their own text color is pinned to dark explicitly below, not
+ * inherited. The submit button also stays constant (solid primary fill,
+ * matching the wtr-btn utility) -- only text sitting on the bare section
+ * background needs to invert.
+ * ============================================================ */
+
+.wtr-raw-html form {
+    display: flex;
+    flex-direction: column;
+    max-width: 42rem;
+    color: var(--color-dark);
+}
+
+[data-bg-tone="dark"] .wtr-raw-html form {
+    color: var(--color-light);
+}
+
+/* Salesforce's own generator separates every field with a bare <br> --
+ * replaced by the label/input margins below so field groups (a label
+ * immediately followed by its own input) sit closer together than the
+ * gap between one group and the next. */
+.wtr-raw-html form br {
+    display: none;
+}
+
+.wtr-raw-html form label {
+    display: block;
+    margin-top: 1.25rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-bold);
+}
+
+.wtr-raw-html form label:first-child {
+    margin-top: 0;
+}
+
+.wtr-raw-html form input[type='text'],
+.wtr-raw-html form input[type='email'],
+.wtr-raw-html form input[type='tel'],
+.wtr-raw-html form input[type='number'],
+.wtr-raw-html form select,
+.wtr-raw-html form textarea {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-neutral-300);
+    border-radius: var(--radius-md);
+    background-color: var(--color-light);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--color-dark);
+}
+
+.wtr-raw-html form textarea {
+    min-height: 8rem;
+    resize: vertical;
+}
+
+/* The reCAPTCHA widget (div.g-recaptcha) sizes itself once Google's script
+ * hydrates it -- only the surrounding gap is ours to set. */
+.wtr-raw-html form .g-recaptcha {
+    margin-top: 1.25rem;
+}
+
+/* Mirrors the wtr-btn utility (top of this file) -- can't apply that
+ * class directly since it isn't ours to add to Salesforce's markup. */
+.wtr-raw-html form input[type='submit'] {
+    display: inline-block;
+    align-self: flex-start;
+    margin-top: 1.25rem;
+    padding: 0.625rem 1.25rem;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.5;
+    color: var(--color-light);
+    background-color: var(--color-primary);
+    border: 2px solid transparent;
+    border-radius: var(--radius-button);
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.wtr-raw-html form input[type='submit']:hover {
+    background-color: var(--color-primary-500);
+}
+
+/* ============================================================
  * Heading weights — h1/h2 Klima Heavy, h3-h6 Klima Bold
  * ============================================================
  * The whole heading scale in two rules. font-bold and font-semibold both

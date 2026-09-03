@@ -6,6 +6,11 @@ Hooks registered here:
   pinned-Draftail-toolbar default in the admin
 - insert_global_admin_css: loads the 350.org admin theme colours (see
   wtrx/static/wtrx/admin/branding.css)
+- construct_main_menu: adds the configurable admin sidebar shortcuts from
+  AdminMenuSettings.sidebar_shortcuts (Settings > Admin menu)
+- construct_settings_menu: groups Branding & SEO / Navigation / Footer /
+  Social under one "Site design" flyout in the Settings menu, so the
+  Settings sidebar doesn't grow one flat entry per settings model forever
 
 Block-type visibility (hiding irrelevant SignupBlock/DonateBlock variants
 per IntegrationSettings) is NOT a hook — it lives in
@@ -23,9 +28,16 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from wagtail import hooks
-from wagtail.admin.menu import MenuItem
+from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 from wagtail.admin.staticfiles import versioned_static
-from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
+from wagtail.contrib.settings.registry import SettingMenuItem
+
+from wtrx.site_settings import (
+    BrandingSEOSettings,
+    FooterSettings,
+    NavigationSettings,
+    SocialSettings,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -80,18 +92,30 @@ def insert_admin_branding_css():
 
 
 # ---------------------------------------------------------------------------
-# Blog admin-menu shortcut
+# Admin sidebar shortcuts (Settings > Admin menu)
 # ---------------------------------------------------------------------------
 #
-# Adds a "Blog" item to the admin sidebar linking to the page explorer for
-# the blog index page configured in Settings > Admin menu
-# (AdminMenuSettings.blog_index_page). Hidden entirely when no blog index
-# page is configured, or the configured page isn't live.
+# Was two hardcoded fields (blog_index_page, press_releases_index_page),
+# each with its own MenuItem subclass and register_admin_menu_item hook —
+# see git history for that version. AdminMenuSettings.sidebar_shortcuts is
+# now a StreamField list of (label, page, icon) entries, so this needs to
+# add a *variable* number of menu items depending on what's configured —
+# register_admin_menu_item hooks each return exactly one item (see
+# wagtail.admin.menu.Menu.registered_menu_items, `items.append(fn())`), so
+# that mechanism can't produce N items from one hook. construct_main_menu
+# is the right hook instead: it receives the already-assembled `items` list
+# for the current request and can append any number of entries to it.
+#
+# Because this hook runs per-request (not once at import time), each
+# MenuItem built here is a fresh instance scoped to this request — unlike
+# the old BlogMenuItem/PressReleasesMenuItem, there's no shared/cached
+# instance to worry about resolving stale data on.
 # ---------------------------------------------------------------------------
 
 
-def _get_blog_index_page(request):
-    # Import here to avoid import-time DB access
+@hooks.register("construct_main_menu")
+def add_admin_menu_shortcuts(request, items):
+    # Imports here to avoid import-time DB access (AGENTS.md pitfall #1).
     from wagtail.models import Site
 
     from wtrx.site_settings import AdminMenuSettings
@@ -99,97 +123,74 @@ def _get_blog_index_page(request):
     try:
         admin_settings = AdminMenuSettings.for_request(request)
     except (AdminMenuSettings.DoesNotExist, Site.DoesNotExist):
-        return None
+        return
 
-    page = admin_settings.blog_index_page
-    if page is None or not page.live:
-        return None
-    return page
-
-
-class BlogMenuItem(MenuItem):
-    def is_shown(self, request):
-        return _get_blog_index_page(request) is not None
-
-    def render_component(self, request):
-        # Recompute rather than reuse a cached URL: menu item instances are
-        # shared across requests, so the target page must be resolved fresh
-        # each time rather than stashed on self.
-        page = _get_blog_index_page(request)
-        url = reverse("wagtailadmin_explore", args=[page.id])
-        return LinkMenuItemComponent(
-            self.name,
-            self.label,
-            url,
-            icon_name=self.icon_name,
-            classname=self.classname,
-            attrs=self.attrs,
+    for index, shortcut in enumerate(admin_settings.sidebar_shortcuts):
+        page = shortcut.value.get("page")
+        if page is None or not page.live:
+            continue
+        label = shortcut.value.get("label") or page.title
+        icon_name = shortcut.value.get("icon") or "doc-empty"
+        items.append(
+            MenuItem(
+                label,
+                reverse("wagtailadmin_explore", args=[page.id]),
+                name=f"admin-menu-shortcut-{index}",
+                icon_name=icon_name,
+                order=150 + index,
+            )
         )
 
 
-@hooks.register("register_admin_menu_item")
-def register_blog_menu_item():
-    return BlogMenuItem(
-        _("Blog"),
-        "#",
-        name="blog",
-        icon_name="doc-empty",
-        order=150,
-    )
-
-
 # ---------------------------------------------------------------------------
-# Press releases admin-menu shortcut
+# Settings menu grouping
 # ---------------------------------------------------------------------------
 #
-# Same pattern as the Blog shortcut above, pointing at
-# AdminMenuSettings.press_releases_index_page instead.
+# Wagtail's own Settings entry (wagtail/admin/wagtail_hooks.py,
+# SettingsMenuItem) is a SubmenuMenuItem wrapping a Menu that itself
+# supports a construct_settings_menu hook — the same items-list-mutation
+# pattern construct_main_menu above uses, just for the Settings flyout
+# instead of the top-level sidebar. Every @register_setting(...) model
+# (site_settings.py) registers a flat SettingMenuItem in that list via
+# Wagtail's own registry (wagtail.contrib.settings.registry.Registry.register),
+# so without this hook the Settings flyout grows one entry per settings
+# model forever. This groups the site-identity/presentation models — the
+# ones an editor thinks of as "how the site looks" — under one "Site
+# design" flyout, leaving Integrations and Admin menu (more
+# operational/technical) at the top level.
+#
+# Matching by `item.model` (SettingMenuItem stores the registered model on
+# itself) rather than by label/slug — robust to a verbose_name changing
+# later, and avoids re-deriving Wagtail's own slugification.
 # ---------------------------------------------------------------------------
 
-
-def _get_press_releases_index_page(request):
-    # Import here to avoid import-time DB access
-    from wagtail.models import Site
-
-    from wtrx.site_settings import AdminMenuSettings
-
-    try:
-        admin_settings = AdminMenuSettings.for_request(request)
-    except (AdminMenuSettings.DoesNotExist, Site.DoesNotExist):
-        return None
-
-    page = admin_settings.press_releases_index_page
-    if page is None or not page.live:
-        return None
-    return page
+_SITE_DESIGN_SETTINGS_MODELS = {
+    BrandingSEOSettings,
+    NavigationSettings,
+    FooterSettings,
+    SocialSettings,
+}
 
 
-class PressReleasesMenuItem(MenuItem):
-    def is_shown(self, request):
-        return _get_press_releases_index_page(request) is not None
+@hooks.register("construct_settings_menu")
+def group_site_design_settings_menu_items(request, items):
+    grouped = [
+        item
+        for item in items
+        if isinstance(item, SettingMenuItem) and item.model in _SITE_DESIGN_SETTINGS_MODELS
+    ]
+    if not grouped:
+        return
 
-    def render_component(self, request):
-        # Recompute rather than reuse a cached URL: menu item instances are
-        # shared across requests, so the target page must be resolved fresh
-        # each time rather than stashed on self.
-        page = _get_press_releases_index_page(request)
-        url = reverse("wagtailadmin_explore", args=[page.id])
-        return LinkMenuItemComponent(
-            self.name,
-            self.label,
-            url,
-            icon_name=self.icon_name,
-            classname=self.classname,
-            attrs=self.attrs,
+    for item in grouped:
+        items.remove(item)
+
+    items.append(
+        SubmenuMenuItem(
+            _("Site design"),
+            Menu(items=grouped),
+            name="site-design",
+            icon_name="view",
+            order=15,
         )
-
-
-@hooks.register("register_admin_menu_item")
-def register_press_releases_menu_item():
-    return PressReleasesMenuItem(
-        _("Press releases"),
-        "#",
-        name="press-releases",
-        icon_name="clipboard-list",
-        order=151,
     )

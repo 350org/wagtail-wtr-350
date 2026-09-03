@@ -39,6 +39,12 @@ class IntegrationType:
         whose value should be rendered verbatim into the site's <head> when
         the integration is enabled (e.g. FundraiseUp's installation script).
         None for integrations that don't inject site-wide markup.
+    body_html_field: same idea as head_html_field, but rendered verbatim
+        immediately after <body> opens instead (base.html) — for markup
+        that specifically has to run early in the body, e.g. Google Tag
+        Manager's <noscript> fallback iframe. None for integrations that
+        don't need this (most won't — head_html_field covers the common
+        case of a vendor <script> tag).
     default_enabled: whether this integration/feature should read as
         *enabled* when no entry for it exists yet in
         IntegrationSettings.integrations at all. False (the default) is
@@ -63,6 +69,7 @@ class IntegrationType:
     category: str
     content_block_names: tuple[str, ...] = field(default_factory=tuple)
     head_html_field: str | None = None
+    body_html_field: str | None = None
     default_enabled: bool = False
 
 

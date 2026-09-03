@@ -25,8 +25,9 @@ import base64
 from unittest.mock import patch
 
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, RequestFactory, TestCase
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 from wagtail.models import Page, Site
 
 from wtrx.blocks import DonateBlock
@@ -38,6 +39,7 @@ from wtrx.site_settings import (
     FooterSettings,
     IntegrationSettings,
     NavigationSettings,
+    SocialSettings,
 )
 
 # Minimal fixtures for TestHeaderLogoRendering — one of each format, to pin
@@ -1133,3 +1135,183 @@ class TestFooterNewsletterSignupRendersInFooter(TestCase):
         mock_fetch.return_value = "<form>canada form</form>"
         content = self.client.get(self.canada.url).content.decode()
         self.assertIn("Thanks for signing up!", content)
+
+
+class TestSocialSettingsTwitterHandle(TestCase):
+    """
+    SocialSettings.twitter_handle derives the twitter:site meta tag's
+    "@handle" from social_links's own "twitter" entry -- replaces the old
+    separate BrandingSEOSettings.twitter_site field (see the migration
+    that removed it, 0068/0069), which could disagree with social_links.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+        cls.social, _ = SocialSettings.objects.get_or_create(site=cls.site)
+
+    def _set_links(self, links):
+        self.social.social_links = links
+        self.social.save()
+
+    def test_empty_when_no_social_links(self):
+        self._set_links([])
+        self.assertEqual(self.social.twitter_handle, "")
+
+    def test_empty_when_no_twitter_entry(self):
+        self._set_links(
+            [("link", {"platform": "facebook", "url": "https://facebook.com/350"})]
+        )
+        self.assertEqual(self.social.twitter_handle, "")
+
+    def test_handle_derived_from_twitter_com_url(self):
+        self._set_links([("link", {"platform": "twitter", "url": "https://twitter.com/350"})])
+        self.assertEqual(self.social.twitter_handle, "@350")
+
+    def test_handle_derived_from_x_com_url(self):
+        self._set_links([("link", {"platform": "twitter", "url": "https://x.com/350"})])
+        self.assertEqual(self.social.twitter_handle, "@350")
+
+    def test_handle_strips_trailing_slash_and_extra_path(self):
+        self._set_links(
+            [("link", {"platform": "twitter", "url": "https://twitter.com/350/status/1"})]
+        )
+        self.assertEqual(self.social.twitter_handle, "@350")
+
+    def test_empty_when_twitter_url_has_no_path(self):
+        self._set_links([("link", {"platform": "twitter", "url": "https://twitter.com/"})])
+        self.assertEqual(self.social.twitter_handle, "")
+
+
+class TestIntegrationSettingsHeadHtml(TestCase):
+    """
+    IntegrationSettings.head_html() concatenates every enabled
+    integration's head_html_field, followed by custom_head_html.
+    GoogleTagManagerConfigBlock (wtrx/integrations/gtm.py) is the first
+    real integration to exercise head_html_field end to end -- Fundraise
+    Up's own installation_code covers this too, but GTM is used here
+    since it's this suite's own natural fixture for both head and body.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+        cls.integration, _ = IntegrationSettings.objects.get_or_create(site=cls.site)
+
+    def _gtm_entry(self, enabled=True, head_snippet="<script>gtm head</script>", body_snippet=""):
+        return (
+            "google_tag_manager",
+            {
+                "enabled": enabled,
+                "head_snippet": head_snippet,
+                "body_snippet": body_snippet,
+            },
+        )
+
+    def test_empty_when_nothing_configured(self):
+        self.assertEqual(str(self.integration.head_html()), "")
+
+    def test_renders_head_snippet_for_an_enabled_gtm_entry(self):
+        self.integration.integrations = [self._gtm_entry()]
+        self.assertIn("<script>gtm head</script>", str(self.integration.head_html()))
+
+    def test_omits_head_snippet_for_a_disabled_gtm_entry(self):
+        self.integration.integrations = [self._gtm_entry(enabled=False)]
+        self.assertEqual(str(self.integration.head_html()), "")
+
+    def test_appends_custom_head_html_after_integration_fragments(self):
+        self.integration.integrations = [self._gtm_entry()]
+        self.integration.custom_head_html = "<meta name=\"custom\">"
+        html = str(self.integration.head_html())
+        self.assertIn("<script>gtm head</script>", html)
+        self.assertIn('<meta name="custom">', html)
+        self.assertLess(
+            html.index("gtm head"), html.index("custom"),
+            "custom_head_html should come after integration fragments",
+        )
+
+    def test_custom_head_html_alone_with_no_integrations_configured(self):
+        self.integration.custom_head_html = "<meta name=\"custom\">"
+        self.assertIn('<meta name="custom">', str(self.integration.head_html()))
+
+
+class TestIntegrationSettingsBodyHtml(TestCase):
+    """
+    IntegrationSettings.body_html() mirrors head_html() but reads
+    IntegrationType.body_html_field/custom_body_html instead -- see
+    registry.py. GoogleTagManagerConfigBlock (wtrx/integrations/gtm.py) is
+    the first real integration to set body_html_field (its <noscript>
+    fallback).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+        cls.integration, _ = IntegrationSettings.objects.get_or_create(site=cls.site)
+
+    def _gtm_entry(self, enabled=True, head_snippet="<script>gtm head</script>", body_snippet="<noscript>gtm body</noscript>"):
+        return (
+            "google_tag_manager",
+            {
+                "enabled": enabled,
+                "head_snippet": head_snippet,
+                "body_snippet": body_snippet,
+            },
+        )
+
+    def test_empty_when_nothing_configured(self):
+        self.assertEqual(str(self.integration.body_html()), "")
+
+    def test_renders_body_snippet_for_an_enabled_gtm_entry(self):
+        self.integration.integrations = [self._gtm_entry()]
+        self.assertIn(
+            "<noscript>gtm body</noscript>", str(self.integration.body_html())
+        )
+
+    def test_body_snippet_stays_optional(self):
+        # GTM's own body_snippet field is required=False -- an
+        # Analytics-only setup (no Tag Manager) has no <noscript>
+        # fallback to paste.
+        self.integration.integrations = [self._gtm_entry(body_snippet="")]
+        self.assertEqual(str(self.integration.body_html()), "")
+
+    def test_appends_custom_body_html_after_integration_fragments(self):
+        self.integration.integrations = [self._gtm_entry()]
+        self.integration.custom_body_html = "<div>custom</div>"
+        html = str(self.integration.body_html())
+        self.assertIn("<noscript>gtm body</noscript>", html)
+        self.assertIn("<div>custom</div>", html)
+        self.assertLess(
+            html.index("gtm body"), html.index("custom"),
+            "custom_body_html should come after integration fragments",
+        )
+
+
+class TestIntegrationSettingsCustomHtmlValidation(SimpleTestCase):
+    """
+    custom_head_html/custom_body_html reuse the same tag-balance validator
+    RawHTMLBlock.clean() uses for StreamField content (AGENTS.md pitfall
+    #43), via wtrx.validators.validate_balanced_html -- wired up as a
+    plain Django model-field validator instead of a block-level clean().
+    Uses Field.clean(value, instance) to validate just this one field,
+    rather than a full model full_clean() that would also require a real
+    `site` FK and every other required field on the model.
+    """
+
+    def _clean(self, field_name, value):
+        field = IntegrationSettings._meta.get_field(field_name)
+        return field.clean(value, IntegrationSettings())
+
+    def test_balanced_html_passes(self):
+        self._clean("custom_head_html", "<script>ok();</script>")
+        self._clean("custom_body_html", "<div><p>ok</p></div>")
+
+    def test_unbalanced_html_raises(self):
+        with self.assertRaises(ValidationError):
+            self._clean("custom_head_html", "<div><span></div>")
+        with self.assertRaises(ValidationError):
+            self._clean("custom_body_html", "<div><span></div>")
+
+    def test_blank_is_allowed(self):
+        self._clean("custom_head_html", "")
+        self._clean("custom_body_html", "")

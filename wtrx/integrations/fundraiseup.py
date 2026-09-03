@@ -60,9 +60,9 @@ class FundraiseUpConfigBlock(StructBlock):
     installation_code = TextBlock(
         label=_("Fundraise Up installation code"),
         help_text=_(
-            "The full <script> snippet from your Fundraise Up dashboard "
-            "(Settings → Installation). Rendered once in the site's <head> "
-            "while Fundraise Up is enabled."
+            "The full script snippet from your Fundraise Up dashboard "
+            "(Settings → Installation). Rendered once in the site's page "
+            "head while Fundraise Up is enabled."
         ),
     )
     element_id_us = CharBlock(

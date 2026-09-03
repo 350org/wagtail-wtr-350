@@ -143,8 +143,11 @@ class TestBaseTemplateSeoTagsRender(TestCase):
         cls.home.add_child(instance=cls.page)
 
         cls.branding, _ = BrandingSEOSettings.objects.get_or_create(site=cls.site)
-        cls.branding.twitter_site = "@testorg"
-        cls.branding.save()
+        cls.social, _ = SocialSettings.objects.get_or_create(site=cls.site)
+        cls.social.social_links = [
+            ("link", {"platform": "twitter", "url": "https://twitter.com/testorg"})
+        ]
+        cls.social.save()
 
     def setUp(self):
         self.client = Client(HTTP_HOST="seo-render-test.localhost")
@@ -166,7 +169,12 @@ class TestBaseTemplateSeoTagsRender(TestCase):
         self.page.canonical_url = ""
         self.page.save()
 
-    def test_twitter_site_meta_tag(self):
+    def test_twitter_site_meta_tag_derived_from_social_links(self):
+        """
+        twitter:site is derived from SocialSettings.social_links's "twitter"
+        entry (see SocialSettings.twitter_handle) — no separate
+        BrandingSEOSettings.twitter_site field any more.
+        """
         response = self.client.get(self.page.url)
         content = response.content.decode()
         self.assertIn('<meta name="twitter:site" content="@testorg" />', content)

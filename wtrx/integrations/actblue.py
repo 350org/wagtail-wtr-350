@@ -39,7 +39,6 @@ class ActBlueConfigBlock(StructBlock):
         help_text=_("Uncheck to temporarily disable ActBlue without removing its configuration."),
     )
     base_url = URLBlock(
-        required=False,
         label=_("Donation base URL"),
         help_text=_(
             "e.g. https://secure.actblue.com/donate/mycampaign. "

@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel, ObjectList, TabbedInterface
 from wagtail.blocks import (
     BooleanBlock,
     CharBlock,
@@ -26,8 +26,10 @@ from .integrations.actblue import (
 from .integrations.action_network import ActionNetworkConfigBlock
 from .integrations.actionkit import ActionKitConfigBlock
 from .integrations.fundraiseup import FundraiseUpConfigBlock
+from .integrations.gtm import GoogleTagManagerConfigBlock
 from .integrations.registry import all_integrations, get_integration
 from .integrations.wagtail_forms import WagtailFormsConfigBlock
+from .validators import validate_balanced_html
 
 
 # ---------------------------------------------------------------------------
@@ -431,16 +433,6 @@ class BrandingSEOSettings(BaseSiteSetting):
         verbose_name=_("site description"),
         help_text=_("Default meta description for the site."),
     )
-    twitter_site = models.CharField(
-        max_length=20,
-        blank=True,
-        verbose_name=_("Twitter/X account"),
-        help_text=_(
-            "The @username of the site's Twitter/X account, e.g. @350. "
-            "Used in the twitter:site meta tag on every page."
-        ),
-    )
-
     panels = [
         MultiFieldPanel(
             [FieldPanel("logo"), FieldPanel("dark_logo"), FieldPanel("favicon")],
@@ -450,7 +442,6 @@ class BrandingSEOSettings(BaseSiteSetting):
             [
                 FieldPanel("default_meta_image"),
                 AIDescriptionFieldPanel("site_description"),
-                FieldPanel("twitter_site"),
             ],
             heading=_("SEO defaults"),
         ),
@@ -535,7 +526,7 @@ class NavigationSettings(BaseSiteSetting):
         use_json_field=True,
     )
 
-    panels = [
+    main_panels = [
         FieldPanel("primary_navigation"),
         FieldPanel("regional_label"),
         MultiFieldPanel(
@@ -551,8 +542,25 @@ class NavigationSettings(BaseSiteSetting):
             [FieldPanel("collapse_desktop_menu")],
             heading=_("Layout"),
         ),
+    ]
+    advanced_panels = [
         FieldPanel("navigation_overrides"),
     ]
+    # Wagtail's settings edit view checks for an `edit_handler` attribute
+    # before falling back to auto-building one from `panels` (see
+    # wagtail.contrib.settings.views.get_setting_edit_handler) — same
+    # TabbedInterface([ObjectList(...), ...]) pattern every page model in
+    # wtrx/models.py already uses for its own edit_handler. `panels` is
+    # kept as the flat main_panels + advanced_panels list too, matching
+    # every other settings model in this file, even though edit_handler is
+    # what actually renders the form now.
+    panels = main_panels + advanced_panels
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(main_panels, heading=_("Main")),
+            ObjectList(advanced_panels, heading=_("Overrides")),
+        ]
+    )
 
     def clean(self):
         errors = {}
@@ -732,7 +740,7 @@ class FooterSettings(BaseSiteSetting):
         ),
     )
 
-    panels = [
+    main_panels = [
         FieldPanel("layout"),
         MultiFieldPanel(
             [FieldPanel("footer_navigation")],
@@ -744,11 +752,22 @@ class FooterSettings(BaseSiteSetting):
         ),
         AIFieldPanel("copyright_text"),
         FieldPanel("regional_label"),
-        FieldPanel("footer_overrides"),
-        FieldPanel("regional_sites"),
         FieldPanel("newsletter_actionkit_shortname"),
         FieldPanel("newsletter_success_message"),
     ]
+    advanced_panels = [
+        FieldPanel("footer_overrides"),
+        FieldPanel("regional_sites"),
+    ]
+    # See NavigationSettings for why both a flat `panels` and a
+    # TabbedInterface `edit_handler` are defined here.
+    panels = main_panels + advanced_panels
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(main_panels, heading=_("Main")),
+            ObjectList(advanced_panels, heading=_("Overrides")),
+        ]
+    )
 
     @property
     def root_page(self):
@@ -819,6 +838,31 @@ class SocialSettings(BaseSiteSetting):
         ),
     ]
 
+    @property
+    def twitter_handle(self):
+        """
+        Derive an "@handle" for the twitter:site meta tag (base.html) from
+        this site's "twitter" entry in social_links, if any — e.g.
+        "https://twitter.com/350" or "https://x.com/350" both yield "@350".
+
+        Replaces the old separate BrandingSEOSettings.twitter_site field
+        (see the data migration that removed it): that field and a
+        "twitter" entry here both claimed to be the site's Twitter/X
+        presence, with nothing keeping them in sync. One source of truth
+        now — an editor sets the profile URL here once, for both the
+        header/footer icon and this meta tag.
+        """
+        from urllib.parse import urlparse
+
+        for block in self.social_links:
+            if block.value.get("platform") != "twitter":
+                continue
+            path = urlparse(block.value.get("url", "")).path.strip("/")
+            handle = path.split("/")[0] if path else ""
+            if handle:
+                return f"@{handle}"
+        return ""
+
     class Meta:
         verbose_name = _("Social")
 
@@ -840,6 +884,7 @@ class IntegrationsStreamBlock(StreamBlock):
     actblue = ActBlueConfigBlock()
     action_network = ActionNetworkConfigBlock()
     wagtail_forms = WagtailFormsConfigBlock()
+    google_tag_manager = GoogleTagManagerConfigBlock()
 
     class Meta:
         label = _("Integrations")
@@ -865,9 +910,40 @@ class IntegrationSettings(BaseSiteSetting):
         help_text=_("Add and configure the platforms this site integrates with."),
         use_json_field=True,
     )
+    custom_head_html = models.TextField(
+        blank=True,
+        validators=[validate_balanced_html],
+        verbose_name=_("custom head code"),
+        help_text=_(
+            "Optional. Raw HTML/script markup inserted verbatim near the top "
+            "of every page's <head> — for one-off scripts that don't warrant "
+            "their own integration above. Rendered exactly as given, after "
+            "every enabled integration's own head markup; only use this for "
+            "code you trust."
+        ),
+    )
+    custom_body_html = models.TextField(
+        blank=True,
+        validators=[validate_balanced_html],
+        verbose_name=_("custom body code"),
+        help_text=_(
+            "Optional. Raw HTML/script markup inserted verbatim immediately "
+            "after <body> opens on every page — for markup that specifically "
+            "has to run early in the body (e.g. a <noscript> fallback). "
+            "Rendered exactly as given, after every enabled integration's "
+            "own body markup; only use this for code you trust."
+        ),
+    )
 
     panels = [
         FieldPanel("integrations"),
+        MultiFieldPanel(
+            [
+                FieldPanel("custom_head_html"),
+                FieldPanel("custom_body_html"),
+            ],
+            heading=_("Custom code"),
+        ),
     ]
 
     def get_integration_config(self, slug):
@@ -993,8 +1069,11 @@ class IntegrationSettings(BaseSiteSetting):
         """
         Concatenate the head-injection markup for every enabled integration
         that declares a `head_html_field` (e.g. Fundraise Up's installation
-        script). Rendered as-is in base.html's <head> — same trust level as
-        editor-pasted vendor scripts elsewhere in this settings model.
+        script, Google Tag Manager's own head snippet), followed by
+        `custom_head_html` — the site-wide fallback for a one-off script
+        that doesn't warrant its own integration module. Rendered as-is in
+        base.html's <head> — same trust level as editor-pasted vendor
+        scripts elsewhere in this settings model.
         """
         fragments = []
         for integration_type in all_integrations():
@@ -1003,46 +1082,93 @@ class IntegrationSettings(BaseSiteSetting):
             config = self.get_integration_config(integration_type.slug)
             if config:
                 fragments.append(config.get(integration_type.head_html_field, ""))
+        if self.custom_head_html:
+            fragments.append(self.custom_head_html)
+        return mark_safe("".join(fragments))
+
+    def body_html(self):
+        """
+        Same as head_html() but for `body_html_field`/`custom_body_html` —
+        markup rendered verbatim immediately after <body> opens (base.html)
+        instead of in <head>. Google Tag Manager's <noscript> fallback
+        iframe (wtrx/integrations/gtm.py) is the first integration to
+        actually use body_html_field; custom_body_html covers anything else
+        that specifically needs to run this early in the body rather than
+        in <head>.
+        """
+        fragments = []
+        for integration_type in all_integrations():
+            if not integration_type.body_html_field:
+                continue
+            config = self.get_integration_config(integration_type.slug)
+            if config:
+                fragments.append(config.get(integration_type.body_html_field, ""))
+        if self.custom_body_html:
+            fragments.append(self.custom_body_html)
         return mark_safe("".join(fragments))
 
     class Meta:
         verbose_name = _("Integrations")
 
 
+class AdminSidebarShortcutBlock(StructBlock):
+    """
+    A single shortcut link in the Wagtail admin sidebar, opening the given
+    page's page-explorer view. Generalizes what used to be two hardcoded
+    fields (blog_index_page, press_releases_index_page) on AdminMenuSettings,
+    each with its own hand-written MenuItem subclass and hook in
+    wagtail_hooks.py — see add_admin_menu_shortcuts() there, which now
+    builds one MenuItem per entry in this list instead.
+    """
+
+    label = CharBlock(
+        required=False,
+        label=_("Label"),
+        help_text=_("Shown in the sidebar. Leave blank to use the page's own title."),
+    )
+    page = PageChooserBlock(
+        label=_("Page"),
+        help_text=_(
+            "The shortcut opens this page's listing in the page explorer. "
+            "Hidden automatically if the page is unpublished."
+        ),
+    )
+    icon = CharBlock(
+        required=False,
+        max_length=50,
+        label=_("Icon"),
+        help_text=_(
+            "Optional. A Wagtail admin icon name, e.g. 'doc-empty' or "
+            "'clipboard-list' — see Wagtail's icon reference "
+            "(https://docs.wagtail.org/en/stable/advanced_topics/icons.html). "
+            "Leave blank for a generic document icon."
+        ),
+    )
+
+    class Meta:
+        icon = "link"
+        label = _("Sidebar shortcut")
+
+
 @register_setting(icon="link", order=60)
 class AdminMenuSettings(BaseSiteSetting):
     """Settings > Admin menu — configures shortcut links in the Wagtail admin sidebar."""
 
-    blog_index_page = models.ForeignKey(
-        "wagtailcore.Page",
-        null=True,
+    sidebar_shortcuts = StreamField(
+        [("shortcut", AdminSidebarShortcutBlock())],
         blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        verbose_name=_("blog index page"),
+        verbose_name=_("sidebar shortcuts"),
         help_text=_(
-            "The page that lists your blog posts. When set, a 'Blog' shortcut "
-            "appears in the admin sidebar linking to it. Leave blank to hide "
-            "the shortcut."
+            "Shortcut links shown in the Wagtail admin sidebar, each opening "
+            "a chosen page's listing in the page explorer — e.g. quick "
+            "access to your blog or press releases index. Add as many as "
+            "you like."
         ),
-    )
-    press_releases_index_page = models.ForeignKey(
-        "wagtailcore.Page",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        verbose_name=_("press releases index page"),
-        help_text=_(
-            "The page that lists your press releases. When set, a 'Press "
-            "releases' shortcut appears in the admin sidebar linking to it. "
-            "Leave blank to hide the shortcut."
-        ),
+        use_json_field=True,
     )
 
     panels = [
-        FieldPanel("blog_index_page"),
-        FieldPanel("press_releases_index_page"),
+        FieldPanel("sidebar_shortcuts"),
     ]
 
     class Meta:

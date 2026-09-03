@@ -1128,7 +1128,7 @@ class Blogs(BasePage, HeroMixin):
             return self.related_intro
         return strip_tags(self.hero_copy or "").strip()
 
-    def get_listing_queryset(self):
+    def get_listing_queryset(self, category=None):
         """
         This page's live/public posts, newest first by the editor-controlled
         published_at (not Wagtail's own first_published_at — see
@@ -1137,19 +1137,28 @@ class Blogs(BasePage, HeroMixin):
         A method rather than an inline query so PageCardsBlock can list the
         same posts in the same order this page's own listing uses; a card
         row on the home page and the index it links to must never disagree
-        about which posts are the most recent.
+        about which posts are the most recent. The optional `category`
+        (a BlogCategory instance) is the same reasoning extended to
+        PageCardsBlock's own optional category filter (see that block's
+        docstring) — both it and this page's own `?category=` filtering in
+        get_context() below now filter through this one method, so a
+        filtered card row and this page's own filtered listing can never
+        disagree either.
 
         Excludes posts with hide_from_blogroll set — this is the single
         place both the Blogs page listing and PageCardsBlock's home page
         cards draw from, so a hidden post disappears from both at once.
         """
-        return (
+        qs = (
             Post.objects.child_of(self)
             .live()
             .public()
             .filter(hide_from_blogroll=False)
             .order_by("-published_at")
         )
+        if category:
+            qs = qs.filter(categories=category)
+        return qs
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
@@ -1169,7 +1178,7 @@ class Blogs(BasePage, HeroMixin):
         if category_slug:
             selected_category = available_categories.filter(slug=category_slug).first()
             if selected_category:
-                posts_qs = posts_qs.filter(categories=selected_category)
+                posts_qs = self.get_listing_queryset(category=selected_category)
 
         paginator = Paginator(posts_qs, ITEMS_PER_PAGE)
         page_number = request.GET.get("page", 1)

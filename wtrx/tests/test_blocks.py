@@ -47,6 +47,7 @@ from wtrx.blocks import (
     CardBlock,
     CardCarouselBlock,
     CardGridBlock,
+    CarouselCardBlock,
     DonateBlock,
     DonateFundraiseUpBlock,
     FeaturePanelBlock,
@@ -84,7 +85,7 @@ from wtrx.blocks import (
     parse_action_network_url,
     resolve_background,
 )
-from wtrx.models import Blogs, ContentPage, HomePage, IndexPage, Post
+from wtrx.models import BlogCategory, Blogs, ContentPage, HomePage, IndexPage, Post
 from wtrx.request_context import _current_request
 from wtrx.site_settings import IntegrationSettings
 
@@ -1918,6 +1919,10 @@ class TestPageCardsBlockFields(SimpleTestCase):
         self.assertNotIn("heading", block.declared_blocks)
         self.assertNotIn("subheading", block.declared_blocks)
 
+    def test_category_is_optional(self):
+        block = PageCardsBlock()
+        self.assertFalse(block.declared_blocks["category"].required)
+
 
 class TestPageCardsBlockGetContext(TestCase):
     """
@@ -2017,6 +2022,124 @@ class TestPageCardsBlockBlogsOrdering(TestCase):
         context = block.get_context({"index_page": self.blogs})
         newest = Post.objects.get(slug="post-pcb-blogs-2")
         self.assertEqual(context["cards"][0]["date"], newest.published_at)
+
+
+class TestBlogsGetListingQuerysetCategory(TestCase):
+    """
+    Blogs.get_listing_queryset(category=...) is the one place both
+    Blogs.get_context()'s own `?category=` filtering and PageCardsBlock's
+    optional category field draw from — see either's docstring. A filtered
+    "Latest updates" card row and this page's own filtered listing must
+    never disagree about which posts match a category.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-blogs-cat")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-blogs-cat")
+        home.add_child(instance=cls.blogs)
+
+        cls.climate = BlogCategory.objects.create(name="Climate", slug="climate-cat")
+        cls.justice = BlogCategory.objects.create(name="Justice", slug="justice-cat")
+
+        cls.climate_post = Post(title="Climate Post", slug="climate-post-cat")
+        cls.blogs.add_child(instance=cls.climate_post)
+        # ParentalManyToManyField.add() only updates the in-memory cluster —
+        # an explicit save() is needed to persist the M2M rows (see
+        # TestPageCardsBlockCategoryFilter's identical fixture below, and
+        # test_pages.py's own version of this same gotcha).
+        cls.climate_post.categories.add(cls.climate)
+        cls.climate_post.save()
+
+        cls.justice_post = Post(title="Justice Post", slug="justice-post-cat")
+        cls.blogs.add_child(instance=cls.justice_post)
+        cls.justice_post.categories.add(cls.justice)
+        cls.justice_post.save()
+
+        cls.uncategorized_post = Post(title="Uncategorized Post", slug="uncategorized-post-cat")
+        cls.blogs.add_child(instance=cls.uncategorized_post)
+
+    def test_no_category_returns_every_post(self):
+        titles = {p.title for p in self.blogs.get_listing_queryset()}
+        self.assertEqual(
+            titles, {"Climate Post", "Justice Post", "Uncategorized Post"}
+        )
+
+    def test_category_filters_to_matching_posts_only(self):
+        titles = {
+            p.title for p in self.blogs.get_listing_queryset(category=self.climate)
+        }
+        self.assertEqual(titles, {"Climate Post"})
+
+    def test_category_with_no_posts_returns_empty(self):
+        empty_category = BlogCategory.objects.create(name="Empty", slug="empty-cat")
+        qs = self.blogs.get_listing_queryset(category=empty_category)
+        self.assertEqual(list(qs), [])
+
+
+class TestPageCardsBlockCategoryFilter(TestCase):
+    """
+    PageCardsBlock.category is optional and only meaningful when
+    index_page resolves to a Blogs instance -- see the block's own
+    docstring. Reuses the same Blogs/BlogCategory fixture shape as
+    TestBlogsGetListingQuerysetCategory.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-pcb-cat")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-pcb-cat")
+        home.add_child(instance=cls.blogs)
+
+        cls.climate = BlogCategory.objects.create(name="Climate", slug="climate-pcb")
+
+        cls.climate_post = Post(title="Climate Post", slug="climate-post-pcb")
+        cls.blogs.add_child(instance=cls.climate_post)
+        # ParentalManyToManyField.add() only updates the in-memory cluster —
+        # save() is needed to persist it (see TestBlogsGetListingQuerysetCategory).
+        cls.climate_post.categories.add(cls.climate)
+        cls.climate_post.save()
+
+        cls.other_post = Post(title="Other Post", slug="other-post-pcb")
+        cls.blogs.add_child(instance=cls.other_post)
+
+        # A generic IndexPage has no category concept -- category must be
+        # silently ignored there rather than raise.
+        cls.index = IndexPage(title="Generic Index", slug="generic-index-pcb")
+        home.add_child(instance=cls.index)
+        cls.index_child = ContentPage(title="Index Child", slug="index-child-pcb")
+        cls.index.add_child(instance=cls.index_child)
+
+    def test_no_category_returns_all_posts(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs, "category": None})
+        headings = {card["heading"] for card in context["cards"]}
+        self.assertEqual(headings, {"Climate Post", "Other Post"})
+
+    def test_category_filters_cards_to_matching_posts_only(self):
+        block = PageCardsBlock()
+        context = block.get_context(
+            {"index_page": self.blogs, "category": self.climate}
+        )
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Climate Post"])
+
+    def test_category_is_ignored_for_a_generic_index_page(self):
+        """
+        A generic IndexPage has no get_listing_queryset(category=...) --
+        setting a category must not raise, it should just fall back to the
+        page's normal unfiltered listing.
+        """
+        block = PageCardsBlock()
+        context = block.get_context(
+            {"index_page": self.index, "category": self.climate}
+        )
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Index Child"])
 
     def test_excludes_non_live_posts(self):
         draft = Post(
