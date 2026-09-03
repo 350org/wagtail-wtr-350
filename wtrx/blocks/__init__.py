@@ -23,7 +23,6 @@ All blocks are assembled into BodyStreamBlock at the bottom of this file.
 import copy
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
-from html.parser import HTMLParser
 import itertools
 import json
 import math
@@ -59,6 +58,7 @@ from wagtail.blocks.stream_block import StreamBlockAdapter
 from wagtail.contrib.table_block.blocks import TableBlock as WagtailTableBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Site
+from wagtail.snippets.blocks import SnippetChooserBlock
 from wagtail_ai.blocks import ai_image_block
 from wagtailmedia.blocks import VideoChooserBlock
 
@@ -71,6 +71,7 @@ from wtrx.constants import (
 )
 from wtrx.integrations import actionkit
 from wtrx.site_settings import IntegrationSettings
+from wtrx.validators import html_is_balanced
 
 # ---------------------------------------------------------------------------
 # Choice constants
@@ -995,51 +996,6 @@ class ButtonGroupBlock(StructBlock):
         }
 
 
-_VOID_ELEMENTS = {
-    "area", "base", "br", "col", "embed", "hr", "img", "input",
-    "link", "meta", "param", "source", "track", "wbr",
-}
-
-
-class _TagBalanceParser(HTMLParser):
-    """
-    Tracks open-tag nesting to catch the most common pasted-embed mistake
-    (a stray or missing closing tag). Does not validate full HTML5
-    conformance (attribute syntax etc.) — that would be noisy against
-    legitimate third-party embed codes, which is exactly what RawHTMLBlock
-    exists to hold. HTMLParser doesn't descend into <script>/<style>
-    content as tags, so inline JS/CSS containing "<"/">" is not an issue.
-    """
-
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.stack = []
-        self.mismatched = False
-
-    def handle_starttag(self, tag, attrs):
-        if tag not in _VOID_ELEMENTS:
-            self.stack.append(tag)
-
-    def handle_endtag(self, tag):
-        if tag in _VOID_ELEMENTS:
-            return
-        if not self.stack or self.stack[-1] != tag:
-            self.mismatched = True
-        elif self.stack:
-            self.stack.pop()
-
-    @property
-    def is_balanced(self):
-        return not self.mismatched and not self.stack
-
-
-def _html_is_balanced(value):
-    parser = _TagBalanceParser()
-    parser.feed(value)
-    parser.close()
-    return parser.is_balanced
-
-
 class RawHTMLBlock(WagtailRawHTMLBlock):
     """
     A raw HTML passthrough block for embed codes, custom widgets, etc.
@@ -1056,7 +1012,7 @@ class RawHTMLBlock(WagtailRawHTMLBlock):
 
     def clean(self, value):
         value = super().clean(value)
-        if value and not _html_is_balanced(value):
+        if value and not html_is_balanced(value):
             raise ValidationError(
                 _(
                     "This HTML appears to have mismatched or unclosed tags "
@@ -1179,7 +1135,6 @@ class CardBlock(ContentPreviewMixin, StructBlock):
         label=_("Link text"),
         help_text=_("Label for the card's CTA button."),
     )
-
     def clean(self, value):
         cleaned = super().clean(value)
         errors = _validate_at_most_one_link(cleaned, {})
@@ -1986,7 +1941,6 @@ class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
             "fields."
         ),
     )
-
     def clean(self, value):
         cleaned = super().clean(value)
         errors = _validate_at_most_one_link(cleaned, {}, extra_fields=("anchor",))
@@ -2091,6 +2045,17 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
     the supporting copy. Migration 0047_condense_more_heading_text_blocks
     folded every existing page's heading/subheading pair into this field's
     HTML on upgrade.
+
+    `category` is optional and only meaningful when index_page resolves to
+    a Blogs instance — a generic IndexPage has no category concept (see
+    above), so it's silently ignored there rather than validated against
+    index_page's type, the same "degrade gracefully" pattern the rest of
+    this block already follows for a generic IndexPage's missing
+    get_listing_queryset(). When set, it's passed straight through to
+    Blogs.get_listing_queryset(category=...) — the one place both this
+    block's filtering and Blogs.get_context()'s own `?category=` filtering
+    now live, so a filtered "Latest updates" row can't disagree with the
+    Blogs page it links to about which posts match.
     """
 
     content = RichTextBlock(
@@ -2106,6 +2071,15 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
             "The 3 most recently published pages under this index page are shown as cards."
         ),
     )
+    category = SnippetChooserBlock(
+        "wtrx.BlogCategory",
+        required=False,
+        label=_("Category"),
+        help_text=_(
+            "Optional. Only applies when Index page above is a Blog/press "
+            "releases index — shows only posts in this category."
+        ),
+    )
     link_text = CharBlock(
         required=False,
         default=_("Read more"),
@@ -2116,6 +2090,7 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
     )
 
     def get_context(self, value, parent_context=None):
+        from wtrx.models import Blogs
         from wtrx.templatetags.wtrx_tags import page_as_card
 
         context = super().get_context(value, parent_context=parent_context)
@@ -2125,7 +2100,11 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
             specific_index = index_page.specific
             listing = getattr(specific_index, "get_listing_queryset", None)
             if listing is not None:
-                children = listing()[:3]
+                category = value.get("category")
+                if category and isinstance(specific_index, Blogs):
+                    children = listing(category=category)[:3]
+                else:
+                    children = listing()[:3]
             else:
                 children = (
                     specific_index.get_children()
@@ -2337,7 +2316,6 @@ class CalloutBlock(ContentPreviewMixin, StructBlock):
             "text — not a full photo background."
         ),
     )
-
     def clean(self, value):
         cleaned = super().clean(value)
         errors = _validate_at_most_one_link(cleaned, {})

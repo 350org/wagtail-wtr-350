@@ -19,8 +19,8 @@
     <meta property="og:description" content="{{ og_desc }}" />
     <meta name="twitter:title" content="{{ og_title }}" />
     <meta name="twitter:description" content="{{ og_desc }}" />
-    {% if settings.wtrx.BrandingSEOSettings.twitter_site %}
-        <meta name="twitter:site" content="{{ settings.wtrx.BrandingSEOSettings.twitter_site }}" />
+    {% if settings.wtrx.SocialSettings.twitter_handle %}
+        <meta name="twitter:site" content="{{ settings.wtrx.SocialSettings.twitter_handle }}" />
     {% endif %}
     {% if meta_img %}
         {% image meta_img fill-1200x630 as og_img %}
@@ -48,14 +48,26 @@
     {% block extra_head %}{% endblock %}
     {% comment %}
     Integration head-injection markup (e.g. Fundraise Up's installation
-    snippet). Fundraise Up's own docs require its installation snippet to be
-    the last script in <head>, so this comes after extra_head. Each fragment
-    is opaque, versioned vendor JS pasted by an admin into Settings →
-    Integrations, same trust level as form_html in the ActionKit block.
+    snippet, Google Tag Manager's own head snippet), plus
+    IntegrationSettings.custom_head_html for a one-off script that doesn't
+    warrant its own integration module. Fundraise Up's own docs require its
+    installation snippet to be the last script in <head>, so this comes
+    after extra_head. Each fragment is opaque, versioned vendor JS pasted
+    by an admin into Settings → Integrations, same trust level as
+    form_html in the ActionKit block.
     {% endcomment %}
     {{ settings.wtrx.IntegrationSettings.head_html }}
 </head>
 <body class="font-body text-dark bg-light">
+    {% comment %}
+    Integration body-injection markup — e.g. Google Tag Manager's
+    <noscript> fallback iframe (wtrx/integrations/gtm.py) — plus
+    IntegrationSettings.custom_body_html for anything else that needs to
+    run this early in the body rather than in <head>. Same pattern as
+    IntegrationSettings.head_html above, rendered as early in <body> as
+    possible instead; see IntegrationType.body_html_field.
+    {% endcomment %}
+    {{ settings.wtrx.IntegrationSettings.body_html }}
     {% block header %}{% endblock %}
     {% block hero %}{% endblock %}
     <main id="main-content" class="my-32">
