@@ -230,6 +230,9 @@ ES modules, 4-space indent, semicolons required.
    caption pill overlaid at the bottom of whichever of `image`/`video` is
    showing (`.wtr-image-caption`, same chrome as `SignupActionKitBlock`/
    `ImageBlock`) — `HeroBlock` has no video, so it's image-only there.
+   "banner" variant only: `HomePage` (the only "full" variant page)
+   omits the field from `hero_panels`, and the "full" section of
+   `hero.html` has no caption chrome at all.
 5. **`wtrx/` extraction readiness**: concrete page models ship their own
    migrations in `wtrx/`. Forks needing custom page types add new apps
    rather than modifying `wtrx/` models directly.

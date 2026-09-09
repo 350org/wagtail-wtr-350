@@ -14,6 +14,8 @@
                     centered dark pill at the bottom of whichever of
                     image/video is showing — same .wtr-image-caption
                     chrome as SignupActionKitBlock/ImageBlock (main.css).
+                    "banner" variant only (HomePage's hero_panels omits the
+                    field; "full" has no caption chrome — see HeroMixin).
     banner_color  — one of BACKGROUND_COLOR_CHOICES. "banner" variant only.
     cta           — optional HeroCTABlock stream value (0 or 1 items:
                     button/signup/donate/announcement). The "full" variant
@@ -300,18 +302,13 @@
                Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
                busy photos/video without flattening the whole background like a uniform opacity did.{% endcomment %}
             <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
-            {% if hero.image_caption %}
-                {% comment %}
-                Same .wtr-image-caption pill as the banner variant above and
-                SignupActionKitBlock/image_block.html/donate_fundraiseup_block.html
-                — see main.css. z-10 so it sits above the gradient scrim, same
-                reasoning as the content column below.
-                {% endcomment %}
-                <div class="absolute inset-x-0 bottom-4 z-10 flex justify-center px-4 sm:bottom-6">
-                    <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ hero.image_caption }}</p>
-                </div>
-            {% endif %}
         {% endif %}
+        {% comment %}
+        No image_caption chrome in this "full" variant — hero.image_caption
+        is a "banner"-only field (HomePage's hero_panels omits it; see
+        HeroMixin). The banner variant's own media column has the
+        .wtr-image-caption pill, above.
+        {% endcomment %}
 
         {% comment %}
         This padding is Figma's Hero Video - Condensed Signup (node 1:560)
