@@ -28,6 +28,7 @@ from .integrations.actionkit import ActionKitConfigBlock
 from .integrations.fundraiseup import FundraiseUpConfigBlock
 from .integrations.gtm import GoogleTagManagerConfigBlock
 from .integrations.registry import all_integrations, get_integration
+from .integrations.usercentrics import UsercentricsConfigBlock
 from .integrations.wagtail_forms import WagtailFormsConfigBlock
 from .validators import validate_balanced_html
 
@@ -885,6 +886,7 @@ class IntegrationsStreamBlock(StreamBlock):
     action_network = ActionNetworkConfigBlock()
     wagtail_forms = WagtailFormsConfigBlock()
     google_tag_manager = GoogleTagManagerConfigBlock()
+    usercentrics = UsercentricsConfigBlock()
 
     class Meta:
         label = _("Integrations")
@@ -1106,6 +1108,18 @@ class IntegrationSettings(BaseSiteSetting):
         if self.custom_body_html:
             fragments.append(self.custom_body_html)
         return mark_safe("".join(fragments))
+
+    def get_usercentrics_config(self):
+        """
+        Return the enabled Usercentrics integration's StructValue, or None.
+
+        Usercentrics gets its own accessor rather than going through
+        head_html() above: its Consent Mode v2 defaults must be the very
+        first scripts in <head>, while head_html() concatenates fragments at
+        the END of <head> (correct for a vendor script like Fundraise Up's,
+        wrong here). See wtrx/templates/wtrx/includes/usercentrics_head.html.
+        """
+        return self.get_integration_config("usercentrics")
 
     class Meta:
         verbose_name = _("Integrations")

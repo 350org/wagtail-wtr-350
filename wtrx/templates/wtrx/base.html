@@ -79,7 +79,7 @@
     and wires it to open the preferences panel. Placed here (not in the footer
     partial) so it is present on every page regardless of footer configuration.
     {% endcomment %}
-    {% if usercentrics_settings_id %}
+    {% if settings.wtrx.IntegrationSettings.get_usercentrics_config and not usercentrics_disabled %}
     <div class="wtr-cookie-settings text-center py-3 text-sm">
         <a href="#" class="uc-cookie-link text-neutral-500 hover:text-dark underline" style="display:none">{% trans "Cookie Settings" %}</a>
     </div>

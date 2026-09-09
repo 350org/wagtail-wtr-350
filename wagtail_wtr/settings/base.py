@@ -306,19 +306,15 @@ WTRX_ACTION_NETWORK_API_KEY = os.environ.get("WTRX_ACTION_NETWORK_API_KEY", "")
 WTRX_ACTIONKIT_API_PASSWORD = os.environ.get("WTRX_ACTIONKIT_API_PASSWORD", "")
 
 # Usercentrics consent management:
-# The consent snippet renders only when WTRX_USERCENTRICS_SETTINGS_ID is non-empty;
-# dev.py blanks it so the external CDN script does not load in local development.
-# Visitor country is determined client-side via Cloudflare's built-in
-# /cdn-cgi/trace edge endpoint (see usercentrics_head.html) — no Cloudflare
-# Worker or Django involvement required.
-WTRX_USERCENTRICS_SETTINGS_ID = os.environ.get(
-    "WTRX_USERCENTRICS_SETTINGS_ID", "AelB3mtRNvAY5D"
-)
-WTRX_USERCENTRICS_VERSION = os.environ.get("WTRX_USERCENTRICS_VERSION", "1.1.4")
-# Manual override for the visitor's country — bypasses the /cdn-cgi/trace fetch
-# entirely and uses this literal value instead. Intended for local/QA testing
-# of a specific country only; leave blank in production so every visitor's
-# real, Cloudflare-edge-detected country is used instead of a fixed one.
-WTRX_USERCENTRICS_COUNTRY = os.environ.get("WTRX_USERCENTRICS_COUNTRY", "")
+# Settings ID, service IDs, script version and country handling are all
+# configured through Settings > Integrations (see
+# wtrx.integrations.usercentrics) rather than env vars now. This is the one
+# remaining env-driven piece: a hard kill switch so an imported production
+# database dump (which may carry a real, enabled Usercentrics entry) never
+# loads the external CDN script during local development — dev.py sets it.
+# See usercentrics_head.html.
+WTRX_USERCENTRICS_DISABLED = os.environ.get(
+    "WTRX_USERCENTRICS_DISABLED", "false"
+).lower() in ("true", "1", "yes")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

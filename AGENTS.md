@@ -669,6 +669,60 @@ check.
     when a new block's content type depends on `SectionContentBlock`
     already being defined.
 
+50. **Usercentrics is an integration now, but not a `head_html_field` one —
+    it needs its own accessor.** `wtrx/integrations/usercentrics.py`
+    registers it like any other integration (config `StructBlock`, added to
+    `IntegrationsStreamBlock` in `site_settings.py`), so settings ID, script
+    version, and the two service-ID lists (`reload_on_opt_in_service_ids`,
+    `deactivate_blocking_service_ids`, both comma-separated and split
+    client-side in the template) are all editable from Settings >
+    Integrations with no deploy — that was the whole point of moving it off
+    `WTRX_USERCENTRICS_SETTINGS_ID`/`_VERSION`/`_COUNTRY` env vars. But
+    unlike Fundraise Up, it does **not** set `head_html_field`:
+    `IntegrationSettings.head_html()` concatenates every integration's
+    fragment at the very END of `<head>` (correct for a vendor script like
+    Fundraise Up's), while Usercentrics' Consent Mode v2 `gtag('consent',
+    'default', ...)` call must run before anything else that could set
+    analytics/ad cookies — i.e. first in `<head>`, before the `<title>` even.
+    `usercentrics_head.html` instead calls
+    `IntegrationSettings.get_usercentrics_config()` (a plain wrapper around
+    `get_integration_config("usercentrics")`) directly and renders itself
+    first, same position it always occupied.
+    - **`WTRX_USERCENTRICS_DISABLED` is the one env var that survived the
+      move** — a hard local-dev kill switch (`dev.py` sets it `True`),
+      independent of whatever `Settings > Integrations` says. Without it, a
+      locally-imported production database dump (which carries a real,
+      enabled Usercentrics entry) would load the external CDN script during
+      local development, exactly the thing the old
+      `WTRX_USERCENTRICS_SETTINGS_ID = ""` override in `dev.py` existed to
+      prevent. `wtrx.context_processors.usercentrics` now only exposes this
+      one flag; everything else comes from `settings.wtrx.IntegrationSettings`
+      directly in the template.
+    - **Migration `0061_seed_usercentrics_integration.py` seeds one
+      "usercentrics" entry per existing `IntegrationSettings` row**, with the
+      exact values that used to be hardcoded (settings ID
+      `AelB3mtRNvAY5D`, script version `1.1.4`, the two service-ID lists).
+      This is not optional bookkeeping: without it, deploying this change
+      would silently turn off the consent banner in production the instant
+      the migration runs — `get_usercentrics_config()` would find no entry
+      until an editor manually added one — which is a compliance regression,
+      not a cosmetic one. Idempotent (skips a site that already has an entry,
+      same pattern as `0058_default_content_feedback_prompt.py`), and
+      deliberately not reversible for the same reason that one isn't: no way
+      to tell a seeded entry from one an editor has since hand-edited.
+    - The service-ID fields stay plain comma-separated `CharBlock`s (not
+      structured sub-fields) so the JS just does
+      `'{{ uc.field|escapejs }}'.split(',').map(s => s.trim()).filter(Boolean)`
+      client-side — the same "flat string, parsed at render time" pattern
+      `FundraiseUpConfigBlock.eu_country_codes` already established, chosen
+      over adding a nested `ListBlock` for one or two IDs at a time.
+    - `manual_country_override` (QA/local testing, skips the `/cdn-cgi/trace`
+      fetch entirely) is preserved as an optional field even though the
+      config the settings ID/service-IDs were migrated from didn't need it
+      populated — leaving it blank reproduces that exact behavior, so this
+      is feature parity with the pre-migration override mechanism, not new
+      surface area.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive names: `feature/signup-block`,

@@ -5,23 +5,21 @@ from django.conf import settings
 
 def usercentrics(request):
     """
-    Expose the Usercentrics consent-management config to every template.
+    Expose the Usercentrics local-dev kill switch to every template.
 
-    ``usercentrics_settings_id`` empty → the consent snippet is not rendered
-    (used to disable it in local development). ``usercentrics_country`` is a
-    manual override for local/QA testing of a specific country — when blank
-    (the production default), usercentrics_head.html instead resolves the
-    visitor's real country client-side via Cloudflare's /cdn-cgi/trace edge
-    endpoint. See wtrx/templates/wtrx/includes/usercentrics_head.html.
+    Everything about *how* Usercentrics renders (settings ID, service IDs,
+    script version, country handling...) is configured entirely through
+    Settings > Integrations now — see wtrx.integrations.usercentrics and
+    IntegrationSettings.get_usercentrics_config(). The only thing left here
+    is ``usercentrics_disabled``, a hard override so an imported production
+    database dump (which may carry a real, enabled Usercentrics entry) never
+    loads the external CDN script during local development. See
+    wtrx/templates/wtrx/includes/usercentrics_head.html.
     """
     return {
-        "usercentrics_settings_id": getattr(
-            settings, "WTRX_USERCENTRICS_SETTINGS_ID", ""
+        "usercentrics_disabled": getattr(
+            settings, "WTRX_USERCENTRICS_DISABLED", False
         ),
-        "usercentrics_version": getattr(
-            settings, "WTRX_USERCENTRICS_VERSION", "1.1.4"
-        ),
-        "usercentrics_country": getattr(settings, "WTRX_USERCENTRICS_COUNTRY", ""),
     }
 
 

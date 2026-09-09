@@ -1,12 +1,17 @@
 {% comment %}
 Usercentrics consent management — must be the first scripts in <head>.
 
-Rendered only when usercentrics_settings_id is set (see wtrx.context_processors
-.usercentrics; blank in dev). Visitor country is resolved client-side via
+Rendered only when Settings > Integrations has an enabled "Usercentrics"
+entry (IntegrationSettings.get_usercentrics_config(); see
+wtrx.integrations.usercentrics) and WTRX_USERCENTRICS_DISABLED isn't set —
+the latter is a hard local-dev kill switch (see settings/dev.py) so an
+imported production database dump never loads the real external CDN script
+during local development. Visitor country is resolved client-side via
 Cloudflare's built-in /cdn-cgi/trace edge endpoint (see block 2 below) — no
 Cloudflare Worker or Django involvement required.
 {% endcomment %}
-{% if usercentrics_settings_id %}
+{% with uc=settings.wtrx.IntegrationSettings.get_usercentrics_config %}
+{% if uc and not usercentrics_disabled %}
 {% comment %}1. Consent Mode v2 defaults — must be first.{% endcomment %}
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -22,42 +27,42 @@ Cloudflare Worker or Django involvement required.
 {% comment %}
 2. Visitor country, then load + init Usercentrics.
 
-When usercentrics_country (WTRX_USERCENTRICS_COUNTRY) is set, use it directly
-and synchronously -- a manual override for local/QA testing of a specific
-country, not the production mechanism. Otherwise, fetch Cloudflare's built-in
-/cdn-cgi/trace edge endpoint (served directly by Cloudflare, never reaches
-Django, so this never touches the page's own edge cache or origin) and parse
-its "loc=XX" line for the visitor's country. Only the parsed two-letter code
-is ever kept -- the rest of the trace response (which also includes the
-visitor's raw IP address) is discarded immediately and never stored or
-transmitted anywhere. If the fetch fails, times out, or has no usable "loc="
-line (e.g. local dev, or any environment not proxied through Cloudflare),
-fail closed to an EU country so the compliance banner still shows rather than
+When "Manual country override" is set on the integration (QA/local testing
+of a specific country), it's used directly and synchronously. Otherwise,
+fetch Cloudflare's built-in /cdn-cgi/trace edge endpoint (served directly by
+Cloudflare, never reaches Django, so this never touches the page's own edge
+cache or origin) and parse its "loc=XX" line for the visitor's country. Only
+the parsed two-letter code is ever kept -- the rest of the trace response
+(which also includes the visitor's raw IP address) is discarded immediately
+and never stored or transmitted anywhere. If the fetch fails, times out, or
+has no usable "loc=" line (e.g. local dev, or any environment not proxied
+through Cloudflare), fail closed to the configured fallback country (an EU
+country by default) so the compliance banner still shows rather than
 silently hiding it.
 {% endcomment %}
 <script>
   (function () {
-    var FALLBACK_COUNTRY = 'DE';
+    var FALLBACK_COUNTRY = '{{ uc.fallback_country|escapejs }}';
     var TRACE_TIMEOUT_MS = 1500;
 
     function loadUsercentrics(country) {
       window.__USERCENTRICS_COUNTRY = country;
       var script = document.createElement('script');
-      script.src = 'https://cdn.350.org/usercentrics-consent/{{ usercentrics_version }}/usercentrics-consent.js';
+      script.src = 'https://cdn.350.org/usercentrics-consent/{{ uc.script_version|escapejs }}/usercentrics-consent.js';
       script.onload = function () {
         UsercentricsConsent.initConsent({
-          settingsId: '{{ usercentrics_settings_id }}',
+          settingsId: '{{ uc.settings_id|escapejs }}',
           serviceIds: {
-            reloadOnOptIn: ['BJz7qNsdj-7', 'SyUQ54odobQ', 'Hko_qNsui-Q', 'n1jiXg1v'],
-            deactivateBlocking: ['BJ59EidsWQ', 'gIwEsybsHImyP9'],
+            reloadOnOptIn: '{{ uc.reload_on_opt_in_service_ids|escapejs }}'.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+            deactivateBlocking: '{{ uc.deactivate_blocking_service_ids|escapejs }}'.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
           },
         });
       };
       document.head.appendChild(script);
     }
 
-    {% if usercentrics_country %}
-    loadUsercentrics('{{ usercentrics_country }}');
+    {% if uc.manual_country_override %}
+    loadUsercentrics('{{ uc.manual_country_override|escapejs }}');
     {% else %}
     var settled = false;
     var timer = setTimeout(function () {
@@ -85,3 +90,4 @@ silently hiding it.
   })();
 </script>
 {% endif %}
+{% endwith %}

@@ -24,8 +24,9 @@ WAGTAILADMIN_BASE_URL = "http://localhost:8000"
 # Disable Usercentrics locally — /cdn-cgi/trace isn't served outside of
 # Cloudflare's edge, so there's no reliable country signal on the dev server,
 # and we don't want the external CDN script loading during local development
-# anyway.
-WTRX_USERCENTRICS_SETTINGS_ID = ""
+# anyway (even if a locally-imported production database dump carries a
+# real, enabled Usercentrics entry in Settings > Integrations).
+WTRX_USERCENTRICS_DISABLED = True
 
 # Disable 2FA enforcement locally so developers aren't forced into TOTP
 # enrollment just to run the admin. Still fully enforced in production.
