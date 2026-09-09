@@ -10,6 +10,10 @@
     copy_is_block — True if copy should be rendered via include_block, False for |richtext
     image         — optional CustomImage instance
     video         — optional wagtailmedia Media instance (type="video")
+    image_caption — optional str, e.g. a photo credit. Overlaid as a
+                    centered dark pill at the bottom of whichever of
+                    image/video is showing — same .wtr-image-caption
+                    chrome as SignupActionKitBlock/ImageBlock (main.css).
     banner_color  — one of BACKGROUND_COLOR_CHOICES. "banner" variant only.
     cta           — optional HeroCTABlock stream value (0 or 1 items:
                     button/signup/donate/announcement). The "full" variant
@@ -249,6 +253,16 @@
                            same overlay is just an unexplained vertical stripe down the
                            left third of the image — there is no seam there to soften.{% endcomment %}
                         <div class="wtr-bg-fade-{{ hero.banner_color|background_key }} absolute inset-y-0 left-0 hidden w-1/3 md:block" aria-hidden="true"></div>
+                        {% if hero.image_caption %}
+                            {% comment %}
+                            Same .wtr-image-caption pill as SignupActionKitBlock/
+                            image_block.html/donate_fundraiseup_block.html — see
+                            main.css.
+                            {% endcomment %}
+                            <div class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
+                                <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ hero.image_caption }}</p>
+                            </div>
+                        {% endif %}
                     </div>
                 {% endif %}
 
@@ -286,6 +300,17 @@
                Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
                busy photos/video without flattening the whole background like a uniform opacity did.{% endcomment %}
             <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
+            {% if hero.image_caption %}
+                {% comment %}
+                Same .wtr-image-caption pill as the banner variant above and
+                SignupActionKitBlock/image_block.html/donate_fundraiseup_block.html
+                — see main.css. z-10 so it sits above the gradient scrim, same
+                reasoning as the content column below.
+                {% endcomment %}
+                <div class="absolute inset-x-0 bottom-4 z-10 flex justify-center px-4 sm:bottom-6">
+                    <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ hero.image_caption }}</p>
+                </div>
+            {% endif %}
         {% endif %}
 
         {% comment %}

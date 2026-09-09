@@ -17,6 +17,17 @@ have no "nearest ancestor wins" concept the way JS's .closest() does — so a
 dark-background SectionBlock several levels up would otherwise invert this
 always-light answer to white-on-white.
 {% endcomment %}
+{% if value.heading %}
+    {% comment %}
+    Same markup/classes as CardGridBlock's heading — centered display
+    heading, inverting with in-data-[bg-tone=dark] same as CardGridBlock's
+    (the heading sits outside the item chrome, which per the note above
+    always stays light regardless of section background).
+    {% endcomment %}
+    <div class="mx-auto max-w-3xl text-center">
+        <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+    </div>
+{% endif %}
 <div class="wtr-accordion flex flex-col gap-4" data-accordion>
     {% for item in value.items %}
         <div class="accordion-item overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50">

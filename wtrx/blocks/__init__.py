@@ -2133,10 +2133,16 @@ class AccordionBlock(ContentPreviewMixin, StructBlock):
     """
     A collapsible accordion (FAQ-style) list.
 
-    Minimum 1 item. No heading field — editors use a TextBlock h2 before
-    this block if a heading is needed.
+    Minimum 1 item. Heading is optional and rendered the same way as
+    CardGridBlock's — a centered display heading (font-heading, 48px at
+    lg:) sitting outside the accordion items' own always-light chrome.
     """
 
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
     items = ListBlock(
         AccordionItemBlock(),
         min_num=1,
@@ -3216,6 +3222,11 @@ class HeroBlock(StructBlock):
         required=False,
         label=_("Image"),
     )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_("Optional caption overlaid at the bottom of the image, e.g. a photo credit."),
+    )
     banner_color = ChoiceBlock(
         choices=BACKGROUND_COLOR_CHOICES,
         default="navy",
@@ -3232,6 +3243,7 @@ class HeroBlock(StructBlock):
             "copy_is_block": False,
             "image": value.get("image"),
             "video": None,  # HeroBlock does not support video; key kept for template contract
+            "image_caption": value.get("image_caption"),
             "banner_color": value.get("banner_color"),
             "cta": [],  # banner variant never renders a cta; key kept for template contract
             "minimal": hero_is_minimal(copy=value.get("content"), video=None, cta=[]),

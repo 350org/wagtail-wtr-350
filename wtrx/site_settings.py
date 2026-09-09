@@ -929,11 +929,12 @@ class IntegrationSettings(BaseSiteSetting):
         validators=[validate_balanced_html],
         verbose_name=_("custom body code"),
         help_text=_(
-            "Optional. Raw HTML/script markup inserted verbatim immediately "
-            "after <body> opens on every page — for markup that specifically "
-            "has to run early in the body (e.g. a <noscript> fallback). "
-            "Rendered exactly as given, after every enabled integration's "
-            "own body markup; only use this for code you trust."
+            "Optional. Raw HTML/script markup inserted verbatim on every "
+            "page, right before </body> closes — for a one-off script that "
+            "doesn't need to run early in the page (if it does, e.g. a "
+            "<noscript> fallback, it needs its own integration module using "
+            "body_html_field instead). Rendered exactly as given; only use "
+            "this for code you trust."
         ),
     )
 
@@ -1090,13 +1091,16 @@ class IntegrationSettings(BaseSiteSetting):
 
     def body_html(self):
         """
-        Same as head_html() but for `body_html_field`/`custom_body_html` —
-        markup rendered verbatim immediately after <body> opens (base.html)
-        instead of in <head>. Google Tag Manager's <noscript> fallback
-        iframe (wtrx/integrations/gtm.py) is the first integration to
-        actually use body_html_field; custom_body_html covers anything else
-        that specifically needs to run this early in the body rather than
-        in <head>.
+        Same as head_html() but for `body_html_field` — markup rendered
+        verbatim immediately after <body> opens (base.html) instead of in
+        <head>. Google Tag Manager's <noscript> fallback iframe
+        (wtrx/integrations/gtm.py) is the integration this exists for —
+        Google's own docs require it as early in <body> as possible.
+
+        Deliberately does NOT include custom_body_html: that field is
+        free-form editor-pasted markup with no such early-body requirement,
+        so base.html renders it separately, right before </body>, instead
+        of concatenating it in here.
         """
         fragments = []
         for integration_type in all_integrations():
@@ -1105,8 +1109,6 @@ class IntegrationSettings(BaseSiteSetting):
             config = self.get_integration_config(integration_type.slug)
             if config:
                 fragments.append(config.get(integration_type.body_html_field, ""))
-        if self.custom_body_html:
-            fragments.append(self.custom_body_html)
         return mark_safe("".join(fragments))
 
     def get_usercentrics_config(self):

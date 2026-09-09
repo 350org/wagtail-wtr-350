@@ -55,19 +55,27 @@
     after extra_head. Each fragment is opaque, versioned vendor JS pasted
     by an admin into Settings → Integrations, same trust level as
     form_html in the ActionKit block.
+
+    request.is_preview is True for Wagtail's live-preview iframe (it's set
+    by Page.serve_preview()/serve(), see wagtail/models/preview.py and
+    pages.py) — that iframe renders this same page template for editing
+    accuracy, but analytics/tracking/custom vendor scripts shouldn't fire
+    on every preview refresh of unpublished draft content.
     {% endcomment %}
-    {{ settings.wtrx.IntegrationSettings.head_html }}
+    {% if not request.is_preview %}{{ settings.wtrx.IntegrationSettings.head_html }}{% endif %}
 </head>
 <body class="font-body text-dark bg-light">
     {% comment %}
     Integration body-injection markup — e.g. Google Tag Manager's
-    <noscript> fallback iframe (wtrx/integrations/gtm.py) — plus
-    IntegrationSettings.custom_body_html for anything else that needs to
-    run this early in the body rather than in <head>. Same pattern as
-    IntegrationSettings.head_html above, rendered as early in <body> as
-    possible instead; see IntegrationType.body_html_field.
+    <noscript> fallback iframe (wtrx/integrations/gtm.py) — rendered as
+    early in <body> as possible, per that integration's own requirement;
+    see IntegrationType.body_html_field. IntegrationSettings.custom_body_html
+    is deliberately NOT included here — it has no early-body requirement,
+    so it renders separately, right before </body>, below.
+
+    request.is_preview guard — see the matching comment on head_html above.
     {% endcomment %}
-    {{ settings.wtrx.IntegrationSettings.body_html }}
+    {% if not request.is_preview %}{{ settings.wtrx.IntegrationSettings.body_html }}{% endif %}
     {% block header %}{% endblock %}
     {% block hero %}{% endblock %}
     <main id="main-content" class="my-32">
@@ -87,5 +95,14 @@
     <script type="module" src="{% static 'js/main.js' %}"></script>
     {% block extra_js %}{% endblock %}
     {% wagtailuserbar %}
+    {% comment %}
+    IntegrationSettings.custom_body_html — a one-off script an admin pastes
+    in Settings → Integrations with no early-body requirement (unlike
+    IntegrationSettings.body_html above), so it renders last, right before
+    </body> closes, out of the way of everything else on the page.
+
+    request.is_preview guard — see the matching comment on head_html above.
+    {% endcomment %}
+    {% if not request.is_preview %}{{ settings.wtrx.IntegrationSettings.custom_body_html|safe }}{% endif %}
 </body>
 </html>

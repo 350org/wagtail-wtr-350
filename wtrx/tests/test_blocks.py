@@ -512,7 +512,7 @@ class TestHeroBlockFields(SimpleTestCase):
         block = HeroBlock()
         self.assertEqual(
             set(block.declared_blocks.keys()),
-            {"headline", "content", "image", "banner_color"},
+            {"headline", "content", "image", "image_caption", "banner_color"},
         )
 
     def test_image_is_not_required(self):
