@@ -704,7 +704,7 @@ check.
       prevent. `wtrx.context_processors.usercentrics` now only exposes this
       one flag; everything else comes from `settings.wtrx.IntegrationSettings`
       directly in the template.
-    - **Migration `0061_seed_usercentrics_integration.py` seeds one
+    - **Migration `0071_seed_usercentrics_integration.py` seeds one
       "usercentrics" entry per existing `IntegrationSettings` row**, with the
       exact values that used to be hardcoded (settings ID
       `AelB3mtRNvAY5D`, script version `1.1.4`, the two service-ID lists).
@@ -716,6 +716,14 @@ check.
       same pattern as `0058_default_content_feedback_prompt.py`), and
       deliberately not reversible for the same reason that one isn't: no way
       to tell a seeded entry from one an editor has since hand-edited.
+      Numbered `0070`/`0071`, not `0060`/`0061` as first generated — this
+      work was rebased onto a branch that had independently claimed those
+      same numbers for its own unrelated migrations. After a rebase like
+      that, delete the renumbered-in-place files and re-run
+      `makemigrations` rather than hand-editing the old ones: the
+      `AlterField`'s `block_lookup` has to reflect the post-rebase model
+      state (every block added on *both* branches), not just get a new
+      filename and `dependencies` entry.
     - The service-ID fields stay plain comma-separated `CharBlock`s (not
       structured sub-fields) so the JS just does
       `'{{ uc.field|escapejs }}'.split(',').map(s => s.trim()).filter(Boolean)`
@@ -744,6 +752,54 @@ check.
     every preview refresh of unpublished draft content. Block-embedded
     integrations (ActionKit forms, Fundraise Up, etc.) still render/fire in
     live preview — only the settings-level head/body injection is gated.
+
+54. **A nested `StructBlock` field with `Meta.collapsed = True` is how to
+    give a block a collapsed "Advanced settings" fieldset** — no custom JS,
+    no per-panel classnames; Wagtail's block-editor `StructBlockAdapter`
+    already reads `block.meta.collapsed` (`js_args()` in Wagtail's own
+    `struct_block.py`) and renders that sub-block's fieldset closed by
+    default, same expand/collapse chevron every other nested block gets.
+    `DonateFundraiseUpBlock.advanced_settings`
+    (`FundraiseUpAdvancedSettingsBlock`, `wtrx/blocks/__init__.py`) is the
+    first user of this: it reverses the earlier "no per-block override, a
+    deliberate product decision" stance on Fundraise Up region IDs (see the
+    Fundraise Up geolocation pitfall history in
+    `wtrx/integrations/fundraiseup.py`'s own docstring) — every field is
+    optional and falls through to `FundraiseUpConfigBlock`'s site-wide
+    value of the same name when blank, so an editor who never opens the
+    section gets identical behavior to before this existed.
+    - **Per-field fallback, not per-section fallback.** Each region
+      resolves independently: `block_val(field) or site_val(field) or
+      default_id`, where `default_id` is itself `block's own
+      element_id_default or site's element_id_default`. Filling in only
+      `element_id_us` in Advanced settings overrides just the US region for
+      that one block instance; every other region still comes from the
+      site config. This mirrors the site-wide config's own existing
+      per-region-falls-back-to-default pattern one level up, rather than
+      inventing a different resolution rule for the block-level override.
+    - Reuses `FundraiseUpConfigBlock`'s exact field names and labels
+      (`element_id_us`/`element_id_nl`/`element_id_ca`/`element_id_gb`/
+      `eu_country_codes`/`element_id_eu`/`element_id_default`) rather than
+      subclassing or importing that block directly — `FundraiseUpConfigBlock`
+      also carries `enabled`/`installation_code`, which make no sense on a
+      per-block override, and StructBlock composition (embedding one
+      StructBlock's fields inside another) isn't how Wagtail block
+      inheritance works; matching names/labels by hand is the actual
+      established pattern here (same as `IMAGE_ALIGNMENT_CHOICES`/
+      `BACKGROUND_COLOR_CHOICES` being shared constants rather than shared
+      block classes).
+    - `get_context()` still gates the *entire* region map (including any
+      block-level override) on `fundraiseup_config` existing and being
+      enabled — an override with the integration disabled would produce a
+      Form ID pointing at a script that was never loaded in `<head>`, the
+      same dead-button failure mode the original no-config case already
+      guards against.
+    - `ContentPreviewMixin`'s harvested-JSON previews (pitfall #31/#45)
+      don't need updating for a new optional field like this: a harvested
+      value with no `advanced_settings` key revives via `to_python()` into
+      that sub-block's own defaults (every field blank), the same as if an
+      editor had never opened the section — no re-harvest, no `KeyError`,
+      unlike adding a *required* field would risk.
 
 ## Git Conventions
 

@@ -2446,6 +2446,95 @@ class DonateBlock(StructBlock):
         }
 
 
+class FundraiseUpAdvancedSettingsBlock(StructBlock):
+    """
+    Optional per-block Fundraise Up form ID overrides for DonateFundraiseUpBlock.
+
+    Mirrors FundraiseUpConfigBlock's region fields exactly (same names, same
+    labels) so the two stay easy to reason about side by side, minus
+    `enabled`/`installation_code` -- those are site-wide concerns, not a
+    per-block one. Every field here is optional; when left blank it falls
+    through to that same field's value on the site-wide config (Settings >
+    Integrations > Fundraise Up). Leaving the whole section untouched
+    reproduces the site-wide behavior exactly, so this is additive, not a
+    replacement for FundraiseUpConfigBlock's own region map.
+
+    `element_id_default` here also becomes *this block's own* fallback for
+    any other region left blank above (before falling through further to
+    the site-wide default) -- see DonateFundraiseUpBlock.get_context()'s
+    region_value() for the exact per-field resolution order.
+
+    Meta.collapsed=True keeps this fieldset closed by default in the
+    editor: most donate blocks never need it, and its 7 fields would
+    otherwise dominate the form above the block's actual content fields.
+    """
+
+    element_id_us = CharBlock(
+        required=False,
+        label=_("Form ID — United States visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_nl = CharBlock(
+        required=False,
+        label=_("Form ID — Netherlands visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_ca = CharBlock(
+        required=False,
+        label=_("Form ID — Canada visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_gb = CharBlock(
+        required=False,
+        label=_("Form ID — United Kingdom visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    eu_country_codes = CharBlock(
+        required=False,
+        label=_("Other European country codes"),
+        help_text=_(
+            "Comma-separated two-letter ISO country codes (e.g. DE,FR,ES,IT) "
+            "that should use the \"other European visitors\" form ID below, "
+            "for this block only. Leave blank to use the site-wide list."
+        ),
+    )
+    element_id_eu = CharBlock(
+        required=False,
+        label=_("Form ID — all other European visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_default = CharBlock(
+        required=False,
+        label=_("Form ID — all other visitors"),
+        help_text=_(
+            "Overrides the site-wide default for this block only, and "
+            "also becomes this block's own fallback for any region left "
+            "blank above. Leave entirely blank to use the site-wide "
+            "default everywhere."
+        ),
+    )
+
+    class Meta:
+        icon = "cogs"
+        label = _("Advanced settings")
+        collapsed = True
+
+
 class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
     """
     A Fundraise Up donate button.
@@ -2470,13 +2559,18 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
     0047_condense_more_heading_text_blocks folded every existing page's
     heading/description pair into this field's HTML on upgrade.
 
-    There is deliberately no `element_id` field on this block any more — every
-    instance always shows the visitor's region-specific Fundraise Up element,
-    resolved client-side from FundraiseUpConfigBlock's settings (see
+    There is no plain `element_id` field on this block: every instance
+    shows the visitor's region-specific Fundraise Up element, resolved
+    client-side from FundraiseUpConfigBlock's site-wide settings (see
     wtrx/integrations/fundraiseup.py for the full geolocation mechanism and
     why it has to be client-side on this cached site). A block author who
-    wants a single fixed element regardless of region has no override here —
-    that was a deliberate product decision, not an oversight.
+    needs a *different* region map than the site-wide one for this one
+    instance — a single fixed element regardless of region, or a
+    campaign-specific override for one region only — uses the collapsed
+    "Advanced settings" section (FundraiseUpAdvancedSettingsBlock) instead:
+    each of its fields overrides its site-wide counterpart only when
+    filled in, so an untouched Advanced settings section is functionally
+    identical to not having one.
 
     Uses RICHTEXT_FEATURES_HEADINGS_H2_H3 (same as CalloutBlock/DonateBlock)
     so editors can add an optional H3 subheading below the H2 heading.
@@ -2518,6 +2612,10 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
             "opposite side. Has no effect when no image is set."
         ),
     )
+    advanced_settings = FundraiseUpAdvancedSettingsBlock(
+        required=False,
+        label=_("Advanced settings"),
+    )
 
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
@@ -2531,28 +2629,39 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
             except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
                 fundraiseup_config = None
 
-        default_id = fundraiseup_config.get("element_id_default", "") if fundraiseup_config else ""
-        ctx["fundraiseup_default_element_id"] = default_id
-
         if fundraiseup_config:
-            eu_codes_raw = fundraiseup_config.get("eu_country_codes", "") or ""
+            advanced = value.get("advanced_settings") or {}
+
+            def site_val(field_name):
+                return fundraiseup_config.get(field_name, "") or ""
+
+            def block_val(field_name):
+                return advanced.get(field_name, "") or ""
+
+            # This block's own default: its own override if set, else the
+            # site-wide default. Also doubles as the fallback for any
+            # region below left blank on both this block and the site.
+            default_id = block_val("element_id_default") or site_val("element_id_default")
+            ctx["fundraiseup_default_element_id"] = default_id
+
+            def region_value(field_name):
+                return block_val(field_name) or site_val(field_name) or default_id
+
+            eu_codes_raw = block_val("eu_country_codes") or site_val("eu_country_codes")
             eu_codes = [code.strip().upper() for code in eu_codes_raw.split(",") if code.strip()]
-            # Every region falls back to the site default when its own field
-            # is left blank, rather than resolving to an empty element ID —
-            # an editor who's only filled in a couple of regions still gets a
-            # working donate form for everyone else.
             ctx["fundraiseup_region_map_json"] = json.dumps(
                 {
-                    "US": fundraiseup_config.get("element_id_us", "") or default_id,
-                    "NL": fundraiseup_config.get("element_id_nl", "") or default_id,
-                    "CA": fundraiseup_config.get("element_id_ca", "") or default_id,
-                    "GB": fundraiseup_config.get("element_id_gb", "") or default_id,
-                    "_eu": fundraiseup_config.get("element_id_eu", "") or default_id,
+                    "US": region_value("element_id_us"),
+                    "NL": region_value("element_id_nl"),
+                    "CA": region_value("element_id_ca"),
+                    "GB": region_value("element_id_gb"),
+                    "_eu": region_value("element_id_eu"),
                     "_eu_countries": eu_codes,
                     "_default": default_id,
                 }
             )
         else:
+            ctx["fundraiseup_default_element_id"] = ""
             ctx["fundraiseup_region_map_json"] = json.dumps({"_default": ""})
         return ctx
 

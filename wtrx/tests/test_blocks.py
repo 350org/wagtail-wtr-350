@@ -51,6 +51,7 @@ from wtrx.blocks import (
     DonateBlock,
     DonateFundraiseUpBlock,
     FeaturePanelBlock,
+    FundraiseUpAdvancedSettingsBlock,
     GatedStreamBlockAdapter,
     HeroBlock,
     HeroCTABlock,
@@ -1769,9 +1770,11 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     """
     DonateFundraiseUpBlock field structure. No custom clean() — every field
     is optional, so no separate validation test class is needed. There is no
-    element_id field: every instance shows the visitor's region-specific
-    Fundraise Up element, resolved from FundraiseUpConfigBlock's settings
-    (see wtrx/integrations/fundraiseup.py).
+    plain element_id field: every instance shows the visitor's
+    region-specific Fundraise Up element, resolved from
+    FundraiseUpConfigBlock's site-wide settings, optionally overridden
+    per-block via the collapsed advanced_settings section (see
+    wtrx/integrations/fundraiseup.py).
     """
 
     def test_has_expected_fields(self):
@@ -1782,6 +1785,7 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
             "image_caption",
             "designation_id",
             "alignment",
+            "advanced_settings",
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
@@ -1808,6 +1812,38 @@ class TestDonateFundraiseUpBlockFields(SimpleTestCase):
     def test_alignment_defaults_to_image_left(self):
         block = DonateFundraiseUpBlock()
         self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+    def test_advanced_settings_is_collapsed_by_default(self):
+        # Most donate blocks never need a region override — the fieldset
+        # shouldn't dominate the form above the block's actual content.
+        block = DonateFundraiseUpBlock()
+        self.assertTrue(block.declared_blocks["advanced_settings"].meta.collapsed)
+
+
+class TestFundraiseUpAdvancedSettingsBlockFields(SimpleTestCase):
+    """
+    FundraiseUpAdvancedSettingsBlock mirrors FundraiseUpConfigBlock's region
+    fields exactly (same names/labels), minus enabled/installation_code —
+    those are site-wide concerns, not a per-block one.
+    """
+
+    def test_has_expected_fields(self):
+        block = FundraiseUpAdvancedSettingsBlock()
+        expected = {
+            "element_id_us",
+            "element_id_nl",
+            "element_id_ca",
+            "element_id_gb",
+            "eu_country_codes",
+            "element_id_eu",
+            "element_id_default",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_all_fields_are_optional(self):
+        block = FundraiseUpAdvancedSettingsBlock()
+        for name in block.declared_blocks:
+            self.assertFalse(block.declared_blocks[name].required, f"{name} should be optional")
 
 
 class TestDonateFundraiseUpBlockGeolocationContext(TestCase):
@@ -1897,6 +1933,73 @@ class TestDonateFundraiseUpBlockGeolocationContext(TestCase):
         block = DonateFundraiseUpBlock()
         ctx = block.get_context({"designation_id": ""}, parent_context={})
         self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+
+    def _get_context_with_advanced(self, advanced_settings):
+        block = DonateFundraiseUpBlock()
+        request = RequestFactory().get("/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        return block.get_context(
+            {"designation_id": "", "advanced_settings": advanced_settings},
+            parent_context={"request": request},
+        )
+
+    def test_no_advanced_settings_key_behaves_like_no_override(self):
+        """A value dict with no advanced_settings key at all (e.g. content
+        saved before this field existed) must resolve identically to an
+        untouched one -- not crash on a missing key."""
+        self._set_fundraiseup_config()
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "US_ID")
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_empty_advanced_settings_behaves_like_no_override(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "US_ID")
+        self.assertEqual(regions["NL"], "NL_ID")
+        self.assertEqual(regions["_eu"], "EU_ID")
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_advanced_settings_overrides_one_region_only(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({"element_id_us": "BLOCK_US"})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "BLOCK_US")
+        # Every other region still resolves from the site-wide config.
+        self.assertEqual(regions["NL"], "NL_ID")
+        self.assertEqual(regions["_eu"], "EU_ID")
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_advanced_settings_default_overrides_site_default(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({"element_id_default": "BLOCK_DEFAULT"})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "BLOCK_DEFAULT")
+
+    def test_advanced_settings_default_is_this_blocks_own_fallback(self):
+        """A region left blank on both this block and the site config falls
+        back through the block's own default before the site's."""
+        self._set_fundraiseup_config(element_id_gb="")
+        ctx = self._get_context_with_advanced({"element_id_default": "BLOCK_DEFAULT"})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["GB"], "BLOCK_DEFAULT")
+
+    def test_advanced_settings_eu_country_codes_override_independently(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({"eu_country_codes": "IT,PT"})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["_eu_countries"], ["IT", "PT"])
+        # element_id_eu itself is untouched, still from the site config.
+        self.assertEqual(regions["_eu"], "EU_ID")
+
+    def test_advanced_settings_ignored_when_integration_not_configured(self):
+        self.integration.integrations = []
+        self.integration.save()
+        ctx = self._get_context_with_advanced({"element_id_us": "BLOCK_US"})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+        self.assertEqual(json.loads(ctx["fundraiseup_region_map_json"]), {"_default": ""})
 
 
 class TestPageCardsBlockFields(SimpleTestCase):

@@ -10,10 +10,16 @@ DonateFundraiseUpBlock in wtrx/blocks/__init__.py for the block itself.
 
 Region-based form geolocation
 ------------------------------
-DonateFundraiseUpBlock always shows a region-specific Fundraise Up element,
-configured here rather than per-block (a deliberate product decision — every
-donate block on the site shows the same regional form, there is no per-block
-override). The visitor's region is resolved **client-side**, not server-side:
+DonateFundraiseUpBlock shows a region-specific Fundraise Up element, whose
+map is configured here as the site-wide default. A block can optionally
+override individual regions for itself via its collapsed "Advanced
+settings" section (FundraiseUpAdvancedSettingsBlock, wtrx/blocks/__init__.py)
+— each of its fields falls through to this site-wide config when left
+blank, so most donate blocks never touch it and behave exactly as before;
+it exists for the occasional campaign-specific block that needs a
+different form for one region, or a single fixed element regardless of
+region (fill in every region field the same way). The visitor's region is
+resolved **client-side**, not server-side:
 this site fronts every page with Cloudflare's edge cache
 (WAGTAILFRONTENDCACHE), so a page rendered with one visitor's country baked
 into the HTML would get cached and served to every other visitor regardless
