@@ -43,21 +43,19 @@ mobile-menu.js already toggles) — no separate JS hook needed.
         <div class="flex items-center justify-between" data-mobile-menu-header-row>
 
             {% comment %}
-            Logo lockup — logo plus, on a section with a regional label, the
-            region badge beside it (Figma "Regional Nav": 16px gap, solid blue
-            pill). The whole lockup is one link: to the override's root page
-            when there is one, otherwise the site root.
+            Logo lockup. The whole lockup is one link: to the override's root
+            page when there is one, otherwise the site root.
 
             Logo uses dark_logo when transparent header is active (dark hero bg),
             falls back to primary logo, then site name text.
 
-            The logo hovers with the badge (both driven by "group" on the
-            anchor). A CSS filter is the only recolour that works on every
-            logo: an <img> is opaque to colour properties whether it holds an
-            SVG or a PNG. brightness(0.55) takes 350's #0F81E9 to #084780 —
-            6/255 off --color-navy, imperceptible — while a differently
-            coloured logo simply darkens proportionally instead of breaking.
-            Transparent headers brighten instead, matching the badge.
+            "group" on the anchor drives the logo's own hover. A CSS filter is
+            the only recolour that works on every logo: an <img> is opaque to
+            colour properties whether it holds an SVG or a PNG.
+            brightness(0.55) takes 350's #0F81E9 to #084780 — 6/255 off
+            --color-navy, imperceptible — while a differently coloured logo
+            simply darkens proportionally instead of breaking. Transparent
+            headers brighten instead.
             {% endcomment %}
             <a href="{% if nav.root_page %}{% pageurl nav.root_page %}{% else %}/{% endif %}" class="group flex items-center gap-4 shrink-0">
                 {% if transparent_header and branding.dark_logo %}
@@ -76,30 +74,6 @@ mobile-menu.js already toggles) — no separate JS hook needed.
                          class="wtr-logo h-10 w-auto object-contain transition {% if transparent_header %}group-hover:brightness-125{% else %}group-hover:brightness-[0.55]{% endif %}">
                 {% else %}
                     <span class="font-heading font-bold text-xl {% if transparent_header %}text-light{% else %}text-dark{% endif %}">{{ current_site.site_name }}</span>
-                {% endif %}
-                {% comment %}
-                The badge fill is the same blue on both header variants — it
-                reads against either — but its hover follows the nav links, so
-                it needs the branch: darken to navy on a light header, lighten
-                on a transparent one, where a navy pill would vanish against a
-                navy hero. Hover is driven by "group" on the lockup anchor.
-                {% endcomment %}
-                {% if nav.regional_label %}
-                    {% comment %}
-                    h-10 matches .wtr-logo's own h-10 exactly, so the badge is
-                    the full height of the logo beside it rather than a small
-                    chip floating against its middle. It is a literal h-10 and
-                    not self-stretch: the lockup anchor is items-center, so a
-                    stretched child would size to the anchor's content box,
-                    which is the logo's height only by coincidence and would
-                    drift the moment anything taller joined the lockup.
-
-                    leading-none because the badge is a fixed-height flex box
-                    that centres its own text — the previous leading-[18px]
-                    was sized for an auto-height chip and now only fights that
-                    centring.
-                    {% endcomment %}
-                    <span class="wtr-regional-label inline-flex h-10 items-center justify-center rounded bg-primary-600 px-2 sm:px-3 font-heading text-sm sm:text-base font-semibold uppercase leading-none tracking-normal sm:tracking-[1px] text-white transition-colors {% if transparent_header %}group-hover:bg-primary-400{% else %}group-hover:bg-navy{% endif %}">{{ nav.regional_label }}</span>
                 {% endif %}
             </a>
 

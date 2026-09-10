@@ -10,12 +10,14 @@ LogoGridBlock use. md:, not sm:, is the row-split breakpoint — cards carry
 more content (image, heading, description, tag, link) than a person card
 or a logo, so they need more room before splitting into multiple columns.
 
-Heading size/alignment matches the same left-aligned display-heading
-convention as CardCarouselBlock/ImageCardListBlock's own section headings
-(font-heading ... lg:text-5xl) — per Figma's "Areas of work", which is
-left-aligned, not centered. Figma draws this step at 96px (text-8xl); the
-whole non-hero ramp was brought down against a 20px body, so it is 48px
-here — see the type scale note in AGENTS.md.
+Heading size matches the same display-heading convention as
+CardCarouselBlock/ImageCardListBlock's own section headings
+(font-heading ... lg:text-5xl), but centered (mx-auto max-w-3xl
+text-center) — matching PageCardsBlock's centered heading/copy
+treatment, since a CardGridBlock section can sit directly above or
+below a PageCardsBlock one. Figma draws this step at 96px (text-8xl);
+the whole non-hero ramp was brought down against a 20px body, so it
+is 48px here — see the type scale note in AGENTS.md.
 
 Width: special-cased in content_page.html/home_page.html/post_page.html
 (alongside page_cards/section/card_carousel/etc.) to skip the shared body
@@ -39,7 +41,9 @@ just giving the row mobile-edge breathing room.
             cards below keep their own always-light bg-neutral-50 fill
             (AGENTS.md pitfall #44) regardless, same as accordion items.
             {% endcomment %}
-            <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+            <div class="mx-auto max-w-3xl text-center">
+                <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+            </div>
         {% endif %}
         <div class="wtr-card-grid flex flex-col gap-6">
             {% for row in rows %}

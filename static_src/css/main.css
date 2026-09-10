@@ -1237,6 +1237,85 @@ body.wtr-scroll-locked {
 }
 
 /* ============================================================
+ * Hero numbered-list markers — .wtr-hero-copy ol
+ * ============================================================
+ * Editors can type an ordered list into hero copy (RICHTEXT_FEATURES_HERO
+ * includes "ol"/"ul" — see constants.py; HeroBlock's own copy field does
+ * not, so this only ever applies to a page-level HeroMixin hero). Replaces
+ * Typography's default decimal marker with a filled circle badge, per
+ * 350.org/science's "Climate science basics" numbered list (a translucent
+ * circle, the number centered inside, beside the item text).
+ *
+ * Item text also steps up to a bold display size (font-heading/700,
+ * 1.35em of whatever .wtr-hero-copy's own responsive text-lg/sm:text-xl/
+ * lg:text-28 (banner) or text-lg (full) step currently is) — Figma's
+ * reference list reads as a short, punchy stat/step sequence, not running
+ * body copy, and the plain body-copy size read too quiet next to a badge
+ * this size. Only <ol> items step up this way; a <ul>/paragraph
+ * elsewhere in the same hero copy stays at the normal body size.
+ *
+ * Badge sized in em against the (now-larger) list item's own font-size
+ * rather than a fixed px, so it scales with the text step automatically
+ * instead of needing its own breakpoints.
+ *
+ * counter()-driven ::before, not ::marker: ::marker can't be flex-aligned
+ * against multi-line item text the way Figma's badge is (vertically
+ * centered against the item as a whole), and its layout box is a browser
+ * implementation detail outside CSS's control.
+ * ============================================================ */
+.wtr-hero-copy ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: wtr-hero-list;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+.wtr-hero-copy ol > li {
+    counter-increment: wtr-hero-list;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1.35em;
+    line-height: 1.15;
+}
+
+.wtr-hero-copy ol > li::before {
+    content: counter(wtr-hero-list);
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 9999px;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 0.55em;
+    line-height: 1;
+}
+
+/* Badge fill/text invert with the same on_light switch hero.html already
+   computes for the rest of the copy (prose-neutral/prose-invert land on
+   this same element) -- a translucent version of whichever text color the
+   copy itself is using, so it reads on any hero.banner_color fill. */
+.wtr-hero-copy.prose-invert ol > li::before {
+    background-color: rgb(255 255 255 / 0.2);
+    color: var(--color-light);
+}
+
+.wtr-hero-copy.prose-neutral ol > li::before {
+    background-color: rgb(0 0 0 / 0.1);
+    color: var(--color-dark);
+}
+
+/* ============================================================
  * Rich text block headings — .wtr-text-block
  * ============================================================
  * Used by text_block.html. Tailwind Typography sizes headings relative to
@@ -1259,6 +1338,7 @@ body.wtr-scroll-locked {
     font-family: var(--font-heading);
     font-size: var(--text-2xl);
     line-height: 1.2;
+    letter-spacing: -0.025em;
     margin-bottom: 0.5rem;
 }
 
@@ -1314,7 +1394,11 @@ body.wtr-scroll-locked {
 
 @media (width >= 64rem) {
     .wtr-text-block h2 {
-        font-size: var(--text-40);
+        /* Matches CardGridBlock/PageCardsBlock's dedicated-field h2 (48px,
+         * Tailwind's text-5xl) rather than the --text-40 non-hero step, so a
+         * SectionBlock's rich-text h2 lines up with a card grid/page cards
+         * heading directly above or below it. */
+        font-size: 3rem;
     }
 }
 

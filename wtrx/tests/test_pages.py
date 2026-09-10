@@ -85,12 +85,23 @@ class TestHeroPanelSelection(TestCase):
         ):
             self.assertIn(field, names)
 
+    def test_home_page_has_no_image_caption_field(self):
+        """
+        hero_image_caption is a "banner"-only field — hero.html's "full"
+        variant (HomePage's only variant) has no caption chrome at all, so
+        hero_panels omits it even though the underlying model field still
+        exists (inherited from HeroMixin, no schema split).
+        """
+        names = _collect_panel_field_names(HomePage.content_panels)
+        self.assertNotIn("hero_image_caption", names)
+
     def test_content_page_has_only_banner_hero_fields(self):
         names = _collect_panel_field_names(ContentPage.content_panels)
         for field in (
             "hero_headline",
             "hero_copy",
             "hero_image",
+            "hero_image_caption",
             "hero_banner_color",
             "hero_cta",
         ):
@@ -103,6 +114,7 @@ class TestHeroPanelSelection(TestCase):
             "hero_headline",
             "hero_copy",
             "hero_image",
+            "hero_image_caption",
             "hero_banner_color",
             "hero_cta",
         ):
@@ -115,6 +127,7 @@ class TestHeroPanelSelection(TestCase):
             "hero_headline",
             "hero_copy",
             "hero_image",
+            "hero_image_caption",
             "hero_banner_color",
             "hero_cta",
         ):
@@ -215,6 +228,7 @@ class TestHomePageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
+            "image_caption",
             "banner_color",
             "cta",
             "minimal",
@@ -312,6 +326,7 @@ class TestContentPageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
+            "image_caption",
             "banner_color",
             "cta",
             "minimal",

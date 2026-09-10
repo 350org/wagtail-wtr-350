@@ -41,8 +41,8 @@
             {% comment %}
             Bottom row: logo lockup + copyright. The lockup anchor always
             renders (text fallback when no logo is configured, same pattern
-            as header.html) so the root_page link and regional badge work
-            regardless of whether a logo is set.
+            as header.html) so the root_page link works regardless of
+            whether a logo is set.
             {% endcomment %}
             <div class="flex flex-col sm:flex-row items-center sm:items-center gap-4">
                 <a href="{% if footer.root_page %}{% pageurl footer.root_page %}{% else %}/{% endif %}" class="shrink-0 flex items-center gap-2">
@@ -62,9 +62,6 @@
                              class="h-8 w-auto object-contain">
                     {% else %}
                         <span class="font-heading font-bold text-lg text-light">{{ current_site.site_name }}</span>
-                    {% endif %}
-                    {% if footer.regional_label %}
-                        <span class="wtr-footer-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white">{{ footer.regional_label }}</span>
                     {% endif %}
                 </a>
                 {% include "wtrx/components/regional_site_switcher.html" %}
@@ -105,14 +102,13 @@
         <div class="grid grid-cols-1 gap-y-8 lg:items-start {% if newsletter %}lg:grid-cols-[1fr_368px] lg:gap-x-12{% endif %}">
 
             {% comment %}
-            Main content: logo lockup + regional badge + nav columns. The
-            logo anchor always renders (text fallback when no logo is
-            configured, same pattern as header.html) so the root_page link
-            and regional badge work regardless of whether a logo is set.
-            Prefers dark_logo on the dark footer bg, falls back to primary
-            logo. order-1 on mobile (first); lg:order-none because desktop
-            positioning comes from this being the first auto-placed grid
-            item in column 1, not from `order`.
+            Main content: logo lockup + nav columns. The logo anchor always
+            renders (text fallback when no logo is configured, same pattern
+            as header.html) so the root_page link works regardless of
+            whether a logo is set. Prefers dark_logo on the dark footer bg,
+            falls back to primary logo. order-1 on mobile (first);
+            lg:order-none because desktop positioning comes from this being
+            the first auto-placed grid item in column 1, not from `order`.
             {% endcomment %}
             <div class="order-1 lg:order-none min-w-0">
                 <div class="mb-10 flex items-center gap-8">
@@ -133,9 +129,6 @@
                                  class="h-10 w-auto object-contain">
                         {% else %}
                             <span class="font-heading font-bold text-2xl text-light">{{ current_site.site_name }}</span>
-                        {% endif %}
-                        {% if footer.regional_label %}
-                            <span class="wtr-footer-regional-label inline-flex items-center justify-center rounded bg-primary-600 px-1.5 py-0.5 font-heading text-xs font-semibold uppercase leading-[18px] tracking-[1px] text-white">{{ footer.regional_label }}</span>
                         {% endif %}
                     </a>
                     {% include "wtrx/components/regional_site_switcher.html" %}

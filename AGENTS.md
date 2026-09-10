@@ -215,9 +215,10 @@ ES modules, 4-space indent, semicolons required.
    providing a dedicated hero at the top of a page (`HomePage`,
    `ContentPage`, etc.); `HeroBlock` places a hero-style section *within*
    the body StreamField. Both render `components/hero.html` and must pass a
-   `hero` context dict with exactly these keys: `headline`, `copy`,
-   `copy_is_block`, `image`, `video`, `link_text`, `link_page`, `link_url`,
-   `in_body`, `minimal`. `in_body=True` only for `HeroBlock` — it swaps the
+   `hero` context dict with exactly these keys: `variant`, `headline`,
+   `copy`, `copy_is_block`, `image`, `video`, `image_caption`,
+   `banner_color`, `cta`, `tag`, `tag_url`, `author`, `published_at`,
+   `minimal`, `in_body`. `in_body=True` only for `HeroBlock` — it swaps the
    page-hero's flat 16px gutter for the `px-4 sm:px-6 lg:px-8` every other
    full-bleed body block uses. `hero` and `quote` must stay in each page
    template's full-bleed block-type list (both own a `max-w-[1500px]`
@@ -225,7 +226,13 @@ ES modules, 4-space indent, semicolons required.
    `hero.video` is a wagtailmedia `Media`, the template switches to a
    two-column layout (text left, video right; stacked on mobile), hiding
    the background-image overlay. Poster fallback: wagtailmedia thumbnail →
-   `hero.image` at `fill-1280x720` → none.
+   `hero.image` at `fill-1280x720` → none. `image_caption` is an optional
+   caption pill overlaid at the bottom of whichever of `image`/`video` is
+   showing (`.wtr-image-caption`, same chrome as `SignupActionKitBlock`/
+   `ImageBlock`) — `HeroBlock` has no video, so it's image-only there.
+   "banner" variant only: `HomePage` (the only "full" variant page)
+   omits the field from `hero_panels`, and the "full" section of
+   `hero.html` has no caption chrome at all.
 5. **`wtrx/` extraction readiness**: concrete page models ship their own
    migrations in `wtrx/`. Forks needing custom page types add new apps
    rather than modifying `wtrx/` models directly.
@@ -668,8 +675,7 @@ check.
     year-content block) — and also avoids class-definition-order cycles
     when a new block's content type depends on `SectionContentBlock`
     already being defined.
-
-50. **Usercentrics is an integration now, but not a `head_html_field` one —
+51. **Usercentrics is an integration now, but not a `head_html_field` one —
     it needs its own accessor.** `wtrx/integrations/usercentrics.py`
     registers it like any other integration (config `StructBlock`, added to
     `IntegrationsStreamBlock` in `site_settings.py`), so settings ID, script
@@ -722,6 +728,22 @@ check.
       populated — leaving it blank reproduces that exact behavior, so this
       is feature parity with the pre-migration override mechanism, not new
       surface area.
+52. **`IntegrationSettings.custom_body_html` renders separately from
+    `body_html()`**, right before `</body>` closes in `base.html` — unlike
+    every per-integration `body_html_field` fragment (e.g. GTM's
+    `<noscript>` fallback), which stays at the top of `<body>` because
+    that integration specifically needs to run that early. Don't fold
+    `custom_body_html` back into `body_html()`'s concatenation; it has no
+    early-body requirement of its own.
+53. **`request.is_preview` gates all integration head/body markup**
+    (`IntegrationSettings.head_html()`/`body_html()`/`custom_body_html`) in
+    `base.html` — Wagtail's live-preview iframe renders the real page
+    template (`Page.serve_preview()`/`make_preview_request()` set
+    `request.is_preview = True`; `Page.serve()` sets it `False`), so
+    without the guard, analytics/tracking/vendor scripts would fire on
+    every preview refresh of unpublished draft content. Block-embedded
+    integrations (ActionKit forms, Fundraise Up, etc.) still render/fire in
+    live preview — only the settings-level head/body injection is gated.
 
 ## Git Conventions
 

@@ -179,6 +179,12 @@ class HeroMixin(models.Model):
       custom pause/play toggle in the corner. Takes over from hero_image as
       the background/image area on both variants; hero_image is still used
       as the poster fallback if the video has none.
+    - hero_image_caption: optional caption pill overlaid at the bottom of
+      whichever of hero_image/hero_video is showing, e.g. a photo credit —
+      same .wtr-image-caption chrome as SignupActionKitBlock/ImageBlock.
+      "banner" variant only — hero.html's "full" section has no caption
+      chrome, and hero_panels (HomePage's panel set) omits this field for
+      the same reason. See banner_hero_panels below.
     - hero_banner_color: background color/gradient. "banner" variant only —
       "full" never shows a solid color background.
     - hero_cta: optional button/signup widget, at most one. HomePage
@@ -255,6 +261,15 @@ class HeroMixin(models.Model):
             "falls back to the hero image above if no thumbnail is set."
         ),
     )
+    hero_image_caption = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("hero image caption"),
+        help_text=_(
+            "Optional caption overlaid at the bottom of the hero image or "
+            "video, e.g. a photo credit."
+        ),
+    )
     hero_banner_color = models.CharField(
         max_length=20,
         choices=BACKGROUND_COLOR_CHOICES,
@@ -273,6 +288,12 @@ class HeroMixin(models.Model):
         use_json_field=True,
     )
 
+    # hero_image_caption is deliberately omitted here (unlike
+    # banner_hero_panels below) — the "full" variant's own hero.html
+    # section has no caption chrome; it's a "banner"-only field. The model
+    # field itself still exists on HomePage (inherited from HeroMixin, no
+    # schema split), it's just never exposed as editable on the only page
+    # type that gets the "full" variant.
     hero_panels = [
         MultiFieldPanel(
             [
@@ -308,6 +329,7 @@ class HeroMixin(models.Model):
                 FieldPanel("hero_headline"),
                 FieldPanel("hero_copy"),
                 FieldPanel("hero_image"),
+                FieldPanel("hero_image_caption"),
                 FieldPanel("hero_banner_color"),
                 FieldPanel("hero_cta"),
             ],
@@ -335,6 +357,7 @@ class HeroMixin(models.Model):
             "copy_is_block": False,
             "image": self.hero_image,
             "video": self.hero_video,
+            "image_caption": self.hero_image_caption,
             "banner_color": self.hero_banner_color,
             "cta": self.hero_cta,
             "minimal": hero_is_minimal(copy=self.hero_copy, video=self.hero_video, cta=self.hero_cta),

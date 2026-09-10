@@ -515,14 +515,20 @@ class TestRegionalLabelRendersInHeader(TestCase):
         self.assertEqual(resolved.regional_label, "")
         self.assertIsNone(resolved.root_page)
 
-    def test_badge_renders_on_override_root_page(self):
+    def test_no_badge_on_override_root_page(self):
+        """
+        The header no longer renders the regional badge, even though
+        regional_label still resolves (see
+        test_resolved_navigation_exposes_override_label above) — it's kept
+        for FooterOverrideBlock/NavigationOverrideBlock parity and any
+        future use, just not displayed.
+        """
         content = self.client.get(self.canada.url).content.decode()
-        self.assertIn("wtr-regional-label", content)
-        self.assertIn("Canada", content)
+        self.assertNotIn("wtr-regional-label", content)
 
-    def test_badge_renders_on_descendant_page(self):
+    def test_no_badge_on_descendant_page(self):
         content = self.client.get(self.program.url).content.decode()
-        self.assertIn("wtr-regional-label", content)
+        self.assertNotIn("wtr-regional-label", content)
 
     def test_no_badge_outside_the_override(self):
         content = self.client.get(self.other.url).content.decode()
@@ -558,14 +564,17 @@ class TestRegionalLabelRendersInHeader(TestCase):
         content = self.client.get(self.other.url).content.decode()
         self.assertIn('<a href="/" class="group flex items-center gap-4', content)
 
-    def test_site_wide_label_renders_without_any_override(self):
-        """A standalone regional fork sets the label once on NavigationSettings."""
+    def test_site_wide_label_does_not_render_without_any_override(self):
+        """
+        regional_label still resolves site-wide (a standalone regional fork
+        can set it once on NavigationSettings), but the header no longer
+        displays a badge for it.
+        """
         self.nav.navigation_overrides = []
         self.nav.regional_label = "Indonesia"
         self.nav.save()
         content = self.client.get(self.other.url).content.decode()
-        self.assertIn("wtr-regional-label", content)
-        self.assertIn("Indonesia", content)
+        self.assertNotIn("wtr-regional-label", content)
 
 
 class TestFooterSettingsResolvedForPage(TestCase):
@@ -802,14 +811,20 @@ class TestFooterRegionalLabelRendersInFooter(TestCase):
         self.assertEqual(resolved.regional_label, "")
         self.assertIsNone(resolved.root_page)
 
-    def test_badge_renders_on_override_root_page(self):
+    def test_no_badge_on_override_root_page(self):
+        """
+        The footer no longer renders the regional badge, even though
+        regional_label still resolves (see
+        test_resolved_footer_exposes_override_label above) — kept for
+        FooterOverrideBlock/NavigationOverrideBlock parity and any future
+        use, just not displayed.
+        """
         content = self.client.get(self.canada.url).content.decode()
-        self.assertIn("wtr-footer-regional-label", content)
-        self.assertIn("Canada", content)
+        self.assertNotIn("wtr-footer-regional-label", content)
 
-    def test_badge_renders_on_descendant_page(self):
+    def test_no_badge_on_descendant_page(self):
         content = self.client.get(self.program.url).content.decode()
-        self.assertIn("wtr-footer-regional-label", content)
+        self.assertNotIn("wtr-footer-regional-label", content)
 
     def test_no_badge_outside_the_override(self):
         content = self.client.get(self.other.url).content.decode()
@@ -1183,6 +1198,62 @@ class TestSocialSettingsTwitterHandle(TestCase):
         self.assertEqual(self.social.twitter_handle, "")
 
 
+class TestIntegrationHtmlSuppressedDuringPreview(TestCase):
+    """
+    base.html gates IntegrationSettings.head_html()/body_html()/
+    custom_body_html behind `{% if not request.is_preview %}`, so
+    analytics/tracking/custom vendor scripts don't fire on every refresh
+    of Wagtail's live-preview iframe for unpublished draft content.
+    request.is_preview is set by Page.serve_preview()/serve() (see
+    wagtail/models/preview.py, pages.py) -- True for a preview render,
+    False for a normal page request.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="preview-suppression-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="preview-suppression-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Preview Suppression Test",
+        )
+        cls.integration, _ = IntegrationSettings.objects.get_or_create(site=cls.site)
+        cls.integration.custom_head_html = '<meta name="marker-head">'
+        cls.integration.custom_body_html = '<div id="marker-body"></div>'
+        cls.integration.integrations = [
+            (
+                "google_tag_manager",
+                {
+                    "enabled": True,
+                    "head_snippet": "<script>marker gtm head</script>",
+                    "body_snippet": "<noscript>marker gtm body</noscript>",
+                },
+            )
+        ]
+        cls.integration.save()
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="preview-suppression-test.localhost")
+
+    def test_markers_present_on_a_normal_page_request(self):
+        content = self.client.get(self.home.url).content.decode()
+        self.assertIn("marker-head", content)
+        self.assertIn("marker-body", content)
+        self.assertIn("marker gtm head", content)
+        self.assertIn("marker gtm body", content)
+
+    def test_markers_absent_from_the_live_preview_render(self):
+        response = self.home.make_preview_request()
+        content = response.content.decode()
+        self.assertNotIn("marker-head", content)
+        self.assertNotIn("marker-body", content)
+        self.assertNotIn("marker gtm head", content)
+        self.assertNotIn("marker gtm body", content)
+
+
 class TestIntegrationSettingsHeadHtml(TestCase):
     """
     IntegrationSettings.head_html() concatenates every enabled
@@ -1238,10 +1309,12 @@ class TestIntegrationSettingsHeadHtml(TestCase):
 class TestIntegrationSettingsBodyHtml(TestCase):
     """
     IntegrationSettings.body_html() mirrors head_html() but reads
-    IntegrationType.body_html_field/custom_body_html instead -- see
-    registry.py. GoogleTagManagerConfigBlock (wtrx/integrations/gtm.py) is
-    the first real integration to set body_html_field (its <noscript>
-    fallback).
+    IntegrationType.body_html_field instead -- see registry.py.
+    GoogleTagManagerConfigBlock (wtrx/integrations/gtm.py) is the first
+    real integration to set body_html_field (its <noscript> fallback).
+
+    Unlike head_html(), body_html() deliberately excludes custom_body_html
+    -- base.html renders that field separately, right before </body>.
     """
 
     @classmethod
@@ -1275,16 +1348,18 @@ class TestIntegrationSettingsBodyHtml(TestCase):
         self.integration.integrations = [self._gtm_entry(body_snippet="")]
         self.assertEqual(str(self.integration.body_html()), "")
 
-    def test_appends_custom_body_html_after_integration_fragments(self):
+    def test_does_not_include_custom_body_html(self):
+        """
+        Unlike head_html(), body_html() excludes custom_body_html -- that
+        field has no early-body requirement (GTM's <noscript> fallback
+        does), so base.html renders it separately, right before </body>,
+        instead of folding it into this early-body fragment.
+        """
         self.integration.integrations = [self._gtm_entry()]
         self.integration.custom_body_html = "<div>custom</div>"
         html = str(self.integration.body_html())
         self.assertIn("<noscript>gtm body</noscript>", html)
-        self.assertIn("<div>custom</div>", html)
-        self.assertLess(
-            html.index("gtm body"), html.index("custom"),
-            "custom_body_html should come after integration fragments",
-        )
+        self.assertNotIn("<div>custom</div>", html)
 
 
 class TestIntegrationSettingsCustomHtmlValidation(SimpleTestCase):
