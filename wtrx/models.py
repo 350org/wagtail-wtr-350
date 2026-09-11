@@ -988,23 +988,39 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             return self.author_name
         return None
 
-    def get_card_image(self):
+    def get_card_image(self, parent=None):
         """
         This post's card/listing image, used wherever it's shown as a card
         (the Blogs index, PageCardsBlock, and its own "Related posts" panel
-        on other posts -- see get_context() below and Blogs.get_context()).
+        on other posts -- see get_context() below and Blogs.get_context()) as
+        well as its own header image (see get_context() below).
 
         Prefers the explicit header image (hero_image, from BannerHeroMixin);
         falls back to the first image found anywhere in this post's body
         StreamField (see _first_image_in_body() for the search rules), so a
         post an editor never set a header image on still gets a
-        representative thumbnail instead of a blank card. Returns None --
-        not an error -- if neither is set; post_card.html already degrades
-        gracefully with no image (AGENTS.md Error Handling).
+        representative thumbnail instead of a blank card; finally falls back
+        to this post's parent Blogs page's own default_card_image, if set
+        (e.g. a generic graphic configured once on a Press Releases index,
+        for statements with no photo of their own, rather than needing one
+        hand-picked per post). Returns None -- not an error -- if none of
+        the three is set; post_card.html already degrades gracefully with no
+        image (AGENTS.md Error Handling).
+
+        `parent` lets a caller that already has this post's parent Blogs
+        page on hand (Blogs.get_context(), Post.get_context()'s related
+        posts loop) pass it in and skip a redundant get_parent() query; it's
+        resolved here when omitted (e.g. PageCardsBlock, which doesn't
+        already have it).
         """
         if self.hero_image_id:
             return self.hero_image
-        return _first_image_in_body(self.body)
+        body_image = _first_image_in_body(self.body)
+        if body_image:
+            return body_image
+        if parent is None:
+            parent = self.get_parent().specific
+        return getattr(parent, "default_card_image", None)
 
     def get_context(self, request, *args, **kwargs):
         from wtrx.templatetags.wtrx_tags import page_as_card
@@ -1017,6 +1033,7 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             tag=parent.title,
             tag_url=parent.url,
         )
+        ctx["hero"]["image"] = self.get_card_image(parent=parent)
 
         # "Related <posts>" — the 3 most recent other live/public posts under
         # this post's own Blogs parent, per Figma's fixed (non-editor-
@@ -1037,7 +1054,7 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
         related_posts = []
         for post in related:
             card = page_as_card(post)
-            card["image"] = post.get_card_image()
+            card["image"] = post.get_card_image(parent=parent)
             card["date"] = post.published_at
             related_posts.append(card)
         ctx["related_posts"] = related_posts
@@ -1097,8 +1114,27 @@ class Blogs(BasePage, HeroMixin):
             "when blank."
         ),
     )
+    default_card_image = models.ForeignKey(
+        CustomImage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("default card image"),
+        help_text=_(
+            "Shown for any post under this page that has no image of its own "
+            "(no header image, and none found in its body content) — both as "
+            "its own header and wherever it's shown as a card. Useful for a "
+            "Press Releases page, where a statement often has no photo. "
+            "Leave blank for no fallback."
+        ),
+    )
 
-    content_panels = BasePage.title_panels + HeroMixin.banner_hero_panels + [FieldPanel("related_intro")]
+    content_panels = (
+        BasePage.title_panels
+        + HeroMixin.banner_hero_panels
+        + [FieldPanel("related_intro"), FieldPanel("default_card_image")]
+    )
 
     promote_panels = BasePage.promote_panels
     settings_panels = BasePage.settings_panels
@@ -1217,7 +1253,7 @@ class Blogs(BasePage, HeroMixin):
         cards = []
         for post in posts:
             card = page_as_card(post)
-            card["image"] = post.get_card_image()
+            card["image"] = post.get_card_image(parent=self)
             card["date"] = post.published_at
             cards.append(card)
 

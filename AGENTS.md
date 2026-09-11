@@ -800,6 +800,41 @@ check.
       that sub-block's own defaults (every field blank), the same as if an
       editor had never opened the section — no re-harvest, no `KeyError`,
       unlike adding a *required* field would risk.
+55. **A missing post image falls back to `Blogs.default_card_image`, set
+    per-index-page rather than site-wide.** `Post.get_card_image()`
+    (`wtrx/models.py`) already preferred `hero_image`, then the first image
+    found in the body; it now falls through a third time to the parent
+    `Blogs` page's own `default_card_image` FK, used both for this post's
+    own header (`Post.get_context()` overrides `ctx["hero"]["image"]` with
+    `self.get_card_image(parent=parent)` after building the banner hero
+    context) and everywhere it's shown as a card (`Blogs.get_context()`,
+    the related-posts loop, `PageCardsBlock`).
+    - **Deliberately scoped per-`Blogs`-page, not a site-wide setting**
+      (e.g. on `BrandingSEOSettings`, next to `default_meta_image`): a
+      "BREAKING NEWS" graphic is right for a Press Releases index (where a
+      statement often has no photo) and wrong as a fallback on ordinary
+      blog posts, which almost always have a real photo and shouldn't
+      silently get a press-release-branded image if an editor forgets one.
+      A site can still set it on more than one `Blogs` page, or leave it
+      blank anywhere it doesn't apply — same "settings over hardcoding"
+      reasoning as the Integrations framework (rule #8), just scoped to a
+      page instance instead of a site setting.
+    - `get_card_image(self, parent=None)` takes an optional parent to avoid
+      a redundant `get_parent()` query at the three call sites that already
+      have the post's parent `Blogs`/index page on hand
+      (`Blogs.get_context()` passes `self`; `Post.get_context()`'s related
+      posts loop and `PageCardsBlock.get_context()` pass their own
+      already-resolved parent/`specific_index`) — it resolves its own via
+      `self.get_parent().specific` only when omitted. Any future caller of
+      `get_card_image()` should pass `parent=` if it already has the
+      parent page in scope, rather than accepting the extra query.
+    - There is still no `is_press_release` flag or coupling to
+      `AdminMenuSettings.press_releases_index_page` anywhere — "is this a
+      press release" is still purely which `Blogs` page a `Post` happens to
+      live under (see `Blogs.post_label`'s docstring), and this feature
+      doesn't change that. Setting `default_card_image` on the Press
+      Releases page is what makes it press-release-specific in practice,
+      not any code-level type check.
 
 ## Git Conventions
 

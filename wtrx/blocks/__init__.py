@@ -2117,7 +2117,7 @@ class PageCardsBlock(ContentPreviewMixin, StructBlock):
                 card = page_as_card(child)
                 get_card_image = getattr(child, "get_card_image", None)
                 if get_card_image is not None:
-                    card["image"] = get_card_image()
+                    card["image"] = get_card_image(parent=specific_index)
                 card["date"] = getattr(child, "published_at", None) or child.first_published_at
                 cards.append(card)
         context["cards"] = cards

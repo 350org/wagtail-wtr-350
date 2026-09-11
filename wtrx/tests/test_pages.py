@@ -682,6 +682,18 @@ class TestPostGetContext(TestCase):
         ctx = self._get_context(Post.objects.get(pk=self.post.pk))
         self.assertEqual(ctx["related_intro"], "News and insights.")
 
+    def test_hero_image_falls_back_to_parent_default_card_image(self):
+        """A post with no header image of its own gets the parent Blogs
+        page's default_card_image in its own hero too, not just in cards
+        (get_context() routes the hero image through get_card_image())."""
+        default_image = CustomImage.objects.create(
+            title="Blogs default hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post_no_author.pk))
+        self.assertEqual(ctx["hero"]["image"], default_image)
+
 
 class TestPostForm(TestCase):
     """
@@ -831,6 +843,64 @@ class TestPostGetCardImage(TestCase):
     def test_none_when_body_is_empty(self):
         post = self._make_post("empty-body", hero_image=None, body=[])
         self.assertIsNone(post.get_card_image())
+
+    def test_falls_back_to_parent_default_card_image(self):
+        """No header image and no image in the body: falls back to the
+        parent Blogs page's default_card_image (e.g. a "Breaking News"
+        graphic set once on a Press Releases index)."""
+        default_image = CustomImage.objects.create(
+            title="Default card image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        post = self._make_post("no-image-with-default", hero_image=None, body=[])
+        self.assertEqual(post.get_card_image(), default_image)
+
+    def test_hero_image_wins_over_parent_default(self):
+        default_image = CustomImage.objects.create(
+            title="Default card image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        post = self._make_post("hero-wins-over-default", hero_image=self.hero_image, body=[])
+        self.assertEqual(post.get_card_image(), self.hero_image)
+
+    def test_body_image_wins_over_parent_default(self):
+        default_image = CustomImage.objects.create(
+            title="Default card image 3", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        body = [
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "66666666-6666-6666-6666-666666666666",
+            }
+        ]
+        post = self._make_post("body-wins-over-default", hero_image=None, body=body)
+        self.assertEqual(post.get_card_image(), self.body_image)
+
+    def test_no_parent_default_still_returns_none(self):
+        post = self._make_post("no-default-set", hero_image=None, body=[])
+        self.assertIsNone(post.get_card_image())
+
+    def test_explicit_parent_kwarg_is_used_instead_of_a_fresh_lookup(self):
+        """Callers that already have the parent Blogs page (Blogs.get_context(),
+        Post.get_context()'s related posts loop) pass it in directly rather
+        than triggering an extra get_parent() query."""
+        other_blogs = Blogs(title="Other Blog", slug="other-blog-cci")
+        Page.objects.filter(depth=1).first().add_child(instance=other_blogs)
+        other_default = CustomImage.objects.create(
+            title="Other default", file=get_test_image_file(size=(1200, 800))
+        )
+        other_blogs.default_card_image = other_default
+        other_blogs.save()
+
+        post = self._make_post("explicit-parent-kwarg", hero_image=None, body=[])
+        # post's real parent (self.blogs) has no default set, but passing a
+        # different parent explicitly should be what's actually used.
+        self.assertEqual(post.get_card_image(parent=other_blogs), other_default)
 
 
 # ---------------------------------------------------------------------------
