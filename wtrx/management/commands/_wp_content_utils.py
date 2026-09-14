@@ -163,25 +163,38 @@ def _unmask_cf_emails(soup):
     Replace Cloudflare's email-obfuscation markup with the real address, in place.
 
     Cloudflare's edge rewrites any visible ``mailto:`` link into
-    ``<a href="/cdn-cgi/l/email-protection#hexhash">`` wrapping
-    ``<span class="__cf_email__" data-cfemail="hexhash">[email&nbsp;protected]</span>``,
-    and only restores the real address client-side via injected JS that
-    never runs for a plain ``requests`` fetch — so without this, an
-    imported body carries the literal "[email protected]" placeholder and a
-    dead link instead of the address.
+    ``<a href="/cdn-cgi/l/email-protection#hexhash">`` and marks the
+    obfuscated text with ``class="__cf_email__" data-cfemail="hexhash"``,
+    only restoring the real address client-side via injected JS that never
+    runs for a plain ``requests`` fetch — so without this, an imported body
+    carries the literal "[email protected]" placeholder and a dead link
+    instead of the address.
+
+    That class/data-cfemail pair lands on two different elements depending
+    on the original markup: wrapped in a separate
+    ``<span class="__cf_email__">`` nested inside the ``<a>`` when the email
+    text wasn't already the anchor's sole content, or directly on the
+    ``<a>`` itself (no inner span at all) when it was — confirmed against a
+    real 350.org press release, where the latter shape left the placeholder
+    completely untouched by a span-only lookup.
     """
-    for span in soup.find_all("span", class_="__cf_email__"):
-        cfemail = span.get("data-cfemail")
+    for node in soup.find_all(class_="__cf_email__"):
+        cfemail = node.get("data-cfemail")
         if not cfemail:
             continue
         try:
             email = _decode_cf_email(cfemail)
         except ValueError:
             continue
-        anchor = span.find_parent("a")
-        if anchor is not None and anchor.get("href", "").startswith(_CF_EMAIL_PROTECTION_PREFIX):
-            anchor["href"] = f"mailto:{email}"
-        span.replace_with(NavigableString(email))
+        if node.name == "a":
+            if node.get("href", "").startswith(_CF_EMAIL_PROTECTION_PREFIX):
+                node["href"] = f"mailto:{email}"
+            node.string = email
+        else:
+            anchor = node.find_parent("a")
+            if anchor is not None and anchor.get("href", "").startswith(_CF_EMAIL_PROTECTION_PREFIX):
+                anchor["href"] = f"mailto:{email}"
+            node.replace_with(NavigableString(email))
 
 
 def _build_clean(node):
