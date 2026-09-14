@@ -24,6 +24,18 @@ dependencies = [
     "wagtail-ai>=3.1,<4.0",
     "llm-anthropic>=0.27,<0.28",
     "wagtail-2fa>=1.8,<2.0",
+    # wagtail-2fa's TokenForm (the login form behind /admin/2fa/auth) has no
+    # otp_device field and relies on django_otp automatically trying every
+    # one of the user's devices when none is explicitly chosen. django-otp
+    # 1.7.1 removed that fallback as a deliberate security fix (it used to
+    # record a failed attempt against every non-matching device) and now
+    # raises "Please select a device." instead -- breaking every login via
+    # this form outright, before the submitted code is ever checked. Pin
+    # below that until wagtail-2fa ships its own otp_device support (or
+    # this project adds it). django-otp is a transitive dependency of
+    # wagtail-2fa (no version pin of its own), so it silently floats to
+    # newer releases on a fresh install without this.
+    "django-otp<1.7.1",
     "django-allauth[socialaccount]>=65.18,<66.0",
 ]
 
