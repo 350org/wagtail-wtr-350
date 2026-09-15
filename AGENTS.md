@@ -868,6 +868,36 @@ check.
       categories — the same "no guessed category" fallback that already
       applies to any English post matching neither source, not a bug
       specific to `--site`.
+57. **A raw boto3 `put_object()`/`copy_object()` call bypasses
+    `STORAGES["default"]["OPTIONS"]["object_parameters"]` entirely** — that
+    dict (currently just `CacheControl`, a 7-day max-age; see
+    `production.py`) is applied by django-storages' `S3Storage.save()` on
+    every *normal* upload through Wagtail, not by S3 itself, so any code
+    path that writes objects directly against the S3 API instead needs to
+    set it by hand or the object lands with no `Cache-Control` header at
+    all. `wtrx/management/commands/migrate_media_bucket.py` (a one-off,
+    since removed — see git history) did exactly this while moving media
+    into Divio's Object Storage bucket, and every object it copied is
+    missing the header as a result — confirmed live via a PageSpeed
+    Insights "Use efficient cache lifetimes" audit flagging the site's
+    `s3.amazonaws.com`-origin media (6.3 of 6.4 MiB total estimated
+    savings). `wtrx/management/commands/backfill_media_cache_control.py`
+    fixes existing objects in place via S3's server-side `CopyObject`
+    (`MetadataDirective=REPLACE`, same bucket/key — no bytes re-transferred
+    through this process), reading `CacheControl` from
+    `default_storage.get_object_parameters()` rather than hardcoding it a
+    second time, so it can't drift from `production.py`. `REPLACE` wipes
+    *all* metadata not explicitly passed back — the command reads the
+    object's own `ContentType`/`ContentDisposition`/`ContentEncoding`/
+    `ContentLanguage`/`Metadata` via `HeadObject` first and carries them
+    through unchanged; omitting `ContentType` in particular would silently
+    reset every re-copied object to `binary/octet-stream`. Reuses
+    `default_storage.connection`'s own boto3 client rather than
+    constructing one by hand, so `endpoint_url`/`region`/`addressing_style`
+    can't drift from whatever this environment is actually configured for
+    (this project's bucket names can contain a literal dot — see the S3
+    config comments in `production.py` — which breaks hand-rolled client
+    config that gets `addressing_style` wrong).
 
 ## Git Conventions
 
