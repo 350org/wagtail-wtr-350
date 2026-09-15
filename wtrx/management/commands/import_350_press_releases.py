@@ -16,6 +16,26 @@ Usage:
     python manage.py import_350_press_releases --dry-run        # preview only
     python manage.py import_350_press_releases --update         # overwrite already-imported
     python manage.py import_350_press_releases --target press-releases  # pick a Blogs page
+    python manage.py import_350_press_releases --site fr --target press-releases-fr
+                                                          # a 350.org country/language site
+
+Country/language sites: 350.org's other-language sites (e.g.
+https://350.org/fr) are separate WordPress multisite subdirectory installs
+with an identical sitemap/theme shape to the main site, just path-prefixed
+-- --site swaps only the base URL (see resolve_site_base_url() in
+_wp_content_utils.py); fetch_press_release()'s page-structure parsing and
+the Yoast site-name stripping both already follow whatever page was
+actually fetched. Imported country-site posts land as ordinary Posts under
+whichever --target Blogs page you point at, in the existing single Wagtail
+locale -- not a separate Wagtail Locale/translation tree, even though
+WAGTAIL_I18N_ENABLED and the header's language switcher exist for that
+purpose (a deliberate scope choice, not an oversight). Since Page.slug is
+only unique among siblings, not site-wide, a country/region sub-home's own
+Blogs child (e.g. wanting 350.org/france/press-releases to have the plain
+slug "press-releases") can collide with an identically-slugged page
+elsewhere in the tree -- --target then also accepts a slash-separated path
+from the site root (e.g. --target france/press-releases) instead of a bare
+slug; see resolve_blogs_target()'s docstring in _wp_content_utils.py.
 
 Field mapping:
     Page <h2> in #press-release-header  -> Post.title
@@ -50,24 +70,25 @@ from django.utils import timezone as dj_timezone
 from wtrx.management.commands._wp_content_utils import (
     convert_body,
     resolve_blogs_target,
+    resolve_site_base_url,
+    verify_site_reachable,
     yoast_seo_fields_from_page,
 )
 
-SITEMAP_INDEX_URL = "https://350.org/sitemap_index.xml"
 USER_AGENT = "350-wagtail-press-release-import/1.0 (+https://github.com/)"
 
 _LOC_RE = re.compile(r"<loc>(.*?)</loc>")
 
 
-def _sitemap_shard_urls(session):
-    resp = session.get(SITEMAP_INDEX_URL, timeout=30)
+def _sitemap_shard_urls(session, sitemap_index_url):
+    resp = session.get(sitemap_index_url, timeout=30)
     resp.raise_for_status()
     return [
         loc for loc in _LOC_RE.findall(resp.text) if "press-release-sitemap" in loc
     ]
 
 
-def fetch_press_release_urls(session):
+def fetch_press_release_urls(session, sitemap_index_url):
     """
     Return every press release URL, most recently published first.
 
@@ -77,7 +98,7 @@ def fetch_press_release_urls(session):
     reversing the combined list gives newest-first.
     """
     urls = []
-    for shard_url in _sitemap_shard_urls(session):
+    for shard_url in _sitemap_shard_urls(session, sitemap_index_url):
         resp = session.get(shard_url, timeout=30)
         resp.raise_for_status()
         for url in _LOC_RE.findall(resp.text):
@@ -157,8 +178,16 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--target",
-            help="Slug of the Blogs page to import under. Required if more than one "
-            "Blogs page exists; optional (and inferred) if there's only one.",
+            help="Slug of the Blogs page to import under, or a slash-separated path "
+            "from the site root (e.g. 'france/press-releases') if a bare slug would "
+            "be ambiguous. Required if more than one Blogs page exists; optional "
+            "(and inferred) if there's only one.",
+        )
+        parser.add_argument(
+            "--site",
+            default="",
+            help="URL path segment for a 350.org country/language site, e.g. 'fr' "
+            "for https://350.org/fr. Omit for the main English site.",
         )
 
     def handle(self, *args, **options):
@@ -171,6 +200,13 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         update = options["update"]
 
+        try:
+            base_url = resolve_site_base_url(options["site"])
+        except ValueError as exc:
+            self.stderr.write(self.style.ERROR(str(exc)))
+            return
+        sitemap_index_url = f"{base_url}/sitemap_index.xml"
+
         blogs_index = resolve_blogs_target(self.stderr, self.style, options["target"])
         if blogs_index is None:
             return
@@ -178,8 +214,14 @@ class Command(BaseCommand):
         session = requests.Session()
         session.headers["User-Agent"] = USER_AGENT
 
+        if not verify_site_reachable(session, base_url):
+            self.stderr.write(
+                self.style.ERROR(f"No WordPress site found at {base_url} — check the --site value.")
+            )
+            return
+
         self.stdout.write("Fetching press release list from sitemap…")
-        urls = fetch_press_release_urls(session)
+        urls = fetch_press_release_urls(session, sitemap_index_url)
         self.stdout.write(f"Found {len(urls)} press releases total.")
 
         created, updated, skipped = 0, 0, 0

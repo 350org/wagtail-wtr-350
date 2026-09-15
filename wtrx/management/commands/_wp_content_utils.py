@@ -34,6 +34,57 @@ def _full_size_wp_image_url(url):
     return parsed._replace(path=match.group("base") + match.group("ext")).geturl()
 
 
+_MAIN_SITE_BASE_URL = "https://350.org"
+
+
+def resolve_site_base_url(site):
+    """
+    Resolve a --site CLI value into a base URL for either import command.
+
+    350.org's other-language "country sites" (e.g. https://350.org/fr) are
+    separate WordPress multisite subdirectory installs, not a query-param
+    switch on the main site — confirmed live: https://350.org/fr/wp-json/
+    returns its own independent site index ("350 Français"), and
+    /fr/sitemap_index.xml, /fr/press-release-sitemap.xml,
+    /fr/wp-json/wp/v2/posts all exist in the exact same shape as the main
+    site's, served by the same theme (a live /fr/ press release page has
+    the identical #press-release-header/#post-time/article.clearfix
+    markup fetch_press_release() already expects). So the only thing that
+    ever needs to change per-site is this base URL — everything else
+    (Yoast site-name stripping, author-byline scraping, image URLs) is
+    already relative to whatever page/response was actually fetched.
+
+    ``site`` is a raw URL path segment (e.g. "fr", or "/fr/" with stray
+    slashes) -- blank (the default) resolves to the main English site.
+    Raises ValueError for a value that looks like a mistaken full URL
+    rather than a bare path segment.
+    """
+    site = site.strip("/")
+    if not site:
+        return _MAIN_SITE_BASE_URL
+    if "://" in site or site.startswith("."):
+        raise ValueError(
+            f"--site should be a URL path segment like 'fr', not {site!r}."
+        )
+    return f"{_MAIN_SITE_BASE_URL}/{site}"
+
+
+def verify_site_reachable(session, base_url):
+    """
+    Confirm base_url points at a real WordPress site before an import run
+    starts, so a typo'd or nonexistent --site value fails fast with one
+    clear message instead of a confusing error partway through paginated
+    REST fetching or sitemap parsing.
+    """
+    try:
+        resp = session.get(f"{base_url}/wp-json/", timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.exceptions.RequestException, ValueError):
+        return False
+    return "wp/v2" in (data.get("namespaces") or [])
+
+
 def _strip_site_name_suffix(title, site_name):
     """
     Yoast's default title template appends " - <Site Name>" to every page's
@@ -83,7 +134,35 @@ def yoast_seo_fields_from_page(soup):
     return _strip_site_name_suffix(title, site_name), description
 
 
-def resolve_blogs_target(stderr, style, target_slug):
+def _find_page_by_path(path):
+    """
+    Walk the default site's page tree by slug, one path segment at a time,
+    and return the page found there (as its real subtype, via .specific),
+    or None if any segment doesn't match.
+
+    E.g. "france/blog" -> site.root_page's child sliced by slug "france",
+    then that page's own child sliced by slug "blog". Exists because
+    Page.slug is only unique among siblings, not site-wide (see
+    resolve_blogs_target's docstring) -- a bare slug can't disambiguate a
+    page nested under a country/region sub-home from an identically-slugged
+    page elsewhere in the tree.
+    """
+    # Deferred import to avoid import-time DB access.
+    from wagtail.models import Site
+
+    site = Site.objects.filter(is_default_site=True).first() or Site.objects.first()
+    if site is None:
+        return None
+
+    page = site.root_page
+    for segment in path.strip("/").split("/"):
+        page = page.get_children().filter(slug=segment).first()
+        if page is None:
+            return None
+    return page.specific
+
+
+def resolve_blogs_target(stderr, style, target):
     """
     Resolve which Blogs page an import command should add children under.
 
@@ -92,16 +171,34 @@ def resolve_blogs_target(stderr, style, target_slug):
     "Blog Index" and "Press Releases" pages) must pick explicitly, rather
     than the command silently guessing via Blogs.objects.first().
 
+    --target also accepts a slash-separated path from the site root (e.g.
+    "france/blog") instead of a bare slug, resolved via _find_page_by_path()
+    -- needed because Page.slug is only unique among siblings, not
+    site-wide, so a country/region sub-home's own Blogs child (e.g.
+    350.org/france/blog) can't always be picked out by slug alone once more
+    than one page in the tree shares that slug.
+
     Returns the Blogs instance, or None (having already written an error
     to stderr) if it can't be resolved.
     """
     # Deferred import to avoid import-time DB access.
     from wtrx.models import Blogs
 
-    if target_slug:
-        blogs = Blogs.objects.filter(slug=target_slug).first()
+    if target:
+        if "/" in target.strip("/"):
+            page = _find_page_by_path(target)
+            if page is None:
+                stderr.write(style.ERROR(f"No page found at path '{target}'."))
+                return None
+            if not isinstance(page, Blogs):
+                stderr.write(
+                    style.ERROR(f"Page at path '{target}' is a {type(page).__name__}, not a Blogs page.")
+                )
+                return None
+            return page
+        blogs = Blogs.objects.filter(slug=target).first()
         if blogs is None:
-            stderr.write(style.ERROR(f"No Blogs page found with slug '{target_slug}'."))
+            stderr.write(style.ERROR(f"No Blogs page found with slug '{target}'."))
         return blogs
 
     all_blogs = list(Blogs.objects.all())

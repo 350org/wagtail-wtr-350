@@ -835,6 +835,39 @@ check.
       doesn't change that. Setting `default_card_image` on the Press
       Releases page is what makes it press-release-specific in practice,
       not any code-level type check.
+56. **350.org's other-language "country sites" (e.g. `https://350.org/fr`)
+    are separate WordPress multisite subdirectory installs**, not a
+    `?lang=` query param on the main site — confirmed live:
+    `https://350.org/fr/wp-json/` returns its own independent site index
+    ("350 Français"), and `/fr/sitemap_index.xml`,
+    `/fr/press-release-sitemap.xml`, `/fr/wp-json/wp/v2/posts` all exist in
+    the exact same shape as the main site's, served by the same theme (a
+    live `/fr/` press release page has the identical
+    `#press-release-header`/`#post-time`/`article.clearfix` markup
+    `fetch_press_release()` already expects). So `import_350_blog.py`/
+    `import_350_press_releases.py`'s `--site` option
+    (`resolve_site_base_url()`/`verify_site_reachable()` in
+    `_wp_content_utils.py`) only ever needs to swap the base URL — Yoast
+    site-name stripping, author-byline scraping, and image URLs are all
+    already relative to whatever page/response was actually fetched, so
+    none of that needed changing.
+    - **Deliberate scope decision**: imported country-site content lands
+      as an ordinary `Post` under whichever `--target` `Blogs` page an
+      editor has created for it, in the existing single (English) Wagtail
+      locale — not a new Wagtail Locale/translation tree. `WAGTAIL_I18N_ENABLED`
+      is already `True` and `wtrx/templates/wtrx/components/language_switcher.html`
+      is already wired into the header expecting more entries in
+      `WAGTAIL_CONTENT_LANGUAGES` (currently English-only, with a comment
+      inviting forks to add more) — that's the more "correct" long-term
+      path for native `/fr/...` URLs and a working language switcher, but
+      it needs a locale enabled in settings and a translated/independent
+      page tree built in the admin, which is real setup cost beyond an
+      import script. Revisit only if a site actually wants that.
+    - `CATEGORY_SLUG_MAP`/`TITLE_CATEGORY_KEYWORDS` (`import_350_blog.py`)
+      are English-only, so a non-English import ends up with zero
+      categories — the same "no guessed category" fallback that already
+      applies to any English post matching neither source, not a bug
+      specific to `--site`.
 
 ## Git Conventions
 
