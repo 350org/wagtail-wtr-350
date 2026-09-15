@@ -2620,6 +2620,14 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
         request = (parent_context or {}).get("request")
+        # Wagtail's live-preview iframe (Page.serve_preview()) — distinct
+        # from `is_block_preview` above, which is the "Add block" picker's
+        # thumbnail preview. Fundraise Up's installation script is
+        # suppressed there along with every other integration's head/body
+        # injection (see base.html's request.is_preview guard and AGENTS.md
+        # pitfall #53), so the anchor below would never hydrate — the
+        # template shows an explanatory placeholder instead.
+        ctx["is_page_preview"] = bool(request is not None and getattr(request, "is_preview", False))
         fundraiseup_config = None
         if request is not None:
             try:

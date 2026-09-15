@@ -81,6 +81,19 @@
                             </div>
                             <span class="mt-4 block rounded-lg bg-primary-600 px-6 py-3 text-center text-lg font-semibold text-light">{% trans "Donate" %}</span>
                         </div>
+                    {% elif is_page_preview %}
+                        {% comment %}
+                        Wagtail's live-preview iframe for a full page (distinct
+                        from is_block_preview above, the "Add block" picker's
+                        thumbnail). Fundraise Up's installation script is
+                        suppressed there too (base.html's request.is_preview
+                        guard, AGENTS.md pitfall #53), so the real anchor below
+                        would never hydrate — show an explanatory placeholder
+                        instead of a silently empty action area.
+                        {% endcomment %}
+                        <div class="wtr-fundraiseup-preview-notice rounded-lg border border-dashed border-light/30 px-4 py-6 text-center text-base text-light/70">
+                            {% trans "The Fundraise Up embed will be rendered here on the live site." %}
+                        </div>
                     {% else %}
                         {% comment %}
                         Region geolocation — see FundraiseUpConfigBlock's
