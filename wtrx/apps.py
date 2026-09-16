@@ -9,8 +9,10 @@ class WtrxConfig(AppConfig):
     def ready(self):
         from wtrx.ai import patch_content_feedback_prompt_default
         from wtrx.forms import patch_wagtail_2fa_device_form
+        from wtrx.media_optimization import connect_signals as connect_media_optimization_signals
         from wtrx.signals import connect_signals
 
         connect_signals()
+        connect_media_optimization_signals()
         patch_wagtail_2fa_device_form()
         patch_content_feedback_prompt_default()

@@ -171,6 +171,33 @@ WAGTAIL_SITE_NAME = "350.org"
 WAGTAILIMAGES_IMAGE_MODEL = "wtrx.CustomImage"
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
 
+# Without this, a PNG source keeps generating PNG renditions for any filter
+# spec that doesn't explicitly request a format (e.g. "fill-640x360") --
+# Wagtail's own default_conversions dict (wagtail/images/models.py) already
+# converts avif/bmp/webp/unanimated-gif sources to PNG, but has no entry for
+# PNG itself, so it falls through unchanged. Confirmed live via a PageSpeed
+# Insights "Improve image delivery" flag: an in-body screenshot's fill-640x360
+# rendition was a 168 KiB PNG the same source would produce as ~40 KiB in
+# WebP. WebP (not JPEG) so a PNG with real transparency still renders
+# correctly rather than getting flattened onto a white background.
+#
+# Two call sites are deliberately pinned to an explicit format in their own
+# template rather than left to this default, since their consumer isn't a
+# browser rendering our own page: base.html's og:image/twitter:image (social
+# link-preview crawlers have historically inconsistent WebP support -- a
+# broken share preview is a highly visible regression) and its favicon
+# (needs the broadest possible browser/OS support, not just modern
+# browsers). Everything else -- cards, hero images, StreamField image
+# blocks, logos -- has no such external-consumer constraint and benefits
+# from the smaller output.
+#
+# Changing this does NOT retroactively affect already-generated renditions
+# (Wagtail caches them per image+filter-spec in the Rendition table/storage
+# regardless of this setting) -- run `python manage.py
+# wagtail_update_image_renditions` after deploying this to regenerate
+# existing ones.
+WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp"}
+
 WAGTAILSEARCH_BACKENDS = {
     "default": {
         "BACKEND": "wagtail.search.backends.database",

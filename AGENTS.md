@@ -882,22 +882,94 @@ check.
     Insights "Use efficient cache lifetimes" audit flagging the site's
     `s3.amazonaws.com`-origin media (6.3 of 6.4 MiB total estimated
     savings). `wtrx/management/commands/backfill_media_cache_control.py`
-    fixes existing objects in place via S3's server-side `CopyObject`
-    (`MetadataDirective=REPLACE`, same bucket/key — no bytes re-transferred
-    through this process), reading `CacheControl` from
-    `default_storage.get_object_parameters()` rather than hardcoding it a
-    second time, so it can't drift from `production.py`. `REPLACE` wipes
-    *all* metadata not explicitly passed back — the command reads the
-    object's own `ContentType`/`ContentDisposition`/`ContentEncoding`/
-    `ContentLanguage`/`Metadata` via `HeadObject` first and carries them
-    through unchanged; omitting `ContentType` in particular would silently
-    reset every re-copied object to `binary/octet-stream`. Reuses
-    `default_storage.connection`'s own boto3 client rather than
-    constructing one by hand, so `endpoint_url`/`region`/`addressing_style`
-    can't drift from whatever this environment is actually configured for
-    (this project's bucket names can contain a literal dot — see the S3
-    config comments in `production.py` — which breaks hand-rolled client
-    config that gets `addressing_style` wrong).
+    (a one-off, since removed — see git history) fixed existing objects in
+    place via S3's server-side `CopyObject` (`MetadataDirective=REPLACE`,
+    same bucket/key — no bytes re-transferred through that process), reading
+    `CacheControl` from `default_storage.get_object_parameters()` rather
+    than hardcoding it a second time, so it couldn't drift from
+    `production.py`. `REPLACE` wipes *all* metadata not explicitly passed
+    back — the command read the object's own `ContentType`/
+    `ContentDisposition`/`ContentEncoding`/`ContentLanguage`/`Metadata` via
+    `HeadObject` first and carried them through unchanged; omitting
+    `ContentType` in particular would have silently reset every re-copied
+    object to `binary/octet-stream`. It reused `default_storage.connection`'s
+    own boto3 client rather than constructing one by hand, so
+    `endpoint_url`/`region`/`addressing_style` couldn't drift from whatever
+    environment it ran in (this project's bucket names can contain a literal
+    dot — see the S3 config comments in `production.py` — which breaks
+    hand-rolled client config that gets `addressing_style` wrong). If this
+    recurs (e.g. a future bulk-copy tool repeats the same mistake), that
+    removed command's approach is the reference implementation to redo.
+58. **`wagtailmedia.models.Media.thumbnail` is a plain `FileField`, not a
+    Wagtail `Image` FK** — Wagtail's rendition pipeline (resize, format
+    conversion, caching) never touches it, so whatever an editor uploads as
+    a video's poster frame is served completely as-is. It's used in exactly
+    one role site-wide, as a `<video poster="...">` (hero's background
+    video, `video_block.html`, `accordion_block.html`) — confirmed live via
+    a PageSpeed Insights "Improve image delivery" flag on an 831 KiB raw PNG
+    hero-video thumbnail (a design-tool export judging by its filename,
+    "Rectangle_130.png") served completely unresized. `wtrx/models.py`'s own
+    help text tells editors to upload one for exactly this poster-frame
+    role, so this was a data-quality gap in a deliberately-used feature, not
+    a bug in the poster fallback chain itself (rule #4 above).
+    `wtrx/media_optimization.py` hooks `pre_save` on `wagtailmedia.Media` (a
+    plain Django signal, connected in `WtrxConfig.ready()` — Media isn't a
+    swappable/subclassable model in this project the way `CustomImage` is
+    for Wagtail's own Image, so a signal is the only hook point available)
+    to cap every new thumbnail to `MAX_THUMBNAIL_DIMENSION` and re-encode it
+    as JPEG before it reaches storage — a video poster always renders opaque
+    underneath the `<video>` element, so PNG's lossless/alpha features are
+    wasted bytes regardless of the source format; transparency is flattened
+    onto white rather than naively dropped (which would otherwise reveal
+    garbage/black in the RGB channels beneath transparent pixels).
+    `backfill_video_thumbnails` applies the same processing to existing
+    `Media` rows. Uses plain Pillow rather than Willow (Wagtail's own image
+    library, used by `CustomImage`/`CustomRendition`) — Willow's newer
+    plugin-registry API (operations resolved dynamically per backend) makes
+    a one-off "resize down, re-encode as JPEG" task on a raw `FileField`
+    more awkward than reaching for Pillow directly, which Willow itself
+    sits on top of anyway. The signal skips reprocessing when a save doesn't
+    touch `thumbnail` at all (compares the instance's value against the
+    database's), so editing a `Media` item's title doesn't recompress its
+    thumbnail every time — the backfill command, which intentionally
+    reprocesses every row regardless, disconnects the same signal for the
+    duration of its run (reconnected in a `finally` block) since its own
+    `Media.save()` call would otherwise trip that same hook a second,
+    redundant time (the optimized filename never matches the database's
+    original one, so the "already processed?" check can't short-circuit it
+    the way it does for an editor's unrelated save).
+59. **A PNG source keeps generating PNG renditions for any filter spec that
+    doesn't request a format explicitly** (e.g. `fill-640x360`) — Wagtail's
+    own `default_conversions` dict (`wagtail/images/models.py`) converts
+    avif/bmp/webp sources (and unanimated GIF) to PNG, but has no entry for
+    PNG itself, so it falls through unchanged. Confirmed live via a
+    PageSpeed Insights "Improve image delivery" flag: an in-body
+    screenshot's `fill-640x360` rendition was a 168 KiB PNG the same source
+    now produces as ~40 KiB in WebP.
+    `WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp"}` (`settings/base.py`)
+    fixes this project-wide with no template changes — WebP rather than
+    JPEG so a PNG with real transparency still renders correctly instead of
+    being flattened onto a white background (Wagtail's own JPEG-output path
+    does exactly that via `willow.set_background_color_rgb`). Two call sites
+    in `base.html` are deliberately pinned away from this default with an
+    explicit `format-jpeg`/`format-png` filter-spec token (**not** a dotted
+    suffix on the size token — `fill-1200x630.jpg` raises
+    `InvalidFilterSpecError` since `FillOperation.construct()` does a bare
+    `width, height = size.split("x")`; the correct form is a second
+    space-separated spec, `fill-1200x630 format-jpeg`, joined into one
+    pipe-separated `Filter.spec` by the `{% image %}` tag parser) since
+    their consumer isn't a browser rendering our own page:
+    `og:image`/`twitter:image` (social link-preview crawlers have
+    historically inconsistent WebP support — a broken share preview is a
+    far more visible regression than the bandwidth saved on one image) and
+    the favicon (needs the broadest possible browser/OS support, and is
+    small enough that WebP's savings there are negligible anyway).
+    Changing this setting does **not** retroactively touch already-generated
+    renditions — Wagtail caches them per `(image, filter_spec)` in the
+    `Rendition` table/storage regardless of this setting, so the fix only
+    reaches new renditions until `python manage.py
+    wagtail_update_image_renditions` (Wagtail's own built-in command; no
+    project-specific backfill needed here) regenerates the existing ones.
 
 ## Git Conventions
 
