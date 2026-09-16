@@ -938,19 +938,27 @@ check.
     redundant time (the optimized filename never matches the database's
     original one, so the "already processed?" check can't short-circuit it
     the way it does for an editor's unrelated save).
-59. **A PNG source keeps generating PNG renditions for any filter spec that
-    doesn't request a format explicitly** (e.g. `fill-640x360`) — Wagtail's
-    own `default_conversions` dict (`wagtail/images/models.py`) converts
-    avif/bmp/webp sources (and unanimated GIF) to PNG, but has no entry for
-    PNG itself, so it falls through unchanged. Confirmed live via a
-    PageSpeed Insights "Improve image delivery" flag: an in-body
-    screenshot's `fill-640x360` rendition was a 168 KiB PNG the same source
-    now produces as ~40 KiB in WebP.
-    `WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp"}` (`settings/base.py`)
-    fixes this project-wide with no template changes — WebP rather than
-    JPEG so a PNG with real transparency still renders correctly instead of
-    being flattened onto a white background (Wagtail's own JPEG-output path
-    does exactly that via `willow.set_background_color_rgb`). Two call sites
+59. **A PNG or JPEG source keeps generating a rendition in that same format
+    for any filter spec that doesn't request one explicitly** (e.g.
+    `fill-640x360`) — Wagtail's own `default_conversions` dict
+    (`wagtail/images/models.py`) converts avif/bmp/webp sources (and
+    unanimated GIF) to PNG, but has no entry for PNG or JPEG themselves, so
+    both fall through unchanged. Confirmed live via a PageSpeed Insights
+    "Improve image delivery" flag: an in-body screenshot's `fill-640x360`
+    rendition was a 168 KiB PNG the same source now produces as ~40 KiB in
+    WebP; JPEG was added to the same setting after the PNG-only version
+    shipped and the same report kept flagging JPEG-sourced images for an
+    identical reason.
+    `WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp"}`
+    (`settings/base.py`) fixes this project-wide with no template changes —
+    WebP (not JPEG) as PNG's target so a PNG with real transparency still
+    renders correctly instead of being flattened onto a white background
+    (Wagtail's own JPEG-output path does exactly that via
+    `willow.set_background_color_rgb`); JPEG sources re-encode to WebP too
+    even though that's a second lossy pass on an already-lossy source —
+    WebP's better compression still nets a real size win for photographic
+    content in practice, and nothing in this project depends on a JPEG
+    rendition's exact bytes surviving untouched. Two call sites
     in `base.html` are deliberately pinned away from this default with an
     explicit `format-jpeg`/`format-png` filter-spec token (**not** a dotted
     suffix on the size token — `fill-1200x630.jpg` raises

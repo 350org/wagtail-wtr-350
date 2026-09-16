@@ -171,15 +171,25 @@ WAGTAIL_SITE_NAME = "350.org"
 WAGTAILIMAGES_IMAGE_MODEL = "wtrx.CustomImage"
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
 
-# Without this, a PNG source keeps generating PNG renditions for any filter
-# spec that doesn't explicitly request a format (e.g. "fill-640x360") --
-# Wagtail's own default_conversions dict (wagtail/images/models.py) already
-# converts avif/bmp/webp/unanimated-gif sources to PNG, but has no entry for
-# PNG itself, so it falls through unchanged. Confirmed live via a PageSpeed
-# Insights "Improve image delivery" flag: an in-body screenshot's fill-640x360
-# rendition was a 168 KiB PNG the same source would produce as ~40 KiB in
-# WebP. WebP (not JPEG) so a PNG with real transparency still renders
-# correctly rather than getting flattened onto a white background.
+# Without this, a PNG or JPEG source keeps generating PNG/JPEG renditions
+# for any filter spec that doesn't explicitly request a format (e.g.
+# "fill-640x360") -- Wagtail's own default_conversions dict
+# (wagtail/images/models.py) already converts avif/bmp/webp/unanimated-gif
+# sources to PNG, but has no entry for PNG or JPEG themselves, so both fall
+# through unchanged. Confirmed live via a PageSpeed Insights "Improve image
+# delivery" flag: an in-body screenshot's fill-640x360 rendition was a 168
+# KiB PNG the same source now produces as ~40 KiB in WebP, and several
+# JPEG-sourced images on the same report kept getting flagged for the same
+# reason after the PNG-only version of this setting shipped.
+#
+# JPEG -> WebP is a second lossy re-encode of an already-lossy source, but
+# WebP's better compression at an equivalent visual quality still nets a
+# real size win for photographic content in practice, and this project has
+# no case where a JPEG rendition's exact bytes need to survive untouched
+# (unlike, say, a legal/archival document).
+#
+# WebP (not JPEG) as PNG's target so a PNG with real transparency still
+# renders correctly rather than getting flattened onto a white background.
 #
 # Two call sites are deliberately pinned to an explicit format in their own
 # template rather than left to this default, since their consumer isn't a
@@ -196,7 +206,7 @@ WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
 # regardless of this setting) -- run `python manage.py
 # wagtail_update_image_renditions` after deploying this to regenerate
 # existing ones.
-WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp"}
+WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp"}
 
 WAGTAILSEARCH_BACKENDS = {
     "default": {
