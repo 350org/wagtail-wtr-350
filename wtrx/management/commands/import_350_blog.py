@@ -341,11 +341,22 @@ class Command(BaseCommand):
                 result.append(category_cache[name])
             return result
 
-        created, updated, skipped = 0, 0, 0
+        created, updated, skipped, errors = 0, 0, 0, 0
 
         for post in fetch_posts(session, wp_api_url, limit=limit, since=since):
             title = html.unescape(post["title"]["rendered"])
             slug = post["slug"]
+
+            if not title.strip():
+                # A handful of WP posts genuinely have no title (shows as
+                # "(no title)" in wp-admin, but the REST API's title.rendered
+                # is just ""). Post.title has no default and can't be blank
+                # (Wagtail's full_clean() raises ValidationError on save), and
+                # there's no good title to guess here -- unlike categories
+                # (TITLE_CATEGORY_KEYWORDS), skip it rather than invent one.
+                self.stdout.write(f"  skip (blank title): {slug}")
+                skipped += 1
+                continue
 
             existing = Post.objects.child_of(blogs_index).filter(slug=slug).first()
             if existing and not update:
@@ -383,61 +394,74 @@ class Command(BaseCommand):
                 )
                 continue
 
-            if existing:
-                existing.title = title
-                existing.published_at = published_at
-                # Only fill it in when it is missing: a page published through
-                # the admin since the last import has a real value that must not
-                # be overwritten by the source's date.
-                existing.first_published_at = (
-                    existing.first_published_at or published_at
-                )
-                existing.hero_image = hero_image
-                existing.body = body
-                existing.author_name = author_name
-                existing.hide_from_blogroll = hide_from_blogroll
-                existing.seo_title = seo_title
-                existing.search_description = search_description
-                # categories is a ParentalManyToManyField (django-modelcluster):
-                # .set() only caches the change in memory -- it's flushed to the
-                # DB by the *next* .save() call (ClusterableModel.commit()), so
-                # it must be called before save(), not after.
-                existing.categories.set(categories)
-                existing.save()
-                updated += 1
-            else:
-                page = Post(
-                    title=title,
-                    slug=slug,
-                    author_name=author_name,
-                    seo_title=seo_title,
-                    search_description=search_description,
-                    published_at=published_at,
-                    # Wagtail only sets first_published_at when a page is
-                    # published through the admin, so an imported page would
-                    # otherwise have none. Anything ordering by it then sorts on
-                    # mostly-NULL data -- and PostgreSQL puts NULLs *first* under
-                    # DESC, so genuinely recent pages sink below every import.
-                    # PageCardsBlock ("3 most recently published") is the visible
-                    # casualty. See `manage.py backfill_first_published`, which
-                    # repairs content imported before this was set here.
-                    first_published_at=published_at,
-                    hero_image=hero_image,
-                    hide_from_blogroll=hide_from_blogroll,
-                    body=body,
-                )
-                blogs_index.add_child(instance=page)
-                # Same ParentalManyToManyField deferred-write behavior as
-                # above: add_child() already saved the page once (to assign
-                # its tree position), but categories still needs a save()
-                # after set() to actually commit to the DB.
-                page.categories.set(categories)
-                page.save()
-                created += 1
+            try:
+                if existing:
+                    existing.title = title
+                    existing.published_at = published_at
+                    # Only fill it in when it is missing: a page published through
+                    # the admin since the last import has a real value that must not
+                    # be overwritten by the source's date.
+                    existing.first_published_at = (
+                        existing.first_published_at or published_at
+                    )
+                    existing.hero_image = hero_image
+                    existing.body = body
+                    existing.author_name = author_name
+                    existing.hide_from_blogroll = hide_from_blogroll
+                    existing.seo_title = seo_title
+                    existing.search_description = search_description
+                    # categories is a ParentalManyToManyField (django-modelcluster):
+                    # .set() only caches the change in memory -- it's flushed to the
+                    # DB by the *next* .save() call (ClusterableModel.commit()), so
+                    # it must be called before save(), not after.
+                    existing.categories.set(categories)
+                    existing.save()
+                    updated += 1
+                else:
+                    page = Post(
+                        title=title,
+                        slug=slug,
+                        author_name=author_name,
+                        seo_title=seo_title,
+                        search_description=search_description,
+                        published_at=published_at,
+                        # Wagtail only sets first_published_at when a page is
+                        # published through the admin, so an imported page would
+                        # otherwise have none. Anything ordering by it then sorts on
+                        # mostly-NULL data -- and PostgreSQL puts NULLs *first* under
+                        # DESC, so genuinely recent pages sink below every import.
+                        # PageCardsBlock ("3 most recently published") is the visible
+                        # casualty. See `manage.py backfill_first_published`, which
+                        # repairs content imported before this was set here.
+                        first_published_at=published_at,
+                        hero_image=hero_image,
+                        hide_from_blogroll=hide_from_blogroll,
+                        body=body,
+                    )
+                    blogs_index.add_child(instance=page)
+                    # Same ParentalManyToManyField deferred-write behavior as
+                    # above: add_child() already saved the page once (to assign
+                    # its tree position), but categories still needs a save()
+                    # after set() to actually commit to the DB.
+                    page.categories.set(categories)
+                    page.save()
+                    created += 1
+            except Exception as exc:  # noqa: BLE001 -- deliberately broad
+                # Known causes (blank title) are already filtered out above,
+                # but a long-running import of hundreds of posts shouldn't die
+                # on some other one-off ValidationError/DataError (e.g. a slug
+                # collision outside this index, an unexpectedly-long field) --
+                # same "one bad item shouldn't abort the run" reasoning as
+                # download_image()'s own broad except in _wp_content_utils.py.
+                self.stdout.write(f"  WARNING: failed to save {slug!r} — {exc!r}")
+                errors += 1
+                continue
 
         if dry_run:
             self.stdout.write(self.style.SUCCESS("Dry run complete — no changes written."))
         else:
             self.stdout.write(
-                self.style.SUCCESS(f"Done. Created {created}, updated {updated}, skipped {skipped}.")
+                self.style.SUCCESS(
+                    f"Done. Created {created}, updated {updated}, skipped {skipped}, errors {errors}."
+                )
             )
