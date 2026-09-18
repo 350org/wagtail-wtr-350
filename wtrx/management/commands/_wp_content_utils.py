@@ -365,8 +365,16 @@ def download_image(session, url, stdout, dry_run=False, alt_text=""):
     # Deferred import to avoid import-time DB access.
     from wtrx.images import CustomImage
 
+    # CustomImage.save() (called below, and via existing.save() just above)
+    # doesn't run Django's max_length validation -- only full_clean() does --
+    # so a WordPress alt text or filename longer than the column truncates
+    # here instead of raising a DataError from Postgres.
+    title_max_length = CustomImage._meta.get_field("title").max_length
+    description_max_length = CustomImage._meta.get_field("description").max_length
+    alt_text = alt_text[:description_max_length]
+
     full_url = _full_size_wp_image_url(url)
-    filename = os.path.basename(urlparse(full_url).path) or "imported-image"
+    filename = (os.path.basename(urlparse(full_url).path) or "imported-image")[:title_max_length]
     existing = CustomImage.objects.filter(title=filename).first()
     if existing:
         if alt_text and not existing.description and not dry_run:
@@ -387,7 +395,7 @@ def download_image(session, url, stdout, dry_run=False, alt_text=""):
             # "big image threshold" processing) — fall back to the scaled copy
             # actually linked in the post content rather than failing the import.
             full_url = url
-            filename = os.path.basename(urlparse(url).path) or "imported-image"
+            filename = (os.path.basename(urlparse(url).path) or "imported-image")[:title_max_length]
             resp = session.get(url, timeout=30)
         resp.raise_for_status()
     except requests.exceptions.RequestException as exc:
