@@ -405,8 +405,22 @@ def download_image(session, url, stdout, dry_run=False, alt_text=""):
         return None
 
     uploaded = SimpleUploadedFile(filename, resp.content)
-    image = CustomImage(title=filename, file=uploaded, description=alt_text)
-    image.save()
+    try:
+        image = CustomImage(title=filename, file=uploaded, description=alt_text)
+        image.save()
+    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see below
+        # A 200 response doesn't guarantee valid image content -- e.g. a
+        # deleted/corrupt WP attachment can serve an HTML error page (or
+        # truncated bytes) at what looks like an image URL. CustomImage's
+        # post_init signal has Willow probe the content to read its
+        # dimensions, and a bad decode raises whatever error Willow/PIL/the
+        # stdlib XML parser (while probing for SVG) happens to throw --
+        # there's no single exception type to catch narrowly. Same "a single
+        # bad image shouldn't abort the whole import run" reasoning as the
+        # RequestException handling above, just for a bad body instead of a
+        # failed request.
+        stdout.write(f"    WARNING: failed to process image {full_url} — {exc!r}")
+        return None
     stdout.write(f"    downloaded image: {filename}")
     return image
 

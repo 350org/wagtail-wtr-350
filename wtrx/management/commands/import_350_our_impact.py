@@ -162,16 +162,17 @@ def _normalize_video_url(url):
 
 def _safe_download_image(session, url, stdout, dry_run):
     """
-    Wrap download_image() with a broad except -- unlike migrate_impact_images.py
-    and the two existing importers (which only ever fetch images from
-    350.org's own WordPress uploads), this page's images come from a dozen+
-    third-party domains (350org.widen.net, cloudfront, media1.fdncms.com,
-    globalpowerup.org, ...), and one of those returned content Willow
-    couldn't decode as an image at all (a bare ElementTree.ParseError while
-    probing for SVG) -- not a network failure, so download_image()'s own
-    requests.exceptions.RequestException handling doesn't catch it. A single
-    bad image shouldn't abort an import of 80+ items, so this is caught here
-    rather than widening the shared helper's contract for every caller.
+    Wrap download_image() with a broad except -- this page's images come
+    from a dozen+ third-party domains (350org.widen.net, cloudfront,
+    media1.fdncms.com, globalpowerup.org, ...), a wider variety than the WP-
+    upload-only sources the other importers deal with, so this is extra
+    insurance against whatever exotic failure one of those domains throws.
+    download_image() itself now also catches a failed decode (Willow/PIL/an
+    ElementTree.ParseError while probing for SVG) for any caller -- turns out
+    a 200 with corrupt/HTML content isn't unique to third-party domains, a
+    plain 350.org WP upload can serve it too -- so this wrapper is no longer
+    the only thing standing between a single bad image and an aborted run,
+    but it stays as a second layer for this page's wider domain surface.
     """
     try:
         return download_image(session, url, stdout, dry_run=dry_run)
