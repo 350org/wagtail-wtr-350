@@ -978,6 +978,46 @@ check.
     reaches new renditions until `python manage.py
     wagtail_update_image_renditions` (Wagtail's own built-in command; no
     project-specific backfill needed here) regenerates the existing ones.
+60. **An oversized source image can OOM-kill a live worker on its first
+    render, with nothing in the logs.** Wagtail's rendition pipeline always
+    fully decodes the source image into memory before resizing it down, for
+    *any* filter spec, regardless of the requested output size — a
+    `fill-640x360` card thumbnail still pays the cost of decoding the whole
+    original first. Confirmed live: `import_350_blog.py` imported a
+    WordPress "full size" upload URL (see `_full_size_wp_image_url()`) that
+    turned out to be a raw, uncompressed-for-web 8192x5464 (44.8MP)
+    original; the first visitor to a blog listing page containing that
+    post's card triggered the decode, which exceeded the container's
+    memory and got `SIGKILL`'d by the OOM killer. `SIGKILL` can't be
+    caught or handled by anything — not gunicorn, not Python's exception
+    machinery — so **nothing gets written to any log**, app or otherwise;
+    the only visible symptom was Cloudflare's generic 502 page (the origin
+    never responded at all) and, if you know to look, a container-restart
+    event in Divio's own infra-level Events panel rather than its app log
+    stream. A worker *timeout* (as opposed to OOM) usually does leave a
+    `WORKER TIMEOUT` line — no log lines at all points at OOM specifically.
+    To diagnose without risking more crashes: pull the suspect page's
+    posts/images via `Blogs.get_listing_queryset()` and check each image's
+    already-stored `width`/`height` (a plain DB read, no re-decode) for an
+    outlier — no need to actually attempt the render to find the culprit.
+    Fixed at the source: `_wp_content_utils.downsize_oversized_image()`
+    caps every imported image to `MAX_IMPORTED_IMAGE_DIMENSION` (3000px on
+    the longest side) at import time, inside `download_image()`'s existing
+    broad `except` (so a resize failure is reported the same way a bad
+    decode already was, rather than needing its own special case). Unlike
+    `wtrx/media_optimization.py`'s video-thumbnail handling (which always
+    re-encodes to JPEG, since a thumbnail only ever plays one fixed poster
+    role), this preserves the original format/mode — these become real
+    content images (hero, cards, in-body) used at a range of sizes, so
+    transparency and format still matter. Deliberately scoped to the
+    import pipeline only, not a blanket signal on every `CustomImage` save
+    the way media thumbnails get one — an editor's own high-res upload for
+    a full-bleed hero is a legitimate, intentional choice, not an untrusted
+    third-party fetch. `backfill_oversized_images` (mirroring
+    `backfill_video_thumbnails`) is the one-time fix for images imported
+    before this existed; it deletes the image's existing renditions after
+    replacing its file, since they were generated from the old oversized
+    original.
 
 ## Git Conventions
 

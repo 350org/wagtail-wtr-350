@@ -34,6 +34,72 @@ def _full_size_wp_image_url(url):
     return parsed._replace(path=match.group("base") + match.group("ext")).geturl()
 
 
+MAX_IMPORTED_IMAGE_DIMENSION = 3000
+
+
+def downsize_oversized_image(content, filename, stdout):
+    """
+    Return ``content``, or a resized copy capped to
+    MAX_IMPORTED_IMAGE_DIMENSION on its longest side.
+
+    A WordPress "full size" upload URL (see _full_size_wp_image_url()) is
+    sometimes a raw, uncompressed-for-web original rather than something
+    actually sized for display -- one imported this way was 8192x5464
+    (44.8MP). Wagtail's rendition pipeline always fully decodes a source
+    image into memory before resizing it down, for *any* filter spec,
+    regardless of the requested output size -- so on the first live request
+    for e.g. a fill-640x360 card thumbnail, that decode alone was enough to
+    OOM-kill the worker (an uncatchable SIGKILL -- nothing gets logged,
+    which is exactly what made this hard to diagnose from Divio's logs
+    alone). Downsizing once here, at import time, bounds that cost for
+    every future request instead of paying it unpredictably on live
+    traffic.
+
+    Unlike wtrx/media_optimization.py's video-thumbnail handling (which
+    always re-encodes to JPEG, since a thumbnail only ever plays one fixed
+    poster role), this preserves the original format/mode -- these become
+    real content images (hero, cards, in-body), used at a range of sizes
+    across the site, so transparency and format still matter.
+
+    Returns ``content`` unchanged if it's already within the cap, or if
+    anything goes wrong decoding/resizing it -- the resulting bytes still
+    have to survive CustomImage.save() right after this call, and that's
+    already wrapped in its own broad except (a bad decode there is reported
+    the same way a bad decode here would be).
+    """
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    try:
+        image = PILImage.open(BytesIO(content))
+        image.load()
+    except Exception:
+        return content
+
+    width, height = image.size
+    longest_side = max(width, height)
+    if longest_side <= MAX_IMPORTED_IMAGE_DIMENSION:
+        return content
+
+    try:
+        scale = MAX_IMPORTED_IMAGE_DIMENSION / longest_side
+        resized = image.resize(
+            (round(width * scale), round(height * scale)),
+            PILImage.Resampling.LANCZOS,
+        )
+        output = BytesIO()
+        save_format = image.format or "PNG"
+        save_kwargs = {"quality": 88, "optimize": True} if save_format == "JPEG" else {}
+        resized.save(output, format=save_format, **save_kwargs)
+    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see docstring
+        stdout.write(f"    WARNING: failed to downsize oversized image {filename} — {exc!r}")
+        return content
+
+    stdout.write(f"    downsized oversized image: {filename} ({width}x{height} -> {resized.size[0]}x{resized.size[1]})")
+    return output.getvalue()
+
+
 _MAIN_SITE_BASE_URL = "https://350.org"
 
 
@@ -404,8 +470,9 @@ def download_image(session, url, stdout, dry_run=False, alt_text=""):
         stdout.write(f"    WARNING: failed to download image {full_url} — {exc}")
         return None
 
-    uploaded = SimpleUploadedFile(filename, resp.content)
     try:
+        content = downsize_oversized_image(resp.content, filename, stdout)
+        uploaded = SimpleUploadedFile(filename, content)
         image = CustomImage(title=filename, file=uploaded, description=alt_text)
         image.save()
     except Exception as exc:  # noqa: BLE001 -- deliberately broad, see below
