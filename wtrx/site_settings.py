@@ -1189,3 +1189,51 @@ class AdminMenuSettings(BaseSiteSetting):
 
     class Meta:
         verbose_name = _("Admin menu")
+
+
+@register_setting(icon="warning", order=70)
+class NotFoundPageSettings(BaseSiteSetting):
+    """
+    Settings > 404 page — hero photo and quick-link buttons for the "page
+    not found" page. Reuses InternalLinkBlock/ExternalLinkBlock (the same
+    link choices NavigationSettings/FooterSettings already use) rather than
+    a bespoke block, so editors get the familiar "internal page or external
+    URL" choice and this list can hold as many or as few links as a fork
+    wants (e.g. About/Blog/Press Releases/Take Action/Contact) instead of a
+    fixed set of named fields.
+    """
+
+    hero_image = models.ForeignKey(
+        CustomImage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("hero image"),
+        help_text=_(
+            "Photo shown beside the headline on the 404 page. Leave blank "
+            "for a plain color panel with no image."
+        ),
+    )
+    quick_links = StreamField(
+        [
+            ("internal", InternalLinkBlock()),
+            ("external", ExternalLinkBlock()),
+        ],
+        blank=True,
+        verbose_name=_("quick links"),
+        help_text=_(
+            "Buttons shown on the 404 page below the search box, e.g. "
+            "links to your About, Blog, Press Releases, Take Action and "
+            "Contact pages. Leave empty to hide this row entirely."
+        ),
+        use_json_field=True,
+    )
+
+    panels = [
+        FieldPanel("hero_image"),
+        FieldPanel("quick_links"),
+    ]
+
+    class Meta:
+        verbose_name = _("404 page")

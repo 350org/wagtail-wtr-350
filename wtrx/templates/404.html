@@ -1,12 +1,88 @@
 {% extends "wtrx/base_page.html" %}
-{% load i18n %}
+{% load i18n wagtailcore_tags wagtailimages_tags %}
 
 {% block title %}{% trans "Page not found" %}{% endblock %}
 
+{% comment %}
+Hero banner — same shape as hero.html's "banner" variant (color panel
+beside an image, wtr-bg-{color}/wtr-bg-fade-{color} pair) but hand-built
+rather than {% include %}'d: this page has no HeroMixin/HeroBlock behind
+it (Django's default 404 view renders straight from urlconf, no page
+model, no get_context()), so there's no `hero` dict to pass. Lives in
+{% block hero %}, not {% block content %} — base.html wraps content in
+<main class="my-32">, and putting the banner there (as a first pass did)
+pulled it 128px down from the header instead of sitting flush beneath it
+like every other page's hero. hero_image is optional
+(NotFoundPageSettings) — with none set, the grid collapses to the text
+column alone, same as hero.html does with no image/video.
+{% endcomment %}
+{% block hero %}
+<div class="mx-auto max-w-[1500px] px-4 pb-4">
+    <div class="wtr-404-hero wtr-bg-navy relative flex flex-col overflow-hidden rounded-lg md:min-h-[300px]">
+        <div class="grid flex-1 grid-cols-1 {% if settings.wtrx.NotFoundPageSettings.hero_image %}md:grid-cols-2 md:items-stretch{% endif %}">
+            <div class="relative z-10 flex flex-col justify-center gap-4 px-6 py-10 text-light sm:px-10 sm:py-12 lg:py-16 {% if settings.wtrx.NotFoundPageSettings.hero_image %}lg:pl-32 lg:pr-0{% else %}lg:px-32{% endif %}">
+                <h1 class="font-heading text-3xl tracking-tight sm:text-4xl lg:text-5xl">{% trans "Page not found!" %}</h1>
+                <p class="text-lg sm:text-xl">{% trans "Error 404" %}</p>
+            </div>
+            {% with hero_image=settings.wtrx.NotFoundPageSettings.hero_image %}
+                {% if hero_image %}
+                    <div class="relative min-h-[220px]">
+                        {% image hero_image fill-1000x800 as bg %}
+                        <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
+                             alt="{{ hero_image.description }}"{% if not hero_image.description %} role="presentation"{% endif %}
+                             class="absolute inset-0 h-full w-full object-cover"
+                             style="{{ hero_image.object_position_style }}" loading="lazy">
+                        <div class="wtr-bg-fade-navy absolute inset-y-0 left-0 hidden w-1/3 md:block" aria-hidden="true"></div>
+                    </div>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 py-16 text-center">
-    <h1 class="font-heading text-32 mb-4">{% trans "Page not found" %}</h1>
-    <p class="text-neutral-600 mb-8">{% trans "The page you requested could not be found." %}</p>
-    <a href="/" class="wtr-btn hover:bg-primary-500">{% trans "Go to homepage" %}</a>
+<div class="wtr-404-content max-w-3xl mx-auto px-4 py-12 sm:py-16">
+    <div class="space-y-4 text-lg text-neutral-700 sm:text-xl">
+        <p>{% trans "Uh-oh, looks like the page you are looking for doesn't exist!" %}</p>
+        <p>{% trans "Let's get you back on track toward a fossil-free future." %}</p>
+    </div>
+
+    <div class="wtr-404-search mt-10">
+        <p class="mb-3 font-heading text-lg font-semibold">{% trans "Try searching for what you need:" %}</p>
+        <form action="{% url 'search' %}" method="get" role="search" class="flex gap-2">
+            <input
+                type="search"
+                name="query"
+                placeholder="{% trans 'Search...' %}"
+                class="flex-1 rounded-md border border-neutral-300 px-4 py-2"
+                aria-label="{% trans 'Search query' %}"
+            />
+            <button type="submit" class="wtr-btn hover:bg-primary-500">
+                {% trans "Search" %}
+            </button>
+        </form>
+    </div>
+
+    {% with quick_links=settings.wtrx.NotFoundPageSettings.quick_links %}
+        {% if quick_links %}
+            <div class="wtr-404-quick-links mt-10">
+                <p class="mb-3 text-neutral-700">{% trans "Or you can:" %}</p>
+                <div class="flex flex-wrap gap-3">
+                    {% for item in quick_links %}
+                        {% if item.block_type == "internal" and item.value.page %}
+                            <a href="{% pageurl item.value.page %}" class="wtr-btn wtr-btn-outline hover:bg-primary-50">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "external" %}
+                            <a href="{{ item.value.url }}" rel="noopener noreferrer" class="wtr-btn wtr-btn-outline hover:bg-primary-50">
+                                {{ item.value.text }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    {% endwith %}
 </div>
 {% endblock %}
