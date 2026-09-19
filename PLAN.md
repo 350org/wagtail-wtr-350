@@ -517,7 +517,7 @@ class BasePage(Page):
 |---|---|---|
 | layout | CharField (choices: columns, minimal) | No, default: columns |
 | footer_navigation | StreamField (FooterColumnBlock: heading + links) | No — used by columns layout |
-| minimal_links | StreamField (InternalLinkBlock, ExternalLinkBlock, AnchorLinkBlock) | No — used by minimal layout |
+| minimal_links | StreamField (InternalLinkBlock, ExternalLinkBlock, AnchorLinkBlock, CookieSettingsLinkBlock) | No — used by minimal layout (renders in both layouts' bottom bar) |
 | copyright_text | CharField | No, falls back to "(c) {year} {site name}" |
 
 **Columns layout**: multi-column navigation grid, logo at top, social links + copyright in bottom bar.
@@ -988,6 +988,14 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   and left of minimal-layout footer when set
 - [x] Anchor links in nav: `AnchorLinkBlock` added to NavigationSettings.primary_navigation,
   FooterColumnBlock.links, and FooterSettings.minimal_links; renders as `<a href="#anchor">`
+- [x] Cookie settings footer link: `CookieSettingsLinkBlock` (text + fallback
+  `policy_url`), added to `FooterSettings.minimal_links` and
+  `FooterOverrideBlock.minimal_links` only. Renders with the `uc-cookie-link`
+  marker class that the Usercentrics wrapper script
+  (`usercentrics-consent.js`, see `wtrx/integrations/usercentrics.py`) already
+  looks for: it intercepts the click and opens the Usercentrics preferences
+  panel for a GDPR-applicable visitor, and otherwise leaves the link alone to
+  follow `policy_url` normally
 - [x] Collapsed desktop menu: `NavigationSettings.collapse_desktop_menu` (BooleanField,
   default False) — when True, desktop nav is hidden and hamburger is shown at all
   breakpoints; uses existing mobile-menu.js (no JS changes needed)

@@ -27,6 +27,21 @@ forloop.first skips the separator before the first link.
                    class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                     {{ item.value.text }}
                 </a>
+            {% elif item.block_type == "cookie_settings" %}
+                {% comment %}
+                uc-cookie-link is the marker class usercentrics-consent.js
+                (see wtrx/integrations/usercentrics.py) already looks for: on
+                load, for a GDPR-applicable visitor, it intercepts clicks on
+                every ".uc-cookie-link" and opens the Usercentrics
+                preferences panel instead of following the href. Everywhere
+                else the script never wires it, so this behaves like a plain
+                external link to policy_url.
+                {% endcomment %}
+                <a href="{{ item.value.policy_url }}"
+                   rel="noopener noreferrer"
+                   class="uc-cookie-link text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                    {{ item.value.text }}
+                </a>
             {% endif %}
         {% endfor %}
     </nav>

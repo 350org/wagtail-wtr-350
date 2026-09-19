@@ -74,6 +74,33 @@ class AnchorLinkBlock(StructBlock):
         label = _("Anchor link")
 
 
+class CookieSettingsLinkBlock(StructBlock):
+    """
+    A footer link carrying the ``uc-cookie-link`` marker class that
+    wtrx/integrations/usercentrics.py's third-party consent script
+    (usercentrics-consent.js) already looks for: for a visitor in a
+    GDPR-applicable country it intercepts the click and opens the
+    Usercentrics preferences panel (``UC_UI.showSecondLayer()``); everywhere
+    else -- or if Usercentrics isn't configured at all -- the script never
+    wires the click, so the link falls through to ``policy_url`` like a
+    plain external link.
+    """
+
+    text = CharBlock(label=_("Link text"))
+    policy_url = URLBlock(
+        label=_("Cookie policy URL"),
+        help_text=_(
+            "Where this link goes for visitors outside the EU/UK, or when "
+            "Usercentrics isn't configured. EU/UK visitors get the "
+            "Usercentrics preferences panel instead of this URL."
+        ),
+    )
+
+    class Meta:
+        icon = "link"
+        label = _("Cookie settings link")
+
+
 class SubmenuBlock(StructBlock):
     """A top-level navigation item that expands into a dropdown of child links."""
 
@@ -279,6 +306,7 @@ class FooterOverrideBlock(StructBlock):
             ("internal", InternalLinkBlock()),
             ("external", ExternalLinkBlock()),
             ("anchor", AnchorLinkBlock()),
+            ("cookie_settings", CookieSettingsLinkBlock()),
         ],
         blank=True,
         label=_("Minimal footer links"),
@@ -667,6 +695,7 @@ class FooterSettings(BaseSiteSetting):
             ("internal", InternalLinkBlock()),
             ("external", ExternalLinkBlock()),
             ("anchor", AnchorLinkBlock()),
+            ("cookie_settings", CookieSettingsLinkBlock()),
         ],
         blank=True,
         verbose_name=_("minimal footer links"),

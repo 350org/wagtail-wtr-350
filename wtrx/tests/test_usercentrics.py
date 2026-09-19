@@ -123,13 +123,12 @@ class TestUsercentricsHeadRendering(TestCase):
         content = response.content.decode()
         self.assertIn("var FALLBACK_COUNTRY = 'FR';", content)
 
-    def test_cookie_settings_link_shown_when_enabled(self):
+    def test_no_standalone_cookie_settings_link(self):
+        # The site-wide standalone ".uc-cookie-link" placeholder below the
+        # footer (formerly rendered unconditionally in base.html) was removed
+        # once the footer's own CookieSettingsLinkBlock (see
+        # wtrx.site_settings) took over that role -- confirm it doesn't
+        # regress back in regardless of Usercentrics configuration.
         self._set_usercentrics()
-        response = self._get()
-        self.assertContains(response, "wtr-cookie-settings")
-
-    def test_cookie_settings_link_hidden_when_no_integration_entry(self):
-        self.integration.integrations = []
-        self.integration.save()
         response = self._get()
         self.assertNotContains(response, "wtr-cookie-settings")
