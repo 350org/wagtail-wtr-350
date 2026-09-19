@@ -366,17 +366,25 @@
             has no #progress (the block's ActionKit page has no progress
             meter configured) — same as the honeypot-field guard above,
             there's nothing to wire up.
+
+            /context/'s own embedded `progress` field is itself flaky —
+            confirmed by comparing it directly against a real ActionKit
+            page's live network traffic: ActionKit's own actionkit.js
+            treats it as unreliable too (see its onContextLoaded: `if
+            (ak.form.want_progress && !context.progress)
+            forms.loadProgress();`) and always fires a second, separate
+            request to the dedicated /progress/ endpoint as a fallback
+            whenever /context/ didn't come back with one. This mirrors
+            that fallback — only firing the extra request on that same
+            condition, not on every load.
             {% endcomment %}
             var progressEl = formContainer.querySelector("#progress");
             var progressTemplate = formContainer.querySelector("script[type='text/ak-template'][for='progress']");
             var shortFormId = "{{ short_form_id|escapejs }}";
             if (progressEl && progressTemplate && baseUrl && shortFormId) {
-                window.__wtrAkProgressCbSeq = (window.__wtrAkProgressCbSeq || 0) + 1;
-                var progressCbName = "__wtrAkProgressCb" + window.__wtrAkProgressCbSeq;
-                window[progressCbName] = function (data) {
-                    delete window[progressCbName];
+                function renderProgress(progressData, pageData) {
                     window.__wtrAkScriptPromise.then(function () {
-                        var context = data || {};
+                        var context = pageData || {};
                         {% comment %}
                         Matches ak.context's own fallback in actionkit.js:
                         older/simpler progress templates guard on
@@ -384,7 +392,7 @@
                         from reading `progress.goal` unconditionally, which
                         would throw on a plain missing key.
                         {% endcomment %}
-                        context.progress = context.progress || {goal: undefined, total: undefined};
+                        context.progress = progressData || {goal: undefined, total: undefined};
                         context.args = {};
                         context.capitalize = actionkit.utils.capitalize;
                         context.add_commas = actionkit.utils.add_commas;
@@ -392,6 +400,29 @@
                             progressEl.innerHTML = actionkit.utils.template(progressTemplate.innerHTML, context);
                         } catch (e) {}
                     });
+                }
+
+                window.__wtrAkProgressCbSeq = (window.__wtrAkProgressCbSeq || 0) + 1;
+                var progressCbName = "__wtrAkProgressCb" + window.__wtrAkProgressCbSeq;
+                window[progressCbName] = function (data) {
+                    delete window[progressCbName];
+                    data = data || {};
+                    if (data.progress) {
+                        renderProgress(data.progress, data);
+                        return;
+                    }
+                    var fallbackCbName = progressCbName + "_fallback";
+                    window[fallbackCbName] = function (progressData) {
+                        delete window[fallbackCbName];
+                        renderProgress(progressData, data);
+                    };
+                    var fallbackScript = document.createElement("script");
+                    fallbackScript.src = baseUrl + "/progress/" + shortFormId + "?form_name=act&callback=" + fallbackCbName;
+                    fallbackScript.onerror = function () {
+                        delete window[fallbackCbName];
+                        renderProgress(null, data);
+                    };
+                    document.body.appendChild(fallbackScript);
                 };
                 var progressScript = document.createElement("script");
                 progressScript.src = baseUrl + "/context/" + shortFormId + "?callback=" + progressCbName +
