@@ -2988,6 +2988,12 @@ class SignupActionKitFormMixin:
 
         ctx["form_html"] = form_html
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
+        # Needed client-side (not just server-side, where it already drove
+        # the form_html fetch above) so _actionkit_form.html's progress-bar
+        # script can hit ActionKit's own /context/<short_form_id> endpoint
+        # itself — see that template for why it can't reuse actionkit.js's
+        # own context-loading path.
+        ctx["short_form_id"] = short_form_id
         ctx["success_message"] = value.get("success_message")
         ctx["panel_tone"] = self.PANEL_TONES.get(
             resolve_background(value.get("background"), default="dark-grey"), ""

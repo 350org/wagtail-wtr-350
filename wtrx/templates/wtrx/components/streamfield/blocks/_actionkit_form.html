@@ -7,9 +7,10 @@
     classes share their form-fetching/caching/panel-tone logic via
     SignupActionKitFormMixin.
 
-    Expects from context: form_html, actionkit_base_url (set by
-    SignupActionKitFormMixin.get_context()), and exactly one of the layout
-    flags `inline` / `stacked`, passed explicitly by the including template.
+    Expects from context: form_html, actionkit_base_url, short_form_id (set
+    by SignupActionKitFormMixin.get_context()), and exactly one of the
+    layout flags `inline` / `stacked`, passed explicitly by the including
+    template.
     Also expects thank-you content, in one of two forms depending on the
     caller: `success_message` (a SuccessMessageBlock StreamValue, set by
     SignupActionKitFormMixin.get_context() — rendered via include_block) or
@@ -306,12 +307,12 @@
             });
 
             {% comment %}
-            Loaded for compatibility (other ActionKit page chrome may
-            expect window.actionkit to exist) but nothing above waits on
-            it — actionkit.forms.initForm is not called at all, since
-            forms.setForm can only ever target the first "act"-named form
-            on the page and would silently do nothing useful for any later
-            instance.
+            actionkit.js itself is loaded both for compatibility (other
+            ActionKit page chrome may expect window.actionkit to exist) and,
+            below, for its actionkit.utils.template()/add_commas() helpers —
+            but actionkit.forms.initForm is never called: forms.setForm can
+            only ever target the first "act"-named form on the page and
+            would silently do nothing useful for any later instance.
             {% endcomment %}
             var baseUrl = "{{ actionkit_base_url|escapejs }}";
             if (baseUrl) {
@@ -330,6 +331,75 @@
                     actionkit.forms.initPage();
                 });
             }
+
+            {% if stacked %}
+            {% comment %}
+            Progress bar. AK's fetched fragment carries an empty #progress
+            container plus a sibling <script type="text/ak-template"
+            for="progress"> holding AK's own (per-campaign, already
+            localized) template for it — but the numbers that template
+            needs (signature/donation totals, the campaign's goal, and two
+            AK "custom fields" that tune it: a manual starting-value offset
+            editors add for e.g. non-digital signatures, and a percent
+            visibility threshold below which the bar stays hidden) only
+            ever arrive via AK's own client-side context fetch. That fetch
+            normally happens through actionkit.forms.initForm()/setForm(),
+            which this block already can't call for the multi-instance
+            reason above — and even if it could, AK's own
+            onProgressLoaded() renders through plain
+            document.getElementById('progress'), not anything scoped to one
+            instance, so on a page with more than one of these blocks (the
+            home page always has two) it would only ever populate the
+            *first* #progress on the page, repeatedly, and leave every
+            other instance blank.
+
+            So this fetches the same data itself, from ActionKit's public
+            /context/ endpoint, scoped with its own JSONP callback name so
+            concurrent instances can't clobber each other, then renders it
+            with actionkit.utils.template() — AK's own template engine —
+            against the <script type="text/ak-template"> tag already
+            sitting inside *this* instance's own fetched fragment. That
+            reuses AK's own per-campaign copy, number formatting, and
+            goal/threshold logic exactly, rather than us re-deriving it,
+            while writing the result only into this instance's own
+            #progress element. No request fires at all if this fragment
+            has no #progress (the block's ActionKit page has no progress
+            meter configured) — same as the honeypot-field guard above,
+            there's nothing to wire up.
+            {% endcomment %}
+            var progressEl = formContainer.querySelector("#progress");
+            var progressTemplate = formContainer.querySelector("script[type='text/ak-template'][for='progress']");
+            var shortFormId = "{{ short_form_id|escapejs }}";
+            if (progressEl && progressTemplate && baseUrl && shortFormId) {
+                window.__wtrAkProgressCbSeq = (window.__wtrAkProgressCbSeq || 0) + 1;
+                var progressCbName = "__wtrAkProgressCb" + window.__wtrAkProgressCbSeq;
+                window[progressCbName] = function (data) {
+                    delete window[progressCbName];
+                    window.__wtrAkScriptPromise.then(function () {
+                        var context = data || {};
+                        {% comment %}
+                        Matches ak.context's own fallback in actionkit.js:
+                        older/simpler progress templates guard on
+                        `if (goal && total)`, but nothing stops a template
+                        from reading `progress.goal` unconditionally, which
+                        would throw on a plain missing key.
+                        {% endcomment %}
+                        context.progress = context.progress || {goal: undefined, total: undefined};
+                        context.args = {};
+                        context.capitalize = actionkit.utils.capitalize;
+                        context.add_commas = actionkit.utils.add_commas;
+                        try {
+                            progressEl.innerHTML = actionkit.utils.template(progressTemplate.innerHTML, context);
+                        } catch (e) {}
+                    });
+                };
+                var progressScript = document.createElement("script");
+                progressScript.src = baseUrl + "/context/" + shortFormId + "?callback=" + progressCbName +
+                    "&form_name=act&want_progress=1&r=" + Math.random();
+                progressScript.onerror = function () { delete window[progressCbName]; };
+                document.body.appendChild(progressScript);
+            }
+            {% endif %}
         })();
     </script>
 {% else %}

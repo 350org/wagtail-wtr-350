@@ -205,6 +205,24 @@ html {
     color: inherit;
 }
 
+/* #action-lead — the outer <section> AK wraps the whole embed in (see the
+ * inline-variant comment below for its structure) — carries AK's own
+ * `bg-white` class. That is the same class-name-collision failure mode as
+ * `text-black` above, just on `background-color` instead of `color`: AK's
+ * `bg-white` happens to spell one of our own Tailwind utilities, so it
+ * paints #action-lead solid white regardless of which panel fill the block
+ * is on. Combined with the white text the rule above (and each variant's
+ * own wrapper colour) sets up assuming a colored panel behind it, that
+ * turns every un-boxed string inside the embed — the petition
+ * heading/description in #action-header, any loose text in #action-form —
+ * white-on-white and unreadable, and leaves a plain white panel where the
+ * block's chosen background (e.g. the blue-gradient fill) should show
+ * through. Reset instead of removed, same as the color guard above, so a
+ * future AK class collision on this element can't do it again either. */
+.wtr-actionkit-embed #action-lead {
+    background-color: transparent;
+}
+
 /* ============================================================
  * ActionKit inline embed override — .wtr-actionkit-embed-inline
  * ============================================================
