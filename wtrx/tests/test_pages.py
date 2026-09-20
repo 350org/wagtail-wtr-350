@@ -683,16 +683,34 @@ class TestPostGetContext(TestCase):
         self.assertEqual(ctx["related_intro"], "News and insights.")
 
     def test_hero_image_falls_back_to_parent_default_card_image(self):
-        """A post with no header image of its own gets the parent Blogs
-        page's default_card_image in its own hero too, not just in cards
-        (get_context() routes the hero image through get_card_image())."""
+        """A post with no header image of its own and no default_hero_image
+        set on its parent falls back to the parent Blogs page's
+        default_card_image instead (get_context() routes the hero image
+        through get_hero_image(), which chains to default_card_image so an
+        already-configured page keeps behaving the same)."""
         default_image = CustomImage.objects.create(
-            title="Blogs default hero image", file=get_test_image_file(size=(1200, 800))
+            title="Blogs default card image", file=get_test_image_file(size=(1200, 800))
         )
         self.blogs.default_card_image = default_image
         self.blogs.save()
         ctx = self._get_context(Post.objects.get(pk=self.post_no_author.pk))
         self.assertEqual(ctx["hero"]["image"], default_image)
+
+    def test_hero_image_prefers_parent_default_hero_image_over_default_card_image(self):
+        """When both are set, the hero-specific fallback wins for the hero
+        (unlike a card, which never looks at default_hero_image — see
+        TestPostGetCardImage.test_does_not_fall_back_to_parent_default_hero_image)."""
+        default_card_image = CustomImage.objects.create(
+            title="Blogs default card image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        default_hero_image = CustomImage.objects.create(
+            title="Blogs default hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post_no_author.pk))
+        self.assertEqual(ctx["hero"]["image"], default_hero_image)
 
 
 class TestPostForm(TestCase):
@@ -901,6 +919,129 @@ class TestPostGetCardImage(TestCase):
         # post's real parent (self.blogs) has no default set, but passing a
         # different parent explicitly should be what's actually used.
         self.assertEqual(post.get_card_image(parent=other_blogs), other_default)
+
+    def test_does_not_fall_back_to_parent_default_hero_image(self):
+        """default_hero_image is a hero-only fallback (see
+        TestPostGetHeroImage) — a card never uses it, even when
+        default_card_image is left blank."""
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image, not a card fallback", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("hero-default-not-for-cards", hero_image=None, body=[])
+        self.assertIsNone(post.get_card_image())
+
+
+class TestPostGetHeroImage(TestCase):
+    """
+    Post.get_hero_image() feeds ctx["hero"]["image"] in get_context() —
+    a separate fallback chain from get_card_image() (see
+    TestPostGetCardImage) so a Blogs page can configure a different image
+    for a post's own header versus its card, while a page that only ever
+    set default_card_image keeps working unchanged (get_hero_image() chains
+    to it when default_hero_image is blank).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-ghi")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-ghi")
+        home.add_child(instance=cls.blogs)
+
+        cls.hero_image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        cls.body_image = CustomImage.objects.create(
+            title="Body image", file=get_test_image_file(size=(1200, 800))
+        )
+
+    def _make_post(self, slug, hero_image=None, body=None):
+        post = Post(title="Test post", slug=slug, hero_image=hero_image)
+        if body is not None:
+            post.body = json.dumps(body)
+        self.blogs.add_child(instance=post)
+        return Post.objects.get(pk=post.pk)
+
+    def test_explicit_hero_image_wins(self):
+        post = self._make_post("hero-wins-ghi", hero_image=self.hero_image, body=[])
+        self.assertEqual(post.get_hero_image(), self.hero_image)
+
+    def test_falls_back_to_first_image_in_body(self):
+        body = [
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "77777777-7777-7777-7777-777777777777",
+            }
+        ]
+        post = self._make_post("body-fallback-ghi", hero_image=None, body=body)
+        self.assertEqual(post.get_hero_image(), self.body_image)
+
+    def test_none_when_nothing_is_set(self):
+        post = self._make_post("no-image-ghi", hero_image=None, body=[])
+        self.assertIsNone(post.get_hero_image())
+
+    def test_falls_back_to_parent_default_hero_image(self):
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("default-hero-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(), default_hero_image)
+
+    def test_chains_to_parent_default_card_image_when_default_hero_image_is_blank(self):
+        """A Blogs page that only ever set default_card_image (nothing has
+        set default_hero_image yet) keeps feeding the hero the same image it
+        always did."""
+        default_card_image = CustomImage.objects.create(
+            title="Default card image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.save()
+        post = self._make_post("chains-to-card-default-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(), default_card_image)
+
+    def test_default_hero_image_wins_over_default_card_image(self):
+        default_card_image = CustomImage.objects.create(
+            title="Default card image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("hero-wins-over-card-default-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(), default_hero_image)
+
+    def test_own_image_wins_over_both_parent_defaults(self):
+        default_card_image = CustomImage.objects.create(
+            title="Default card image 3", file=get_test_image_file(size=(1200, 800))
+        )
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image 3", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("own-wins-ghi", hero_image=self.hero_image, body=[])
+        self.assertEqual(post.get_hero_image(), self.hero_image)
+
+    def test_explicit_parent_kwarg_is_used_instead_of_a_fresh_lookup(self):
+        other_blogs = Blogs(title="Other Blog", slug="other-blog-ghi")
+        Page.objects.filter(depth=1).first().add_child(instance=other_blogs)
+        other_default = CustomImage.objects.create(
+            title="Other default hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        other_blogs.default_hero_image = other_default
+        other_blogs.save()
+
+        post = self._make_post("explicit-parent-kwarg-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(parent=other_blogs), other_default)
 
 
 # ---------------------------------------------------------------------------

@@ -988,24 +988,32 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             return self.author_name
         return None
 
+    def _own_or_body_image(self):
+        """
+        Shared first two steps of both get_card_image() and get_hero_image():
+        this post's own explicit header image (hero_image, from
+        BannerHeroMixin), else the first image found anywhere in its body
+        StreamField (see _first_image_in_body() for the search rules).
+        Returns None if neither is set -- the two callers differ only in
+        which of the parent Blogs page's fields they fall back to next.
+        """
+        if self.hero_image_id:
+            return self.hero_image
+        return _first_image_in_body(self.body)
+
     def get_card_image(self, parent=None):
         """
         This post's card/listing image, used wherever it's shown as a card
         (the Blogs index, PageCardsBlock, and its own "Related posts" panel
-        on other posts -- see get_context() below and Blogs.get_context()) as
-        well as its own header image (see get_context() below).
+        on other posts -- see get_context() below and Blogs.get_context()).
 
-        Prefers the explicit header image (hero_image, from BannerHeroMixin);
-        falls back to the first image found anywhere in this post's body
-        StreamField (see _first_image_in_body() for the search rules), so a
-        post an editor never set a header image on still gets a
-        representative thumbnail instead of a blank card; finally falls back
-        to this post's parent Blogs page's own default_card_image, if set
-        (e.g. a generic graphic configured once on a Press Releases index,
-        for statements with no photo of their own, rather than needing one
-        hand-picked per post). Returns None -- not an error -- if none of
-        the three is set; post_card.html already degrades gracefully with no
-        image (AGENTS.md Error Handling).
+        Prefers this post's own image (see _own_or_body_image()); finally
+        falls back to this post's parent Blogs page's own default_card_image,
+        if set (e.g. a generic graphic configured once on a Press Releases
+        index, for statements with no photo of their own, rather than
+        needing one hand-picked per post). Returns None -- not an error --
+        if none of those is set; post_card.html already degrades gracefully
+        with no image (AGENTS.md Error Handling).
 
         `parent` lets a caller that already has this post's parent Blogs
         page on hand (Blogs.get_context(), Post.get_context()'s related
@@ -1013,14 +1021,41 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
         resolved here when omitted (e.g. PageCardsBlock, which doesn't
         already have it).
         """
-        if self.hero_image_id:
-            return self.hero_image
-        body_image = _first_image_in_body(self.body)
-        if body_image:
-            return body_image
+        own = self._own_or_body_image()
+        if own:
+            return own
         if parent is None:
             parent = self.get_parent().specific
         return getattr(parent, "default_card_image", None)
+
+    def get_hero_image(self, parent=None):
+        """
+        This post's own header image (see get_context() below) -- a
+        separate fallback chain from get_card_image() above, since a
+        page-wide "no photo" graphic (e.g. Press Releases' default_card_image)
+        isn't always the right thing to show full-bleed at the top of the
+        post itself.
+
+        Prefers this post's own image (see _own_or_body_image()); then the
+        parent Blogs page's own default_hero_image, if set; then, since most
+        Blogs pages will only ever configure one of the two fields, falls
+        back further to the parent's default_card_image -- the same
+        pre-existing fallback get_card_image() uses -- so a page that only
+        set default_card_image (nothing has set default_hero_image yet)
+        keeps behaving exactly as before this method existed. Returns None
+        if nothing at all is set.
+
+        `parent` behaves the same as on get_card_image() -- see its
+        docstring.
+        """
+        own = self._own_or_body_image()
+        if own:
+            return own
+        if parent is None:
+            parent = self.get_parent().specific
+        return getattr(parent, "default_hero_image", None) or getattr(
+            parent, "default_card_image", None
+        )
 
     def get_context(self, request, *args, **kwargs):
         from wtrx.templatetags.wtrx_tags import page_as_card
@@ -1033,7 +1068,7 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             tag=parent.title,
             tag_url=parent.url,
         )
-        ctx["hero"]["image"] = self.get_card_image(parent=parent)
+        ctx["hero"]["image"] = self.get_hero_image(parent=parent)
 
         # "Related <posts>" — the 3 most recent other live/public posts under
         # this post's own Blogs parent, per Figma's fixed (non-editor-
@@ -1123,17 +1158,39 @@ class Blogs(BasePage, HeroMixin):
         verbose_name=_("default card image"),
         help_text=_(
             "Shown for any post under this page that has no image of its own "
-            "(no header image, and none found in its body content) — both as "
-            "its own header and wherever it's shown as a card. Useful for a "
+            "(no header image, and none found in its body content) wherever "
+            "it's shown as a card — the listing below, \"Related …\" panels, "
+            "and Page Cards blocks. Also used as that post's own header image "
+            "when Default hero image (below) is left blank. Useful for a "
             "Press Releases page, where a statement often has no photo. "
             "Leave blank for no fallback."
+        ),
+    )
+    default_hero_image = models.ForeignKey(
+        CustomImage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("default hero image"),
+        help_text=_(
+            "Shown as the header image for any post under this page that has "
+            "no image of its own, instead of Default card image (above) — "
+            "for when the two should differ, e.g. a generic banner graphic "
+            "at the top of the post versus a smaller icon on its card. Falls "
+            "back to Default card image when left blank. Leave both blank "
+            "for no fallback."
         ),
     )
 
     content_panels = (
         BasePage.title_panels
         + HeroMixin.banner_hero_panels
-        + [FieldPanel("related_intro"), FieldPanel("default_card_image")]
+        + [
+            FieldPanel("related_intro"),
+            FieldPanel("default_card_image"),
+            FieldPanel("default_hero_image"),
+        ]
     )
 
     promote_panels = BasePage.promote_panels
