@@ -23,6 +23,8 @@ No auth required — this is the same markup ActionKit serves to anonymous
 visitors of the hosted page, just without the surrounding site chrome.
 """
 
+import re
+
 import requests
 from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
@@ -181,7 +183,27 @@ def fetch_embed_form_html(hostname, short_form_id, timeout=5):
             f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
         )
 
-    return response.text
+    return _make_recaptcha_async(response.text)
+
+
+# ActionKit's fetched fragment includes its own <script
+# src="https://www.google.com/recaptcha/api.js"></script> tag with no
+# async/defer -- fine on ActionKit's own hosted page, but once spliced into
+# our page via {{ form_html|safe }} it blocks HTML parsing exactly like a
+# first-party blocking script would (confirmed live via PageSpeed Insights
+# flagging recaptcha/api.js as a render-blocking resource, 750ms of it).
+# Google's own docs recommend loading api.js with async/defer, and recaptcha
+# only ever renders in response to an explicit callback/onload, not at parse
+# time, so this is safe.
+_RECAPTCHA_SCRIPT_RE = re.compile(
+    r'<script\s+src="https://www\.google\.com/recaptcha/api\.js"\s*>'
+)
+
+
+def _make_recaptcha_async(html):
+    return _RECAPTCHA_SCRIPT_RE.sub(
+        '<script src="https://www.google.com/recaptcha/api.js" async>', html
+    )
 
 
 # Shared by every caller that auto-renders a fetched ActionKit form

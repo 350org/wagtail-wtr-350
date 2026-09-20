@@ -284,6 +284,16 @@ class TestFetchEmbedFormHTML(SimpleTestCase):
         with self.assertRaises(ActionKitError):
             actionkit.fetch_embed_form_html("myorg.actionkit.com", "")
 
+    @patch("wtrx.integrations.actionkit.requests.get")
+    def test_recaptcha_script_is_made_async(self, mock_get):
+        mock_get.return_value = self._mock_response(
+            text='<form>...</form><script src="https://www.google.com/recaptcha/api.js"></script>'
+        )
+        html = actionkit.fetch_embed_form_html("myorg.actionkit.com", "join")
+        self.assertIn(
+            '<script src="https://www.google.com/recaptcha/api.js" async>', html
+        )
+
 
 class TestSignupActionKitBlockContext(TestCase):
     """SignupActionKitBlock.get_context() fetches, caches, and degrades gracefully."""

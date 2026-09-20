@@ -12,6 +12,7 @@ Usage:
     python manage.py import_350_blog --update              # overwrite already-imported posts
     python manage.py import_350_blog --site fr --target blog-index-fr
                                                              # a 350.org country/language site
+    python manage.py import_350_blog --skip-authors        # leave author_name blank
 
 Country/language sites: 350.org's other-language sites (e.g.
 https://350.org/fr) are separate WordPress multisite subdirectory installs
@@ -301,6 +302,14 @@ class Command(BaseCommand):
             help="URL path segment for a 350.org country/language site, e.g. 'fr' "
             "for https://350.org/fr. Omit for the main English site.",
         )
+        parser.add_argument(
+            "--skip-authors",
+            action="store_true",
+            help="Don't resolve or set post authors. Skips the extra live-page fetch "
+            "used to scrape guest-contributor bylines. New posts are left with a "
+            "blank author_name; --update never overwrites an already-imported post's "
+            "existing author_name.",
+        )
 
     def handle(self, *args, **options):
         # Deferred imports to avoid import-time DB access (architecture rule #4).
@@ -310,6 +319,7 @@ class Command(BaseCommand):
         since = options["since"]
         dry_run = options["dry_run"]
         update = options["update"]
+        skip_authors = options["skip_authors"]
 
         try:
             base_url = resolve_site_base_url(options["site"])
