@@ -47,25 +47,34 @@
     {% if not is_block_preview %}
         <script>
             {% comment %}
-            document.write() used to load this synchronously (forcing the
-            parser to pause here), which is exactly what PageSpeed Insights'
-            "render-blocking requests" audit flags -- confirmed live via a
-            report showing ajax.googleapis.com/jquery.min.js as a
-            render-blocking resource on a page with this block. A
-            dynamically created and appended <script> is async by default
-            (per the HTML spec, unlike a static tag), so this loads jQuery
-            without blocking parsing. The promise is awaited below before
-            actionkit.js loads, preserving document.write's original
-            same-order guarantee (jQuery present before actionkit.js runs).
+            MUST stay document.write(), even though it's exactly what
+            PageSpeed Insights' "render-blocking requests" audit flags. A
+            past attempt replaced this with a dynamically-created (and
+            therefore non-blocking/async) <script> element instead, which
+            broke in production: form_html below is ActionKit's own fetched
+            fragment, and it isn't just form fields -- it carries several
+            inline <script> blocks of its own (e.g.
+            `jQuery( document ).ready(function() { ... });` right near the
+            top, for its "oneclick" prefill, plus more further down for
+            radio/checkbox styling) that call jQuery *immediately and
+            synchronously* as the browser parses them, with no deferral of
+            their own to wait for it. document.write() is what guarantees
+            jQuery has finished loading and executing before the parser
+            reaches those scripts -- confirmed live via a
+            "Uncaught ReferenceError: jQuery is not defined" console error
+            once the async version shipped (intermittent, since it's a race
+            against however long the script takes to fetch). Signups
+            themselves keep working either way -- validation/submit below
+            is vanilla JS, not jQuery -- but the oneclick lead-hiding and
+            radio/checkbox styling silently no-op whenever the race is lost.
+            A dynamically-appended <script> loses the ordering guarantee
+            entirely (that's the whole point of using one), so there's no
+            way to keep those two features reliable short of not using
+            jQuery at all in ActionKit's own fragment -- not something to
+            "fix" for Lighthouse again without changing that.
             {% endcomment %}
-            if (typeof jQuery === "undefined" && !window.__wtrJqueryScriptPromise) {
-                window.__wtrJqueryScriptPromise = new Promise(function (resolve) {
-                    var s = document.createElement("script");
-                    s.src = "https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js";
-                    s.onload = resolve;
-                    s.onerror = resolve;
-                    document.body.appendChild(s);
-                });
+            if (typeof jQuery === "undefined") {
+                document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
             }
         </script>
     {% endif %}
@@ -336,17 +345,10 @@
             if (baseUrl) {
                 if (!window.__wtrAkScriptPromise) {
                     window.__wtrAkScriptPromise = new Promise(function (resolve) {
-                        function loadActionKitJs() {
-                            var s = document.createElement("script");
-                            s.src = baseUrl + "/resources/actionkit.js";
-                            s.onload = resolve;
-                            document.body.appendChild(s);
-                        }
-                        if (window.__wtrJqueryScriptPromise) {
-                            window.__wtrJqueryScriptPromise.then(loadActionKitJs);
-                        } else {
-                            loadActionKitJs();
-                        }
+                        var s = document.createElement("script");
+                        s.src = baseUrl + "/resources/actionkit.js";
+                        s.onload = resolve;
+                        document.body.appendChild(s);
                     });
                 }
                 window.__wtrAkScriptPromise.then(function () {

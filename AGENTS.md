@@ -1034,32 +1034,55 @@ check.
     replacing its file, since they were generated from the old oversized
     original.
 61. **`SignupActionKitBlock`'s two third-party scripts are render-blocking
-    by default, and neither is fixed by a template `async`/`defer` attribute
-    alone.** Confirmed live via PageSpeed Insights flagging both on
-    `wagtail.350.org`: jQuery from `ajax.googleapis.com` (loaded by
-    `_actionkit_form.html` for `actionkit.js`'s benefit) used
-    `document.write()`, which forces the parser to pause and fetch+execute
-    synchronously no matter what attributes a static `<script>` tag would
-    carry; and `https://www.google.com/recaptcha/api.js` arrives already
-    embedded, with no `async`, *inside* ActionKit's own fetched form
-    fragment (see `fetch_embed_form_html`), so there's no template tag to
-    attribute in the first place — it's third-party HTML we splice in via
+    by default, but only one of them can safely be un-blocked.** Confirmed
+    live via PageSpeed Insights flagging both on `wagtail.350.org`: jQuery
+    from `ajax.googleapis.com` (loaded by `_actionkit_form.html` for
+    `actionkit.js`'s benefit) used `document.write()`; and
+    `https://www.google.com/recaptcha/api.js` arrives already embedded, with
+    no `async`, *inside* ActionKit's own fetched form fragment (see
+    `fetch_embed_form_html`), so there's no template tag to attribute in the
+    first place — it's third-party HTML spliced in via
     `{{ form_html|safe }}`, the same class of problem as pitfall #36's
-    Tailwind-class leak. Fixed by: (1) replacing `document.write` with a
-    dynamically created and `appendChild`-ed `<script>` element, which is
-    async by default per the HTML spec — chained via
-    `window.__wtrJqueryScriptPromise` so `actionkit.js` still waits for
-    jQuery first, preserving `document.write`'s original same-order
-    guarantee without blocking the parser; and (2) `_make_recaptcha_async()`
-    in `wtrx/integrations/actionkit.py`, a regex substitution run on the
-    fragment right after fetch (before caching), adding `async` to
-    recaptcha's own script tag — safe because recaptcha only ever renders
-    on an explicit callback, never at parse time. The jQuery-loading
-    `<script>` block must stay wrapped in Django's
+    Tailwind-class leak.
+
+    reCAPTCHA's fix stands: `_make_recaptcha_async()` in
+    `wtrx/integrations/actionkit.py`, a regex substitution run on the
+    fragment right after fetch (before caching), adds `async` to recaptcha's
+    own script tag — safe because recaptcha auto-scans the DOM for
+    `.g-recaptcha` elements once *it* has loaded, on its own schedule; it
+    never needs to run at a specific point in the parse.
+
+    **jQuery's `document.write()` must stay, and was reverted after actually
+    breaking production.** The instinct is the same fix — replace it with a
+    dynamically created, `appendChild`-ed `<script>` (async by default per
+    the HTML spec) — and that was shipped once. It's wrong here specifically
+    because `form_html` isn't just form fields: ActionKit's own fetched
+    fragment carries several inline `<script>` blocks (e.g.
+    `jQuery( document ).ready(function() {...});` near the very top, for its
+    "oneclick" lead-prefill, plus more further down for radio/checkbox
+    styling) that call jQuery *immediately and synchronously* as the parser
+    reaches them, with no deferral of their own. `document.write()`'s
+    parser-pausing behavior is what guarantees jQuery has finished loading
+    and executing before the parser gets there — confirmed live via
+    `Uncaught ReferenceError: jQuery is not defined` in production once the
+    async version shipped (intermittent — a race against fetch time, so
+    worse on mobile/slow connections, which is exactly why it wasn't caught
+    immediately). Signup submission itself was never at risk — validation/
+    submit further down this same file is vanilla JS, not jQuery-dependent
+    — but the oneclick lead-hiding and radio/checkbox styling silently
+    no-op every time the race is lost. There's no way to keep those two
+    ActionKit-fragment features reliable without the synchronous guarantee,
+    so this one specific "render-blocking requests" flag from PageSpeed is
+    not fixable from our side short of ActionKit dropping jQuery from its
+    own fragment. Don't re-attempt the dynamic-`<script>` version without
+    changing that.
+
+    Either way, a jQuery-loading `<script>` block that literally mentions
+    `ajax.googleapis.com` must stay wrapped in Django's
     `{% if not is_block_preview %}` (not just an inner JS `return;`) or the
-    literal `ajax.googleapis.com` string leaks into block-picker preview
-    HTML and breaks `test_previews_never_call_a_third_party_platform`,
-    which asserts on the literal string, not on whether the JS actually runs.
+    literal string leaks into block-picker preview HTML and breaks
+    `test_previews_never_call_a_third_party_platform`, which asserts on the
+    literal string, not on whether the JS actually runs.
 
 ## Git Conventions
 
