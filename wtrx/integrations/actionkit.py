@@ -120,6 +120,18 @@ def base_url(hostname):
     return f"https://{host}"
 
 
+# ActionKit stamps an Action's "source" with its own "restful_api" default
+# for anything submitted through this endpoint (as opposed to a browser POST
+# straight to an ActionKit-hosted page, which it tags "website") -- both of
+# our submission paths (FormPage forwarding, SignupActionKitBlock's inline
+# endpoint) are really website visitors filling in our own embedded forms,
+# so a request-level "source" isn't collected to make this configurable.
+# ``fields`` is spread after this default, so a source ever present there
+# (there isn't one today -- map_form_fields has no "source" mapping) would
+# still win.
+DEFAULT_ACTION_SOURCE = "website"
+
+
 def submit_action(hostname, username, password, page, fields, timeout=5):
     """
     POST an action to ActionKit's REST API.
@@ -135,7 +147,7 @@ def submit_action(hostname, username, password, page, fields, timeout=5):
         )
 
     url = f"{base_url(hostname)}/rest/v1/action/"
-    payload = {"page": page, **fields}
+    payload = {"page": page, "source": DEFAULT_ACTION_SOURCE, **fields}
 
     response = requests.post(
         url,

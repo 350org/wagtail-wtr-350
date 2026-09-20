@@ -4,8 +4,8 @@ Tests for the ActionKit signup integration.
 Covers:
 - map_form_fields: standard label mapping, single-name split, custom-field
   passthrough, and the no-email case.
-- submit_action: URL construction, HTTP Basic auth, JSON body, success on 2xx,
-  and ActionKitError on non-2xx.
+- submit_action: URL construction, HTTP Basic auth, JSON body (including the
+  default "source": "website"), success on 2xx, and ActionKitError on non-2xx.
 - FormPage.process_form_submission: forwards to ActionKit when the platform is
   "actionkit" and a page is set; a forwarding failure is swallowed/logged and
   the local submission is still saved.
@@ -127,6 +127,29 @@ class TestSubmitAction(SimpleTestCase):
         self.assertEqual(kwargs["json"]["page"], "join")
         self.assertEqual(kwargs["json"]["email"], "a@b.com")
         self.assertEqual(kwargs["json"]["first_name"], "Alice")
+
+    @patch("wtrx.integrations.actionkit.requests.post")
+    def test_defaults_source_to_website(self, mock_post):
+        # Without an explicit "source", ActionKit's REST endpoint stamps its
+        # own "restful_api" default -- our submissions are really website
+        # visitors using our own embedded forms, not API integration traffic.
+        mock_post.return_value = self._mock_response(201)
+        actionkit.submit_action(
+            "myorg.actionkit.com", "apiuser", "secret", "join", {"email": "a@b.com"}
+        )
+        self.assertEqual(mock_post.call_args.kwargs["json"]["source"], "website")
+
+    @patch("wtrx.integrations.actionkit.requests.post")
+    def test_an_explicit_source_field_wins_over_the_default(self, mock_post):
+        mock_post.return_value = self._mock_response(201)
+        actionkit.submit_action(
+            "myorg.actionkit.com",
+            "apiuser",
+            "secret",
+            "join",
+            {"email": "a@b.com", "source": "newsletter"},
+        )
+        self.assertEqual(mock_post.call_args.kwargs["json"]["source"], "newsletter")
 
     @patch("wtrx.integrations.actionkit.requests.post")
     def test_accepts_full_url_hostname(self, mock_post):
