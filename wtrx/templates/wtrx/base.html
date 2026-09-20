@@ -57,6 +57,20 @@
     {% endwith %}
     {% organization_structured_data %}
     {% block fonts %}{% endblock %}
+    {% if hero.video and hero.poster_url %}
+        {% comment %}
+        Chrome's `fetchpriority` attribute isn't honored on a <video>'s
+        implicit `poster` fetch (only <img>/<link rel=preload>/<script>/
+        <iframe> -- see HeroMixin.get_hero_context()'s docstring), yet
+        Chrome still treats that poster as the LCP paint candidate for a
+        video hero. Without this preload naming it directly, PageSpeed
+        Insights' "LCP request discovery" audit flags fetchpriority=high as
+        missing even though it's right there on the <video> tag in
+        _hero_background_video.html -- the attribute just isn't reaching
+        the fetch that actually matters.
+        {% endcomment %}
+        <link rel="preload" as="image" fetchpriority="high" href="{{ hero.poster_url }}">
+    {% endif %}
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
     {% block extra_stylesheets %}{% endblock %}
     {% block extra_head %}{% endblock %}

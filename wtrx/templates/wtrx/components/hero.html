@@ -239,10 +239,19 @@
                             {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-3 right-3" %}
                         {% elif hero.image %}
                             {% image hero.image fill-1000x800 as bg %}
+                            {% comment %}
+                            A page-level hero (not hero.in_body) is always
+                            above the fold and usually the LCP element --
+                            loading="lazy" here was actively deferring the
+                            site's own LCP image. An in-body HeroBlock isn't
+                            guaranteed to be above the fold, so it keeps
+                            lazy-loading.
+                            {% endcomment %}
                             <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
                                  alt="{{ hero.image.description }}"{% if not hero.image.description %} role="presentation"{% endif %}
                                  class="absolute inset-0 h-full w-full object-cover"
-                                 style="{{ hero.image.object_position_style }}" loading="lazy">
+                                 style="{{ hero.image.object_position_style }}"
+                                 {% if hero.in_body %}loading="lazy"{% else %}loading="eager" fetchpriority="high"{% endif %}>
                         {% endif %}
                         {% comment %}Blends the color panel into the media — see main.css; picks the
                            matching-color fade class so the seam between panel and media
@@ -290,10 +299,17 @@
             {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-4 right-4 z-10 sm:top-6 sm:right-6" %}
         {% elif hero.image %}
             {% image hero.image fill-1600x700 as bg %}
+            {% comment %}
+            "full" is HomePage's page-level hero only (see hero.html's
+            docstring) -- always above the fold, so no hero.in_body branch
+            is needed here the way the "banner" variant above has one.
+            loading="lazy" here was actively deferring the site's own LCP
+            image.
+            {% endcomment %}
             <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
                  alt="{{ hero.image.description }}"{% if not hero.image.description %} role="presentation"{% endif %}
                  class="absolute inset-0 h-full w-full object-cover"
-                 style="{{ hero.image.object_position_style }}" loading="lazy">
+                 style="{{ hero.image.object_position_style }}" loading="eager" fetchpriority="high">
         {% endif %}
 
         {% if hero.video or hero.image %}

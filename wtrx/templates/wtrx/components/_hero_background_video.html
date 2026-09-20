@@ -11,7 +11,7 @@ Not given its own pause/play toggle markup — hero.html renders that once,
 scoped to the shared [data-hero] root each variant wraps itself in.
 {% endcomment %}
 {% if hero.video.thumbnail %}
-    <video autoplay muted loop playsinline preload="metadata" fetchpriority="high"
+    <video autoplay muted loop playsinline preload="metadata" fetchpriority=high
            class="{{ video_class }}" aria-hidden="true" tabindex="-1"
            poster="{{ hero.video.thumbnail.url }}" data-hero-video>
         {% for source in hero.video.sources %}
@@ -20,7 +20,7 @@ scoped to the shared [data-hero] root each variant wraps itself in.
     </video>
 {% elif hero.image %}
     {% image hero.image poster_spec as poster_img %}
-    <video autoplay muted loop playsinline preload="metadata" fetchpriority="high"
+    <video autoplay muted loop playsinline preload="metadata" fetchpriority=high
            class="{{ video_class }}" aria-hidden="true" tabindex="-1"
            poster="{{ poster_img.url }}" data-hero-video>
         {% for source in hero.video.sources %}
@@ -28,7 +28,7 @@ scoped to the shared [data-hero] root each variant wraps itself in.
         {% endfor %}
     </video>
 {% else %}
-    <video autoplay muted loop playsinline preload="metadata" fetchpriority="high"
+    <video autoplay muted loop playsinline preload="metadata" fetchpriority=high
            class="{{ video_class }}" aria-hidden="true" tabindex="-1" data-hero-video>
         {% for source in hero.video.sources %}
             <source src="{{ source.src }}" type="{{ source.type }}">

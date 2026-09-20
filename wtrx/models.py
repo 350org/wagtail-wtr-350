@@ -349,7 +349,27 @@ class HeroMixin(models.Model):
         minimal is only meaningful for the "banner" variant (see hero.html)
         but is computed unconditionally here, same as banner_color/cta —
         the "full" variant's template simply ignores it.
+
+        poster_url duplicates _hero_background_video.html's own
+        thumbnail-then-image fallback chain (same poster_spec sizes:
+        fill-1600x700 for "full", fill-1000x800 for "banner") so base.html's
+        <head> can <link rel="preload"> it. This is only ever needed at all
+        because Chrome's `fetchpriority` attribute isn't honored on a
+        <video>'s implicit `poster` image fetch (only on <img>/<link
+        rel=preload>/<script>/<iframe>) -- Chrome still treats the poster as
+        the LCP paint candidate for a video hero, so without a preload link
+        naming it directly, that fetch never gets bumped off default
+        priority no matter what's set on the <video> tag itself. None when
+        there's no video (a plain <img> hero already gets fetchpriority
+        correctly via the attribute right on its own tag, see hero.html).
         """
+        poster_url = None
+        if self.hero_video:
+            if self.hero_video.thumbnail:
+                poster_url = self.hero_video.thumbnail.url
+            elif self.hero_image:
+                spec = "fill-1600x700" if self.hero_variant == "full" else "fill-1000x800"
+                poster_url = self.hero_image.get_rendition(spec).url
         return {
             "variant": self.hero_variant,
             "headline": self.hero_headline or self.title,
@@ -357,6 +377,7 @@ class HeroMixin(models.Model):
             "copy_is_block": False,
             "image": self.hero_image,
             "video": self.hero_video,
+            "poster_url": poster_url,
             "image_caption": self.hero_image_caption,
             "banner_color": self.hero_banner_color,
             "cta": self.hero_cta,

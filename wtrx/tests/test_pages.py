@@ -228,12 +228,56 @@ class TestHomePageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
+            "poster_url",
             "image_caption",
             "banner_color",
             "cta",
             "minimal",
         }
         self.assertEqual(set(ctx["hero"].keys()), required_keys)
+
+    def test_poster_url_none_without_video(self):
+        ctx = self._get_context(self.home)
+        self.assertIsNone(ctx["hero"]["poster_url"])
+
+    def test_poster_url_uses_video_thumbnail(self):
+        """
+        base.html preloads this URL with fetchpriority=high (see
+        HeroMixin.get_hero_context()'s docstring) since Chrome doesn't honor
+        fetchpriority on a <video>'s own poster fetch -- so it must resolve
+        to the same thumbnail _hero_background_video.html renders as the
+        poster, not just be non-None.
+        """
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from wagtailmedia.models import Media
+
+        media = Media.objects.create(
+            title="Hero video",
+            type="video",
+            thumbnail=SimpleUploadedFile("poster.png", get_test_image_file().file.read(), content_type="image/png"),
+        )
+        self.home.hero_video = media
+        try:
+            ctx = self._get_context(self.home)
+            self.assertEqual(ctx["hero"]["poster_url"], media.thumbnail.url)
+        finally:
+            self.home.hero_video = None
+
+    def test_poster_url_falls_back_to_hero_image_rendition(self):
+        """No thumbnail on the video -- falls back to hero_image, same as
+        _hero_background_video.html's own fallback chain."""
+        from wagtailmedia.models import Media
+
+        media = Media.objects.create(title="Hero video", type="video")
+        image = CustomImage.objects.create(title="Hero image", file=get_test_image_file())
+        self.home.hero_video = media
+        self.home.hero_image = image
+        try:
+            ctx = self._get_context(self.home)
+            self.assertEqual(ctx["hero"]["poster_url"], image.get_rendition("fill-1600x700").url)
+        finally:
+            self.home.hero_video = None
+            self.home.hero_image = None
 
 
 class TestHomePageMeta(TestCase):
@@ -326,6 +370,7 @@ class TestContentPageGetContext(TestCase):
             "copy_is_block",
             "image",
             "video",
+            "poster_url",
             "image_caption",
             "banner_color",
             "cta",
