@@ -21,11 +21,21 @@ fallback logic itself (see AGENTS.md architecture rule #4's poster fallback
 chain).
 
 connect_signals() below hooks pre_save on wagtailmedia.Media so every future
-thumbnail upload is capped to MAX_THUMBNAIL_DIMENSION and re-encoded as JPEG
+thumbnail upload is capped to MAX_THUMBNAIL_DIMENSION and re-encoded as WebP
 before it reaches storage -- a video poster is always rendered opaque
 underneath the <video> element, so PNG's lossless/alpha features are wasted
 bytes here regardless of the source format. The backfill_video_thumbnails
 management command applies the same processing to existing Media rows.
+
+Originally re-encoded to JPEG instead -- switched to WebP after a later
+PageSpeed Insights "Improve image delivery" pass flagged the JPEG output
+itself (a real hero poster, ~99 KiB) for a further ~72 KiB by using a
+modern format, matching WAGTAILIMAGES_FORMAT_CONVERSIONS' existing
+png/jpeg -> webp choice for ordinary Wagtail images (settings/base.py) --
+this thumbnail never goes through Wagtail's rendition pipeline at all (see
+above), so it needed its own conversion rather than inheriting that
+setting. Re-running backfill_video_thumbnails converts any
+already-JPEG-optimized thumbnail from before this change to WebP too.
 
 Skips reprocessing on a save that doesn't touch thumbnail at all (compares
 against the value already in the database), so editing a Media item's title
@@ -52,12 +62,12 @@ from PIL import Image as PILImage
 logger = logging.getLogger(__name__)
 
 MAX_THUMBNAIL_DIMENSION = 1600
-THUMBNAIL_JPEG_QUALITY = 82
+THUMBNAIL_QUALITY = 82
 
 
 def build_optimized_thumbnail(field_file):
     """
-    Return a ContentFile holding an optimized JPEG version of field_file
+    Return a ContentFile holding an optimized WebP version of field_file
     (capped to MAX_THUMBNAIL_DIMENSION on its longest side, transparency
     flattened onto white), or None if field_file can't be read as an image.
     """
@@ -86,10 +96,10 @@ def build_optimized_thumbnail(field_file):
         )
 
     output = BytesIO()
-    image.save(output, format="JPEG", quality=THUMBNAIL_JPEG_QUALITY, optimize=True)
+    image.save(output, format="WEBP", quality=THUMBNAIL_QUALITY)
 
     base_name = os.path.splitext(os.path.basename(field_file.name))[0]
-    return ContentFile(output.getvalue(), name=f"{base_name}.jpg")
+    return ContentFile(output.getvalue(), name=f"{base_name}.webp")
 
 
 def optimize_media_thumbnail(sender, instance, **kwargs):

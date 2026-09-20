@@ -195,7 +195,7 @@ def fetch_embed_form_html(hostname, short_form_id, timeout=5):
             f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
         )
 
-    return _make_recaptcha_async(response.text)
+    return _fix_country_label_for_attribute(_make_recaptcha_async(response.text))
 
 
 # ActionKit's fetched fragment includes its own <script
@@ -216,6 +216,24 @@ def _make_recaptcha_async(html):
     return _RECAPTCHA_SCRIPT_RE.sub(
         '<script src="https://www.google.com/recaptcha/api.js" async>', html
     )
+
+
+# ActionKit's own country <select> renders with id="country" (no "id_"
+# prefix, unlike every other field -- e.g. email's input carries
+# id="id_email"), but its <label> still points at for="id_country" -- a
+# genuine for/id mismatch in ActionKit's own markup, confirmed live via a
+# direct fetch of the raw fragment (grepping every <label for="..."> against
+# every id="..." in the same response: id_email resolves, id_country does
+# not). Browsers/screen readers match `for` by exact id, so this leaves the
+# select with no accessible name -- confirmed via PageSpeed Insights'
+# "Select elements do not have associated label elements" audit. Safe to
+# rewrite: static_src/js/components/actionkit-country-prefill.js selects
+# this field by `select[name="country"]`, never by id.
+_COUNTRY_LABEL_FOR_RE = re.compile(r'<label for="id_country">')
+
+
+def _fix_country_label_for_attribute(html):
+    return _COUNTRY_LABEL_FOR_RE.sub('<label for="country">', html)
 
 
 # Shared by every caller that auto-renders a fetched ActionKit form

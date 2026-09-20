@@ -317,6 +317,21 @@ class TestFetchEmbedFormHTML(SimpleTestCase):
             '<script src="https://www.google.com/recaptcha/api.js" async>', html
         )
 
+    @patch("wtrx.integrations.actionkit.requests.get")
+    def test_country_label_for_attribute_is_fixed(self, mock_get):
+        mock_get.return_value = self._mock_response(
+            text=(
+                '<label for="id_email">Email Address</label>'
+                '<input type="text" name="email" id="id_email">'
+                '<label for="id_country">Country</label>'
+                '<select name="country" id="country"></select>'
+            )
+        )
+        html = actionkit.fetch_embed_form_html("myorg.actionkit.com", "join")
+        self.assertIn('<label for="country">Country</label>', html)
+        # The (already-correct) email label/input pairing must be untouched.
+        self.assertIn('<label for="id_email">Email Address</label>', html)
+
 
 class TestSignupActionKitBlockContext(TestCase):
     """SignupActionKitBlock.get_context() fetches, caches, and degrades gracefully."""

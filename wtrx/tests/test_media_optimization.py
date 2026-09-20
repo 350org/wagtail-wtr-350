@@ -54,7 +54,7 @@ class TestBuildOptimizedThumbnail(TestCase):
         media = _make_media(thumbnail_bytes=_png_bytes((2000, 1000)))
         result = build_optimized_thumbnail(media.thumbnail)
         image = PILImage.open(result)
-        self.assertEqual(image.format, "JPEG")
+        self.assertEqual(image.format, "WEBP")
         self.assertEqual(max(image.size), MAX_THUMBNAIL_DIMENSION)
         self.assertEqual(image.size, (MAX_THUMBNAIL_DIMENSION, MAX_THUMBNAIL_DIMENSION // 2))
 
@@ -64,11 +64,11 @@ class TestBuildOptimizedThumbnail(TestCase):
         image = PILImage.open(result)
         self.assertEqual(image.size, (400, 300))
 
-    def test_output_is_always_jpeg_regardless_of_source_format(self):
+    def test_output_is_always_webp_regardless_of_source_format(self):
         media = _make_media(thumbnail_bytes=_png_bytes((400, 300)))
         result = build_optimized_thumbnail(media.thumbnail)
-        self.assertTrue(result.name.endswith(".jpg"))
-        self.assertEqual(PILImage.open(result).format, "JPEG")
+        self.assertTrue(result.name.endswith(".webp"))
+        self.assertEqual(PILImage.open(result).format, "WEBP")
 
     def test_flattens_transparency_onto_white_rather_than_black(self):
         media = _make_media(thumbnail_bytes=_png_bytes((10, 10), mode="RGBA", color=(255, 0, 0, 0)))
@@ -95,7 +95,7 @@ class TestOptimizeMediaThumbnailSignal(TestCase):
             type="video",
             thumbnail=SimpleUploadedFile("Rectangle_130.png", _png_bytes((2000, 1000)), content_type="image/png"),
         )
-        self.assertTrue(media.thumbnail.name.endswith(".jpg"))
+        self.assertTrue(media.thumbnail.name.endswith(".webp"))
         image = PILImage.open(media.thumbnail)
         self.assertEqual(max(image.size), MAX_THUMBNAIL_DIMENSION)
 
@@ -156,7 +156,7 @@ class TestBackfillVideoThumbnailsCommand(TestCase):
         call_command("backfill_video_thumbnails")
 
         media.refresh_from_db()
-        self.assertTrue(media.thumbnail.name.endswith(".jpg"))
+        self.assertTrue(media.thumbnail.name.endswith(".webp"))
         self.assertEqual(max(PILImage.open(media.thumbnail).size), MAX_THUMBNAIL_DIMENSION)
 
     def test_media_id_filters_to_a_single_item(self):
@@ -167,8 +167,8 @@ class TestBackfillVideoThumbnailsCommand(TestCase):
 
         target.refresh_from_db()
         other.refresh_from_db()
-        self.assertTrue(target.thumbnail.name.endswith(".jpg"))
-        self.assertFalse(other.thumbnail.name.endswith(".jpg"))
+        self.assertTrue(target.thumbnail.name.endswith(".webp"))
+        self.assertFalse(other.thumbnail.name.endswith(".webp"))
 
     def test_undecodable_thumbnail_is_reported_not_treated_as_an_error(self):
         _make_media(thumbnail_name="poster.png", thumbnail_bytes=b"not actually an image")
@@ -184,4 +184,4 @@ class TestBackfillVideoThumbnailsCommand(TestCase):
             type="video",
             thumbnail=SimpleUploadedFile("poster.png", _png_bytes((2000, 1000)), content_type="image/png"),
         )
-        self.assertTrue(media.thumbnail.name.endswith(".jpg"))
+        self.assertTrue(media.thumbnail.name.endswith(".webp"))
