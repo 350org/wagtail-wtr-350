@@ -1018,6 +1018,33 @@ check.
     before this existed; it deletes the image's existing renditions after
     replacing its file, since they were generated from the old oversized
     original.
+61. **`SignupActionKitBlock`'s two third-party scripts are render-blocking
+    by default, and neither is fixed by a template `async`/`defer` attribute
+    alone.** Confirmed live via PageSpeed Insights flagging both on
+    `wagtail.350.org`: jQuery from `ajax.googleapis.com` (loaded by
+    `_actionkit_form.html` for `actionkit.js`'s benefit) used
+    `document.write()`, which forces the parser to pause and fetch+execute
+    synchronously no matter what attributes a static `<script>` tag would
+    carry; and `https://www.google.com/recaptcha/api.js` arrives already
+    embedded, with no `async`, *inside* ActionKit's own fetched form
+    fragment (see `fetch_embed_form_html`), so there's no template tag to
+    attribute in the first place — it's third-party HTML we splice in via
+    `{{ form_html|safe }}`, the same class of problem as pitfall #36's
+    Tailwind-class leak. Fixed by: (1) replacing `document.write` with a
+    dynamically created and `appendChild`-ed `<script>` element, which is
+    async by default per the HTML spec — chained via
+    `window.__wtrJqueryScriptPromise` so `actionkit.js` still waits for
+    jQuery first, preserving `document.write`'s original same-order
+    guarantee without blocking the parser; and (2) `_make_recaptcha_async()`
+    in `wtrx/integrations/actionkit.py`, a regex substitution run on the
+    fragment right after fetch (before caching), adding `async` to
+    recaptcha's own script tag — safe because recaptcha only ever renders
+    on an explicit callback, never at parse time. The jQuery-loading
+    `<script>` block must stay wrapped in Django's
+    `{% if not is_block_preview %}` (not just an inner JS `return;`) or the
+    literal `ajax.googleapis.com` string leaks into block-picker preview
+    HTML and breaks `test_previews_never_call_a_third_party_platform`,
+    which asserts on the literal string, not on whether the JS actually runs.
 
 ## Git Conventions
 
