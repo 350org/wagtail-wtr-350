@@ -597,7 +597,8 @@ html {
 }
 
 .wtr-actionkit-embed-stacked .input-text,
-.wtr-actionkit-embed-stacked .input-select {
+.wtr-actionkit-embed-stacked .input-select,
+.wtr-actionkit-embed-stacked .input-textarea {
     margin: 0;
     padding: 0.5rem 0.75rem;
     background-color: var(--color-neutral-50);
@@ -620,8 +621,12 @@ html {
 /* :not() on the type here because ActionKit puts .ak-userfield-input on
  * every user field including the opt-in checkbox and radios — a 100%-wide,
  * borderless, transparent checkbox is not a checkbox. Those two get their
- * own rules below instead. */
+ * own rules below instead. The cover-letter field is a separate selector
+ * (.letter-text) because AK doesn't give it .ak-userfield-input at all —
+ * without this it fell through to the wrapper's --color-light text color
+ * with no background override, i.e. white text on a white/transparent box. */
 .wtr-actionkit-embed-stacked .ak-userfield-input:not([type='checkbox']):not([type='radio']),
+.wtr-actionkit-embed-stacked .letter-text,
 .wtr-actionkit-embed-stacked select {
     width: 100%;
     padding: 0;
@@ -630,6 +635,13 @@ html {
     color: var(--color-dark);
     font-family: var(--font-body);
     font-size: 0.875rem;
+}
+
+/* AK ships this field with no rows/min-height of its own (native 2-row
+ * default), too short to preview a letter of any real length. */
+.wtr-actionkit-embed-stacked .letter-text {
+    min-height: 8rem;
+    resize: vertical;
 }
 
 /* Validation errors.
@@ -976,7 +988,8 @@ html {
  * colour exactly and dissolve into it, so they keep the neutral-50 default,
  * which is what makes them a surface there. */
 .wtr-actionkit-embed-stacked.wtr-ak-on-light .input-text,
-.wtr-actionkit-embed-stacked.wtr-ak-on-light .input-select {
+.wtr-actionkit-embed-stacked.wtr-ak-on-light .input-select,
+.wtr-actionkit-embed-stacked.wtr-ak-on-light .input-textarea {
     background-color: var(--color-light);
 }
 
