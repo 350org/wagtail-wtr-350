@@ -380,7 +380,7 @@ class Command(BaseCommand):
             categories = get_categories(_category_names(post, title))
             hide_from_blogroll = _is_hidden_from_blogroll(post)
             body = convert_body(post["content"]["rendered"], session, self.stdout, dry_run=dry_run)
-            author_name = _author_name(post, session)
+            author_name = "" if skip_authors else _author_name(post, session)
             seo_title, search_description = yoast_seo_fields_from_api_post(post)
 
             hero_image = None
@@ -416,7 +416,8 @@ class Command(BaseCommand):
                     )
                     existing.hero_image = hero_image
                     existing.body = body
-                    existing.author_name = author_name
+                    if not skip_authors:
+                        existing.author_name = author_name
                     existing.hide_from_blogroll = hide_from_blogroll
                     existing.seo_title = seo_title
                     existing.search_description = search_description
