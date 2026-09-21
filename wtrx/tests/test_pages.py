@@ -22,6 +22,7 @@ from wtrx.models import (
     Blogs,
     ContentPage,
     FormPage,
+    HeroMixin,
     HomePage,
     IndexPage,
     ITEMS_PER_PAGE,
@@ -85,6 +86,22 @@ class TestHeroPanelSelection(TestCase):
         ):
             self.assertIn(field, names)
 
+    def test_home_page_has_pre_header_field(self):
+        """
+        hero_pre_header is the mirror image of hero_image_caption below: a
+        home-page-only field exposed on hero_panels and omitted from
+        banner_hero_panels, with the column itself present on every
+        HeroMixin page (no schema split).
+        """
+        names = _collect_panel_field_names(HomePage.content_panels)
+        self.assertIn("hero_pre_header", names)
+
+    def test_banner_pages_have_no_pre_header_field(self):
+        for model in (ContentPage, IndexPage, Blogs):
+            with self.subTest(model=model.__name__):
+                names = _collect_panel_field_names(model.content_panels)
+                self.assertNotIn("hero_pre_header", names)
+
     def test_home_page_has_no_image_caption_field(self):
         """
         hero_image_caption is a "banner"-only field — hero.html's "full"
@@ -107,6 +124,60 @@ class TestHeroPanelSelection(TestCase):
         ):
             self.assertIn(field, names)
         self.assertNotIn("hero_video", names)
+
+    def _content_page_hero_panel(self):
+        """ContentPage's Hero panel, found by heading rather than index so
+        the test survives a panel being added above it."""
+        panels = [
+            panel
+            for panel in ContentPage.content_panels
+            if str(getattr(panel, "heading", "")) == "Hero"
+        ]
+        self.assertEqual(len(panels), 1)
+        return panels[0]
+
+    def test_hide_hero_is_the_last_field_in_the_hero_panel(self):
+        """
+        hide_hero is a property of the hero, so it belongs in the Hero panel
+        rather than a section of its own -- and last, after the fields it
+        turns off. ContentPage rebuilds the panel around
+        HeroMixin.banner_hero_fields to get this, since the shared
+        banner_hero_panels can't carry a field IndexPage and Blogs lack.
+        """
+        names = _collect_panel_field_names(self._content_page_hero_panel().children)
+        self.assertEqual(names[-1], "hide_hero")
+        self.assertEqual(names[:-1], [f.field_name for f in HeroMixin.banner_hero_fields])
+
+        all_names = _collect_panel_field_names(ContentPage.content_panels)
+        self.assertEqual(all_names.count("hide_hero"), 1)
+
+    def test_hide_hero_is_permission_gated(self):
+        """
+        Nesting must not weaken the permission gate: Wagtail builds the edit
+        form from the merged form options of every panel, and
+        PanelGroup.get_form_options() merges each child's field_permissions
+        dict upward, so a nested gated FieldPanel still keeps the field off
+        the form entirely -- unsettable by POST, not merely hidden.
+        """
+        panel = self._content_page_hero_panel().bind_to_model(ContentPage)
+        self.assertEqual(
+            panel.get_form_options().get("field_permissions"),
+            {"hide_hero": "wtrx.disable_hero"},
+        )
+
+    def test_shared_banner_hero_panels_are_unaffected(self):
+        """
+        ContentPage shares banner_hero_fields' FieldPanel instances with
+        banner_hero_panels, which IndexPage and Blogs still use.
+        bind_to_model() clones before setting .model, so neither binding can
+        leak into the other -- but an in-place mutation of the shared list
+        would, and this catches it.
+        """
+        for model in (IndexPage, Blogs):
+            with self.subTest(model=model.__name__):
+                names = _collect_panel_field_names(model.content_panels)
+                self.assertNotIn("hide_hero", names)
+                self.assertIn("hero_headline", names)
 
     def test_index_page_has_only_banner_hero_fields(self):
         names = _collect_panel_field_names(IndexPage.content_panels)
@@ -223,6 +294,7 @@ class TestHomePageGetContext(TestCase):
         ctx = self._get_context(self.home)
         required_keys = {
             "variant",
+            "pre_header",
             "headline",
             "copy",
             "copy_is_block",
@@ -365,6 +437,7 @@ class TestContentPageGetContext(TestCase):
         ctx = self._get_context(self.page)
         expected = {
             "variant",
+            "pre_header",
             "headline",
             "copy",
             "copy_is_block",
@@ -479,6 +552,39 @@ class TestBannerHeroRendering(TestCase):
         content = self.client.get(self.full.url).content.decode()
         self.assertIn("md:min-h-[385px]", content)
         self.assertNotIn("md:min-h-[300px]", content)
+
+    def test_hide_hero_removes_the_hero(self):
+        page = ContentPage(
+            title="No Hero Here",
+            slug="no-hero-here",
+            hero_headline="This headline should not render",
+            hide_hero=True,
+        )
+        self.home.add_child(instance=page)
+        content = self.client.get(page.url).content.decode()
+        self.assertNotIn("wtr-page-hero", content)
+        self.assertNotIn("This headline should not render", content)
+
+    def test_hide_hero_keeps_exactly_one_h1_from_the_page_title(self):
+        """
+        The hero owns the page's only <h1>. With it hidden the document
+        would otherwise have none, since every body heading is h2 or lower.
+        """
+        page = ContentPage(
+            title="Accessible Without A Hero",
+            slug="accessible-without-a-hero",
+            hide_hero=True,
+        )
+        self.home.add_child(instance=page)
+        content = self.client.get(page.url).content.decode()
+        self.assertEqual(content.count("<h1"), 1)
+        self.assertIn(
+            '<h1 class="sr-only">Accessible Without A Hero</h1>', content
+        )
+
+    def test_hero_shown_by_default(self):
+        content = self.client.get(self.full.url).content.decode()
+        self.assertIn("wtr-page-hero", content)
 
 
 class TestContentPageMeta(TestCase):

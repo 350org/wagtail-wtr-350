@@ -261,6 +261,15 @@ class HeroMixin(models.Model):
             "falls back to the hero image above if no thumbnail is set."
         ),
     )
+    hero_pre_header = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("hero pre-header"),
+        help_text=_(
+            "Optional short line shown above the headline, e.g. "
+            "\"Welcome to 350 Canada\"."
+        ),
+    )
     hero_image_caption = models.CharField(
         max_length=255,
         blank=True,
@@ -294,9 +303,18 @@ class HeroMixin(models.Model):
     # field itself still exists on HomePage (inherited from HeroMixin, no
     # schema split), it's just never exposed as editable on the only page
     # type that gets the "full" variant.
+    #
+    # hero_pre_header is the exact inverse: exposed here and omitted from
+    # banner_hero_panels. It is a home-page device ("Welcome to 350
+    # Canada" above the 96px display headline) and reads as clutter above
+    # the compact banner's 48px one. Same no-schema-split arrangement —
+    # the column exists on every HeroMixin page, only the panel differs,
+    # so widening it later to a banner page is a one-line change with no
+    # migration.
     hero_panels = [
         MultiFieldPanel(
             [
+                FieldPanel("hero_pre_header"),
                 FieldPanel("hero_headline"),
                 FieldPanel("hero_copy"),
                 FieldPanel("hero_image"),
@@ -323,18 +341,21 @@ class HeroMixin(models.Model):
     # docstring for why a dead-field mismatch (the picker offering
     # choices components/hero.html's "banner" variant would have
     # silently skipped anyway) used to exist here and no longer does.
+    # Split out so a page type can rebuild the same Hero panel with an extra
+    # field appended (ContentPage.hide_hero). Sharing FieldPanel instances
+    # across two MultiFieldPanels on two models is safe — bind_to_model()
+    # clones before setting .model.
+    banner_hero_fields = [
+        FieldPanel("hero_headline"),
+        FieldPanel("hero_copy"),
+        FieldPanel("hero_image"),
+        FieldPanel("hero_image_caption"),
+        FieldPanel("hero_banner_color"),
+        FieldPanel("hero_cta"),
+    ]
+
     banner_hero_panels = [
-        MultiFieldPanel(
-            [
-                FieldPanel("hero_headline"),
-                FieldPanel("hero_copy"),
-                FieldPanel("hero_image"),
-                FieldPanel("hero_image_caption"),
-                FieldPanel("hero_banner_color"),
-                FieldPanel("hero_cta"),
-            ],
-            heading=_("Hero"),
-        ),
+        MultiFieldPanel(banner_hero_fields, heading=_("Hero")),
     ]
 
     def get_hero_context(self):
@@ -372,6 +393,7 @@ class HeroMixin(models.Model):
                 poster_url = self.hero_image.get_rendition(spec).url
         return {
             "variant": self.hero_variant,
+            "pre_header": self.hero_pre_header,
             "headline": self.hero_headline or self.title,
             "copy": self.hero_copy,
             "copy_is_block": False,
@@ -490,6 +512,10 @@ class BannerHeroMixin(models.Model):
         """
         context = {
             "variant": "banner",
+            # Post has no hero_pre_header column at all (it is a HeroMixin
+            # field and Post uses BannerHeroMixin); pinned None to keep the
+            # hero.html contract complete.
+            "pre_header": None,
             "headline": self.hero_headline or self.title,
             "copy": self.hero_copy,
             "copy_is_block": False,
@@ -687,6 +713,15 @@ class ContentPage(BasePage, HeroMixin):
         use_json_field=True,
     )
 
+    hide_hero = models.BooleanField(
+        default=False,
+        verbose_name=_("hide hero"),
+        help_text=_(
+            "Hide the hero banner entirely and start the page at its body. "
+            "The page title is still announced to screen readers."
+        ),
+    )
+
     body = StreamField(
         BodyStreamBlock(),
         blank=True,
@@ -695,10 +730,27 @@ class ContentPage(BasePage, HeroMixin):
         use_json_field=True,
     )
 
+    # hide_hero is a property of the hero, so it sits inside the Hero panel
+    # rather than in a section of its own — last, after the fields it turns
+    # off. The shared banner_hero_panels can't carry it (IndexPage and Blogs
+    # have no such field), hence the rebuild around banner_hero_fields.
+    #
+    # It is gated on a custom permission rather than shown to every editor:
+    # a page with no hero has no visible <h1> and no banner, which is a
+    # deliberate, site-shaping choice rather than routine page setup.
+    # FieldPanel(permission=...) removes the field from the form entirely
+    # for anyone without it, and nesting does not weaken that —
+    # PanelGroup.get_form_options() merges each child's field_permissions
+    # dict upward, so it cannot be set by POSTing the form either.
+    # Superusers always pass has_perm.
     content_panels = (
         BasePage.title_panels
-        + HeroMixin.banner_hero_panels
         + [
+            MultiFieldPanel(
+                HeroMixin.banner_hero_fields
+                + [FieldPanel("hide_hero", permission="wtrx.disable_hero")],
+                heading=_("Hero"),
+            ),
             FieldPanel("body"),
         ]
     )
@@ -729,6 +781,12 @@ class ContentPage(BasePage, HeroMixin):
     class Meta:
         verbose_name = _("content page")
         verbose_name_plural = _("content pages")
+        # Hung off ContentPage itself rather than a dedicated proxy/unmanaged
+        # model: this is the only page type with the field, so there is
+        # nothing to share, and this costs one AlterModelOptions instead of
+        # a second model and ContentType. Assign it to a group in
+        # Settings > Groups; "wtrx.disable_hero" is the codename.
+        permissions = [("disable_hero", "Can disable a page hero")]
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)

@@ -2,7 +2,9 @@
 {% load i18n wagtailcore_tags %}
 
 {% block hero %}
-    {% include "wtrx/components/hero.html" %}
+    {% if not page.hide_hero %}
+        {% include "wtrx/components/hero.html" %}
+    {% endif %}
 {% endblock %}
 
 {% comment %}
@@ -21,9 +23,20 @@ room, not inter-block spacing, so it's left alone and stacks on top of
 (not instead of) this gap.
 {% endcomment %}
 {% block content %}
+{% if page.hide_hero %}
+    {% comment %}
+    The hero owns this page's only <h1> (components/hero.html renders
+    hero.headline, which falls back to the page title). With the hero
+    hidden the document would have no h1 at all, so screen readers and
+    the accessibility tree lose the page's name — every heading in the
+    body is an h2 or lower. This restores it visually-hidden, so the
+    page reads correctly without changing the design.
+    {% endcomment %}
+    <h1 class="sr-only">{{ page.title }}</h1>
+{% endif %}
 <div class="wtr-body-stack space-y-24">
 {% for block in page.body %}
-    <div data-block-type="{{ block.block_type }}"{% if block.block_type == "section" or block.block_type == "card_grid" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "signup_actionkit" or block.block_type == "image" or block.block_type == "hero" or block.block_type == "quote" or block.block_type == "page_cards" or block.block_type == "image_grid" or block.block_type == "logo_grid" or block.block_type == "person_card_grid" or block.block_type == "timeline" %}{% else %} class="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8"{% endif %}>
+    <div data-block-type="{{ block.block_type }}"{% if block.block_type == "section" or block.block_type == "card_grid" or block.block_type == "card_carousel" or block.block_type == "donate_fundraiseup" or block.block_type == "callout" or block.block_type == "image_card_list" or block.block_type == "image_text" or block.block_type == "feature_panel" or block.block_type == "signup_actionkit" or block.block_type == "image" or block.block_type == "hero" or block.block_type == "quote" or block.block_type == "page_cards" or block.block_type == "image_grid" or block.block_type == "logo_grid" or block.block_type == "person_card_grid" or block.block_type == "timeline" or block.block_type == "heading" %}{% else %} class="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8"{% endif %}>
         {% include_block block %}
     </div>
 {% endfor %}

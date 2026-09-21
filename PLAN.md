@@ -29,7 +29,8 @@ wagtail-wtr/
 │   ├── blocks/
 │   │   ├── __init__.py                 # Exports BodyStreamBlock, SectionContentBlock
 │   │   ├── content.py                  # TextBlock, ImageBlock, VideoBlock, ButtonBlock,
-│   │   │                               #   QuoteBlock, RawHTMLBlock, TableBlock
+│   │   │                               #   QuoteBlock, RawHTMLBlock, TableBlock,
+│   │   │                               #   HeadingBlock
 │   │   ├── layout.py                   # SectionBlock, CardGridBlock, AccordionBlock
 │   │   ├── composite.py                # CalloutBlock, HeroBlock
 │   │   ├── cards.py                    # CardBlock, PersonCardBlock
@@ -163,6 +164,15 @@ wagtail-wtr/
 - Features: bold, italic, link, ol, ul, h2, h3, h4
 - (value) **required**
 
+**1b. HeadingBlock** (StructBlock)
+
+| Field | Type | Required |
+|---|---|---|
+| heading | CharBlock | **Yes** |
+
+A standalone centered H2, rendering the same markup as `CardGridBlock`'s own
+optional heading so the two line up when both appear on a page.
+
 **2. ImageBlock** (StructBlock)
 
 | Field | Type | Required |
@@ -203,9 +213,11 @@ Custom `clean()` enforces exactly one link field.
 | attribution | CharBlock | No |
 | title | CharBlock | No |
 
-**6. RawHTMLBlock**
+**6. RawHTMLBlock** — labelled "Custom embed" in the editor
 - Type: RawHTMLBlock (no wrapper)
 - (value) **required**
+- Picker description leads with "Please talk to Tech & Security before using."
+
 
 **7. TableBlock**
 - Type: wagtail.contrib.table_block.TableBlock (no wrapper)

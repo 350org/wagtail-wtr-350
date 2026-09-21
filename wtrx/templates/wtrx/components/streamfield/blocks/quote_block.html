@@ -39,7 +39,7 @@ own alignment algorithm doesn't have that gotcha.
 {% endcomment %}
 {% comment %}
 Width matches image_block.html exactly — max-w-[1500px] with the shared
-px-4 sm:px-6 lg:px-8 gutter — and "quote" is in the page templates'
+flat px-4 gutter — and "quote" is in the page templates'
 full-bleed list so this block owns its own width rather than inheriting
 the body column's max-w-5xl. The two blocks are frequently stacked and
 both are a single full-width piece of media, so a quote at 1024px against
@@ -50,7 +50,7 @@ that, and the text overlay still spills into the remaining ~20% gutter —
 the proportions of the composition are unchanged, it is just measured
 against a wider container now.
 {% endcomment %}
-<div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+<div class="max-w-[1500px] mx-auto px-4">
 <div class="wtr-quote relative">
     <div class="w-full overflow-hidden rounded-lg sm:w-4/5 {% if value.alignment == 'image-right' %}sm:ml-auto{% else %}sm:mr-auto{% endif %}">
         {% if value.media_file %}

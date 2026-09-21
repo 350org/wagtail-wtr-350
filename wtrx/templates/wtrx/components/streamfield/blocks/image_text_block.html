@@ -56,6 +56,17 @@ comes from the page templates' space-y-32 on the block loop.
             <div class="wtr-image-text-content prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl in-data-[bg-tone=dark]:prose-invert">
                 {{ value.content|richtext }}
             </div>
+            {% if value.link_text %}
+                {% comment %}
+                size="lg" matches callout_block.html's CTA. The style is
+                editor-chosen (BUTTON_STYLE_CHOICES, same set ButtonBlock
+                offers) rather than branching on a background: this block has
+                no background field, so there is no on_light flag to read.
+                {% endcomment %}
+                <div class="mt-6">
+                    {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style=value.link_style size="lg" %}
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
