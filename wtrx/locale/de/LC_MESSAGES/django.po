@@ -20,103 +20,107 @@ msgstr ""
 
 #: blocks/__init__.py:81
 msgid "Primary"
-msgstr ""
+msgstr "Primär"
 
 #: blocks/__init__.py:82
 msgid "Secondary"
-msgstr ""
+msgstr "Sekundär"
 
 #: blocks/__init__.py:83
 msgid "Outline"
-msgstr ""
+msgstr "Umriss"
 
 #: blocks/__init__.py:84
 msgid "Urgent"
-msgstr ""
+msgstr "Dringend"
 
 #: blocks/__init__.py:95
 msgid "Regular"
-msgstr ""
+msgstr "Normal"
 
 #: blocks/__init__.py:96 blocks/__init__.py:175
 msgid "Large"
-msgstr ""
+msgstr "Groß"
 
 #: blocks/__init__.py:106
 msgid "Image left"
-msgstr ""
+msgstr "Bild links"
 
 #: blocks/__init__.py:107
 msgid "Image right"
-msgstr ""
+msgstr "Bild rechts"
 
 #: blocks/__init__.py:116
 msgid "Small (280px)"
-msgstr ""
+msgstr "Klein (280px)"
 
 #: blocks/__init__.py:117
 msgid "Default (378px)"
-msgstr ""
+msgstr "Standard (378px)"
 
 #: blocks/__init__.py:118
 msgid "Large (480px)"
-msgstr ""
+msgstr "Groß (480px)"
 
 #: blocks/__init__.py:140
 msgid "White"
-msgstr ""
+msgstr "Weiß"
 
 #: blocks/__init__.py:141
 msgid "Light grey"
-msgstr ""
+msgstr "Hellgrau"
 
 #: blocks/__init__.py:142
 msgid "Dark grey"
-msgstr ""
+msgstr "Dunkelgrau"
 
 #: blocks/__init__.py:143
 msgid "Navy"
-msgstr ""
+msgstr "Marineblau"
 
 #: blocks/__init__.py:144
 msgid "Red"
-msgstr ""
+msgstr "Rot"
 
 #: blocks/__init__.py:145
 msgid "350 Blue"
-msgstr ""
+msgstr "350-Blau"
 
 #: blocks/__init__.py:173
 msgid "Small"
-msgstr ""
+msgstr "Klein"
 
 #: blocks/__init__.py:174
 msgid "Medium"
-msgstr ""
+msgstr "Mittel"
 
 #: blocks/__init__.py:186
 msgid "Narrow (800px)"
-msgstr ""
+msgstr "Schmal (800px)"
 
 #: blocks/__init__.py:187
 msgid "Default (1152px)"
-msgstr ""
+msgstr "Standard (1152px)"
 
 #: blocks/__init__.py:188
 msgid "Wide (1266px)"
-msgstr ""
+msgstr "Breit (1266px)"
 
 #: blocks/__init__.py:266
 msgid ""
 "This does not appear to be an Action Network URL. Expected a URL like "
 "https://actionnetwork.org/forms/your-form-slug"
 msgstr ""
+"Diese Adresse scheint keine Action-Network-URL zu sein. Erwartet wird eine "
+"URL wie https://actionnetwork.org/forms/your-form-slug"
 
 #: blocks/__init__.py:276
 msgid ""
-"Could not find a form slug in this URL. Expected a URL like https://"
-"actionnetwork.org/forms/your-form-slug"
+"Could not find a form slug in this URL. Expected a URL like "
+"https://actionnetwork.org/forms/your-form-slug"
 msgstr ""
+"In dieser URL wurde kein Formular-Slug gefunden. Erwartet wird eine URL wie "
+"https://actionnetwork.org/forms/your-form-slug"
 
 #: blocks/__init__.py:288
 #, python-format
@@ -124,72 +128,82 @@ msgid ""
 "Unsupported Action Network action type '%(url_type)s'. Currently supported: "
 "%(supported)s."
 msgstr ""
+"Nicht unterstützter Action-Network-Aktionstyp: „%(url_type)s“. Derzeit "
+"unterstützt: %(supported)s."
 
 #: blocks/__init__.py:298
 #, python-format
 msgid "The URL slug '%(slug)s' contains unexpected characters."
-msgstr ""
+msgstr "Der URL-Slug „%(slug)s“ enthält unerwartete Zeichen."
 
 #: blocks/__init__.py:325 blocks/__init__.py:921
 msgid "Provide only one of link page, link URL, or anchor."
-msgstr ""
+msgstr "Nur eines der Felder Zielseite, Link-URL oder Anker ausfüllen."
 
 #: blocks/__init__.py:329
 msgid "Provide either a link page or a link URL, not both."
-msgstr ""
+msgstr "Entweder eine Zielseite oder eine Link-URL angeben, nicht beides."
 
 #: blocks/__init__.py:577
 msgid "A future powered by people"
-msgstr ""
+msgstr "Eine Zukunft, getragen von Menschen"
 
 #: blocks/__init__.py:587 blocks/__init__.py:678
 msgid "Jane Doe"
-msgstr ""
+msgstr "Erika Mustermann"
 
 #: blocks/__init__.py:588 blocks/__init__.py:679
 msgid "Regional Organising Lead"
-msgstr ""
+msgstr "Regionale Organizing-Leitung"
 
 #: blocks/__init__.py:591
 msgid ""
 "Jane coordinates campaign partners across the region and has organised with "
 "the climate movement for over a decade."
 msgstr ""
+"Erika koordiniert die Kampagnenpartner in der Region und organisiert seit "
+"über zehn Jahren in der Klimabewegung."
 
 #: blocks/__init__.py:659
 #, python-format
 msgid "Partner Organization %(n)d"
-msgstr ""
+msgstr "Partnerorganisation %(n)d"
 
 #: blocks/__init__.py:707
 msgid "Sign up"
-msgstr ""
+msgstr "Anmelden"
 
 #: blocks/__init__.py:726 blocks/__init__.py:3251
 msgid "Text"
-msgstr ""
+msgstr "Text"
 
 #: blocks/__init__.py:729
 msgid ""
 "Rich text: paragraphs, headings, lists, bold/italic and links. The default "
 "choice for ordinary body copy."
 msgstr ""
+"Rich Text: Absätze, Überschriften, Listen, fett/kursiv und Links. Die "
+"Standardwahl für normalen Fließtext."
 
 #: blocks/__init__.py:757
 msgid "Lead paragraph"
-msgstr ""
+msgstr "Einleitungsabsatz"
 
 #: blocks/__init__.py:760
 msgid ""
-"A larger introductory paragraph for opening a page or section. Bold/italic/"
-"links only — use a regular Text block for headings or lists."
+"A larger introductory paragraph for opening a page or section. "
+"Bold/italic/links only — use a regular Text block for headings or lists."
 msgstr ""
+"Ein größerer Einleitungsabsatz zum Einstieg in eine Seite oder einen "
+"Abschnitt. Nur fett/kursiv/Links — für Überschriften oder Listen einen "
+"normalen Textblock verwenden."
 
 #: blocks/__init__.py:768
 msgid ""
-"<p>A short, larger opening statement that sits above the regular body copy.</"
-"p>"
+"<p>A short, larger opening statement that sits above the regular body "
+"copy.</p>"
 msgstr ""
+"<p>Eine kurze, größere Einstiegsaussage über dem normalen Fließtext.</p>"
 
 #: blocks/__init__.py:786 blocks/__init__.py:803 blocks/__init__.py:1152
 #: blocks/__init__.py:1218 blocks/__init__.py:1409 blocks/__init__.py:1421
@@ -197,163 +211,176 @@ msgstr ""
 #: blocks/__init__.py:2231 blocks/__init__.py:2622 blocks/__init__.py:3096
 #: blocks/__init__.py:3189 blocks/__init__.py:3378
 msgid "Image"
-msgstr ""
+msgstr "Bild"
 
 #: blocks/__init__.py:789 blocks/__init__.py:1412
 msgid "Alt text"
-msgstr ""
+msgstr "Alternativtext"
 
 #: blocks/__init__.py:791 blocks/__init__.py:1414
 msgid ""
 "Overrides the image description for screen readers. Leave blank to use the "
 "description set on the image itself."
 msgstr ""
+"Überschreibt die Bildbeschreibung für Screenreader. Leer lassen, um die am "
+"Bild hinterlegte Beschreibung zu verwenden."
 
 #: blocks/__init__.py:797 blocks/__init__.py:827
 msgid "Caption"
-msgstr ""
+msgstr "Bildunterschrift"
 
 #: blocks/__init__.py:798
 msgid "Optional caption displayed below the image."
-msgstr ""
+msgstr "Optionale Bildunterschrift, die unter dem Bild angezeigt wird."
 
 #: blocks/__init__.py:817
 msgid "Embed URL"
-msgstr ""
+msgstr "Einbettungs-URL"
 
 #: blocks/__init__.py:818
 msgid "YouTube, Vimeo, or other oEmbed-compatible URL."
-msgstr ""
+msgstr "YouTube, Vimeo oder eine andere oEmbed-kompatible URL."
 
 #: blocks/__init__.py:822 blocks/__init__.py:2236
 msgid "Media file"
-msgstr ""
+msgstr "Mediendatei"
 
 #: blocks/__init__.py:823
 msgid "An uploaded video file from the media library."
-msgstr ""
+msgstr "Eine aus der Mediathek hochgeladene Videodatei."
 
 #: blocks/__init__.py:836
 msgid "Provide either an embed URL or a media file."
-msgstr ""
+msgstr "Entweder eine Einbettungs-URL oder eine Mediendatei angeben."
 
 #: blocks/__init__.py:841
 msgid "Provide either an embed URL or a media file, not both."
 msgstr ""
+"Entweder eine Einbettungs-URL oder eine Mediendatei angeben, nicht beides."
 
 #: blocks/__init__.py:851
 msgid "Video"
-msgstr ""
+msgstr "Video"
 
 #: blocks/__init__.py:878 blocks/__init__.py:1954 blocks/__init__.py:2014
 #: blocks/__init__.py:2118 blocks/__init__.py:2415 blocks/__init__.py:2738
 msgid "Button text"
-msgstr ""
+msgstr "Beschriftung des Buttons"
 
 #: blocks/__init__.py:881 blocks/__init__.py:1156 blocks/__init__.py:1631
 #: blocks/__init__.py:1959 blocks/__init__.py:2019 blocks/__init__.py:2248
 #: blocks/__init__.py:2336 blocks/__init__.py:3254
 msgid "Link page"
-msgstr ""
+msgstr "Zielseite"
 
 #: blocks/__init__.py:882
 msgid "Internal page link. Set only one of the three link fields."
-msgstr ""
+msgstr "Link auf eine interne Seite. Nur eines der drei Linkfelder ausfüllen."
 
 #: blocks/__init__.py:886 blocks/__init__.py:1161 blocks/__init__.py:1636
 #: blocks/__init__.py:1964 blocks/__init__.py:2024 blocks/__init__.py:2253
 #: blocks/__init__.py:2341 blocks/__init__.py:3259
 msgid "Link URL"
-msgstr ""
+msgstr "Link-URL"
 
 #: blocks/__init__.py:887 blocks/__init__.py:1965
 msgid "External link. Set only one of the three link fields."
-msgstr ""
+msgstr "Externer Link. Nur eines der drei Linkfelder ausfüllen."
 
 #: blocks/__init__.py:891 blocks/__init__.py:1969 site_settings.py:68
 msgid "Anchor"
-msgstr ""
+msgstr "Anker"
 
 #: blocks/__init__.py:893 blocks/__init__.py:1971
 msgid ""
-"Jump to a block on this same page, by its Anchor ID and without the # symbol "
-"(e.g. 'petition'). Set only one of the three link fields."
+"Jump to a block on this same page, by its Anchor ID and without the # symbol"
+" (e.g. 'petition'). Set only one of the three link fields."
 msgstr ""
+"Springt zu einem Block auf derselben Seite, über dessen Anker-ID und ohne "
+"das Zeichen # (z. B. „petition“). Nur eines der drei Linkfelder ausfüllen."
 
 #: blocks/__init__.py:901
 msgid "Style"
-msgstr ""
+msgstr "Stil"
 
 #: blocks/__init__.py:906
 msgid "Size"
-msgstr ""
+msgstr "Größe"
 
 #: blocks/__init__.py:916
 msgid "Provide a link page, a link URL, or an anchor."
-msgstr ""
+msgstr "Eine Zielseite, eine Link-URL oder einen Anker angeben."
 
 #: blocks/__init__.py:936
 msgid "Button"
-msgstr ""
+msgstr "Button"
 
 #: blocks/__init__.py:939
 msgid ""
 "A single call-to-action button. Links to a page on this site, an external "
 "URL, or an anchor further down the same page."
 msgstr ""
+"Ein einzelner Call-to-Action-Button. Verlinkt auf eine Seite dieser Website,"
+" eine externe URL oder einen Anker weiter unten auf derselben Seite."
 
 #: blocks/__init__.py:943 blocks/__init__.py:1011
 #: templates/wtrx/components/streamfield/blocks/card_carousel_block.html:131
 msgid "Take action"
-msgstr ""
+msgstr "Jetzt aktiv werden"
 
 #: blocks/__init__.py:951
 msgid "Horizontal"
-msgstr ""
+msgstr "Horizontal"
 
 #: blocks/__init__.py:952
 msgid "Vertical"
-msgstr ""
+msgstr "Vertikal"
 
 #: blocks/__init__.py:981
 msgid "Buttons"
-msgstr ""
+msgstr "Buttons"
 
 #: blocks/__init__.py:985 blocks/__init__.py:3087 blocks/__init__.py:3180
 #: site_settings.py:572
 msgid "Layout"
-msgstr ""
+msgstr "Anordnung"
 
 #: blocks/__init__.py:987
 msgid ""
 "Horizontal lays buttons out in centered rows. Vertical stacks them in a "
 "centered column."
 msgstr ""
+"Horizontal ordnet die Buttons in zentrierten Reihen an. Vertikal stapelt sie"
+" in einer zentrierten Spalte."
 
 #: blocks/__init__.py:1002
 msgid "Button Group"
-msgstr ""
+msgstr "Button-Gruppe"
 
 #: blocks/__init__.py:1005
 msgid ""
-"Two or more call-to-action buttons, laid out horizontally or vertically. Use "
-"the single Button block instead for one CTA."
+"Two or more call-to-action buttons, laid out horizontally or vertically. Use"
+" the single Button block instead for one CTA."
 msgstr ""
+"Zwei oder mehr Call-to-Action-Buttons, horizontal oder vertikal angeordnet. "
+"Für einen einzelnen CTA stattdessen den Block Button verwenden."
 
 #: blocks/__init__.py:1019 blocks/__init__.py:1166
 #: templates/wtrx/components/card.html:90
 msgid "Learn more"
-msgstr ""
+msgstr "Mehr erfahren"
 
 #: blocks/__init__.py:1050 validators.py:75
 msgid ""
 "This HTML appears to have mismatched or unclosed tags — check that every "
 "opening tag has a matching closing tag."
 msgstr ""
+"Dieses HTML scheint nicht geschlossene oder nicht zusammenpassende Tags zu "
+"enthalten — prüfen, ob zu jedem öffnenden Tag ein schließendes gehört."
 
 #: blocks/__init__.py:1059
 msgid "Raw HTML"
-msgstr ""
+msgstr "Reines HTML"
 
 #: blocks/__init__.py:1062
 msgid ""
@@ -361,34 +388,44 @@ msgid ""
 "of markup. It is rendered exactly as given, so only use it for code you "
 "trust. Tag balance is validated on save; markup safety is not."
 msgstr ""
+"HTML von einem anderen Dienst einfügen: eine Einbettung, ein Widget, ein "
+"Markup-Schnipsel. Es wird exakt so ausgegeben, wie es eingefügt wurde, also "
+"nur für vertrauenswürdigen Code verwenden. Beim Speichern wird geprüft, ob "
+"die Tags ausgeglichen sind; die Sicherheit des Markups nicht."
 
 #: blocks/__init__.py:1089
 msgid "Table"
-msgstr ""
+msgstr "Tabelle"
 
 #: blocks/__init__.py:1092
 msgid ""
 "A simple data table, edited as a spreadsheet-style grid. The first row and "
 "column can each be marked as headers."
 msgstr ""
+"Eine einfache Datentabelle, die wie ein Tabellenblatt bearbeitet wird. Erste"
+" Zeile und erste Spalte lassen sich jeweils als Kopfzeile markieren."
 
 #: blocks/__init__.py:1135
 msgid "Tag"
-msgstr ""
+msgstr "Schlagwort"
 
 #: blocks/__init__.py:1136
 msgid ""
 "Optional short label displayed as a pill above the heading (e.g. 'Global')."
 msgstr ""
+"Optionales kurzes Label, das als Pille über der Überschrift angezeigt wird "
+"(z. B. „Global“)."
 
 #: blocks/__init__.py:1140 site_settings.py:1184
 msgid "Icon"
-msgstr ""
+msgstr "Icon"
 
 #: blocks/__init__.py:1142
 msgid ""
 "Optional small icon image (ideally square) displayed beside the content."
 msgstr ""
+"Optionales kleines Icon-Bild (idealerweise quadratisch), das neben dem "
+"Inhalt angezeigt wird."
 
 #: blocks/__init__.py:1147 blocks/__init__.py:1315 blocks/__init__.py:1768
 #: blocks/__init__.py:1854 blocks/__init__.py:1933 blocks/__init__.py:2009
@@ -398,439 +435,506 @@ msgstr ""
 #: blocks/__init__.py:3615 blocks/__init__.py:3691 models.py:663 models.py:732
 #: models.py:812 models.py:1004 models.py:1243 models.py:1454
 msgid "Content"
-msgstr ""
+msgstr "Inhalt"
 
 #: blocks/__init__.py:1148
 msgid "Type your heading as an H3 at the top, then optional supporting copy."
 msgstr ""
+"Die Überschrift oben als H3 schreiben, darunter optional ergänzenden Text."
 
 #: blocks/__init__.py:1157 blocks/__init__.py:1960 blocks/__init__.py:2020
 #: blocks/__init__.py:2249 blocks/__init__.py:2337 blocks/__init__.py:3255
 msgid "Internal link. Set either this or Link URL, not both."
 msgstr ""
+"Interner Link. Entweder dieses Feld oder die Link-URL ausfüllen, nicht "
+"beides."
 
 #: blocks/__init__.py:1162 blocks/__init__.py:2025 blocks/__init__.py:2254
 #: blocks/__init__.py:2342 blocks/__init__.py:3260
 msgid "External link. Set either this or Link page, not both."
 msgstr ""
+"Externer Link. Entweder dieses Feld oder die Zielseite ausfüllen, nicht "
+"beides."
 
 #: blocks/__init__.py:1167 blocks/__init__.py:2243 blocks/__init__.py:2331
 #: site_settings.py:44 site_settings.py:55 site_settings.py:66
 #: site_settings.py:89
 msgid "Link text"
-msgstr ""
+msgstr "Linktext"
 
 #: blocks/__init__.py:1168
 msgid "Label for the card's CTA button."
-msgstr ""
+msgstr "Beschriftung des CTA-Buttons der Karte."
 
 #: blocks/__init__.py:1195 blocks/__init__.py:1223 blocks/__init__.py:1774
 msgid "Card"
-msgstr ""
+msgstr "Karte"
 
 #: blocks/__init__.py:1198
 msgid ""
 "A single linked card: heading, short description, optional image, tag and "
 "icon. Usually reached for via Card Grid, which lays several out together."
 msgstr ""
+"Eine verlinkte Karte: Überschrift, kurze Beschreibung, optional Bild, "
+"Schlagwort und Icon. Üblicherweise über das Kartenraster verwendet, das "
+"mehrere davon anordnet."
 
 #: blocks/__init__.py:1231
 msgid "Name"
-msgstr ""
+msgstr "Name"
 
 #: blocks/__init__.py:1234
 msgid "Role / title"
-msgstr ""
+msgstr "Rolle / Funktion"
 
 #: blocks/__init__.py:1238
 msgid "Photo"
-msgstr ""
+msgstr "Foto"
 
 #: blocks/__init__.py:1242
 msgid "Bio"
-msgstr ""
+msgstr "Kurzbiografie"
 
 #: blocks/__init__.py:1246
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:31
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:53
 msgid "Email"
-msgstr ""
+msgstr "E-Mail"
 
 #: blocks/__init__.py:1250
 msgid "Phone"
-msgstr ""
+msgstr "Telefon"
 
 #: blocks/__init__.py:1254 templates/wtrx/components/person_card.html:115
 #: templates/wtrx/components/person_card.html:132
 msgid "Website"
-msgstr ""
+msgstr "Website"
 
 #: blocks/__init__.py:1266
 msgid "Person"
-msgstr ""
+msgstr "Person"
 
 #: blocks/__init__.py:1269
 msgid ""
 "A person: photo, name, role and short bio, with optional contact details. "
 "Use for staff, spokespeople or board listings."
 msgstr ""
+"Eine Person: Foto, Name, Rolle und kurze Biografie, mit optionalen "
+"Kontaktdaten. Für Team, Sprecher:innen oder Vorstand."
 
 #: blocks/__init__.py:1331
 msgid "Title"
-msgstr ""
+msgstr "Titel"
 
 #: blocks/__init__.py:1336
 msgid "Accordion item"
-msgstr ""
+msgstr "Akkordeon-Element"
 
 #: blocks/__init__.py:1370 blocks/__init__.py:1583 blocks/__init__.py:1673
 #: blocks/__init__.py:1725 blocks/__init__.py:1791 blocks/__init__.py:2175
 msgid "Heading"
-msgstr ""
+msgstr "Überschrift"
 
 #: blocks/__init__.py:1371 blocks/__init__.py:1584 blocks/__init__.py:2176
 msgid "Section heading, rendered as an H2."
-msgstr ""
+msgstr "Abschnittsüberschrift, ausgegeben als H2."
 
 #: blocks/__init__.py:1377 blocks/__init__.py:1798 blocks/__init__.py:2030
 msgid "Cards"
-msgstr ""
+msgstr "Karten"
 
 #: blocks/__init__.py:1392
 msgid "Card Grid"
-msgstr ""
+msgstr "Kartenraster"
 
 #: blocks/__init__.py:1395
 msgid ""
-"An auto-responsive grid of 2-12 linked cards, laid out automatically — never "
-"a lone card on its own row. There are no column controls."
+"An auto-responsive grid of 2-12 linked cards, laid out automatically — never"
+" a lone card on its own row. There are no column controls."
 msgstr ""
+"Ein automatisch reagierendes Raster aus 2 bis 12 verlinkten Karten, "
+"automatisch angeordnet — nie eine einzelne Karte allein in einer Reihe. Es "
+"gibt keine Spalteneinstellungen."
 
 #: blocks/__init__.py:1590
 msgid "Images"
-msgstr ""
+msgstr "Bilder"
 
 #: blocks/__init__.py:1605
 msgid "Image Grid"
-msgstr ""
+msgstr "Bildraster"
 
 #: blocks/__init__.py:1608
 msgid ""
 "An auto-responsive grid of 2-24 photos, cropped to a consistent square "
 "shape. No per-image captions. There are no column controls."
 msgstr ""
+"Ein automatisch reagierendes Raster aus 2 bis 24 Fotos, einheitlich "
+"quadratisch zugeschnitten. Keine Bildunterschriften pro Bild. Es gibt keine "
+"Spalteneinstellungen."
 
 #: blocks/__init__.py:1621 blocks/__init__.py:1649
 msgid "Logo"
-msgstr ""
+msgstr "Logo"
 
 #: blocks/__init__.py:1623
 msgid "Organization name"
-msgstr ""
+msgstr "Name der Organisation"
 
 #: blocks/__init__.py:1625
 msgid ""
 "Used as alt text if the image has no description, and as the logo's "
 "accessible label if it links out."
 msgstr ""
+"Wird als Alternativtext verwendet, wenn das Bild keine Beschreibung hat, und"
+" als barrierefreies Label des Logos, wenn es verlinkt ist."
 
 #: blocks/__init__.py:1632
 msgid "Internal page link. Set only one of the two link fields."
 msgstr ""
+"Link auf eine interne Seite. Nur eines der beiden Linkfelder ausfüllen."
 
 #: blocks/__init__.py:1637
 msgid "External link. Set only one of the two link fields."
-msgstr ""
+msgstr "Externer Link. Nur eines der beiden Linkfelder ausfüllen."
 
 #: blocks/__init__.py:1678 site_settings.py:468
 msgid "Logos"
-msgstr ""
+msgstr "Logos"
 
 #: blocks/__init__.py:1692
 msgid "Logo Grid"
-msgstr ""
+msgstr "Logoraster"
 
 #: blocks/__init__.py:1695
 msgid ""
 "A grid of 2-30 partner/funder logos, sized consistently. Logos may "
 "optionally link out."
 msgstr ""
+"Ein Raster aus 2 bis 30 Partner- oder Förderlogos in einheitlicher Größe. "
+"Logos können optional verlinkt sein."
 
 #: blocks/__init__.py:1730
 msgid "People"
-msgstr ""
+msgstr "Personen"
 
 #: blocks/__init__.py:1742
 msgid "Person Card Grid"
-msgstr ""
+msgstr "Personen-Kartenraster"
 
 #: blocks/__init__.py:1745
 msgid ""
-"A grid of up to 12 people, laid out automatically — never a lone card on its "
-"own row. There are no column controls."
+"A grid of up to 12 people, laid out automatically — never a lone card on its"
+" own row. There are no column controls."
 msgstr ""
+"Ein Raster aus bis zu 12 Personen, automatisch angeordnet — nie eine "
+"einzelne Karte allein in einer Reihe. Es gibt keine Spalteneinstellungen."
 
 #: blocks/__init__.py:1769
 msgid "Type your heading as an H3 at the top, then the supporting copy."
-msgstr ""
+msgstr "Die Überschrift oben als H3 schreiben, darunter den ergänzenden Text."
 
 #: blocks/__init__.py:1792
 msgid "Centered heading above the image and cards."
-msgstr ""
+msgstr "Zentrierte Überschrift über Bild und Karten."
 
 #: blocks/__init__.py:1803 blocks/__init__.py:1860 blocks/__init__.py:2641
 msgid "Image alignment"
-msgstr ""
+msgstr "Bildausrichtung"
 
 #: blocks/__init__.py:1804
 msgid "Which side the image sits on — the cards sit on the opposite side."
 msgstr ""
+"Auf welcher Seite das Bild steht — die Karten stehen auf der "
+"gegenüberliegenden Seite."
 
 #: blocks/__init__.py:1809
 msgid "Image Card List"
-msgstr ""
+msgstr "Kartenliste mit Bild"
 
 #: blocks/__init__.py:1855
 msgid "Type your heading as an H2 at the top, then the body text."
-msgstr ""
+msgstr "Die Überschrift oben als H2 schreiben, darunter den Fließtext."
 
 #: blocks/__init__.py:1861
 msgid "Which side the image sits on — the text sits on the opposite side."
 msgstr ""
+"Auf welcher Seite das Bild steht — der Text steht auf der gegenüberliegenden"
+" Seite."
 
 #: blocks/__init__.py:1866
 msgid "Image size"
-msgstr ""
+msgstr "Bildgröße"
 
 #: blocks/__init__.py:1867
 msgid "How wide the image column is."
-msgstr ""
+msgstr "Wie breit die Bildspalte ist."
 
 #: blocks/__init__.py:1872
 msgid "Crop to square"
-msgstr ""
+msgstr "Quadratisch zuschneiden"
 
 #: blocks/__init__.py:1874
 msgid ""
-"Uncheck to show the image at its natural aspect ratio instead of cropping it "
-"to a square — useful for a logo or other image that looks wrong cropped."
+"Uncheck to show the image at its natural aspect ratio instead of cropping it"
+" to a square — useful for a logo or other image that looks wrong cropped."
 msgstr ""
+"Abwählen, um das Bild in seinem natürlichen Seitenverhältnis statt "
+"quadratisch zugeschnitten zu zeigen — nützlich für ein Logo oder ein anderes"
+" Bild, das zugeschnitten falsch wirkt."
 
 #: blocks/__init__.py:1882
 msgid "Image + Text"
-msgstr ""
+msgstr "Bild + Text"
 
 #: blocks/__init__.py:1925 blocks/__init__.py:3057 blocks/__init__.py:3159
 msgid "Eyebrow"
-msgstr ""
+msgstr "Dachzeile"
 
 #: blocks/__init__.py:1927
 msgid ""
 "Optional short label shown in a pill above the heading, e.g. \"Featured "
 "Campaign\". Leave blank to omit the pill."
 msgstr ""
+"Optionales kurzes Label, das als Pille über der Überschrift angezeigt wird, "
+"z. B. „Kampagne im Fokus“. Leer lassen, um die Pille wegzulassen."
 
 #: blocks/__init__.py:1934 blocks/__init__.py:2097 blocks/__init__.py:2733
 #: blocks/__init__.py:2833
 msgid "Type your heading as an H2 at the top, then optional supporting copy."
 msgstr ""
+"Die Überschrift oben als H2 schreiben, darunter optional ergänzenden Text."
 
 #: blocks/__init__.py:1940
 msgid "Alignment"
-msgstr ""
+msgstr "Ausrichtung"
 
 #: blocks/__init__.py:1941
 msgid "Which side of the panel the image sits on."
-msgstr ""
+msgstr "Auf welcher Seite des Panels das Bild steht."
 
 #: blocks/__init__.py:1946 blocks/__init__.py:3075 blocks/__init__.py:3168
 #: blocks/__init__.py:3635
 msgid "Background"
-msgstr ""
+msgstr "Hintergrund"
 
 #: blocks/__init__.py:1948
 msgid ""
 "Panel fill. The dark colors invert the text, pill and button colors; White "
 "and Light grey keep them dark."
 msgstr ""
+"Füllung des Panels. Die dunklen Farben kehren Text-, Pillen- und "
+"Buttonfarben um; Weiß und Hellgrau lassen sie dunkel."
 
 #: blocks/__init__.py:1955 blocks/__init__.py:2015
 msgid "Optional CTA button label. Leave blank to omit the button."
 msgstr ""
+"Optionale Beschriftung des CTA-Buttons. Leer lassen, um den Button "
+"wegzulassen."
 
 #: blocks/__init__.py:1985
 msgid "Feature Panel"
-msgstr ""
+msgstr "Highlight-Panel"
 
 #: blocks/__init__.py:2010
 msgid "Type your heading as an H2 at the top, then the supporting copy."
-msgstr ""
+msgstr "Die Überschrift oben als H2 schreiben, darunter den ergänzenden Text."
 
 #: blocks/__init__.py:2042
 msgid "Card Carousel"
-msgstr ""
+msgstr "Karten-Karussell"
 
 #: blocks/__init__.py:2101
 msgid "Index page"
-msgstr ""
+msgstr "Übersichtsseite"
 
 #: blocks/__init__.py:2103
 msgid ""
-"The 3 most recently published pages under this index page are shown as cards."
+"The 3 most recently published pages under this index page are shown as "
+"cards."
 msgstr ""
+"Die 3 zuletzt veröffentlichten Seiten unterhalb dieser Übersichtsseite "
+"werden als Karten angezeigt."
 
 #: blocks/__init__.py:2109
 msgid "Category"
-msgstr ""
+msgstr "Kategorie"
 
 #: blocks/__init__.py:2111
 msgid ""
 "Optional. Only applies when Index page above is a Blog/press releases index "
 "— shows only posts in this category."
 msgstr ""
+"Optional. Gilt nur, wenn die Übersichtsseite oben eine Blog- oder "
+"Pressemitteilungsübersicht ist — zeigt dann nur Beiträge dieser Kategorie."
 
 #: blocks/__init__.py:2117 templates/wtrx/components/person_card.html:52
 msgid "Read more"
-msgstr ""
+msgstr "Weiterlesen"
 
 #: blocks/__init__.py:2120
 msgid ""
 "Optional CTA button below the cards. Always links to the index page above."
 msgstr ""
+"Optionaler CTA-Button unter den Karten. Verlinkt immer auf die "
+"Übersichtsseite oben."
 
 #: blocks/__init__.py:2160
 msgid "Page Cards"
-msgstr ""
+msgstr "Seitenkarten"
 
 #: blocks/__init__.py:2181
 msgid "Items"
-msgstr ""
+msgstr "Elemente"
 
 #: blocks/__init__.py:2186
 msgid "Accordion"
-msgstr ""
+msgstr "Akkordeon"
 
 #: blocks/__init__.py:2202
 msgid "Read the full story"
-msgstr ""
+msgstr "Ganze Geschichte lesen"
 
 #: blocks/__init__.py:2232
 msgid "Set either this or Media file, not both."
-msgstr ""
+msgstr "Entweder dieses Feld oder die Mediendatei ausfüllen, nicht beides."
 
 #: blocks/__init__.py:2238
 msgid ""
-"An uploaded video file from the media library. Set either this or Image, not "
-"both."
+"An uploaded video file from the media library. Set either this or Image, not"
+" both."
 msgstr ""
+"Eine aus der Mediathek hochgeladene Videodatei. Entweder dieses Feld oder "
+"das Bild ausfüllen, nicht beides."
 
 #: blocks/__init__.py:2244 blocks/__init__.py:2332
 msgid "CTA button label. Leave blank to omit the button."
-msgstr ""
+msgstr "Beschriftung des CTA-Buttons. Leer lassen, um den Button wegzulassen."
 
 #: blocks/__init__.py:2259
 msgid "Media alignment"
-msgstr ""
+msgstr "Medienausrichtung"
 
 #: blocks/__init__.py:2261
 msgid ""
 "Which side the (~80%-width) image sits on — the text sits on the opposite "
 "side."
 msgstr ""
+"Auf welcher Seite das Bild (ca. 80 % Breite) steht — der Text steht auf der "
+"gegenüberliegenden Seite."
 
 #: blocks/__init__.py:2272
 msgid "Provide either an image or a media file."
-msgstr ""
+msgstr "Entweder ein Bild oder eine Mediendatei angeben."
 
 #: blocks/__init__.py:2277
 msgid "Provide either an image or a media file, not both."
-msgstr ""
+msgstr "Entweder ein Bild oder eine Mediendatei angeben, nicht beides."
 
 #: blocks/__init__.py:2288
 msgid "Quote"
-msgstr ""
+msgstr "Zitat"
 
 #: blocks/__init__.py:2291
 msgid ""
 "A large pull-quote set beside an image or video, with an optional button. "
 "Best used once on a page, for a testimonial or key line."
 msgstr ""
+"Ein großes herausgehobenes Zitat neben einem Bild oder Video, mit optionalem"
+" Button. Am besten einmal pro Seite, für ein Testimonial oder eine "
+"Kernaussage."
 
 #: blocks/__init__.py:2325
 msgid ""
 "Optional heading (H2) and/or subheading (H3) at the top, followed by an "
 "optional paragraph and/or bulleted or numbered list."
 msgstr ""
+"Optionale Überschrift (H2) und/oder Unterüberschrift (H3) oben, gefolgt von "
+"einem optionalen Absatz und/oder einer Aufzählung oder nummerierten Liste."
 
 #: blocks/__init__.py:2347 blocks/__init__.py:3388
 msgid "Color"
-msgstr ""
+msgstr "Farbe"
 
 #: blocks/__init__.py:2351
 msgid "Background image"
-msgstr ""
+msgstr "Hintergrundbild"
 
 #: blocks/__init__.py:2353
 msgid ""
 "Optional. Rendered as a subtle, low-opacity texture behind the text — not a "
 "full photo background."
 msgstr ""
+"Optional. Wird als dezente, wenig deckende Textur hinter dem Text ausgegeben"
+" — nicht als vollflächiges Hintergrundfoto."
 
 #: blocks/__init__.py:2366
 msgid "Callout"
-msgstr ""
+msgstr "Hinweisbox"
 
 #: blocks/__init__.py:2369
 msgid ""
 "A solid-colour panel with a heading and a call-to-action button. Use it to "
 "break up a long page and push readers toward one action."
 msgstr ""
+"Ein einfarbiges Panel mit Überschrift und Call-to-Action-Button. Damit lässt"
+" sich eine lange Seite auflockern und die Lesenden zu einer Aktion führen."
 
 #: blocks/__init__.py:2408 blocks/__init__.py:2616
 msgid ""
 "Type your heading as an H2 at the top, optionally followed by an H3 "
 "subheading, then optional supporting copy."
 msgstr ""
+"Die Überschrift oben als H2 schreiben, optional gefolgt von einer "
+"H3-Unterüberschrift und danach optional ergänzendem Text."
 
 #: blocks/__init__.py:2414 blocks/__init__.py:2463 blocks/__init__.py:2475
 #: templates/wtrx/components/streamfield/blocks/donate_block.html:7
 #: templates/wtrx/components/streamfield/blocks/donate_fundraiseup_block.html:84
 msgid "Donate"
-msgstr ""
+msgstr "Spenden"
 
 #: blocks/__init__.py:2416 blocks/__init__.py:2739
 msgid "Leave blank to use the site default button label."
 msgstr ""
+"Leer lassen, um die Standard-Buttonbeschriftung der Website zu verwenden."
 
 #: blocks/__init__.py:2421
 msgid "Override amounts"
-msgstr ""
+msgstr "Beträge überschreiben"
 
 #: blocks/__init__.py:2423
 msgid ""
 "Optional list of suggested donation amounts. Leave empty to use the site-"
 "wide defaults."
 msgstr ""
+"Optionale Liste vorgeschlagener Spendenbeträge. Leer lassen, um die "
+"websiteweiten Standardwerte zu verwenden."
 
 #: blocks/__init__.py:2429
 msgid "Override URL"
-msgstr ""
+msgstr "URL überschreiben"
 
 #: blocks/__init__.py:2431
 msgid ""
 "Optional override for the donation URL. Overrides the site-wide donation "
 "base URL from IntegrationSettings."
 msgstr ""
+"Optionale Überschreibung der Spenden-URL. Hat Vorrang vor der websiteweiten "
+"Spenden-Basis-URL aus den Integrationseinstellungen."
 
 #: blocks/__init__.py:2466
 msgid ""
 "A donation ask with suggested amounts, linking out to ActBlue. Amounts and "
 "the destination come from Settings > Integrations unless overridden here."
 msgstr ""
+"Eine Spendenaufforderung mit vorgeschlagenen Beträgen, die zu ActBlue führt."
+" Beträge und Ziel stammen aus Einstellungen > Integrationen, sofern sie hier"
+" nicht überschrieben werden."
 
 #: blocks/__init__.py:2506 integrations/fundraiseup.py:76
 msgid "Form ID — United States visitors"
-msgstr ""
+msgstr "Formular-ID — Besucher:innen aus den USA"
 
 #: blocks/__init__.py:2508 blocks/__init__.py:2516 blocks/__init__.py:2524
 #: blocks/__init__.py:2532 blocks/__init__.py:2549
@@ -838,22 +942,24 @@ msgid ""
 "Overrides the site-wide value for this block only. Leave blank to use the "
 "site default."
 msgstr ""
+"Überschreibt den websiteweiten Wert nur für diesen Block. Leer lassen, um "
+"den Standardwert der Website zu verwenden."
 
 #: blocks/__init__.py:2514 integrations/fundraiseup.py:81
 msgid "Form ID — Netherlands visitors"
-msgstr ""
+msgstr "Formular-ID — Besucher:innen aus den Niederlanden"
 
 #: blocks/__init__.py:2522 integrations/fundraiseup.py:86
 msgid "Form ID — Canada visitors"
-msgstr ""
+msgstr "Formular-ID — Besucher:innen aus Kanada"
 
 #: blocks/__init__.py:2530 integrations/fundraiseup.py:91
 msgid "Form ID — United Kingdom visitors"
-msgstr ""
+msgstr "Formular-ID — Besucher:innen aus dem Vereinigten Königreich"
 
 #: blocks/__init__.py:2538 integrations/fundraiseup.py:96
 msgid "Other European country codes"
-msgstr ""
+msgstr "Weitere europäische Ländercodes"
 
 #: blocks/__init__.py:2540
 msgid ""
@@ -861,14 +967,18 @@ msgid ""
 "use the \"other European visitors\" form ID below, for this block only. "
 "Leave blank to use the site-wide list."
 msgstr ""
+"Kommagetrennte zweibuchstabige ISO-Ländercodes (z. B. DE,FR,ES,IT), die die "
+"Formular-ID für „alle übrigen europäischen Besucher:innen“ unten verwenden "
+"sollen — nur für diesen Block. Leer lassen, um die websiteweite Liste zu "
+"verwenden."
 
 #: blocks/__init__.py:2547 integrations/fundraiseup.py:106
 msgid "Form ID — all other European visitors"
-msgstr ""
+msgstr "Formular-ID — alle übrigen europäischen Besucher:innen"
 
 #: blocks/__init__.py:2555 integrations/fundraiseup.py:114
 msgid "Form ID — all other visitors"
-msgstr ""
+msgstr "Formular-ID — alle übrigen Besucher:innen"
 
 #: blocks/__init__.py:2557
 msgid ""
@@ -876,142 +986,169 @@ msgid ""
 "block's own fallback for any region left blank above. Leave entirely blank "
 "to use the site-wide default everywhere."
 msgstr ""
+"Überschreibt den websiteweiten Standard nur für diesen Block und dient "
+"zugleich als blockeigener Rückfallwert für jede oben leer gelassene Region. "
+"Ganz leer lassen, um überall den websiteweiten Standard zu verwenden."
 
 #: blocks/__init__.py:2566 blocks/__init__.py:2649
 msgid "Advanced settings"
-msgstr ""
+msgstr "Erweiterte Einstellungen"
 
 #: blocks/__init__.py:2626 blocks/__init__.py:3100 blocks/__init__.py:3193
 #: blocks/__init__.py:3382
 msgid "Image caption"
-msgstr ""
+msgstr "Bildunterschrift"
 
 #: blocks/__init__.py:2627 blocks/__init__.py:3101 blocks/__init__.py:3194
 msgid "Optional caption overlaid on the image, e.g. a photo credit."
 msgstr ""
+"Optionale Bildunterschrift, die über dem Bild liegt, z. B. ein Fotonachweis."
 
 #: blocks/__init__.py:2631
 msgid "Designation ID"
-msgstr ""
+msgstr "Verwendungszweck-ID"
 
 #: blocks/__init__.py:2633
 msgid ""
 "Optional Fundraise Up designation ID to route this donation to a specific "
 "fund. Applies on top of whichever region-specific form the visitor is shown."
 msgstr ""
+"Optionale Fundraise-Up-Verwendungszweck-ID, um diese Spende einem bestimmten"
+" Fonds zuzuordnen. Gilt zusätzlich zu dem regionsspezifischen Formular, das "
+"der jeweiligen Person angezeigt wird."
 
 #: blocks/__init__.py:2643
 msgid ""
-"Which side the image sits on — the dark panel sits on the opposite side. Has "
-"no effect when no image is set."
+"Which side the image sits on — the dark panel sits on the opposite side. Has"
+" no effect when no image is set."
 msgstr ""
+"Auf welcher Seite das Bild steht — das dunkle Panel steht auf der "
+"gegenüberliegenden Seite. Ohne Wirkung, wenn kein Bild gesetzt ist."
 
 #: blocks/__init__.py:2710
 msgid "Donate (Fundraise Up)"
-msgstr ""
+msgstr "Spenden (Fundraise Up)"
 
 #: blocks/__init__.py:2737
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:45
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:80
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:17
 msgid "Sign Up"
-msgstr ""
+msgstr "Anmeldung"
 
 #: blocks/__init__.py:2743
 msgid "Form page"
-msgstr ""
+msgstr "Formularseite"
 
 #: blocks/__init__.py:2744
 msgid "The FormPage whose form will be rendered inline."
-msgstr ""
+msgstr "Die Formularseite, deren Formular eingebettet ausgegeben wird."
 
 #: blocks/__init__.py:2748 blocks/__init__.py:2844 blocks/__init__.py:3121
 #: blocks/__init__.py:3214
 msgid "Success message"
-msgstr ""
+msgstr "Erfolgsmeldung"
 
 #: blocks/__init__.py:2750
 msgid ""
 "Message shown after successful submission. Leave blank for a generic thank-"
 "you."
 msgstr ""
+"Meldung nach erfolgreichem Absenden. Leer lassen für einen allgemeinen Dank."
 
 #: blocks/__init__.py:2756
 msgid "Sign Up (Wagtail Forms)"
-msgstr ""
+msgstr "Anmeldung (Wagtail-Formulare)"
 
 #: blocks/__init__.py:2759
 msgid ""
 "A form built in this CMS (a Form page), rendered inline. Use it when the "
 "submissions should live here rather than on an external platform."
 msgstr ""
+"Ein in diesem CMS erstelltes Formular (eine Formularseite), eingebettet "
+"ausgegeben. Zu verwenden, wenn die Einsendungen hier bleiben sollen statt "
+"auf einer externen Plattform."
 
 #: blocks/__init__.py:2804
 msgid "Success message content"
-msgstr ""
+msgstr "Inhalt der Erfolgsmeldung"
 
 #: blocks/__init__.py:2836
 msgid "Action Network URL"
-msgstr ""
+msgstr "Action-Network-URL"
 
 #: blocks/__init__.py:2838
 msgid ""
-"Paste the full Action Network form URL (e.g. https://actionnetwork.org/forms/"
-"your-form-slug)."
+"Paste the full Action Network form URL (e.g. "
+"https://actionnetwork.org/forms/your-form-slug)."
 msgstr ""
+"Die vollständige URL des Action-Network-Formulars einfügen (z. B. "
+"https://actionnetwork.org/forms/your-form-slug)."
 
 #: blocks/__init__.py:2846
 msgid ""
 "Optional. Replaces Action Network's default thank-you screen after a "
 "successful signup."
 msgstr ""
+"Optional. Ersetzt die Standard-Dankeseite von Action Network nach einer "
+"erfolgreichen Anmeldung."
 
 #: blocks/__init__.py:2852 blocks/__init__.py:3114 blocks/__init__.py:3207
 #: blocks/__init__.py:3657
 msgid "Anchor ID"
-msgstr ""
+msgstr "Anker-ID"
 
 #: blocks/__init__.py:2854 blocks/__init__.py:3116 blocks/__init__.py:3209
 #: blocks/__init__.py:3659
 msgid ""
 "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
 msgstr ""
+"Optional. Fügt ein id-Attribut für Direktlinks hinzu (z. B. „contact“ → "
+"#contact)."
 
 #: blocks/__init__.py:2889
 msgid "Sign Up (Action Network)"
-msgstr ""
+msgstr "Anmeldung (Action Network)"
 
 #: blocks/__init__.py:2892
 msgid ""
-"An Action Network form embedded in the page, from its public URL. Supporters "
-"sign up without leaving the site."
+"An Action Network form embedded in the page, from its public URL. Supporters"
+" sign up without leaving the site."
 msgstr ""
+"Ein über seine öffentliche URL in die Seite eingebettetes Action-Network-"
+"Formular. Unterstützer:innen melden sich an, ohne die Website zu verlassen."
 
 #: blocks/__init__.py:3059 blocks/__init__.py:3161
 msgid ""
 "Optional short label shown as a pill above the heading (e.g. 'Sign the "
 "Petition')."
 msgstr ""
+"Optionales kurzes Label, das als Pille über der Überschrift angezeigt wird "
+"(z. B. „Petition unterschreiben“)."
 
 #: blocks/__init__.py:3068
 msgid ""
 "Type your heading as an H2 at the top, then optional supporting copy, shown "
 "above the ActionKit form."
 msgstr ""
+"Die Überschrift oben als H2 schreiben, darunter optional ergänzenden Text, "
+"der über dem ActionKit-Formular erscheint."
 
 #: blocks/__init__.py:3077 blocks/__init__.py:3170
 msgid ""
 "Panel fill behind the heading, copy and form. The same palette as the page "
 "hero banner, callout and section blocks."
 msgstr ""
+"Panelfüllung hinter Überschrift, Text und Formular. Dieselbe Palette wie "
+"Hero-Banner, Hinweisbox und Abschnittsblöcke."
 
 #: blocks/__init__.py:3083 blocks/__init__.py:3176
 msgid "Side by side"
-msgstr ""
+msgstr "Nebeneinander"
 
 #: blocks/__init__.py:3084 blocks/__init__.py:3177
 msgid "Stacked vertically"
-msgstr ""
+msgstr "Vertikal gestapelt"
 
 #: blocks/__init__.py:3089 blocks/__init__.py:3182
 msgid ""
@@ -1019,10 +1156,13 @@ msgid ""
 "vertically runs image, copy and form down a single narrow column — better "
 "for long forms with many fields."
 msgstr ""
+"Nebeneinander teilt Text und Formular in zwei Spalten (Standard). Vertikal "
+"gestapelt setzt Bild, Text und Formular untereinander in eine schmale Spalte"
+" — besser für lange Formulare mit vielen Feldern."
 
 #: blocks/__init__.py:3104 blocks/__init__.py:3197
 msgid "ActionKit Page Shortname"
-msgstr ""
+msgstr "ActionKit-Seitenkurzname"
 
 #: blocks/__init__.py:3106 blocks/__init__.py:3199
 msgid ""
@@ -1030,6 +1170,10 @@ msgid ""
 "from ActionKit and rendered automatically — whatever fields that page is "
 "configured with will appear, with no further setup needed here."
 msgstr ""
+"Der Kurzname der ActionKit-Seite (z. B. „join“). Ihr Anmeldeformular wird "
+"von ActionKit geholt und automatisch ausgegeben — es erscheinen genau die "
+"Felder, mit denen diese Seite konfiguriert ist, ohne weitere Einstellungen "
+"hier."
 
 #: blocks/__init__.py:3123 blocks/__init__.py:3216
 msgid ""
@@ -1037,43 +1181,53 @@ msgid ""
 "form instead of redirecting to ActionKit's own thank-you page. ActionKit's "
 "normal submission is a full-page POST directly to ActionKit, so this works "
 "by forwarding the signup through our own server (the same "
-"integrations.actionkit.submit_action REST call FormPage signups already use) "
-"instead — which does not go through ActionKit's own recaptcha check, the "
+"integrations.actionkit.submit_action REST call FormPage signups already use)"
+" instead — which does not go through ActionKit's own recaptcha check, the "
 "same trade-off that forwarding already accepts elsewhere."
 msgstr ""
+"Optional. Wenn gesetzt, zeigt eine erfolgreiche Anmeldung diese Meldung "
+"anstelle des Formulars, statt zur Dankeseite von ActionKit weiterzuleiten. "
+"Das normale Absenden bei ActionKit ist ein Seiten-POST direkt an ActionKit; "
+"deshalb läuft die Anmeldung hierfür über unseren eigenen Server (derselbe "
+"REST-Aufruf integrations.actionkit.submit_action, den FormPage-Anmeldungen "
+"schon nutzen) — und damit nicht über die recaptcha-Prüfung von ActionKit, "
+"derselbe Kompromiss, den diese Weiterleitung auch an anderer Stelle bereits "
+"eingeht."
 
 #: blocks/__init__.py:3137 blocks/__init__.py:3230
 msgid "Sign Up (ActionKit)"
-msgstr ""
+msgstr "Anmeldung (ActionKit)"
 
 #: blocks/__init__.py:3272
 msgid "Announcement bar"
-msgstr ""
+msgstr "Ankündigungsleiste"
 
 #: blocks/__init__.py:3307 blocks/__init__.py:3341
 msgid "Call to action"
-msgstr ""
+msgstr "Handlungsaufruf"
 
 #: blocks/__init__.py:3367
 msgid "Headline"
-msgstr ""
+msgstr "Schlagzeile"
 
 #: blocks/__init__.py:3368
 msgid "The hero heading text."
-msgstr ""
+msgstr "Der Text der Hero-Überschrift."
 
 #: blocks/__init__.py:3374
 msgid "Optional supporting copy below the headline."
-msgstr ""
+msgstr "Optionaler ergänzender Text unter der Überschrift."
 
 #: blocks/__init__.py:3383
 msgid ""
 "Optional caption overlaid at the bottom of the image, e.g. a photo credit."
 msgstr ""
+"Optionale Bildunterschrift, die unten über dem Bild liegt, z. B. ein "
+"Fotonachweis."
 
 #: blocks/__init__.py:3416 models.py:328 models.py:357
 msgid "Hero"
-msgstr ""
+msgstr "Hero"
 
 #: blocks/__init__.py:3419
 msgid ""
@@ -1081,188 +1235,221 @@ msgid ""
 "background -- for opening a section mid-page. A page's own hero is set on "
 "the page itself, not with this block."
 msgstr ""
+"Ein Banner über die volle Breite mit Überschrift, ergänzendem Text und "
+"farbigem Hintergrund — um mitten auf der Seite einen Abschnitt zu eröffnen. "
+"Der eigene Hero einer Seite wird an der Seite selbst eingestellt, nicht mit "
+"diesem Block."
 
 #: blocks/__init__.py:3637
 msgid ""
 "Full-bleed fill behind the whole section. The dark colors invert the text "
 "inside it."
 msgstr ""
+"Randlose Füllung hinter dem gesamten Abschnitt. Die dunklen Farben kehren "
+"den Text darin um."
 
 #: blocks/__init__.py:3644
 msgid "Padding"
-msgstr ""
+msgstr "Innenabstand"
 
 #: blocks/__init__.py:3649
 msgid "Content width"
-msgstr ""
+msgstr "Inhaltsbreite"
 
 #: blocks/__init__.py:3651
 msgid ""
 "How wide the section's content column is. Narrow suits a text + accordion "
 "stack; wide suits a full-bleed video or image."
 msgstr ""
+"Wie breit die Inhaltsspalte des Abschnitts ist. Schmal passt zu einem Stapel"
+" aus Text und Akkordeon; breit passt zu einem randlosen Video oder Bild."
 
 #: blocks/__init__.py:3665
 msgid "Section"
-msgstr ""
+msgstr "Abschnitt"
 
 #: blocks/__init__.py:3704 blocks/__init__.py:3711
 msgid "Year"
-msgstr ""
+msgstr "Jahr"
 
 #: blocks/__init__.py:3705
 msgid ""
 "E.g. '2019'. Used to build the year-jump navigation and this year's anchor "
 "link."
 msgstr ""
+"Z. B. „2019“. Dient dem Aufbau der Jahresnavigation und des Ankerlinks "
+"dieses Jahres."
 
 #: blocks/__init__.py:3767
 msgid "Years"
-msgstr ""
+msgstr "Jahre"
 
 #: blocks/__init__.py:3779
 msgid "Timeline"
-msgstr ""
+msgstr "Zeitleiste"
 
 #: images.py:25
 msgid "description"
-msgstr ""
+msgstr "Beschreibung"
 
 #: images.py:26
 msgid "Used as alt text for screen readers. Describe what the image shows."
 msgstr ""
+"Wird als Alternativtext für Screenreader verwendet. Beschreiben, was das "
+"Bild zeigt."
 
 #: images.py:32
 msgid "credit"
-msgstr ""
+msgstr "Bildnachweis"
 
 #: images.py:33
 msgid "Photographer or source attribution (e.g. 'Photo: Jane Smith')."
-msgstr ""
+msgstr "Nennung von Fotograf:in oder Quelle (z. B. „Foto: Erika Mustermann“)."
 
 #: images.py:39 models.py:478
 msgid "image"
-msgstr ""
+msgstr "Bild"
 
 #: images.py:40
 msgid "images"
-msgstr ""
+msgstr "Bilder"
 
 #: integrations/actblue.py:25
 msgid "All amounts must be greater than zero."
-msgstr ""
+msgstr "Alle Beträge müssen größer als null sein."
 
 #: integrations/actblue.py:28
 msgid "Enter a comma-separated list of amounts, e.g. 10,25,50,100."
-msgstr ""
+msgstr "Eine kommagetrennte Liste von Beträgen eingeben, z. B. 10,25,50,100."
 
 #: integrations/actblue.py:38 integrations/action_network.py:23
 #: integrations/actionkit.py:285 integrations/fundraiseup.py:63
 #: integrations/gtm.py:40 integrations/usercentrics.py:30
 #: integrations/wagtail_forms.py:39
 msgid "Enabled"
-msgstr ""
+msgstr "Aktiviert"
 
 #: integrations/actblue.py:39
 msgid ""
 "Uncheck to temporarily disable ActBlue without removing its configuration."
 msgstr ""
+"Abwählen, um ActBlue vorübergehend zu deaktivieren, ohne die Konfiguration "
+"zu löschen."
 
 #: integrations/actblue.py:42
 msgid "Donation base URL"
-msgstr ""
+msgstr "Basis-URL für Spenden"
 
 #: integrations/actblue.py:44
 msgid ""
 "e.g. https://secure.actblue.com/donate/mycampaign. Used by DonateBlock when "
 "no override URL is set."
 msgstr ""
+"Z. B. https://secure.actblue.com/donate/mycampaign. Wird vom Spenden-Block "
+"verwendet, wenn keine abweichende URL gesetzt ist."
 
 #: integrations/actblue.py:50
 msgid "Suggested donation amounts"
-msgstr ""
+msgstr "Vorgeschlagene Spendenbeträge"
 
 #: integrations/actblue.py:52
 msgid ""
 "Comma-separated integers, e.g. 10,25,50,100. Used by DonateBlock when no "
 "override amounts are set."
 msgstr ""
+"Kommagetrennte ganze Zahlen, z. B. 10,25,50,100. Werden vom Spenden-Block "
+"verwendet, wenn keine abweichenden Beträge gesetzt sind."
 
 #: integrations/actblue.py:60
 msgid "Default to recurring donation"
-msgstr ""
+msgstr "Standardmäßig regelmäßige Spende"
 
 #: integrations/actblue.py:65 integrations/actblue.py:71
 msgid "ActBlue"
-msgstr ""
+msgstr "ActBlue"
 
 #: integrations/action_network.py:24
 msgid ""
 "Uncheck to temporarily disable Action Network without removing its "
 "configuration."
 msgstr ""
+"Abwählen, um Action Network vorübergehend zu deaktivieren, ohne die "
+"Konfiguration zu löschen."
 
 #: integrations/action_network.py:28
 msgid "Action Network API key"
-msgstr ""
+msgstr "Action-Network-API-Schlüssel"
 
 #: integrations/action_network.py:30
 msgid ""
 "Required for server-side Action Network integrations. Leave blank if using "
 "the embed widget approach."
 msgstr ""
+"Erforderlich für serverseitige Action-Network-Integrationen. Leer lassen, "
+"wenn das eingebettete Widget verwendet wird."
 
 #: integrations/action_network.py:37 integrations/action_network.py:43
 msgid "Action Network"
-msgstr ""
+msgstr "Action Network"
 
 #: integrations/actionkit.py:286
 msgid ""
 "Uncheck to temporarily disable ActionKit without removing its configuration."
 msgstr ""
+"Abwählen, um ActionKit vorübergehend zu deaktivieren, ohne die Konfiguration"
+" zu löschen."
 
 #: integrations/actionkit.py:289
 msgid "ActionKit hostname"
-msgstr ""
+msgstr "ActionKit-Hostname"
 
 #: integrations/actionkit.py:291
 msgid ""
 "Your ActionKit instance hostname, e.g. 'myorg.actionkit.com' (no scheme or "
 "trailing slash needed)."
 msgstr ""
+"Der Hostname Ihrer ActionKit-Instanz, z. B. „myorg.actionkit.com“ (ohne "
+"Schema und ohne abschließenden Schrägstrich)."
 
 #: integrations/actionkit.py:296
 msgid "ActionKit API username"
-msgstr ""
+msgstr "ActionKit-API-Benutzername"
 
 #: integrations/actionkit.py:297
 msgid "The ActionKit REST API username used for HTTP Basic auth."
 msgstr ""
+"Der Benutzername der ActionKit-REST-API für die HTTP-Basic-"
+"Authentifizierung."
 
 #: integrations/actionkit.py:301
 msgid "ActionKit API password"
-msgstr ""
+msgstr "ActionKit-API-Passwort"
 
 #: integrations/actionkit.py:303
 msgid ""
 "The ActionKit REST API password. In production, prefer the "
-"WTRX_ACTIONKIT_API_PASSWORD environment variable, which overrides this value "
-"so the secret is not stored in the database."
+"WTRX_ACTIONKIT_API_PASSWORD environment variable, which overrides this value"
+" so the secret is not stored in the database."
 msgstr ""
+"Das Passwort der ActionKit-REST-API. In der Produktion besser die "
+"Umgebungsvariable WTRX_ACTIONKIT_API_PASSWORD verwenden, die diesen Wert "
+"überschreibt, damit das Geheimnis nicht in der Datenbank liegt."
 
 #: integrations/actionkit.py:311 integrations/actionkit.py:317 models.py:1445
 msgid "ActionKit"
-msgstr ""
+msgstr "ActionKit"
 
 #: integrations/fundraiseup.py:64
 msgid ""
 "Uncheck to temporarily disable Fundraise Up without removing its "
 "configuration."
 msgstr ""
+"Abwählen, um Fundraise Up vorübergehend zu deaktivieren, ohne die "
+"Konfiguration zu löschen."
 
 #: integrations/fundraiseup.py:67
 msgid "Fundraise Up installation code"
-msgstr ""
+msgstr "Fundraise-Up-Installationscode"
 
 #: integrations/fundraiseup.py:69
 msgid ""
@@ -1270,25 +1457,34 @@ msgid ""
 "Installation). Rendered once in the site's page head while Fundraise Up is "
 "enabled."
 msgstr ""
+"Das vollständige Skript-Snippet aus Ihrem Fundraise-Up-Dashboard "
+"(Einstellungen → Installation). Wird einmal im Head der Seiten ausgegeben, "
+"solange Fundraise Up aktiviert ist."
 
 #: integrations/fundraiseup.py:77
 msgid ""
 "Fundraise Up element ID shown to visitors geolocated to the United States."
 msgstr ""
+"Fundraise-Up-Element-ID für Besucher:innen, die den USA zugeordnet werden."
 
 #: integrations/fundraiseup.py:82
 msgid ""
 "Fundraise Up element ID shown to visitors geolocated to the Netherlands."
 msgstr ""
+"Fundraise-Up-Element-ID für Besucher:innen, die den Niederlanden zugeordnet "
+"werden."
 
 #: integrations/fundraiseup.py:87
 msgid "Fundraise Up element ID shown to visitors geolocated to Canada."
 msgstr ""
+"Fundraise-Up-Element-ID für Besucher:innen, die Kanada zugeordnet werden."
 
 #: integrations/fundraiseup.py:92
 msgid ""
 "Fundraise Up element ID shown to visitors geolocated to the United Kingdom."
 msgstr ""
+"Fundraise-Up-Element-ID für Besucher:innen, die dem Vereinigten Königreich "
+"zugeordnet werden."
 
 #: integrations/fundraiseup.py:98
 msgid ""
@@ -1296,12 +1492,18 @@ msgid ""
 "use the \"other European visitors\" form ID below. Do not include "
 "Netherlands or United Kingdom — they're configured separately above."
 msgstr ""
+"Kommagetrennte zweibuchstabige ISO-Ländercodes (z. B. DE,FR,ES,IT), die die "
+"Formular-ID für „alle übrigen europäischen Besucher:innen“ unten verwenden "
+"sollen. Niederlande und Vereinigtes Königreich nicht aufnehmen — sie werden "
+"oben separat konfiguriert."
 
 #: integrations/fundraiseup.py:108
 msgid ""
 "Shown to visitors geolocated to a country listed above under \"Other "
 "European country codes\"."
 msgstr ""
+"Wird Besucher:innen angezeigt, die einem oben unter „Weitere europäische "
+"Ländercodes“ gelisteten Land zugeordnet werden."
 
 #: integrations/fundraiseup.py:116
 msgid ""
@@ -1309,20 +1511,26 @@ msgid ""
 "initial state before the visitor's country is known or if it can't be "
 "determined (e.g. local development)."
 msgstr ""
+"Wird allen Besucher:innen angezeigt, die von keiner Region oben erfasst "
+"sind, und als Ausgangszustand des Formulars, solange das Land noch nicht "
+"bekannt ist oder sich nicht ermitteln lässt (z. B. in der lokalen "
+"Entwicklung)."
 
 #: integrations/fundraiseup.py:124 integrations/fundraiseup.py:130
 msgid "Fundraise Up"
-msgstr ""
+msgstr "Fundraise Up"
 
 #: integrations/gtm.py:42
 msgid ""
 "Uncheck to temporarily disable Tag Manager/Analytics without removing its "
 "configuration."
 msgstr ""
+"Abwählen, um Tag Manager/Analytics vorübergehend zu deaktivieren, ohne die "
+"Konfiguration zu löschen."
 
 #: integrations/gtm.py:47
 msgid "Head snippet"
-msgstr ""
+msgstr "Head-Snippet"
 
 #: integrations/gtm.py:49
 msgid ""
@@ -1330,68 +1538,83 @@ msgid ""
 "instructions, pasted exactly as given. Rendered once near the top of the "
 "site's page head while this integration is enabled."
 msgstr ""
+"Das Skript-Snippet aus der Einrichtungsanleitung von Google Tag Manager oder"
+" Google Analytics, exakt so eingefügt wie angegeben. Wird einmal nahe dem "
+"Anfang des Seiten-Heads ausgegeben, solange diese Integration aktiviert ist."
 
 #: integrations/gtm.py:57
 msgid "Body snippet"
-msgstr ""
+msgstr "Body-Snippet"
 
 #: integrations/gtm.py:59
 msgid ""
 "Optional. Google Tag Manager's noscript fallback snippet, if you're using "
-"Tag Manager — a standalone Analytics-only setup has no equivalent snippet to "
-"paste here. Rendered immediately after the page body opens while this "
+"Tag Manager — a standalone Analytics-only setup has no equivalent snippet to"
+" paste here. Rendered immediately after the page body opens while this "
 "integration is enabled."
 msgstr ""
+"Optional. Das noscript-Fallback-Snippet von Google Tag Manager, falls Tag "
+"Manager genutzt wird — eine reine Analytics-Einrichtung hat hier kein "
+"Gegenstück. Wird direkt nach dem Öffnen des Body ausgegeben, solange diese "
+"Integration aktiviert ist."
 
 #: integrations/gtm.py:69 integrations/gtm.py:75
 msgid "Google Tag Manager / Analytics"
-msgstr ""
+msgstr "Google Tag Manager / Analytics"
 
 #: integrations/usercentrics.py:31
 msgid "Uncheck to temporarily disable the Usercentrics consent banner."
 msgstr ""
+"Abwählen, um das Usercentrics-Einwilligungsbanner vorübergehend zu "
+"deaktivieren."
 
 #: integrations/usercentrics.py:34
 msgid "Settings ID"
-msgstr ""
+msgstr "Settings-ID"
 
 #: integrations/usercentrics.py:35
 msgid "The \"Settings ID\" from your Usercentrics dashboard."
-msgstr ""
+msgstr "Die „Settings ID“ aus Ihrem Usercentrics-Dashboard."
 
 #: integrations/usercentrics.py:39
 msgid "Script version"
-msgstr ""
+msgstr "Skriptversion"
 
 #: integrations/usercentrics.py:41
 msgid ""
 "Version of usercentrics-consent.js to load, from cdn.350.org/usercentrics-"
 "consent/<version>/usercentrics-consent.js."
 msgstr ""
+"Zu ladende Version von usercentrics-consent.js, von "
+"cdn.350.org/usercentrics-consent/<version>/usercentrics-consent.js."
 
 #: integrations/usercentrics.py:47
 msgid "Reload-on-opt-in service IDs"
-msgstr ""
+msgstr "Service-IDs mit Neuladen bei Einwilligung"
 
 #: integrations/usercentrics.py:49
 msgid ""
 "Comma-separated Usercentrics service IDs that should reload the page when a "
 "visitor opts in to them."
 msgstr ""
+"Kommagetrennte Usercentrics-Service-IDs, bei deren Einwilligung die Seite "
+"neu geladen werden soll."
 
 #: integrations/usercentrics.py:55
 msgid "Deactivate-blocking service IDs"
-msgstr ""
+msgstr "Service-IDs ohne Skriptblockierung"
 
 #: integrations/usercentrics.py:57
 msgid ""
 "Comma-separated Usercentrics service IDs whose default script blocking "
 "should be deactivated."
 msgstr ""
+"Kommagetrennte Usercentrics-Service-IDs, deren standardmäßige "
+"Skriptblockierung deaktiviert werden soll."
 
 #: integrations/usercentrics.py:64
 msgid "Fallback country"
-msgstr ""
+msgstr "Rückfall-Land"
 
 #: integrations/usercentrics.py:66
 msgid ""
@@ -1399,21 +1622,29 @@ msgid ""
 "(e.g. the geolocation lookup times out). Defaults to an EU country so the "
 "compliance banner fails closed (shows) rather than silently hiding."
 msgstr ""
+"Zweibuchstabiger Ländercode, der verwendet wird, wenn sich das Land nicht "
+"ermitteln lässt (z. B. weil die Geolokalisierung in eine Zeitüberschreitung "
+"läuft). Standardmäßig ein EU-Land, damit das Compliance-Banner im Zweifel "
+"erscheint statt stillschweigend ausgeblendet zu werden."
 
 #: integrations/usercentrics.py:75
 msgid "Manual country override (testing only)"
-msgstr ""
+msgstr "Land manuell erzwingen (nur zum Testen)"
 
 #: integrations/usercentrics.py:77
 msgid ""
 "Two-letter country code to force for every visitor, skipping the automatic "
-"Cloudflare geolocation lookup entirely. For QA/testing of a specific country "
-"only -- leave blank in production so each visitor's real country is used."
+"Cloudflare geolocation lookup entirely. For QA/testing of a specific country"
+" only -- leave blank in production so each visitor's real country is used."
 msgstr ""
+"Zweibuchstabiger Ländercode, der für alle Besucher:innen erzwungen wird und "
+"die automatische Cloudflare-Geolokalisierung vollständig überspringt. Nur "
+"für QA/Tests eines bestimmten Landes — in der Produktion leer lassen, damit "
+"das tatsächliche Land jeder Person verwendet wird."
 
 #: integrations/usercentrics.py:86 integrations/usercentrics.py:92
 msgid "Usercentrics"
-msgstr ""
+msgstr "Usercentrics"
 
 #: integrations/wagtail_forms.py:41
 msgid ""
@@ -1421,36 +1652,43 @@ msgid ""
 "editor. This does not affect any FormPage that is already published — it "
 "only controls whether editors can add new Wagtail Forms signup blocks."
 msgstr ""
+"Abwählen, um den integrierten Wagtail-Formulare-Anmeldeblock im Seiteneditor"
+" auszublenden. Bereits veröffentlichte Formularseiten sind davon nicht "
+"betroffen — es steuert nur, ob Redakteur:innen neue Wagtail-Formulare-"
+"Anmeldeblöcke hinzufügen können."
 
 #: integrations/wagtail_forms.py:50
 msgid "Wagtail Forms"
-msgstr ""
+msgstr "Wagtail-Formulare"
 
 #: integrations/wagtail_forms.py:56
 msgid "Wagtail Forms (built-in)"
-msgstr ""
+msgstr "Wagtail-Formulare (integriert)"
 
 #: models.py:68
 msgid "meta image"
-msgstr ""
+msgstr "Meta-Bild"
 
 #: models.py:70
 msgid ""
-"Optional. Overrides the default meta image for social sharing. Falls back to "
-"Branding & SEO settings default."
+"Optional. Overrides the default meta image for social sharing. Falls back to"
+" Branding & SEO settings default."
 msgstr ""
+"Optional. Überschreibt das Standard-Meta-Bild für das Teilen in sozialen "
+"Netzwerken. Andernfalls gilt der Standard aus den Einstellungen für Marke "
+"und SEO."
 
 #: models.py:76
 msgid "hide from search"
-msgstr ""
+msgstr "aus der Suche ausblenden"
 
 #: models.py:77
 msgid "Exclude this page from search results and the sitemap."
-msgstr ""
+msgstr "Diese Seite aus den Suchergebnissen und der Sitemap ausschließen."
 
 #: models.py:81
 msgid "canonical URL"
-msgstr ""
+msgstr "kanonische URL"
 
 #: models.py:83
 msgid ""
@@ -1458,236 +1696,262 @@ msgid ""
 "engines should treat another URL as the primary version. Defaults to this "
 "page's own URL."
 msgstr ""
+"Optional. Setzen, wenn der Inhalt dieser Seite auch anderswo existiert und "
+"Suchmaschinen eine andere URL als Hauptversion behandeln sollen. "
+"Standardmäßig die URL dieser Seite."
 
 #: models.py:109
 msgid "For search engines"
-msgstr ""
+msgstr "Für Suchmaschinen"
 
 #: models.py:123
 msgid "SEO"
-msgstr ""
+msgstr "SEO"
 
 #: models.py:246
 msgid "hero headline"
-msgstr ""
+msgstr "Hero-Überschrift"
 
 #: models.py:248 models.py:462
 msgid ""
 "Optional. Overrides the page title as the displayed heading. Leave blank to "
 "use the page title."
 msgstr ""
+"Optional. Ersetzt den Seitentitel als angezeigte Überschrift. Leer lassen, "
+"um den Seitentitel zu verwenden."
 
 #: models.py:255
 msgid "hero copy"
-msgstr ""
+msgstr "Hero-Text"
 
 #: models.py:256 models.py:470
 msgid "Optional subtext displayed below the headline."
-msgstr ""
+msgstr "Optionaler Text unterhalb der Überschrift."
 
 #: models.py:264 site_settings.py:1241
 msgid "hero image"
-msgstr ""
+msgstr "Hero-Bild"
 
 #: models.py:266
 msgid ""
 "Optional hero background or feature image. Also used as the video poster if "
 "no thumbnail is set on the video."
 msgstr ""
+"Optionales Hintergrund- oder Hauptbild des Hero. Dient auch als Video-"
+"Poster, wenn am Video kein Vorschaubild gesetzt ist."
 
 #: models.py:276
 msgid "hero video"
-msgstr ""
+msgstr "Hero-Video"
 
 #: models.py:278
 msgid ""
-"Optional. When set, this video autoplays (muted, looping) as the hero's full-"
-"bleed background instead of the hero image, with a pause/play button in the "
-"corner. Upload a thumbnail on the video in the media library to use as a "
-"poster frame; falls back to the hero image above if no thumbnail is set."
+"Optional. When set, this video autoplays (muted, looping) as the hero's "
+"full-bleed background instead of the hero image, with a pause/play button in"
+" the corner. Upload a thumbnail on the video in the media library to use as "
+"a poster frame; falls back to the hero image above if no thumbnail is set."
 msgstr ""
+"Optional. Wenn gesetzt, läuft dieses Video automatisch (stumm, in Schleife) "
+"als randloser Hintergrund des Hero anstelle des Hero-Bildes, mit einem "
+"Pause-/Wiedergabe-Button in der Ecke. In der Mediathek ein Vorschaubild zum "
+"Video hochladen, das als Posterbild dient; ohne Vorschaubild wird das Hero-"
+"Bild oben verwendet."
 
 #: models.py:288
 msgid "hero image caption"
-msgstr ""
+msgstr "Bildunterschrift des Hero"
 
 #: models.py:290
 msgid ""
 "Optional caption overlaid at the bottom of the hero image or video, e.g. a "
 "photo credit."
 msgstr ""
+"Optionale Bildunterschrift, die unten über dem Hero-Bild oder -Video liegt, "
+"z. B. ein Fotonachweis."
 
 #: models.py:298
 msgid "hero banner color"
-msgstr ""
+msgstr "Farbe des Hero-Banners"
 
 #: models.py:300
 msgid ""
 "Background color for the compact hero banner. Only affects pages whose hero "
 "renders as a banner (i.e. every page except the homepage)."
 msgstr ""
+"Hintergrundfarbe des kompakten Hero-Banners. Betrifft nur Seiten, deren Hero"
+" als Banner ausgegeben wird (also alle außer der Startseite)."
 
 #: models.py:307 models.py:706 models.py:777 models.py:1180
 msgid "hero call to action"
-msgstr ""
+msgstr "Handlungsaufruf im Hero"
 
 #: models.py:308
 msgid "Optional button or signup bar shown below the hero copy. At most one."
 msgstr ""
+"Optionaler Button oder Anmeldeleiste unter dem Hero-Text. Höchstens einer."
 
 #: models.py:428
 msgid "published at"
-msgstr ""
+msgstr "veröffentlicht am"
 
 #: models.py:429
 msgid "The date shown on this page and used to order listings."
 msgstr ""
+"Das auf dieser Seite angezeigte Datum, nach dem auch Listen sortiert werden."
 
 #: models.py:460
 msgid "headline"
-msgstr ""
+msgstr "Überschrift"
 
 #: models.py:469
 msgid "copy"
-msgstr ""
+msgstr "Text"
 
 #: models.py:484
 msgid "banner color"
-msgstr ""
+msgstr "Bannerfarbe"
 
 #: models.py:495
 msgid "Header"
-msgstr ""
+msgstr "Kopfbereich"
 
 #: models.py:546
 msgid "name"
-msgstr ""
+msgstr "Name"
 
 #: models.py:550
 msgid "slug"
-msgstr ""
+msgstr "Slug"
 
 #: models.py:551
 msgid ""
 "Used in the blog's category filter URL. Auto-filled from the name if left "
 "blank."
 msgstr ""
+"Wird in der URL des Blog-Kategoriefilters verwendet. Wird aus dem Namen "
+"automatisch gefüllt, wenn leer gelassen."
 
 #: models.py:561
 msgid "blog category"
-msgstr ""
+msgstr "Blog-Kategorie"
 
 #: models.py:562
 msgid "blog categories"
-msgstr ""
+msgstr "Blog-Kategorien"
 
 #: models.py:633 models.py:714 models.py:793 models.py:980
 msgid "body"
-msgstr ""
+msgstr "Inhalt"
 
 #: models.py:634 models.py:715 models.py:981
 msgid "Page body content."
-msgstr ""
+msgstr "Inhalt des Seitenkörpers."
 
 #: models.py:639
 msgid "transparent header"
-msgstr ""
+msgstr "transparenter Kopfbereich"
 
 #: models.py:641
 msgid ""
 "Make the header transparent so the hero image extends behind it. "
 "Automatically uses the dark logo variant when enabled."
 msgstr ""
+"Macht den Kopfbereich transparent, sodass das Hero-Bild dahinter durchläuft."
+" Verwendet dann automatisch die dunkle Logovariante."
 
 #: models.py:653
 msgid "Header options"
-msgstr ""
+msgstr "Kopfbereich-Optionen"
 
 #: models.py:664 models.py:733 models.py:813 models.py:1005 models.py:1244
 #: models.py:1455
 msgid "Promote"
-msgstr ""
+msgstr "Bewerben"
 
 #: models.py:665 models.py:734 models.py:814 models.py:1006 models.py:1245
 #: models.py:1456
 msgid "Settings"
-msgstr ""
+msgstr "Einstellungen"
 
 #: models.py:679
 msgid "home page"
-msgstr ""
+msgstr "Startseite"
 
 #: models.py:680
 msgid "home pages"
-msgstr ""
+msgstr "Startseiten"
 
 #: models.py:707 models.py:778 models.py:1181
 msgid "Optional button shown below the hero copy. At most one."
-msgstr ""
+msgstr "Optionaler Button unter dem Hero-Text. Höchstens einer."
 
 #: models.py:751
 msgid "content page"
-msgstr ""
+msgstr "Inhaltsseite"
 
 #: models.py:752
 msgid "content pages"
-msgstr ""
+msgstr "Inhaltsseiten"
 
 #: models.py:785 models.py:1407
 msgid "intro"
-msgstr ""
+msgstr "Einleitung"
 
 #: models.py:787
 msgid "Optional introductory text displayed above the child page listing."
-msgstr ""
+msgstr "Optionaler Einleitungstext über der Liste der Unterseiten."
 
 #: models.py:794
 msgid "Optional body content displayed below the child page listing."
-msgstr ""
+msgstr "Optionaler Inhalt unter der Liste der Unterseiten."
 
 #: models.py:831
 msgid "index page"
-msgstr ""
+msgstr "Übersichtsseite"
 
 #: models.py:832
 msgid "index pages"
-msgstr ""
+msgstr "Übersichtsseiten"
 
 #: models.py:940
 msgid "author"
-msgstr ""
+msgstr "Autor:in"
 
 #: models.py:941
 msgid "Defaults to whoever creates this post. Editable."
-msgstr ""
+msgstr "Standardmäßig die Person, die diesen Beitrag anlegt. Änderbar."
 
 #: models.py:946
 msgid "author name"
-msgstr ""
+msgstr "Autor:innenname"
 
 #: models.py:948
 msgid ""
 "Byline for a guest writer or imported post who doesn't have a site account. "
 "Ignored if Author (above) is set."
 msgstr ""
+"Namenszeile für Gastautor:innen oder importierte Beiträge ohne Konto auf der"
+" Website. Wird ignoriert, wenn oben Autor:in gesetzt ist."
 
 #: models.py:955
 msgid "author title"
-msgstr ""
+msgstr "Funktion der Autor:in"
 
 #: models.py:957
 msgid ""
 "Optional role/affiliation shown next to Author name, e.g. \"Senior "
 "Campaigner at Oil Change International\"."
 msgstr ""
+"Optionale Rolle oder Zugehörigkeit neben dem Autor:innennamen, z. B. „Senior"
+" Campaignerin bei Oil Change International“."
 
 #: models.py:965
 msgid "categories"
-msgstr ""
+msgstr "Kategorien"
 
 #: models.py:969
 msgid "hide from blogroll"
-msgstr ""
+msgstr "aus der Blogliste ausblenden"
 
 #: models.py:971
 msgid ""
@@ -1695,52 +1959,66 @@ msgid ""
 "cards elsewhere on the site (e.g. Page Cards on the home page). The post is "
 "still directly accessible and still appears in search."
 msgstr ""
+"Diesen Beitrag aus der Liste der Blog-Seite und aus allen „neueste "
+"Beiträge“-Karten anderswo auf der Website ausschließen (z. B. Seitenkarten "
+"auf der Startseite). Der Beitrag bleibt direkt erreichbar und erscheint "
+"weiterhin in der Suche."
 
 #: models.py:1014
 msgid "post"
-msgstr ""
+msgstr "Beitrag"
 
 #: models.py:1015 models.py:1139
 msgid "posts"
-msgstr ""
+msgstr "Beiträge"
 
 #: models.py:1140
 #, python-format
 msgid "Related %(label)s"
-msgstr ""
+msgstr "Verwandte %(label)s"
 
 #: models.py:1141
 #, python-format
 msgid "Read more %(label)s"
-msgstr ""
+msgstr "Mehr %(label)s lesen"
 
 #: models.py:1187
 msgid "related posts intro"
-msgstr ""
+msgstr "Einleitung zu verwandten Beiträgen"
 
 #: models.py:1189
 msgid ""
 "Supporting copy under the \"Related …\" heading at the bottom of each post "
 "under this page. Falls back to this page's header copy when blank."
 msgstr ""
+"Ergänzender Text unter der Überschrift „Verwandte …“ am Ende jedes Beitrags "
+"unterhalb dieser Seite. Ohne Angabe wird der Kopftext dieser Seite "
+"verwendet."
 
 #: models.py:1200
 msgid "default card image"
-msgstr ""
+msgstr "Standard-Kartenbild"
 
 #: models.py:1202
 msgid ""
 "Shown for any post under this page that has no image of its own (no header "
 "image, and none found in its body content) wherever it's shown as a card — "
-"the listing below, \"Related …\" panels, and Page Cards blocks. Also used as "
-"that post's own header image when Default hero image (below) is left blank. "
-"Useful for a Press Releases page, where a statement often has no photo. "
+"the listing below, \"Related …\" panels, and Page Cards blocks. Also used as"
+" that post's own header image when Default hero image (below) is left blank."
+" Useful for a Press Releases page, where a statement often has no photo. "
 "Leave blank for no fallback."
 msgstr ""
+"Wird für jeden Beitrag unterhalb dieser Seite angezeigt, der kein eigenes "
+"Bild hat (kein Kopfbild und keines im Inhalt gefunden), überall dort, wo er "
+"als Karte erscheint — in der Liste unten, in „Verwandte …“-Panels und in "
+"Seitenkarten-Blöcken. Dient außerdem als Kopfbild dieses Beitrags, wenn das "
+"Standard-Hero-Bild (unten) leer bleibt. Nützlich für eine "
+"Pressemitteilungsseite, wo eine Mitteilung oft kein Foto hat. Leer lassen, "
+"wenn es keinen Rückfall geben soll."
 
 #: models.py:1217
 msgid "default hero image"
-msgstr ""
+msgstr "Standard-Hero-Bild"
 
 #: models.py:1219
 msgid ""
@@ -1750,26 +2028,33 @@ msgid ""
 "smaller icon on its card. Falls back to Default card image when left blank. "
 "Leave both blank for no fallback."
 msgstr ""
+"Wird als Kopfbild jedes Beitrags unterhalb dieser Seite angezeigt, der kein "
+"eigenes Bild hat — anstelle des Standard-Kartenbildes (oben), wenn sich "
+"beide unterscheiden sollen, z. B. eine allgemeine Bannergrafik oben im "
+"Beitrag gegenüber einem kleineren Icon auf seiner Karte. Ohne Angabe gilt "
+"das Standard-Kartenbild. Beide leer lassen, wenn es keinen Rückfall geben "
+"soll."
 
 #: models.py:1257 models.py:1258
 msgid "Blogs"
-msgstr ""
+msgstr "Blogs"
 
 #: models.py:1408
 msgid "Optional introductory text displayed above the form."
-msgstr ""
+msgstr "Optionaler Einleitungstext über dem Formular."
 
 #: models.py:1413
 msgid "thank you text"
-msgstr ""
+msgstr "Dankestext"
 
 #: models.py:1414
 msgid "Text displayed after a successful form submission."
 msgstr ""
+"Text, der nach dem erfolgreichen Absenden des Formulars angezeigt wird."
 
 #: models.py:1419
 msgid "ActionKit page name"
-msgstr ""
+msgstr "ActionKit-Seitenname"
 
 #: models.py:1421
 msgid ""
@@ -1777,50 +2062,54 @@ msgid ""
 "ActionKit integration (Settings → Integrations) is enabled. Leave blank to "
 "disable ActionKit forwarding for this form."
 msgstr ""
+"Der Kurzname der ActionKit-Seite, an die dieses Formular sendet. Wird nur "
+"verwendet, wenn die ActionKit-Integration (Einstellungen → Integrationen) "
+"aktiviert ist. Leer lassen, um die Weiterleitung an ActionKit für dieses "
+"Formular zu deaktivieren."
 
 #: models.py:1433
 msgid "Form fields"
-msgstr ""
+msgstr "Formularfelder"
 
 #: models.py:1441
 msgid "Email notifications"
-msgstr ""
+msgstr "E-Mail-Benachrichtigungen"
 
 #: models.py:1468
 msgid "form page"
-msgstr ""
+msgstr "Formularseite"
 
 #: models.py:1469
 msgid "form pages"
-msgstr ""
+msgstr "Formularseiten"
 
 #: site_settings.py:45 site_settings.py:1175
 msgid "Page"
-msgstr ""
+msgstr "Seite"
 
 #: site_settings.py:49
 msgid "Internal link"
-msgstr ""
+msgstr "Interner Link"
 
 #: site_settings.py:56 site_settings.py:377 site_settings.py:404
 msgid "URL"
-msgstr ""
+msgstr "URL"
 
 #: site_settings.py:60
 msgid "External link"
-msgstr ""
+msgstr "Externer Link"
 
 #: site_settings.py:69
 msgid "Anchor ID without the # symbol, e.g. 'about'."
-msgstr ""
+msgstr "Anker-ID ohne das Zeichen #, z. B. „about“."
 
 #: site_settings.py:74
 msgid "Anchor link"
-msgstr ""
+msgstr "Ankerlink"
 
 #: site_settings.py:91
 msgid "Cookie policy URL"
-msgstr ""
+msgstr "URL der Cookie-Richtlinie"
 
 #: site_settings.py:93
 msgid ""
@@ -1828,182 +2117,214 @@ msgid ""
 "isn't configured. EU/UK visitors get the Usercentrics preferences panel "
 "instead of this URL."
 msgstr ""
+"Wohin dieser Link für Besucher:innen außerhalb der EU/des UK führt oder wenn"
+" Usercentrics nicht konfiguriert ist. Besucher:innen aus der EU und dem UK "
+"erhalten stattdessen das Usercentrics-Einstellungsfenster."
 
 #: site_settings.py:101
 msgid "Cookie settings link"
-msgstr ""
+msgstr "Link zu den Cookie-Einstellungen"
 
 #: site_settings.py:107
 msgid "Menu label"
-msgstr ""
+msgstr "Menübezeichnung"
 
 #: site_settings.py:114
 msgid "Dropdown links"
-msgstr ""
+msgstr "Links im Aufklappmenü"
 
 #: site_settings.py:119
 msgid "Dropdown menu"
-msgstr ""
+msgstr "Aufklappmenü"
 
 #: site_settings.py:145 site_settings.py:272
 msgid "Root page"
-msgstr ""
+msgstr "Wurzelseite"
 
 #: site_settings.py:147
 msgid ""
 "This page and every page beneath it will use this navigation instead of the "
-"default. If a page falls under more than one override, the override with the "
-"most specific (closest) root page wins."
+"default. If a page falls under more than one override, the override with the"
+" most specific (closest) root page wins."
 msgstr ""
+"Diese Seite und jede Seite darunter verwenden diese Navigation statt der "
+"Standardnavigation. Fällt eine Seite unter mehrere Überschreibungen, gewinnt"
+" die mit der spezifischsten (nächstgelegenen) Wurzelseite."
 
 #: site_settings.py:156 site_settings.py:283
 msgid "Regional label"
-msgstr ""
+msgstr "Regionsbezeichnung"
 
 #: site_settings.py:158 site_settings.py:285
 msgid ""
 "Region name shown as a badge beside the logo for this section, e.g. "
 "\"Canada\". Leave blank for no badge."
 msgstr ""
+"Regionsname, der für diesen Bereich als Badge neben dem Logo erscheint, z. "
+"B. „Kanada“. Leer lassen für kein Badge."
 
 #: site_settings.py:165 site_settings.py:490
 #: templates/wtrx/navigation/header.html:87
 #: templates/wtrx/navigation/header.html:441
 msgid "Primary navigation"
-msgstr ""
+msgstr "Hauptnavigation"
 
 #: site_settings.py:166
 msgid "Links shown in the main navigation bar for this section."
-msgstr ""
+msgstr "Links, die in der Hauptnavigationsleiste dieses Bereichs erscheinen."
 
 #: site_settings.py:168 site_settings.py:507
 msgid "CTA button text"
-msgstr ""
+msgstr "Text des CTA-Buttons"
 
 #: site_settings.py:171 site_settings.py:516
 msgid "CTA page"
-msgstr ""
+msgstr "CTA-Seite"
 
 #: site_settings.py:173
 msgid ""
 "Internal link for the CTA button. Set either this, CTA URL, or CTA anchor, "
 "not more than one."
 msgstr ""
+"Interner Link für den CTA-Button. Entweder dieses Feld, die CTA-URL oder den"
+" CTA-Anker setzen, nicht mehr als eines."
 
 #: site_settings.py:179 site_settings.py:523
 msgid "CTA URL"
-msgstr ""
+msgstr "CTA-URL"
 
 #: site_settings.py:181
 msgid ""
 "External link for the CTA button. Set either this, CTA page, or CTA anchor, "
 "not more than one."
 msgstr ""
+"Externer Link für den CTA-Button. Entweder dieses Feld, die CTA-Seite oder "
+"den CTA-Anker setzen, nicht mehr als eines."
 
 #: site_settings.py:187 site_settings.py:531
 msgid "CTA anchor"
-msgstr ""
+msgstr "CTA-Anker"
 
 #: site_settings.py:189 site_settings.py:533
 msgid ""
 "Anchor link for the CTA button (without the # symbol, e.g. 'donate'). Set "
-"this instead of CTA page or CTA URL to link to an anchor on the current page."
+"this instead of CTA page or CTA URL to link to an anchor on the current "
+"page."
 msgstr ""
+"Ankerlink für den CTA-Button (ohne das Zeichen #, z. B. „donate“). Statt "
+"CTA-Seite oder CTA-URL setzen, um auf einen Anker der aktuellen Seite zu "
+"verlinken."
 
 #: site_settings.py:196 site_settings.py:539
 msgid "Collapse desktop menu"
-msgstr ""
+msgstr "Menü am Desktop einklappen"
 
 #: site_settings.py:198
-msgid "Always show the hamburger menu icon, even on desktop, for this section."
+msgid ""
+"Always show the hamburger menu icon, even on desktop, for this section."
 msgstr ""
+"Das Hamburger-Menü-Icon für diesen Bereich immer anzeigen, auch am Desktop."
 
 #: site_settings.py:213 site_settings.py:603
 msgid ""
 "Set either a CTA page, CTA URL, or CTA anchor when CTA button text is "
 "provided."
 msgstr ""
+"Eine CTA-Seite, CTA-URL oder einen CTA-Anker setzen, wenn ein Text für den "
+"CTA-Button angegeben ist."
 
 #: site_settings.py:222 site_settings.py:616
 msgid "Set only one of CTA page, CTA URL, or CTA anchor — not multiple."
 msgstr ""
+"Nur eines von CTA-Seite, CTA-URL oder CTA-Anker setzen — nicht mehrere."
 
 #: site_settings.py:228 site_settings.py:621
 msgid "CTA button text is required when a CTA page, URL, or anchor is set."
 msgstr ""
+"Der Text des CTA-Buttons ist erforderlich, wenn eine CTA-Seite, -URL oder "
+"ein -Anker gesetzt ist."
 
 #: site_settings.py:236
 msgid "Navigation override"
-msgstr ""
+msgstr "Navigationsüberschreibung"
 
 #: site_settings.py:242
 msgid "Column heading"
-msgstr ""
+msgstr "Spaltenüberschrift"
 
 #: site_settings.py:249
 msgid "Links"
-msgstr ""
+msgstr "Links"
 
 #: site_settings.py:254
 msgid "Footer column"
-msgstr ""
+msgstr "Fußzeilenspalte"
 
 #: site_settings.py:260
 msgid "Columns"
-msgstr ""
+msgstr "Spalten"
 
 #: site_settings.py:261
 msgid "Minimal"
-msgstr ""
+msgstr "Minimal"
 
 #: site_settings.py:274
 msgid ""
 "This page and every page beneath it will use this footer instead of the "
-"default. If a page falls under more than one override, the override with the "
-"most specific (closest) root page wins."
+"default. If a page falls under more than one override, the override with the"
+" most specific (closest) root page wins."
 msgstr ""
+"Diese Seite und jede Seite darunter verwenden diese Fußzeile statt der "
+"Standardfußzeile. Fällt eine Seite unter mehrere Überschreibungen, gewinnt "
+"die mit der spezifischsten (nächstgelegenen) Wurzelseite."
 
 #: site_settings.py:292
 msgid "Footer layout"
-msgstr ""
+msgstr "Fußzeilen-Layout"
 
 #: site_settings.py:293
 msgid "Leave blank to use the columns layout."
-msgstr ""
+msgstr "Leer lassen, um das Spaltenlayout zu verwenden."
 
 #: site_settings.py:298 templates/wtrx/navigation/footer.html:150
 msgid "Footer navigation"
-msgstr ""
+msgstr "Fußzeilennavigation"
 
 #: site_settings.py:300
 msgid ""
 "Footer link columns for this section. Each column has a heading and a list "
 "of links."
 msgstr ""
+"Spalten mit Fußzeilenlinks für diesen Bereich. Jede Spalte hat eine "
+"Überschrift und eine Liste von Links."
 
 #: site_settings.py:312
 msgid "Minimal footer links"
-msgstr ""
+msgstr "Links der minimalen Fußzeile"
 
 #: site_settings.py:314
 msgid ""
 "Flat list of links displayed inline in the minimal footer layout for this "
 "section."
 msgstr ""
+"Einfache Liste von Links, die im minimalen Fußzeilenlayout dieses Bereichs "
+"nebeneinander erscheinen."
 
 #: site_settings.py:321
 msgid "Copyright text"
-msgstr ""
+msgstr "Copyright-Text"
 
 #: site_settings.py:323
 msgid ""
 "Optional. Overrides the default \"© {year} {site name}\" copyright line for "
 "this section."
 msgstr ""
+"Optional. Überschreibt die Standard-Copyright-Zeile „© {year} {site name}“ "
+"für diesen Bereich."
 
 #: site_settings.py:329
 msgid "Newsletter signup — ActionKit page shortname"
-msgstr ""
+msgstr "Newsletter-Anmeldung — ActionKit-Seitenkurzname"
 
 #: site_settings.py:331
 msgid ""
@@ -2011,116 +2332,133 @@ msgid ""
 "section's footer signup box. Leave blank to show no signup box for this "
 "section, even if the site default has one set."
 msgstr ""
+"Der Kurzname der ActionKit-Seite (z. B. „newsletter-canada“), die das "
+"Anmeldefeld in der Fußzeile dieses Bereichs speist. Leer lassen, damit in "
+"diesem Bereich kein Anmeldefeld erscheint, auch wenn websiteweit eines "
+"gesetzt ist."
 
 #: site_settings.py:339
 msgid "Newsletter signup — success message"
-msgstr ""
+msgstr "Newsletter-Anmeldung — Erfolgsmeldung"
 
 #: site_settings.py:341
 msgid ""
-"Shown in place of the form after a successful signup for this section. Falls "
-"back to the site default's message when left blank (unlike the other fields "
-"on this override, which show nothing rather than fall back)."
+"Shown in place of the form after a successful signup for this section. Falls"
+" back to the site default's message when left blank (unlike the other fields"
+" on this override, which show nothing rather than fall back)."
 msgstr ""
+"Erscheint in diesem Bereich nach erfolgreicher Anmeldung anstelle des "
+"Formulars. Leer gelassen greift die websiteweite Meldung (anders als bei den"
+" übrigen Feldern dieser Überschreibung, die dann nichts anzeigen statt auf "
+"den Standard zurückzufallen)."
 
 #: site_settings.py:350
 msgid "Footer override"
-msgstr ""
+msgstr "Fußzeilenüberschreibung"
 
 #: site_settings.py:376
 msgid "Platform"
-msgstr ""
+msgstr "Plattform"
 
 #: site_settings.py:381
 msgid "Social link"
-msgstr ""
+msgstr "Social-Media-Link"
 
 #: site_settings.py:391
 msgid "Region name"
-msgstr ""
+msgstr "Regionsname"
 
 #: site_settings.py:391
 msgid "e.g. \"Canada\"."
-msgstr ""
+msgstr "Z. B. „Kanada“."
 
 #: site_settings.py:395
 msgid "Description"
-msgstr ""
+msgstr "Beschreibung"
 
 #: site_settings.py:397
 msgid ""
 "Optional. Shown as a subheading below the region name — for a linked site "
 "that isn't a regional site itself and needs a line of context (e.g. \"350 "
 "Action\", \"350 Global\"). Entries with a description render in their own "
-"two-column row below the plain region links, since the extra text needs more "
-"room."
+"two-column row below the plain region links, since the extra text needs more"
+" room."
 msgstr ""
+"Optional. Erscheint als Unterzeile unter dem Regionsnamen — für eine "
+"verlinkte Website, die selbst keine Regionalseite ist und eine Zeile Kontext"
+" braucht (z. B. „350 Action“, „350 Global“). Einträge mit Beschreibung "
+"erscheinen in einer eigenen zweispaltigen Zeile unter den einfachen "
+"Regionslinks, da der zusätzliche Text mehr Platz braucht."
 
 #: site_settings.py:404
 msgid "Link to that region's site."
-msgstr ""
+msgstr "Link zur Website dieser Region."
 
 #: site_settings.py:408
 msgid "Regional site link"
-msgstr ""
+msgstr "Link zu einer Regionalseite"
 
 #: site_settings.py:426
 msgid "logo"
-msgstr ""
+msgstr "Logo"
 
 #: site_settings.py:427
 msgid "Primary site logo. Displayed in the header."
-msgstr ""
+msgstr "Haupt-Logo der Website. Wird im Kopfbereich angezeigt."
 
 #: site_settings.py:435
 msgid "dark logo"
-msgstr ""
+msgstr "dunkles Logo"
 
 #: site_settings.py:437
 msgid ""
 "Logo variant for dark or transparent backgrounds (e.g. transparent header)."
 msgstr ""
+"Logovariante für dunkle oder transparente Hintergründe (z. B. transparenter "
+"Kopfbereich)."
 
 #: site_settings.py:446
 msgid "favicon"
-msgstr ""
+msgstr "Favicon"
 
 #: site_settings.py:447
 msgid "Browser favicon (square image, 32×32 px or SVG)."
-msgstr ""
+msgstr "Browser-Favicon (quadratisches Bild, 32 × 32 px oder SVG)."
 
 #: site_settings.py:455
 msgid "default meta image"
-msgstr ""
+msgstr "Standard-Meta-Bild"
 
 #: site_settings.py:457
 msgid ""
 "Fallback OG / Twitter card image used when a page has no meta image set."
 msgstr ""
+"Rückfallbild für OG / Twitter Card, wenn eine Seite kein Meta-Bild gesetzt "
+"hat."
 
 #: site_settings.py:462
 msgid "site description"
-msgstr ""
+msgstr "Websitebeschreibung"
 
 #: site_settings.py:463
 msgid "Default meta description for the site."
-msgstr ""
+msgstr "Standard-Meta-Beschreibung der Website."
 
 #: site_settings.py:475
 msgid "SEO defaults"
-msgstr ""
+msgstr "SEO-Standards"
 
 #: site_settings.py:480
 msgid "Branding & SEO"
-msgstr ""
+msgstr "Marke & SEO"
 
 #: site_settings.py:491
 msgid "Links shown in the main navigation bar."
-msgstr ""
+msgstr "Links, die in der Hauptnavigationsleiste erscheinen."
 
 #: site_settings.py:497 site_settings.py:718
 msgid "regional label"
-msgstr ""
+msgstr "Regionsbezeichnung"
 
 #: site_settings.py:499
 msgid ""
@@ -2128,29 +2466,40 @@ msgid ""
 "\"Canada\". Leave blank for no badge. Sections with their own navigation "
 "override set this on the override instead."
 msgstr ""
+"Regionsname, der auf der gesamten Website als Badge neben dem Logo "
+"erscheint, z. B. „Kanada“. Leer lassen für kein Badge. Bereiche mit eigener "
+"Navigationsüberschreibung setzen dies dort."
 
 #: site_settings.py:508
 msgid "Text for the header call-to-action button."
-msgstr ""
+msgstr "Text für den Call-to-Action-Button im Kopfbereich."
 
 #: site_settings.py:518
-msgid "Internal link for the CTA button. Set either this or CTA URL, not both."
+msgid ""
+"Internal link for the CTA button. Set either this or CTA URL, not both."
 msgstr ""
+"Interner Link für den CTA-Button. Entweder dieses Feld oder die CTA-URL "
+"setzen, nicht beides."
 
 #: site_settings.py:525
 msgid ""
 "External link for the CTA button. Set either this or CTA page, not both."
 msgstr ""
+"Externer Link für den CTA-Button. Entweder dieses Feld oder die CTA-Seite "
+"setzen, nicht beides."
 
 #: site_settings.py:541
 msgid ""
 "Always show the hamburger menu icon, even on desktop. Navigation links are "
 "hidden behind the menu toggle at all screen sizes."
 msgstr ""
+"Das Hamburger-Menü-Icon immer anzeigen, auch am Desktop. Die "
+"Navigationslinks liegen dann bei jeder Bildschirmgröße hinter dem Menü-"
+"Button."
 
 #: site_settings.py:548
 msgid "navigation overrides"
-msgstr ""
+msgstr "Navigationsüberschreibungen"
 
 #: site_settings.py:550
 msgid ""
@@ -2158,57 +2507,66 @@ msgid ""
 "applies to a chosen root page and every page beneath it; pages outside any "
 "override use the default navigation above."
 msgstr ""
+"Alternative Navigationen für einzelne Bereiche der Website. Jede "
+"Überschreibung gilt für eine gewählte Wurzelseite und alle Seiten darunter; "
+"Seiten außerhalb jeder Überschreibung verwenden die Standardnavigation oben."
 
 #: site_settings.py:568
 msgid "CTA button"
-msgstr ""
+msgstr "CTA-Button"
 
 #: site_settings.py:589 site_settings.py:797
 msgid "Main"
-msgstr ""
+msgstr "Allgemein"
 
 #: site_settings.py:590 site_settings.py:798
 msgid "Overrides"
-msgstr ""
+msgstr "Überschreibungen"
 
 #: site_settings.py:667
 msgid "Navigation"
-msgstr ""
+msgstr "Navigation"
 
 #: site_settings.py:678
 msgid "footer layout"
-msgstr ""
+msgstr "Fußzeilen-Layout"
 
 #: site_settings.py:680
 msgid ""
 "Columns: multi-column navigation grid. Minimal: single-row bar with logo, "
 "copyright, social icons, and inline links."
 msgstr ""
+"Spalten: mehrspaltiges Navigationsraster. Minimal: einzeilige Leiste mit "
+"Logo, Copyright, Social-Icons und Links nebeneinander."
 
 #: site_settings.py:687
 msgid "footer navigation"
-msgstr ""
+msgstr "Fußzeilennavigation"
 
 #: site_settings.py:689
 msgid "Footer link columns. Each column has a heading and a list of links."
 msgstr ""
+"Spalten mit Fußzeilenlinks. Jede Spalte hat eine Überschrift und eine Liste "
+"von Links."
 
 #: site_settings.py:701
 msgid "minimal footer links"
-msgstr ""
+msgstr "Links der minimalen Fußzeile"
 
 #: site_settings.py:703
 msgid "Flat list of links displayed inline in the minimal footer layout."
 msgstr ""
+"Einfache Liste von Links, die im minimalen Fußzeilenlayout nebeneinander "
+"erscheinen."
 
 #: site_settings.py:710
 msgid "copyright text"
-msgstr ""
+msgstr "Copyright-Text"
 
 #: site_settings.py:712
-msgid ""
-"Optional. Overrides the default \"© {year} {site name}\" copyright line."
+msgid "Optional. Overrides the default \"© {year} {site name}\" copyright line."
 msgstr ""
+"Optional. Überschreibt die Standard-Copyright-Zeile „© {year} {site name}“."
 
 #: site_settings.py:720
 msgid ""
@@ -2216,10 +2574,13 @@ msgid ""
 "\"Canada\". Leave blank for no badge. Sections with their own footer "
 "override set this on the override instead."
 msgstr ""
+"Regionsname, der auf der gesamten Website als Badge neben dem Logo "
+"erscheint, z. B. „Kanada“. Leer lassen für kein Badge. Bereiche mit eigener "
+"Fußzeilenüberschreibung setzen dies dort."
 
 #: site_settings.py:728
 msgid "footer overrides"
-msgstr ""
+msgstr "Fußzeilenüberschreibungen"
 
 #: site_settings.py:730
 msgid ""
@@ -2227,10 +2588,13 @@ msgid ""
 "to a chosen root page and every page beneath it; pages outside any override "
 "use the default footer above."
 msgstr ""
+"Alternative Fußzeilen für einzelne Bereiche der Website. Jede Überschreibung"
+" gilt für eine gewählte Wurzelseite und alle Seiten darunter; Seiten "
+"außerhalb jeder Überschreibung verwenden die Standardfußzeile oben."
 
 #: site_settings.py:739
 msgid "regional sites"
-msgstr ""
+msgstr "Regionalseiten"
 
 #: site_settings.py:741
 msgid ""
@@ -2238,10 +2602,14 @@ msgid ""
 "dropdown beside the footer logo on every page — the same list regardless of "
 "any footer override, since it isn't region-specific content itself."
 msgstr ""
+"Links zu anderen Regionalseiten von 350.org, die auf jeder Seite in einem "
+"Aufklappmenü „Rund um die Welt“ neben dem Fußzeilenlogo erscheinen — "
+"dieselbe Liste unabhängig von jeder Fußzeilenüberschreibung, da es selbst "
+"kein regionsspezifischer Inhalt ist."
 
 #: site_settings.py:751
 msgid "newsletter signup — ActionKit page shortname"
-msgstr ""
+msgstr "Newsletter-Anmeldung — ActionKit-Seitenkurzname"
 
 #: site_settings.py:753
 msgid ""
@@ -2251,88 +2619,102 @@ msgid ""
 "show no signup box. Sections with their own footer override set this on the "
 "override instead."
 msgstr ""
+"Der Kurzname der ActionKit-Seite (z. B. „newsletter“), die das websiteweite "
+"Anmeldefeld in der Fußzeile speist. Ihr Formular wird von ActionKit geholt "
+"und automatisch ausgegeben, genau wie beim Block Anmeldung (ActionKit). Leer"
+" lassen, damit kein Anmeldefeld erscheint. Bereiche mit eigener "
+"Fußzeilenüberschreibung setzen dies dort."
 
 #: site_settings.py:764
 msgid "Thanks for signing up!"
-msgstr ""
+msgstr "Danke für deine Anmeldung!"
 
 #: site_settings.py:765
 msgid "newsletter signup — success message"
-msgstr ""
+msgstr "Newsletter-Anmeldung — Erfolgsmeldung"
 
 #: site_settings.py:767
 msgid ""
 "Shown in place of the form after a successful newsletter signup. Sections "
 "with their own footer override set this on the override instead."
 msgstr ""
+"Erscheint nach erfolgreicher Newsletter-Anmeldung anstelle des Formulars. "
+"Bereiche mit eigener Fußzeilenüberschreibung setzen dies dort."
 
 #: site_settings.py:777
 msgid "Columns layout"
-msgstr ""
+msgstr "Spaltenlayout"
 
 #: site_settings.py:781
 msgid "Minimal layout"
-msgstr ""
+msgstr "Minimales Layout"
 
 #: site_settings.py:839
 msgid "Footer"
-msgstr ""
+msgstr "Fußzeile"
 
 #: site_settings.py:849
 msgid "social links"
-msgstr ""
+msgstr "Social-Media-Links"
 
 #: site_settings.py:854
 msgid "show in header"
-msgstr ""
+msgstr "im Kopfbereich anzeigen"
 
 #: site_settings.py:855
 msgid "Display social media icons in the site header."
-msgstr ""
+msgstr "Social-Media-Icons im Kopfbereich der Website anzeigen."
 
 #: site_settings.py:859
 msgid "show in footer"
-msgstr ""
+msgstr "in der Fußzeile anzeigen"
 
 #: site_settings.py:860
 msgid "Display social media icons in the site footer."
-msgstr ""
+msgstr "Social-Media-Icons in der Fußzeile der Website anzeigen."
 
 #: site_settings.py:867
 msgid "Display options"
-msgstr ""
+msgstr "Anzeigeoptionen"
 
 #: site_settings.py:897
 msgid "Social"
-msgstr ""
+msgstr "Social Media"
 
 #: site_settings.py:921 site_settings.py:1156
 msgid "Integrations"
-msgstr ""
+msgstr "Integrationen"
 
 #: site_settings.py:940
 msgid "integrations"
-msgstr ""
+msgstr "Integrationen"
 
 #: site_settings.py:941
 msgid "Add and configure the platforms this site integrates with."
 msgstr ""
+"Die Plattformen hinzufügen und konfigurieren, mit denen diese Website "
+"zusammenarbeitet."
 
 #: site_settings.py:947
 msgid "custom head code"
-msgstr ""
+msgstr "eigener Code im Head"
 
 #: site_settings.py:949
 msgid ""
 "Optional. Raw HTML/script markup inserted verbatim near the top of every "
-"page's <head> — for one-off scripts that don't warrant their own integration "
-"above. Rendered exactly as given, after every enabled integration's own head "
-"markup; only use this for code you trust."
+"page's <head> — for one-off scripts that don't warrant their own integration"
+" above. Rendered exactly as given, after every enabled integration's own "
+"head markup; only use this for code you trust."
 msgstr ""
+"Optional. Rohes HTML-/Script-Markup, das unverändert nahe dem Anfang des "
+"<head> jeder Seite eingefügt wird — für einmalige Skripte, die keine eigene "
+"Integration oben rechtfertigen. Wird exakt so ausgegeben wie eingegeben, "
+"nach dem Head-Markup jeder aktivierten Integration; nur für "
+"vertrauenswürdigen Code verwenden."
 
 #: site_settings.py:959
 msgid "custom body code"
-msgstr ""
+msgstr "eigener Code im Body"
 
 #: site_settings.py:961
 msgid ""
@@ -2342,39 +2724,54 @@ msgid ""
 "integration module using body_html_field instead). Rendered exactly as "
 "given; only use this for code you trust."
 msgstr ""
+"Optional. Rohes HTML-/Script-Markup, das unverändert auf jeder Seite direkt "
+"vor dem schließenden </body> eingefügt wird — für ein einmaliges Skript, das"
+" nicht früh in der Seite laufen muss (falls doch, z. B. ein "
+"<noscript>-Fallback, braucht es ein eigenes Integrationsmodul mit "
+"body_html_field). Wird exakt so ausgegeben wie eingegeben; nur für "
+"vertrauenswürdigen Code verwenden."
 
 #: site_settings.py:977
 msgid "Custom code"
-msgstr ""
+msgstr "Eigener Code"
 
 #: site_settings.py:1171
 msgid "Label"
-msgstr ""
+msgstr "Bezeichnung"
 
 #: site_settings.py:1172
 msgid "Shown in the sidebar. Leave blank to use the page's own title."
 msgstr ""
+"Wird in der Seitenleiste angezeigt. Leer lassen, um den Titel der Seite "
+"selbst zu verwenden."
 
 #: site_settings.py:1177
 msgid ""
 "The shortcut opens this page's listing in the page explorer. Hidden "
 "automatically if the page is unpublished."
 msgstr ""
+"Die Verknüpfung öffnet die Liste dieser Seite im Seiten-Explorer. Wird "
+"automatisch ausgeblendet, wenn die Seite unveröffentlicht ist."
 
 #: site_settings.py:1186
 msgid ""
 "Optional. A Wagtail admin icon name, e.g. 'doc-empty' or 'clipboard-list' — "
-"see Wagtail's icon reference (https://docs.wagtail.org/en/stable/"
-"advanced_topics/icons.html). Leave blank for a generic document icon."
+"see Wagtail's icon reference "
+"(https://docs.wagtail.org/en/stable/advanced_topics/icons.html). Leave blank"
+" for a generic document icon."
 msgstr ""
+"Optional. Ein Icon-Name aus dem Wagtail-Admin, z. B. „doc-empty“ oder "
+"„clipboard-list“ — siehe Wagtails Icon-Referenz "
+"(https://docs.wagtail.org/en/stable/advanced_topics/icons.html). Leer lassen"
+" für ein allgemeines Dokument-Icon."
 
 #: site_settings.py:1195
 msgid "Sidebar shortcut"
-msgstr ""
+msgstr "Verknüpfung in der Seitenleiste"
 
 #: site_settings.py:1205
 msgid "sidebar shortcuts"
-msgstr ""
+msgstr "Verknüpfungen in der Seitenleiste"
 
 #: site_settings.py:1207
 msgid ""
@@ -2382,20 +2779,25 @@ msgid ""
 "page's listing in the page explorer — e.g. quick access to your blog or "
 "press releases index. Add as many as you like."
 msgstr ""
+"Verknüpfungen in der Seitenleiste des Wagtail-Admins, die jeweils die Liste "
+"einer gewählten Seite im Seiten-Explorer öffnen — z. B. schneller Zugriff "
+"auf den Blog- oder Pressemitteilungs-Index. Beliebig viele möglich."
 
 #: site_settings.py:1220
 msgid "Admin menu"
-msgstr ""
+msgstr "Admin-Menü"
 
 #: site_settings.py:1243
 msgid ""
 "Photo shown beside the headline on the 404 page. Leave blank for a plain "
 "color panel with no image."
 msgstr ""
+"Foto, das auf der 404-Seite neben der Überschrift erscheint. Leer lassen für"
+" ein einfarbiges Panel ohne Bild."
 
 #: site_settings.py:1253
 msgid "quick links"
-msgstr ""
+msgstr "Schnelllinks"
 
 #: site_settings.py:1255
 msgid ""
@@ -2403,265 +2805,274 @@ msgid ""
 "About, Blog, Press Releases, Take Action and Contact pages. Leave empty to "
 "hide this row entirely."
 msgstr ""
+"Buttons, die auf der 404-Seite unter dem Suchfeld erscheinen, z. B. Links zu"
+" Über uns, Blog, Pressemitteilungen, Aktiv werden und Kontakt. Leer lassen, "
+"um diese Zeile ganz auszublenden."
 
 #: site_settings.py:1268
 msgid "404 page"
-msgstr ""
+msgstr "404-Seite"
 
 #: templates/404.html:4
 msgid "Page not found"
-msgstr ""
+msgstr "Seite nicht gefunden"
 
 #: templates/404.html:24
 msgid "Page not found!"
-msgstr ""
+msgstr "Seite nicht gefunden!"
 
 #: templates/404.html:25
 msgid "Error 404"
-msgstr ""
+msgstr "Fehler 404"
 
 #: templates/404.html:47
 msgid "Uh-oh, looks like the page you are looking for doesn't exist!"
-msgstr ""
+msgstr "Hoppla, die gesuchte Seite scheint es nicht zu geben!"
 
 #: templates/404.html:48
 msgid "Let's get you back on track toward a fossil-free future."
-msgstr ""
+msgstr "Zurück auf den Weg in eine Zukunft ohne fossile Energien."
 
 #: templates/404.html:52
 msgid "Try searching for what you need:"
-msgstr ""
+msgstr "Versuch es mit einer Suche:"
 
 #: templates/404.html:57 templates/wtrx/search/search.html:14
 msgid "Search..."
-msgstr ""
+msgstr "Suchen …"
 
 #: templates/404.html:59 templates/wtrx/search/search.html:16
 msgid "Search query"
-msgstr ""
+msgstr "Suchanfrage"
 
 #: templates/404.html:62 templates/wtrx/search/search.html:3
 #: templates/wtrx/search/search.html:7 templates/wtrx/search/search.html:19
 msgid "Search"
-msgstr ""
+msgstr "Suchen"
 
 #: templates/404.html:70
 msgid "Or you can:"
-msgstr ""
+msgstr "Oder du kannst:"
 
 #: templates/wtrx/components/_hero_video_toggle.html:21
 #: templates/wtrx/components/_hero_video_toggle.html:22
 msgid "Pause Video"
-msgstr ""
+msgstr "Video pausieren"
 
 #: templates/wtrx/components/_hero_video_toggle.html:22
 msgid "Play Video"
-msgstr ""
+msgstr "Video abspielen"
 
 #: templates/wtrx/components/footer_minimal_links.html:9
 msgid "Footer links"
-msgstr ""
+msgstr "Fußzeilenlinks"
 
 #: templates/wtrx/components/language_switcher.html:15
 msgid "Language"
-msgstr ""
+msgstr "Sprache"
 
 #: templates/wtrx/components/pagination.html:10
 msgid "Pagination"
-msgstr ""
+msgstr "Seitennummerierung"
 
 #: templates/wtrx/components/pagination.html:15
 #: templates/wtrx/components/pagination.html:19
 msgid "Previous"
-msgstr ""
+msgstr "Zurück"
 
 #: templates/wtrx/components/pagination.html:40
 #: templates/wtrx/components/pagination.html:44
 msgid "Next"
-msgstr ""
+msgstr "Weiter"
 
 #: templates/wtrx/components/person_card.html:91
 #: templates/wtrx/components/regional_site_switcher.html:69
 msgid "Close"
-msgstr ""
+msgstr "Schließen"
 
 #: templates/wtrx/components/regional_site_switcher.html:47
 #: templates/wtrx/components/regional_site_switcher.html:78
 msgid "Around the World"
-msgstr ""
+msgstr "Rund um die Welt"
 
 #: templates/wtrx/components/streamfield/blocks/_actionkit_form.html:102
 msgid "This field is required."
-msgstr ""
+msgstr "Dieses Feld ist erforderlich."
 
 #: templates/wtrx/components/streamfield/blocks/_actionkit_form.html:103
 msgid "Enter a valid email address."
-msgstr ""
+msgstr "Bitte eine gültige E-Mail-Adresse eingeben."
 
 #: templates/wtrx/components/streamfield/blocks/_actionkit_form.html:104
 #: views.py:92
 msgid "Something went wrong. Please try again."
-msgstr ""
+msgstr "Etwas ist schiefgelaufen. Bitte versuche es erneut."
 
 #: templates/wtrx/components/streamfield/blocks/_actionkit_form.html:477
 msgid "This signup form is temporarily unavailable. Please try again shortly."
 msgstr ""
+"Dieses Anmeldeformular ist vorübergehend nicht verfügbar. Bitte versuche es "
+"gleich noch einmal."
 
 #: templates/wtrx/components/streamfield/blocks/accordion_block.html:126
 #: templates/wtrx/components/streamfield/blocks/video_block.html:16
 msgid "Your browser does not support the video tag."
-msgstr ""
+msgstr "Dein Browser unterstützt das Video-Tag nicht."
 
 #: templates/wtrx/components/streamfield/blocks/card_carousel_block.html:148
 msgid "Previous cards"
-msgstr ""
+msgstr "Vorherige Karten"
 
 #: templates/wtrx/components/streamfield/blocks/card_carousel_block.html:153
 msgid "Next cards"
-msgstr ""
+msgstr "Nächste Karten"
 
 #: templates/wtrx/components/streamfield/blocks/donate_fundraiseup_block.html:73
 msgid "One-time"
-msgstr ""
+msgstr "Einmalig"
 
 #: templates/wtrx/components/streamfield/blocks/donate_fundraiseup_block.html:74
 msgid "Monthly"
-msgstr ""
+msgstr "Monatlich"
 
 #: templates/wtrx/components/streamfield/blocks/donate_fundraiseup_block.html:82
 msgid "Other"
-msgstr ""
+msgstr "Andere"
 
 #: templates/wtrx/components/streamfield/blocks/donate_fundraiseup_block.html:98
 msgid "The Fundraise Up embed will be rendered here on the live site."
 msgstr ""
+"Die Fundraise-Up-Einbettung erscheint an dieser Stelle auf der Live-Website."
 
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:36
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:44
 msgid "First name"
-msgstr ""
+msgstr "Vorname"
 
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:40
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:48
 msgid "Last name"
-msgstr ""
+msgstr "Nachname"
 
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:74
 msgid "JavaScript is required to load the signup form."
-msgstr ""
+msgstr "Für das Anmeldeformular wird JavaScript benötigt."
 
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:16
 msgid "Thank you for signing up!"
-msgstr ""
+msgstr "Danke für deine Anmeldung!"
 
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:23
 msgid "JavaScript is required to load the sign up form."
-msgstr ""
+msgstr "Für das Anmeldeformular wird JavaScript benötigt."
 
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:57
 msgid "Message"
-msgstr ""
+msgstr "Nachricht"
 
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:64
 msgid "Loading form..."
-msgstr ""
+msgstr "Formular wird geladen …"
 
 #: templates/wtrx/components/streamfield/blocks/timeline_block.html:71
 msgid "Jump to year"
-msgstr ""
+msgstr "Zum Jahr springen"
 
 #: templates/wtrx/components/streamfield/blocks/timeline_block.html:72
 msgid "Previous years"
-msgstr ""
+msgstr "Frühere Jahre"
 
 #: templates/wtrx/components/streamfield/blocks/timeline_block.html:103
 msgid "Next years"
-msgstr ""
+msgstr "Spätere Jahre"
 
 #: templates/wtrx/navigation/footer.html:77
 #, python-format
 msgid "&copy; %(year)s %(name)s"
-msgstr ""
+msgstr "&copy; %(year)s %(name)s"
 
 #: templates/wtrx/navigation/footer.html:225
 msgid "Sign up to stay connected."
-msgstr ""
+msgstr "Melde dich an und bleib in Verbindung."
 
 #: templates/wtrx/navigation/footer.html:288
 #, python-format
 msgid "&copy; %(year)s %(name)s."
-msgstr ""
+msgstr "&copy; %(year)s %(name)s."
 
 #: templates/wtrx/navigation/header.html:234
 #: templates/wtrx/navigation/header.html:241
 #: templates/wtrx/navigation/header.html:250
 #: templates/wtrx/navigation/header.html:257
 msgid "Open menu"
-msgstr ""
+msgstr "Menü öffnen"
 
 #: templates/wtrx/navigation/header.html:292
 #: templates/wtrx/navigation/header.html:296
 #: templates/wtrx/navigation/header.html:434
 #: templates/wtrx/navigation/header.html:438
 msgid "Mobile navigation"
-msgstr ""
+msgstr "Mobile Navigation"
 
 #: templates/wtrx/no_cms_access.html:4
 msgid "No CMS access"
-msgstr ""
+msgstr "Kein CMS-Zugang"
 
 #: templates/wtrx/no_cms_access.html:8
 msgid "Oops! You don't have access to the CMS"
-msgstr ""
+msgstr "Hoppla! Du hast keinen Zugang zum CMS"
 
 #: templates/wtrx/no_cms_access.html:10
 msgid ""
 "Please contact the Tech &amp; Security team at <a href=\"mailto:tech-"
-"help@350.org\" class=\"underline\">tech-help@350.org</a> and we can help you "
-"out!"
+"help@350.org\" class=\"underline\">tech-help@350.org</a> and we can help you"
+" out!"
 msgstr ""
+"Bitte wende dich an das Tech- &amp; Security-Team unter <a "
+"href=\"mailto:tech-help@350.org\" class=\"underline\">tech-help@350.org</a> "
+"— wir helfen dir weiter!"
 
 #: templates/wtrx/pages/blogs_page.html:29
 msgid "Filter By:"
-msgstr ""
+msgstr "Filtern nach:"
 
 #: templates/wtrx/pages/blogs_page.html:34
 msgid "All"
-msgstr ""
+msgstr "Alle"
 
 #: templates/wtrx/pages/blogs_page.html:55
 msgid "No posts found."
-msgstr ""
+msgstr "Keine Beiträge gefunden."
 
 #: templates/wtrx/pages/form_page.html:52
 msgid "Submit"
-msgstr ""
+msgstr "Absenden"
 
 #: templates/wtrx/pages/form_page.html:63
 msgid "Thank you for your submission."
-msgstr ""
+msgstr "Danke für deine Einsendung."
 
 #: templates/wtrx/pages/index_page.html:27
 msgid "No pages found."
-msgstr ""
+msgstr "Keine Seiten gefunden."
 
 #: templates/wtrx/search/search.html:39
 #, python-format
 msgid "No results found for \"%(query)s\"."
-msgstr ""
+msgstr "Keine Ergebnisse für „%(query)s“."
 
 #: views.py:50
 msgid "Missing ActionKit page."
-msgstr ""
+msgstr "Fehlende ActionKit-Seite."
 
 #: views.py:57 views.py:63
 msgid "Signup is not configured."
-msgstr ""
+msgstr "Die Anmeldung ist nicht konfiguriert."
 
 #: views.py:74
 msgid "Email address is required."
-msgstr ""
+msgstr "Eine E-Mail-Adresse ist erforderlich."
 
 #: wagtail_hooks.py:190
 msgid "Site design"
-msgstr ""
+msgstr "Websitegestaltung"
