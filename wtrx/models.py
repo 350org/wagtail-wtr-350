@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
 from django.http import JsonResponse
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.html import strip_tags
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
@@ -150,6 +150,27 @@ class BasePage(Page):
         if self.hide_from_search:
             return []
         return super().get_sitemap_urls(request)
+
+    def serve_preview(self, request, mode_name):
+        """
+        Render the preview in the page's own language, not the editor's.
+
+        A served page gets its language from the URL prefix (`/pt/...`) via
+        LocaleMiddleware, but a preview is requested from an admin URL outside
+        `i18n_patterns`, so the active language there is whatever the editor's
+        admin is set to. Without this, previewing a Portuguese page renders
+        every `{% trans %}` string in the chrome -- buttons, pagination, form
+        errors -- in English, which makes the preview useless for exactly the
+        pages that need checking most. Wagtail does not do this itself:
+        `Page.serve_preview()` builds its own TemplateResponse and never
+        touches the active translation.
+        """
+        with translation.override(self.locale.language_code):
+            response = super().serve_preview(request, mode_name)
+            # TemplateResponse renders lazily, after this block would exit.
+            if hasattr(response, "render") and not response.is_rendered:
+                response.render()
+            return response
 
     class Meta:
         abstract = True

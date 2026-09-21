@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     "wagtail.images",
     "wagtail.search",
     "wagtail.admin",
-    "wagtail.locales",
+    "wagtail_localize.locales",
     "wagtail",
     "wagtail_localize",
     "modelcluster",
@@ -131,12 +131,23 @@ LANGUAGE_CODE = "en"
 TIME_ZONE = "UTC"
 USE_TZ = True
 
+# Each language is its own page tree under Root, served at /<code>/ (English,
+# the default, keeps the unprefixed URLs). The codes are the URL prefixes, and
+# they match the country sites 350.org already publishes: /fr/, /pt/, /de/,
+# /id/. Adding a language here is a deploy; creating its Locale row is not
+# (Settings > Locales, or `manage.py bootstrap_locales`).
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
-    # Sites add languages as needed:
-    # ('es', _('Spanish')),
-    # ('fr', _('French')),
+    ("pt", _("Portuguese")),
+    ("es", _("Spanish")),
+    ("fr", _("French")),
+    ("de", _("German")),
+    ("id", _("Indonesian")),
 ]
+
+# Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx
+# ships its own under wtrx/locale/, which Django discovers automatically.
+LOCALE_PATHS = [os.path.join(BASE_DIR, "locale")]
 
 # Static files
 STATICFILES_FINDERS = [

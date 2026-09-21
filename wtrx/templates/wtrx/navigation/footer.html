@@ -45,7 +45,7 @@
             whether a logo is set.
             {% endcomment %}
             <div class="flex flex-col sm:flex-row items-center sm:items-center gap-4">
-                <a href="{% if footer.root_page %}{% pageurl footer.root_page %}{% else %}/{% endif %}" class="shrink-0 flex items-center gap-2">
+                <a href="{% if footer.root_page %}{% pageurl footer.root_page|localized %}{% else %}/{% endif %}" class="shrink-0 flex items-center gap-2">
                     {% if branding.dark_logo %}
                         {% image branding.dark_logo max-120x48 as footer_logo %}
                         <img src="{{ footer_logo.url }}"
@@ -112,7 +112,7 @@
             {% endcomment %}
             <div class="order-1 lg:order-none min-w-0">
                 <div class="mb-10 flex items-center gap-8">
-                    <a href="{% if footer.root_page %}{% pageurl footer.root_page %}{% else %}/{% endif %}" class="inline-flex items-center gap-2">
+                    <a href="{% if footer.root_page %}{% pageurl footer.root_page|localized %}{% else %}/{% endif %}" class="inline-flex items-center gap-2">
                         {% if branding.dark_logo %}
                             {% image branding.dark_logo max-160x60 as footer_logo %}
                             <img src="{{ footer_logo.url }}"
@@ -152,7 +152,7 @@
                                     {% for link in column.value.links %}
                                         <li>
                                             {% if link.block_type == "internal" and link.value.page %}
-                                                <a href="{% pageurl link.value.page %}"
+                                                <a href="{% pageurl link.value.page|localized %}"
                                                    class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                                                     {{ link.value.text }}
                                                 </a>

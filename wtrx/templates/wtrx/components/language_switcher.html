@@ -1,27 +1,33 @@
-{% load i18n %}
+{% load i18n wtrx_tags %}
 {% comment %}
-Language switcher — only rendered when more than one language is active.
-Uses Django's built-in set_language view via a POST form.
-django.middleware.locale.LocaleMiddleware must be enabled.
+Language switcher — links to this page in each language that has content.
+
+Rendered only when more than one Locale exists, so a single-language fork sees
+nothing. `language_links` (wtrx_tags) resolves each target through Wagtail's
+translation linkage, falling back to that language's home page; see its
+docstring for why this is links rather than Django's set_language POST.
+
+Deliberately distinct from regional_site_switcher.html ("Around the World"),
+which goes to other 350.org sites rather than to this page in another language.
 {% endcomment %}
-{% get_available_languages as languages %}
-{% get_current_language as current_lang %}
-{% if languages|length > 1 %}
-    <form action="{% url 'set_language' %}" method="post" class="mt-2">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.path }}">
-        <label for="language-select" class="sr-only">{% trans "Language" %}</label>
-        <select
-            id="language-select"
-            name="language"
-            onchange="this.form.submit()"
-            class="text-sm text-neutral-700 bg-light border border-neutral-300 rounded-md px-2 py-1"
-        >
-            {% for lang_code, lang_name in languages %}
-                <option value="{{ lang_code }}"{% if lang_code == current_lang %} selected{% endif %}>
-                    {{ lang_name }}
-                </option>
+{% language_links as languages %}
+{% if languages %}
+    <nav class="wtr-language-switcher mt-2" aria-label="{% trans 'Language' %}">
+        <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {% for language in languages %}
+                <li>
+                    {% if language.is_current %}
+                        <span class="font-medium" aria-current="true">{{ language.label }}</span>
+                    {% else %}
+                        <a href="{{ language.url }}"
+                           hreflang="{{ language.code }}"
+                           lang="{{ language.code }}"
+                           class="{% if transparent_header %}text-neutral-400 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
+                            {{ language.label }}
+                        </a>
+                    {% endif %}
+                </li>
             {% endfor %}
-        </select>
-    </form>
+        </ul>
+    </nav>
 {% endif %}

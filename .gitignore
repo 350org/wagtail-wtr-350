@@ -58,6 +58,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Compiled translation catalogues — .po is source, .mo is build output
+*.mo
+
 # Test coverage
 .coverage
 htmlcov/

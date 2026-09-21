@@ -416,18 +416,54 @@ forks that don't use these can delete those blocks.
 
 ---
 
-## Adding languages
+## Languages
 
-In `wagtail_wtr/settings/base.py`, uncomment or add languages:
+Each language is its own page tree under Root, served under its own URL prefix.
+English (the default) keeps unprefixed URLs:
+
+```
+Root
+├── Home (en)   ->  example.org/
+├── Home (pt)   ->  example.org/pt/
+└── Home (fr)   ->  example.org/fr/
+```
+
+A translated page is a real, separately editable page linked to its source, so
+it can have its own slug (`/about/` -> `/pt/sobre-nos/`) and can hold pages that
+exist in one language only. An English-language *region* (`/canada/`) is not a
+language and stays an ordinary section under the English Home.
+
+Configured in `wagtail_wtr/settings/base.py`:
 
 ```python
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
-    ("en", "English"),
-    ("es", "Spanish"),
+    ("en", _("English")),
+    ("pt", _("Portuguese")),
 ]
 ```
 
-Translations are managed via the Wagtail admin using wagtail-localize.
+Adding a language takes a deploy (the list above) plus its `Locale` row:
+
+```bash
+make locales          # creates a Locale row per configured language, idempotent
+```
+
+Order matters, and the admin gives no hint about it: Settings > Locales can only
+offer languages already listed in `WAGTAIL_CONTENT_LANGUAGES`. Once every
+configured language has a row, the "Add" button opens a form with an empty
+dropdown and appears to do nothing.
+
+Two separate things get translated:
+
+| What | How |
+|---|---|
+| Page content | Wagtail admin, via wagtail-localize ("Translate this page") |
+| UI chrome (buttons, pagination, form errors) | gettext catalogues: `make messages`, then `make compile-messages` |
+
+`.po` files are committed; `.mo` files are build output (gitignored, compiled in
+the Dockerfile). Identifier fields — ActionKit form IDs, anchor slugs, Fundraise
+Up element IDs — are deliberately excluded from translation; see `IdentifierBlock`
+in `wtrx/blocks/__init__.py`.
 
 ---
 

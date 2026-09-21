@@ -142,7 +142,7 @@ wagtail-wtr/
 | Future pip package | `wagtail-wtrx` (CodeRed pattern) | Package ships concrete models; forks extend with new page types in separate apps. Extraction happens when wtrx is stable. |
 | CSS framework | Tailwind CSS v4 with semantic design tokens | `bg-primary`, `font-heading`, etc. Sites customize via `@theme {}` block in `static_src/css/theme.css`. No raw color values in templates. |
 | Dark mode | No (post-MVP) | Reduces CSS complexity |
-| Multi-lingual | Yes, via `wagtail-localize` | i18n infrastructure from day one. Sites default to English, add languages as needed. |
+| Multi-lingual | Yes, via `wagtail-localize` | One page tree per language under Root, each served at `/<code>/`; English unprefixed. Sites default to English, add languages as needed. |
 | Layout philosophy | Opinionated composite blocks, no raw columns | Editors can't break layouts |
 | Hero | HeroMixin on pages + HeroBlock in StreamField | Dedicated hero at top of page + mid-page hero sections |
 | Page title / h1 | Page title is the h1. `hero_headline` overrides if set. | Every page gets an h1 automatically |
@@ -624,7 +624,7 @@ INSTALLED_APPS = [
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",     # Required for site settings models
     "wagtail.contrib.frontend_cache",  # Required for CDN cache invalidation
-    "wagtail.locales",              # Required for locale management UI (wagtail-localize)
+    "wagtail_localize.locales",     # Locale management UI (replaces wagtail.locales)
     "wagtail_localize",             # Required for i18n support
     "wagtailmedia",                 # Required for VideoBlock (VideoChooserBlock)
     # ... project apps ...
@@ -1047,7 +1047,7 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
 - [ ] Verify ActBlue donation link generation
 - [x] Verify Action Network widget embedding
 - [ ] Verify IndexPage child page listing with pagination
-- [ ] Verify i18n: add a second language, translate a page, confirm language switcher works
+- [x] Verify i18n: add a second language, translate a page, confirm language switcher works
 
 ---
 

@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags %}
+{% load i18n wagtailcore_tags wtrx_tags %}
 {% comment %}
 Pipe-separated inline link list (e.g. "Privacy Policy | Terms of Service").
 Shared by both footer layouts — the minimal layout's top row and the columns
@@ -12,7 +12,7 @@ forloop.first skips the separator before the first link.
                 <span class="text-light" aria-hidden="true">|</span>
             {% endif %}
             {% if item.block_type == "internal" and item.value.page %}
-                <a href="{% pageurl item.value.page %}"
+                <a href="{% pageurl item.value.page|localized %}"
                    class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                     {{ item.value.text }}
                 </a>

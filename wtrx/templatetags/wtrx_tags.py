@@ -1,10 +1,11 @@
 import json
 
 from django import template
+from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.html import _json_script_escapes, format_html
 from django.utils.safestring import mark_safe
-from wagtail.models import Site
+from wagtail.models import Locale, Site
 
 from wtrx.blocks import background_is_light as _background_is_light, resolve_background
 from wtrx.integrations import actionkit
@@ -506,3 +507,174 @@ def absolute_uri(url, request):
     if not url:
         return url
     return request.build_absolute_uri(url)
+
+
+# ---------------------------------------------------------------------------
+# Languages
+# ---------------------------------------------------------------------------
+
+
+@register.simple_tag(takes_context=True)
+def language_links(context):
+    """
+    Links to this page in every other language that has content.
+
+    Each language is its own page tree under Root (see WAGTAIL_CONTENT_LANGUAGES
+    in settings/base.py), so "the same page in French" is a real, separately
+    editable page found through Wagtail's `translation_key` linkage, not a URL
+    with a different prefix. Where no translation of this page exists, the link
+    falls back to that language's home page -- a visitor who wants the French
+    site should land on the French site, not on a 404 for a page nobody has
+    translated yet.
+
+    This is deliberately NOT Django's `set_language` view. That view switches
+    the *interface* language and redirects to the same path, which in this
+    architecture points at a page in the wrong tree (translated pages have
+    translated slugs, so `/pt/about/` need not exist for `/about/`) or at the
+    wrong content entirely.
+
+    Returns a list of dicts: `code`, `label`, `url`, `is_current`. Languages
+    with neither a translation of this page nor a reachable home page are
+    omitted rather than linked to nothing. Distinct from the "Around the World"
+    regional switcher (regional_site_switcher.html), which goes to other
+    350.org *sites*.
+    """
+    page = context.get("page")
+    request = context.get("request")
+
+    locales = {locale.pk: locale for locale in Locale.objects.all()}
+    if len(locales) < 2:
+        return []
+
+    labels = dict(getattr(settings, "WAGTAIL_CONTENT_LANGUAGES", []))
+
+    # This page in each language, where it has been translated.
+    pages_by_locale = {}
+    if page is not None:
+        pages_by_locale[page.locale_id] = page
+        for translation_page in page.get_translations().live().select_related("locale"):
+            pages_by_locale[translation_page.locale_id] = translation_page
+
+    # Fallback target: each language's own home page (a translation of the
+    # site root), resolved once and only when something actually needs it.
+    homes_by_locale = None
+
+    links = []
+    for locale in locales.values():
+        label = labels.get(locale.language_code)
+        if label is None:
+            # A Locale row for a language no longer offered in settings.
+            continue
+
+        target = pages_by_locale.get(locale.pk)
+        if target is None:
+            if homes_by_locale is None:
+                homes_by_locale = _locale_home_pages(request)
+            target = homes_by_locale.get(locale.pk)
+        if target is None:
+            continue
+
+        url = target.get_url(request=request)
+        if not url:
+            continue
+
+        links.append(
+            {
+                "code": locale.language_code,
+                "label": label,
+                "url": url,
+                "is_current": page is not None and locale.pk == page.locale_id,
+            }
+        )
+
+    return links
+
+
+def _locale_home_pages(request):
+    """Map locale id -> that language's home page, for the current site."""
+    site = Site.find_for_request(request) if request else Site.objects.filter(is_default_site=True).first()
+    if site is None:
+        return {}
+    roots = site.root_page.get_translations(inclusive=True).live().select_related("locale")
+    return {root.locale_id: root for root in roots}
+
+
+@register.simple_tag(takes_context=True)
+def page_translation_alternates(context):
+    """
+    hreflang alternates for this page's real translations.
+
+    Unlike `language_links`, this never falls back to a language's home page:
+    an `<link rel="alternate" hreflang="fr">` pointing at the French home page
+    is a claim to search engines that the two pages are the same content, which
+    for an untranslated page is false. Only pages genuinely linked by
+    `translation_key` are emitted, along with the page itself, and the
+    default-language version additionally as `x-default`.
+
+    Returns a list of dicts: `code`, `url` (absolute, so the tag is usable in
+    `<head>`). Empty for an untranslated page — a lone self-referencing
+    alternate says nothing.
+    """
+    page = context.get("page")
+    if page is None:
+        return []
+
+    request = context.get("request")
+    translations = [
+        translation
+        for translation in page.get_translations().live().select_related("locale")
+        # Alias pages are excluded deliberately. wagtail-localize creates one
+        # whenever a translation needs an untranslated parent (translating
+        # /canada/ into French creates a French Home aliasing the English one),
+        # purely so the language tree has a root path. An alias mirrors its
+        # source rather than translating it, so advertising it as the French
+        # version of a page tells search engines that English content is a
+        # French translation of itself.
+        if translation.alias_of_id is None
+    ]
+    if not translations:
+        return []
+
+    default_code = getattr(settings, "LANGUAGE_CODE", "en")
+    alternates = []
+    default_url = None
+
+    for candidate in [page, *translations]:
+        url = candidate.get_full_url(request=request)
+        if not url:
+            continue
+        code = candidate.locale.language_code
+        alternates.append({"code": code, "url": url})
+        if code == default_code:
+            default_url = url
+
+    if default_url:
+        alternates.append({"code": "x-default", "url": default_url})
+
+    return alternates
+
+
+@register.filter
+def localized(page):
+    """
+    This page in the language currently being served, where it exists.
+
+    Navigation, footer and CTA links are chosen once in site settings
+    (`NavigationSettings`/`FooterSettings` are `BaseSiteSetting` — one row per
+    Site, shared by every language tree), so the page chooser holds the English
+    page. Rendering that link as-is sends a visitor reading `/pt/` back into the
+    English site on the first click.
+
+    Wagtail's own `Page.localized` resolves to the translation matching the
+    active language and falls back to the page itself when there is none, which
+    is exactly the behaviour wanted here: a translated destination is used, an
+    untranslated one still links somewhere real rather than 404ing. Costs one
+    query per link on pages outside the default language; none on English pages
+    (`localized` short-circuits when the locale already matches).
+
+    Usage:
+        <a href="{% pageurl item.value.page|localized %}">
+    """
+    if page is None:
+        return page
+    return getattr(page, "localized", page)
