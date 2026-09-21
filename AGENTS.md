@@ -215,12 +215,29 @@ ES modules, 4-space indent, semicolons required.
    providing a dedicated hero at the top of a page (`HomePage`,
    `ContentPage`, etc.); `HeroBlock` places a hero-style section *within*
    the body StreamField. Both render `components/hero.html` and must pass a
-   `hero` context dict with exactly these keys: `variant`, `headline`,
-   `copy`, `copy_is_block`, `image`, `video`, `image_caption`,
+   `hero` context dict with exactly these keys: `variant`, `pre_header`,
+   `headline`, `copy`, `copy_is_block`, `image`, `video`, `image_caption`,
    `banner_color`, `cta`, `tag`, `tag_url`, `author`, `published_at`,
-   `minimal`, `in_body`. `in_body=True` only for `HeroBlock` — it swaps the
-   page-hero's flat 16px gutter for the `px-4 sm:px-6 lg:px-8` every other
-   full-bleed body block uses. `hero` and `quote` must stay in each page
+   `minimal`, `in_body`. `in_body=True` only for `HeroBlock`, and it no
+   longer changes the gutter — every hero and every full-width block now
+   shares one container, `mx-auto max-w-[1500px] px-4` (flat 16px at every
+   breakpoint). The nav (`header.html`) deliberately still steps
+   `px-4 sm:px-6 lg:px-8`, so from `sm:` up the header's content is inset
+   8–16px further than the hero beneath it. `pre_header` is an uppercase
+   overline above the headline, editable on `HomePage` only
+   (`HeroMixin.hero_panels`; `banner_hero_panels` omits it, and
+   `BannerHeroMixin`/`HeroBlock` pin it `None`). In the "full" variant it
+   sits on a translucent dark scrim (`.wtr-hero-pre-header` in `main.css`,
+   which owns its padding and 6px radius) for contrast against the
+   background photo — the hero's own gradient fades to transparent at the
+   top and so does not cover this band. Deliberately not the `eyebrow`
+   pill of `FeaturePanelBlock`/`SignupActionKitBlock`: an opaque fill at
+   `wtr-btn`'s radius reads as a CTA, and `hero.cta` renders a real button
+   just below it. The rule is scoped `.wtr-hero:not(.wtr-hero-banner)` —
+   the banner variant's text column sits on a flat `banner_color` fill and
+   flips to `text-dark` on a light banner, where a dark scrim would be
+   wrong. It is the site's only non-heading user of `font-heavy`
+   (pitfall #34). `hero` and `quote` must stay in each page
    template's full-bleed block-type list (both own a `max-w-[1500px]`
    wrapper that's unreachable inside the shared body column). When
    `hero.video` is a wagtailmedia `Media`, the template switches to a
@@ -510,10 +527,10 @@ check.
     Light/dark text branches on `background_is_light`
     (`LIGHT_BACKGROUND_COLORS = {white, light-grey}`), computed once via
     `{% with %}`, never a direct color-name comparison. `SectionBlock`
-    renders as an inset rounded panel (`max-w-[1500px]
-    px-4 sm:px-6 lg:px-8`, matching `image_block.html`'s and the nav's own
-    container/radius) publishing `data-bg-tone` for children to invert
-    against. `IMAGE_ALIGNMENT_CHOICES` is the same kind of shared constant
+    renders as an inset rounded panel (`max-w-[1500px] px-4`, matching
+    `image_block.html`'s own container/radius — see pitfall #60 for the
+    single full-width container string and why the nav is no longer part of
+    it) publishing `data-bg-tone` for children to invert against. `IMAGE_ALIGNMENT_CHOICES` is the same kind of shared constant
     for left/right image blocks (`QuoteBlock`, `FeaturePanelBlock`,
     `ImageCardListBlock`, `ImageTextBlock`, `DonateFundraiseUpBlock`) — the
     image column always stays the first DOM child and gets
@@ -526,12 +543,17 @@ check.
     copies `static_src/fonts/` into gitignored `static_compiled/fonts/`.
     Four faces map to specific weights, and three are **remapped tokens**
     that will surprise anyone assuming Tailwind defaults: `font-medium` =
-    600 (not 500), `font-semibold`/`font-bold` both = 700 (no utility
-    reaches Heavy/800). **h1/h2 get Heavy, h3-h6 get Bold via bare element
-    rules in `main.css`** (unlayered, so they beat any weight utility on a
-    heading outright, including Tailwind Typography's own hardcoded prose
-    weights) — putting a weight utility on a heading silently does
-    nothing; add/change an unlayered element rule instead. Only `woff2`+
+    600 (not 500), `font-semibold`/`font-bold` both = 700, and Heavy (800)
+    is reachable only through `font-heavy`, a utility Tailwind generates
+    from theme.css's own `--font-weight-heavy` token. **h1/h2 get Heavy,
+    h3-h6 get Bold via bare element rules in `main.css`** (unlayered, so
+    they beat any weight utility on a heading outright, including Tailwind
+    Typography's own hardcoded prose weights) — putting a weight utility on
+    a *heading* silently does nothing; add/change an unlayered element rule
+    instead (`.wtr-timeline-year-label` is the worked example). A
+    **non-heading** element is not covered by those rules and takes
+    `font-heavy` normally: `.wtr-hero-pre-header` (a `<p>`) is the one
+    element on the site that does this. Only `woff2`+
     `woff` are shipped (no `eot`/`svg`/`ttf`).
 35. **Alt text is the rendition's `alt`**, not `image.title` (which
     defaults to the filename) — read via `{% image ... as img %}` then
@@ -565,12 +587,24 @@ check.
     not removing it** — key error-state CSS off `:has(.ak-error)`
     (the label/input class AK does remove), never `:has(> ul.ak-err)`. AK
     also reports one field error at a time.
-39. **Some block adjacencies auto-tighten to 32px** (from the page loop's
+39. **Some block adjacencies auto-tighten** (from the page loop's
     default 96px/128px `space-y-*`) via unlayered `:has()` rules in
-    `main.css`'s "Body-stack spacing" section — around `button` blocks, and
-    `text` immediately before a card row. Deliberate and automatic, not
+    `main.css`'s "Body-stack spacing" section — to 32px around `button`
+    blocks and for `text` immediately before a card row, and to **40px
+    after a `heading` block**. Deliberate and automatic, not
     editor-configurable, and one-directional (card-row → text stays at the
-    full gap).
+    full gap). `heading` is the one rule with no `:has()` test on what
+    follows, because a section title is always followed by its own
+    content. Its 40px is not a third invented number: it is
+    `CardGridBlock`/`PageCardsBlock`'s own `mb-10` between their optional
+    heading and their cards, which `HeadingBlock` exists to match (see
+    pitfall #64). The gap between two blocks in this stack is always the
+    **earlier** block's `margin-block-end`, so a heading's 40px belongs on
+    the block wrapper, never as an `mb-10` on its own `h2` — that would
+    sum with the loop's gap to 136px. A `heading` inside a `SectionBlock`
+    keeps that panel's `space-y-8` (32px) instead: `section_block.html`
+    wraps its children in no `data-block-type` element, so there is
+    nothing for these rules to select.
 40. **`RawHTMLBlock.clean()` validates tag balance only** (a hand-written
     stack-based `HTMLParser` subclass), not HTML safety or full
     conformance — catches the common stray/missing closing tag, nothing
@@ -1118,3 +1152,119 @@ Present changes to the user and explicitly ask them to review; wait for
 sign-off before committing. There is no mandatory automated agent-review
 step — `/code-review` (or similar) is available on request, not a required
 gate.
+
+60. **There is one container string for full-width content:
+    `mx-auto max-w-[1500px] px-4` — a flat 16px gutter at every
+    breakpoint.** Used by `components/hero.html` (both variants),
+    `section_block.html`, `image_block.html`, `quote_block.html`,
+    `timeline_block.html`, `signup_actionkit_block.html`,
+    `feature_panel_block.html` and `donate_fundraiseup_block.html`. Two
+    things used to break alignment here and both are easy to reintroduce:
+    - **The two idioms are not equivalent.** `max-w-[1500px] px-8` on one
+      element (cap and gutter together) gives a 1436px panel; a `w-full
+      px-8` shell wrapping a `max-w-[1500px]` child gives a 1500px panel
+      whose edge sits 32px further out. `SignupActionKitBlock`,
+      `FeaturePanelBlock` and `DonateFundraiseUpBlock` were all the second
+      shape and so sat wider than `SectionBlock` despite three of them
+      naming 1500px. Put the cap and the gutter on the *same* element.
+    - **`px-4 sm:px-6 lg:px-8` is not the full-width gutter.** It is the
+      *body column's* gutter, and it is still correct there and on the
+      narrower `max-w-[1218px]` card families. A full-width block that
+      copies it is inset 8–16px too far from `sm:` up.
+    The nav (`header.html`) deliberately keeps `px-4 sm:px-6 lg:px-8`, so
+    its content is inset further than the hero directly beneath it at
+    `sm:` and above. That is the long-standing behaviour (the page hero
+    always had a flat `px-4`), not an oversight — changing it is a
+    one-line edit if the design ever wants them flush.
+    `card_carousel_block.html` is the other deliberate exception: it uses
+    `pl-4 sm:pl-6 lg:pl-8`, a left gutter only, because the carousel is
+    meant to bleed off the right edge.
+
+61. **The gap between the hero and the first body block is conditional,
+    and lives entirely in CSS.** `base.html` gives `<main>` a flat
+    `my-32` (128px). An unlayered rule in `main.css` ("Hero -> first
+    full-bleed block") overrides `margin-block-start` to 16px, but only
+    when **both** hold: `body:has(.wtr-page-hero)`
+    (set by `hero.html` only when `in_body` is false, so a mid-body
+    `HeroBlock` never triggers it and a `hide_hero` page correctly keeps
+    128px) **and** the stack's `:first-child` is one of exactly four
+    panel-shaped types: `section`, `signup_actionkit`,
+    `donate_fundraiseup`, `feature_panel`. Those four render as filled
+    rounded panels at the hero's own width, so hero-then-panel reads as
+    one stack. Every other type keeps 128px — **including full-bleed ones
+    like `image`, `quote` or `card_grid`**, which sit directly on the page
+    background and need the section break. "Is full-bleed" and "is a
+    panel" are different questions that merely overlap; the four are
+    listed by hand and a new panel block must be added to that selector
+    deliberately.
+    **That margin is the only source of the gap below a hero.** The hero
+    wrapper in `components/hero.html` used to carry a `pb-4` of its own as
+    well, which summed with this rule to a visible 32px wherever it fired
+    (and gave a mid-body `HeroBlock` a stray 16px under it that no other
+    block in the stack has). Both hero variants now end flush at their
+    panel edge — don't reintroduce vertical padding there to "fix" a gap;
+    change this margin instead.
+
+62. **`wtr-btn` sets `white-space: nowrap`**, so a button cannot wrap
+    however wide its container is. `ButtonGroupBlock`'s "vertical" layout
+    caps its column (`mx-auto max-w-sm`) and stretches its buttons
+    (`items-stretch` at every breakpoint, not just below `sm:` as before),
+    which only reads correctly because `.wtr-button-group-vertical
+    .wtr-btn` in `main.css` overrides `white-space` to `normal` and adds
+    `text-align: center` — `wtr-btn` sets no text-align, so a stretched
+    `inline-block` would left-align its label beside centred shorter
+    siblings. Unlayered, so it beats `wtr-btn`'s own `@utility`
+    declarations. `feature_panel_block.html` solves the same problem
+    inline on a single button. Horizontal rows deliberately keep
+    content-width, `nowrap` buttons — a row of stretched buttons reads as
+    a segmented control rather than as separate CTAs.
+
+63. **`ContentPage.hide_hero` is gated by `FieldPanel(permission=
+    "wtrx.disable_hero")`**, a custom permission declared in
+    `ContentPage.Meta.permissions` rather than on a proxy or unmanaged
+    model — it is the only page type with the field, so there is nothing
+    to share and it costs one `AlterModelOptions` instead of a second
+    model and ContentType. Wagtail removes the field from the form
+    entirely for users without it, so it cannot be set by POSTing either;
+    superusers always pass `has_perm`. Assign it to a group in Settings >
+    Groups.
+    The checkbox lives **inside** the Hero `MultiFieldPanel`, as its last
+    child — after the fields it turns off. That is why `HeroMixin` exposes
+    `banner_hero_fields` (the panel's children) alongside
+    `banner_hero_panels` (the assembled panel): `ContentPage` rebuilds the
+    same panel around those children plus the toggle, since the shared
+    `banner_hero_panels` can't carry a field `IndexPage` and `Blogs` lack.
+    Sharing `FieldPanel` instances across two `MultiFieldPanel`s on two
+    models is safe — `Panel.bind_to_model()` clones before setting
+    `.model`. Nesting does not weaken the gate:
+    `PanelGroup.get_form_options()` merges each child's `field_permissions`
+    dict upward, so the field stays absent from the form itself. Note a
+    nested `PanelGroup` renders via `multi_field_panel_child.html` (a bare
+    `<h3>`, no toggle), so `classname="collapsed"` does nothing there — a
+    collapsed fieldset needs a top-level panel, unlike blocks, which get
+    one from `Meta.collapsed` (pitfall #54). The hero owns the page's only `<h1>` (via
+    `hero.headline`, which falls back to the page title), so
+    `content_page.html` emits `<h1 class="sr-only">{{ page.title }}</h1>`
+    when the hero is hidden — without it the document has no `h1` at all,
+    since every body heading is `h2` or lower.
+
+64. **`HeadingBlock` and the card-row heading are kept in step by
+    convention, not by shared code.** `heading_block.html` lifts its
+    container tiers and its whole `h2` class string from
+    `card_grid_block.html`'s own optional heading, so a standalone heading
+    and a card-row heading on the same page line up on the same edge and
+    share a type size. Nothing in code links them — changing one means
+    changing the other by hand, in both templates.
+    The one place they deliberately differ is where the 40px below the
+    heading is applied: `card_grid_block.html` puts `mb-10` on its `h2`
+    (an internal gap, down to its own cards), while `HeadingBlock` gets
+    the same 40px from a `data-block-type='heading'` rule in `main.css`'s
+    "Body-stack spacing" (a gap between two blocks, which in that stack is
+    always the earlier block's `margin-block-end` — see pitfall #39).
+    Putting `mb-10` on `heading_block.html`'s `h2` as well would sum with
+    the page loop's `space-y-24/32` to 136px.
+    It is also registered on both `BodyStreamBlock` and
+    `SectionContentBlock`, and must stay in every page template's
+    full-bleed block-type list — like the card families it owns a
+    `max-w-[1218px]` tier that is unreachable inside the shared body
+    column.

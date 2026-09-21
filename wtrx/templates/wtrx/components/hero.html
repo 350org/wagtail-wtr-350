@@ -5,6 +5,11 @@
   Expects a `hero` dict (or object) with these keys/attributes:
     variant       — "full" (HomePage's page-level hero only) or "banner"
                     (every other HeroMixin page, and always for HeroBlock)
+    pre_header    — optional short line rendered above the headline as a
+                    plain uppercase overline (no pill chrome), e.g.
+                    "Welcome to 350 Canada". Exposed as an editable field
+                    on HomePage only (HeroMixin.hero_panels); pinned None
+                    by BannerHeroMixin (Post) and HeroBlock.
     headline      — the heading text (str)
     copy          — optional richtext value (rendered via |richtext or include_block)
     copy_is_block — True if copy should be rendered via include_block, False for |richtext
@@ -83,11 +88,9 @@
     {# BANNER VARIANT — compact color panel beside an image/video          #}
     {# ------------------------------------------------------------------ #}
     {% comment %}
-    Flat px-4/pb-4 (16px), no top padding — matches Figma's Content Hero
-    wrapper exactly (px-[16px] pb-[16px], no pt). The gap above the hero
-    comes entirely from header.html's own py-6 bottom padding, same as
-    Figma's Nav (py-[24px]) sitting directly above with no extra hero-side
-    top padding of its own.
+    Flat px-4 (16px), no vertical padding. Figma's Content Hero wrapper
+    specifies pb-[16px]; that 16px lives on base.html's <main> instead.
+    The gap above comes from header.html's own py-6.
 
     This also applies when this same template renders as a mid-page
     HeroBlock inside page.body instead of the page-level HeroMixin hero:
@@ -97,18 +100,21 @@
     {% endcomment %}
     {% with on_light=hero.banner_color|background_is_light %}
     {% comment %}
-    Gutter differs by caller. A page-level hero keeps Figma's flat 16px
-    wrapper (above). A mid-page HeroBlock instead takes the same
-    px-4 sm:px-6 lg:px-8 every other full-bleed body block uses
-    (image, image_text, callout, card_grid, signup_actionkit), because in
-    the body it sits in a stack with them and a 16px gutter against their
-    32px one reads as the hero being misaligned rather than as a
-    deliberate full-bleed. The 1500px cap is shared either way, and
-    "hero" is in the page templates' full-bleed list so that cap is
+    One container string for every caller, shared with every full-bleed
+    body block: mx-auto max-w-[1500px] px-4, a flat 16px gutter at every
+    breakpoint (AGENTS.md pitfall #60). The nav (navigation/header.html)
+    deliberately still steps px-4 sm:px-6 lg:px-8, so from sm: up its
+    content is inset further than the hero beneath it.
+
+    "hero" is in the page templates' full-bleed list so the 1500px cap is
     actually reachable — without it the block was wrapped in max-w-5xl and
     rendered 1024px wide against the image block's 1500px.
+
+    No bottom padding here, deliberately: the gap below the hero belongs
+    entirely to base.html's <main> margin — see main.css's "Hero -> first
+    full-bleed block".
     {% endcomment %}
-    <div class="mx-auto max-w-[1500px] pb-4 {% if hero.in_body %}px-4 sm:px-6 lg:px-8{% else %}px-4{% endif %}">
+    <div class="{% if not hero.in_body %}wtr-page-hero {% endif %}mx-auto max-w-[1500px] px-4">
         {% comment %}
         Height is normally a flat md:min-h-[385px], sized for two columns of
         real content. `minimal` (headline, and optionally an image, but no
@@ -169,6 +175,22 @@
                     {% endcomment %}
                     {% if hero.published_at %}
                         <p class="text-sm">{{ hero.published_at|date:"F j, Y" }}</p>
+                    {% endif %}
+                    {% if hero.pre_header %}
+                        {% comment %}
+                        Only HomePage exposes hero_pre_header today (see
+                        HeroMixin.hero_panels), so in practice this renders in
+                        the "full" branch below. Kept here too so the field is
+                        a one-line panel change away from working on a banner
+                        page, rather than a template change as well.
+
+                        No scrim here: this column sits on a flat
+                        banner_color fill and inherits its on_light text
+                        colour, so there is no contrast to correct.
+                        {% endcomment %}
+                        <p class="wtr-hero-pre-header font-heading text-lg font-heavy uppercase tracking-[0.1em] lg:text-2xl">
+                            {{ hero.pre_header }}
+                        </p>
                     {% endif %}
                     {% comment %}
                     48px (lg:text-5xl) is the banner headline — the "full"
@@ -290,106 +312,134 @@
     {# choice too; removed in favor of always left-aligned, matching what #}
     {# every real "full"-variant page already used in practice.           #}
     {# ------------------------------------------------------------------ #}
-    <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col mx-4 rounded-lg justify-end
-                {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}"
-         {% if hero.video %}data-hero{% endif %}>
+    {% comment %}
+    Same container as the "banner" variant above: mx-auto max-w-[1500px]
+    px-4, a flat 16px gutter at every breakpoint (AGENTS.md pitfall #60).
+    No bottom padding — the gap below belongs to base.html's <main>.
 
-        {% if hero.video %}
-            {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1600x700" %}
-            {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-4 right-4 z-10 sm:top-6 sm:right-6" %}
-        {% elif hero.image %}
-            {% image hero.image fill-1600x700 as bg %}
-            {% comment %}
-            "full" is HomePage's page-level hero only (see hero.html's
-            docstring) -- always above the fold, so no hero.in_body branch
-            is needed here the way the "banner" variant above has one.
-            loading="lazy" here was actively deferring the site's own LCP
-            image.
-            {% endcomment %}
-            <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
-                 alt="{{ hero.image.description }}"{% if not hero.image.description %} role="presentation"{% endif %}
-                 class="absolute inset-0 h-full w-full object-cover"
-                 style="{{ hero.image.object_position_style }}" loading="eager" fetchpriority="high">
-        {% endif %}
+    It has to be a wrapper rather than utilities on the panel itself: the
+    panel carries rounded-lg/overflow-hidden/bg-dark, so a gutter applied
+    there would pad the inside of the rounded panel instead of insetting it.
+    {% endcomment %}
+    <div class="{% if not hero.in_body %}wtr-page-hero {% endif %}mx-auto max-w-[1500px] px-4">
+        <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col rounded-lg justify-end
+                    {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}"
+             {% if hero.video %}data-hero{% endif %}>
 
-        {% if hero.video or hero.image %}
-            {% comment %}Linear gradient scrim over the background (dark, fading from bottom to transparent
-               at top) at 80% opacity — matches the Figma hero fill stack: FFFFFF base,
-               Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
-               busy photos/video without flattening the whole background like a uniform opacity did.{% endcomment %}
-            <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
-        {% endif %}
-        {% comment %}
-        No image_caption chrome in this "full" variant — hero.image_caption
-        is a "banner"-only field (HomePage's hero_panels omits it; see
-        HeroMixin). The banner variant's own media column has the
-        .wtr-image-caption pill, above.
-        {% endcomment %}
-
-        {% comment %}
-        This padding is Figma's Hero Video - Condensed Signup (node 1:560)
-        read literally: its Content frame sits 128px in from the hero's left
-        edge and 64px up off its floor, with no max-width centering of its
-        own — the headline's own 1033px cap (below) is what bounds the line
-        length. This was mx-auto max-w-7xl, which lands near 128px at
-        Figma's own 1512px frame width but drifts wider on every larger
-        screen (336px at 1920), pulling the headline away from the edge the
-        design anchors it to.
-
-        z-10 (not just relative): this column, the gradient scrim above, and
-        the background video/image below are all positioned siblings with no
-        z-index, so paint order falls back to DOM order — this column comes
-        last and should already win. That held in Chromium testing, but
-        video elements are a known spot for browsers to special-case
-        compositing/stacking, which silently broke it (the CTA's success
-        message rendered underneath the scrim). Both the banner variant's
-        text column and the video pause/play toggle above already carry an
-        explicit z-10 for the same reason; this brings the "full" variant's
-        content column in line with that instead of the one place still
-        depending on implicit ordering.
-        {% endcomment %}
-        <div class="relative z-10 w-full text-light px-6 py-10 text-left sm:px-10 sm:py-12 lg:px-32 lg:py-16">
-
-            {% comment %}
-            96px/1.135, no tracking, capped at 1033px — Figma's headline text
-            node measures 1033x218 for its two 96px lines (218/2/96 = 1.135),
-            and specifies no letter-spacing, so tracking-tight's -0.025em
-            (-2.4px per character at this size) is dropped here: the 1033px
-            cap is drawn against normal tracking.
-            {% endcomment %}
-            <h1 class="font-heading text-4xl text-balance sm:text-5xl lg:text-8xl lg:leading-[1.135] lg:max-w-[1033px]">
-                {{ hero.headline }}
-            </h1>
-
-            {% if hero.copy %}
-                <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl">
-                    {% if hero.copy_is_block %}
-                        {% include_block hero.copy %}
-                    {% else %}
-                        {{ hero.copy|richtext }}
-                    {% endif %}
-                </div>
+            {% if hero.video %}
+                {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1600x700" %}
+                {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-4 right-4 z-10 sm:top-6 sm:right-6" %}
+            {% elif hero.image %}
+                {% image hero.image fill-1600x700 as bg %}
+                {% comment %}
+                "full" is HomePage's page-level hero only (see hero.html's
+                docstring) -- always above the fold, so no hero.in_body branch
+                is needed here the way the "banner" variant above has one.
+                loading="lazy" here was actively deferring the site's own LCP
+                image.
+                {% endcomment %}
+                <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
+                     alt="{{ hero.image.description }}"{% if not hero.image.description %} role="presentation"{% endif %}
+                     class="absolute inset-0 h-full w-full object-cover"
+                     style="{{ hero.image.object_position_style }}" loading="eager" fetchpriority="high">
             {% endif %}
 
+            {% if hero.video or hero.image %}
+                {% comment %}Linear gradient scrim over the background (dark, fading from bottom to transparent
+                   at top) at 80% opacity — matches the Figma hero fill stack: FFFFFF base,
+                   Image at 100%, Linear gradient at 80% on top. Keeps text/CTA legible over
+                   busy photos/video without flattening the whole background like a uniform opacity did.{% endcomment %}
+                <div class="absolute inset-0 bg-gradient-to-t from-dark/80 via-dark/40 to-transparent" aria-hidden="true"></div>
+            {% endif %}
             {% comment %}
-            hero.cta — at most one of a button or a signup bar (donate and
-            announcement-bar CTAs are commented out in HeroCTABlock's
-            definition until they're properly implemented — see
-            HeroCTABlock's docstring).
-
-            Sizing is Figma's: 20px below the headline (its Content frame's
-            gap), and a 677px-wide widget — exactly what the Signup
-            Horizontal instance measures, and just enough for its two 250px
-            fields plus the submit button on one row (250 + 250 + 144 + two
-            16px gaps). max-w-2xl (672px) fell 5px short of that and wrapped
-            the button onto its own line.
+            No image_caption chrome in this "full" variant — hero.image_caption
+            is a "banner"-only field (HomePage's hero_panels omits it; see
+            HeroMixin). The banner variant's own media column has the
+            .wtr-image-caption pill, above.
             {% endcomment %}
-            {% for cta_block in hero.cta %}
-                <div class="mt-5 max-w-[677px]">
-                    {% include_block cta_block with compact=True %}
-                </div>
-            {% endfor %}
 
+            {% comment %}
+            This padding is Figma's Hero Video - Condensed Signup (node 1:560)
+            read literally: its Content frame sits 128px in from the hero's left
+            edge and 64px up off its floor, with no max-width centering of its
+            own — the headline's own 1033px cap (below) is what bounds the line
+            length. This was mx-auto max-w-7xl, which lands near 128px at
+            Figma's own 1512px frame width but drifts wider on every larger
+            screen (336px at 1920), pulling the headline away from the edge the
+            design anchors it to.
+
+            z-10 (not just relative): this column, the gradient scrim above, and
+            the background video/image below are all positioned siblings with no
+            z-index, so paint order falls back to DOM order — this column comes
+            last and should already win. That held in Chromium testing, but
+            video elements are a known spot for browsers to special-case
+            compositing/stacking, which silently broke it (the CTA's success
+            message rendered underneath the scrim). Both the banner variant's
+            text column and the video pause/play toggle above already carry an
+            explicit z-10 for the same reason; this brings the "full" variant's
+            content column in line with that instead of the one place still
+            depending on implicit ordering.
+            {% endcomment %}
+            <div class="relative z-10 w-full text-light px-6 py-10 text-left sm:px-10 sm:py-12 lg:px-32 lg:py-16">
+
+                {% if hero.pre_header %}
+                    {% comment %}
+                    Sits on a translucent scrim for contrast against the
+                    background photo — see .wtr-hero-pre-header in main.css,
+                    which also owns the padding and radius.
+
+                    mb-4 rather than a flex gap: this column spaces its
+                    children with explicit margins (copy mt-4, cta mt-5).
+
+                    font-heavy, not font-bold: a <p> takes a weight utility
+                    normally, unlike a heading (AGENTS.md pitfall #34). This
+                    is the site's only non-heading user of Klima Heavy.
+                    {% endcomment %}
+                    <p class="wtr-hero-pre-header mb-4 font-heading text-lg font-heavy uppercase tracking-[0.1em] text-light lg:text-2xl">
+                        {{ hero.pre_header }}
+                    </p>
+                {% endif %}
+                {% comment %}
+                96px/1.135, no tracking, capped at 1033px — Figma's headline text
+                node measures 1033x218 for its two 96px lines (218/2/96 = 1.135),
+                and specifies no letter-spacing, so tracking-tight's -0.025em
+                (-2.4px per character at this size) is dropped here: the 1033px
+                cap is drawn against normal tracking.
+                {% endcomment %}
+                <h1 class="font-heading text-4xl text-balance sm:text-5xl lg:text-8xl lg:leading-[1.135] lg:max-w-[1033px]">
+                    {{ hero.headline }}
+                </h1>
+
+                {% if hero.copy %}
+                    <div class="wtr-hero-copy mt-4 prose prose-invert text-lg max-w-2xl">
+                        {% if hero.copy_is_block %}
+                            {% include_block hero.copy %}
+                        {% else %}
+                            {{ hero.copy|richtext }}
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                {% comment %}
+                hero.cta — at most one of a button or a signup bar (donate and
+                announcement-bar CTAs are commented out in HeroCTABlock's
+                definition until they're properly implemented — see
+                HeroCTABlock's docstring).
+
+                Sizing is Figma's: 20px below the headline (its Content frame's
+                gap), and a 677px-wide widget — exactly what the Signup
+                Horizontal instance measures, and just enough for its two 250px
+                fields plus the submit button on one row (250 + 250 + 144 + two
+                16px gaps). max-w-2xl (672px) fell 5px short of that and wrapped
+                the button onto its own line.
+                {% endcomment %}
+                {% for cta_block in hero.cta %}
+                    <div class="mt-5 max-w-[677px]">
+                        {% include_block cta_block with compact=True %}
+                    </div>
+                {% endfor %}
+
+            </div>
         </div>
     </div>
 

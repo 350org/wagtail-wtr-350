@@ -41,9 +41,9 @@ _actionkit_form.html — that flag is the form's own field-layout CSS
 choice, and is correct in both layouts.
 {% endcomment %}
 {% with bg=value.background|background_key on_light=value.background|background_is_light %}
-<div class="w-full px-4 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1500px] px-4">
     <div class="wtr-signup wtr-signup-actionkit wtr-bg-{{ bg }} mx-auto overflow-hidden rounded-lg
-                {% if value.layout == 'vertical' %}max-w-[800px]{% else %}max-w-[1426px]{% endif %}"
+                {% if value.layout == 'vertical' %}max-w-[800px]{% else %}w-full{% endif %}"
          {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
         {% if value.layout == 'vertical' %}
             {% if value.image %}

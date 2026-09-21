@@ -1206,6 +1206,91 @@ h3, h4, h5, h6 {
     margin-block-end: 2rem;
 }
 
+/* A section title is always followed by its own content, so no :has()
+ * test on what comes next. 40px matches CardGridBlock/PageCardsBlock's
+ * own heading-to-cards mb-10, so a standalone and a card-row heading on
+ * one page share a rhythm — keep the two in step.
+ *
+ * Page-level stack only: a `heading` inside a SectionBlock keeps that
+ * panel's space-y-8, since section_block.html wraps its children in no
+ * data-block-type element. */
+.wtr-body-stack > [data-block-type='heading'] {
+    margin-block-end: 2.5rem;
+}
+
+/* ============================================================
+ * Hero -> first full-bleed block — .wtr-page-hero / .wtr-block-full-bleed
+ * ============================================================
+ * base.html gives <main> a flat my-32 (128px), so a full-bleed block
+ * directly under a hero sat 128px below it. Both are 1500px rounded
+ * panels with the same gutters; at that distance they read as unrelated
+ * rather than as a stack, which is the whole point of the hero being a
+ * panel in the first place.
+ *
+ * Tightened to 16px so the two panels carry the same rhythm as a
+ * SectionBlock and the block beneath it. 16px is Figma's own Content
+ * Hero bottom padding, not a new spacing number.
+ *
+ * This margin is the only source of the gap below a hero — the hero
+ * wrapper carries no bottom padding of its own.
+ *
+ * Both conditions are required, hence two :has() tests:
+ *
+ *  - .wtr-page-hero  — set by components/hero.html only when in_body is
+ *    false, so a mid-body HeroBlock never triggers this, and a page whose
+ *    hero is switched off (ContentPage.hide_hero) correctly keeps the
+ *    full 128px, since nothing renders the class at all.
+ *  - the first block is one of the four panel-shaped types listed below:
+ *    section, signup_actionkit, donate_fundraiseup, feature_panel. Each
+ *    renders as a filled rounded panel at the same 1500px width and the
+ *    same gutters as the hero itself, so the two stack as one object and
+ *    the large gap is what looks wrong. Every other block type keeps the
+ *    full 128px — including full-bleed ones like image, quote or
+ *    card_grid, which sit directly on the page background rather than in
+ *    a panel and need the section break to read as separate.
+ *
+ * Listed explicitly rather than derived from the full-bleed set, because
+ * "is full-bleed" and "is a panel" are different questions that happen to
+ * overlap. A new panel block has to be added here by hand.
+ *
+ * index_page.html has no full-bleed branch and blogs_page.html has no
+ * body stack, so neither is affected by construction.
+ *
+ * Unlayered, so it beats Tailwind's my-32 in @layer utilities without a
+ * specificity fight — same mechanism as the body-stack rules above.
+ * ============================================================ */
+body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='section']),
+body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='signup_actionkit']),
+body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='donate_fundraiseup']),
+body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='feature_panel']) {
+    margin-block-start: 1rem;
+}
+
+/* ============================================================
+ * Vertical button stacks — .wtr-button-group-vertical
+ * ============================================================
+ * ButtonGroupBlock's "vertical" layout caps its column and stretches its
+ * buttons to fill it (see button_group_block.html), so every button in a
+ * stack is the same width. That only works if a label longer than the
+ * column can wrap, and wtr-btn sets white-space: nowrap -- without this
+ * override a long label just widens past the cap and the stack goes
+ * ragged again, which is the thing the cap exists to prevent.
+ *
+ * text-align matters for the same reason: wtr-btn sets none, and an
+ * inline-block stretched by a flex parent would otherwise left-align its
+ * label while its shorter siblings look centred.
+ *
+ * Unlayered, so it beats wtr-btn's own @utility declarations regardless
+ * of source order -- the same mechanism the heading-weight and
+ * body-stack rules above rely on. Scoped to the vertical layout only:
+ * horizontal rows deliberately keep content-width, nowrap buttons.
+ * ============================================================ */
+.wtr-button-group-vertical .wtr-btn {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+}
+
 /* ============================================================
  * Mobile / collapsed-desktop nav menu — .wtr-scroll-locked
  * ============================================================
@@ -1903,6 +1988,28 @@ h3.victories-header {
 .wtr-card-carousel-track .wtr-card p,
 .wtr-card-carousel-track .wtr-card h3 {
     line-height: 1.25;
+}
+
+/* ============================================================
+ * Hero pre-header — .wtr-hero-pre-header
+ * ============================================================
+ * Translucent scrim behind the overline in the "full" variant, which
+ * sits on a background photo: the hero's gradient fades to transparent
+ * at the top, so it does not cover the band this line occupies.
+ *
+ * Deliberately not a filled pill — an opaque fill at wtr-btn's own
+ * radius reads as a CTA, and hero.cta renders a real button below.
+ *
+ * Scoped away from the banner variant, whose text column sits on a flat
+ * banner_color fill and flips to text-dark on a light banner. Both
+ * panels carry .wtr-hero; only the banner adds .wtr-hero-banner.
+ * ============================================================ */
+.wtr-hero:not(.wtr-hero-banner) .wtr-hero-pre-header {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    background-color: color-mix(in srgb, var(--color-dark) 62%, transparent);
+    backdrop-filter: blur(6px);
 }
 
 /* ============================================================

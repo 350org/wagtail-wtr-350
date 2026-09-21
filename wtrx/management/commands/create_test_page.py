@@ -288,6 +288,10 @@ def _lead_text_block():
     )
 
 
+def _heading_block():
+    return _sb("heading", {"heading": "A standalone centered heading"})
+
+
 def _image_block_full(image_id):
     """ImageBlock with caption and explicit alt text."""
     return _sb(
@@ -820,6 +824,11 @@ def _content_blocks(image_id, index_page_id, form_page_id):
     blocks += [_label("text"), _text_block()]
 
     blocks += [_label("lead_text"), _lead_text_block()]
+
+    blocks += [
+        _label("heading", "standalone centered H2, matching a card row's heading"),
+        _heading_block(),
+    ]
 
     blocks += [
         _label("image", "with alt text and caption"),

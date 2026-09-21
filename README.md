@@ -307,7 +307,7 @@ class HomePage(BasePage, HeroMixin):
 
 | Category | Blocks |
 |---|---|
-| Content | Text, Image, Video, Button, Quote, Raw HTML, Table |
+| Content | Text, Heading, Image, Video, Button, Quote, Custom embed, Table |
 | Layout | Section (with background/padding), Card Grid, Accordion |
 | Composite | Callout (image + text side-by-side), Hero (mid-page) |
 | Cards | Card, Person Card |

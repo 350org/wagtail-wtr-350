@@ -4,9 +4,21 @@
 "horizontal" (default) uses `rows` (from ButtonGroupBlock.get_context),
 the same _balanced_rows() dynamic-centering technique CardGridBlock/
 ImageGridBlock/LogoGridBlock/PersonCardGridBlock use, rendered as centered
-flex rows. Buttons size to their own content in both layouts -- unlike
-those other blocks' items, a button stretched to fill a row would look
-wrong, so there's no flex-1/max-w wrapper here.
+flex rows.
+
+The two layouts size their buttons differently on purpose. Horizontal
+buttons size to their own content, because a row of stretched buttons
+reads as a segmented control rather than as separate CTAs. A vertical
+stack is the opposite case: stacked buttons of three different widths
+read as ragged, so the column is capped (max-w-sm) and its buttons
+stretch to fill it, which is what the mobile breakpoint already did at
+every layout. This used to apply below sm: only, so the same stack was
+uniform on a phone and ragged on a desktop.
+
+Equal widths mean a long label has to wrap, which wtr-btn's own
+white-space: nowrap prevents -- see .wtr-button-group-vertical in
+main.css for the override, and feature_panel_block.html for the same
+problem solved inline on a single button.
 {% endcomment %}
 {% comment %}
 Each button's size is "regular"/"large" (BUTTON_SIZE_CHOICES); button.html's
@@ -14,7 +26,7 @@ own size= param only distinguishes "lg" from everything else, so "large" is
 the only value translated on the way through -- same as button_block.html.
 {% endcomment %}
 {% if value.layout == "vertical" %}
-    <div class="wtr-button-group flex flex-col items-stretch gap-4 sm:items-center">
+    <div class="wtr-button-group wtr-button-group-vertical mx-auto flex max-w-sm flex-col items-stretch gap-4">
         {% for button in value.buttons %}
             {% if button.size == "large" %}
                 {% include "wtrx/components/button.html" with text=button.text link_page=button.link_page link_url=button.link_url anchor=button.anchor style=button.style size="lg" %}

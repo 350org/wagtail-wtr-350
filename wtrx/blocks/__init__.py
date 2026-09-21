@@ -34,6 +34,7 @@ from django import forms
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.functional import cached_property
+from django.utils.text import format_lazy
 from django.utils.html import strip_tags
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.staticfiles import versioned_static
@@ -76,6 +77,11 @@ from wtrx.validators import html_is_balanced
 # ---------------------------------------------------------------------------
 # Choice constants
 # ---------------------------------------------------------------------------
+
+# Shown in two places on purpose: the block picker (RawHTMLBlock.Meta
+# .description) and above the textarea in the editor, so it still reaches an
+# editor who opened an existing block rather than coming via the picker.
+RAW_HTML_SECURITY_NOTICE = _("Please talk to Tech & Security before using.")
 
 BUTTON_STYLE_CHOICES = [
     ("primary", _("Primary")),
@@ -738,6 +744,48 @@ class LeadTextBlock(RichTextBlock):
         )
 
 
+class HeadingBlock(StructBlock):
+    """
+    A standalone centered H2.
+
+    Card rows (CardGridBlock, AccordionBlock) already carry an optional
+    `heading` that renders as a centered H2 above their items. This is that
+    same heading with nothing beneath it, for the case where a section needs
+    a title but the content under it is several separate blocks rather than
+    one card row.
+
+    Deliberately renders byte-identical markup to card_grid_block.html's
+    heading -- same three-tier container and the same h2 class string -- so a
+    standalone heading and a card-row heading sitting in the same page line
+    up on the left edge and share a type size. Changing one means changing
+    both; they are not linked in code, only by convention and this docstring.
+
+    Heading only, no supporting copy: a Text block directly beneath covers
+    that, and the body stack already tightens text-before-a-card-row
+    adjacencies (see main.css's "Body-stack spacing").
+
+    Deliberately NOT ContentPreviewMixin (AGENTS.md pitfall #42/#45): no real
+    page uses this block yet, so block_previews.json has nothing to harvest
+    and that mixin's is_previewable ignores Meta.preview_value.
+    """
+
+    heading = CharBlock(
+        required=True,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as a centered H2."),
+    )
+
+    class Meta:
+        icon = "title"
+        label = _("Heading")
+        template = "wtrx/components/streamfield/blocks/heading_block.html"
+        description = _(
+            "A standalone centered section heading (H2), matching the heading "
+            "style used above card rows."
+        )
+        preview_value = {"heading": _("What we're working on")}
+
+
 @ai_image_block()
 class ImageBlock(ContentPreviewMixin, StructBlock):
     """
@@ -1010,6 +1058,13 @@ class RawHTMLBlock(WagtailRawHTMLBlock):
     #: width this block's content is too small to read in the pane.
     preview_target_width = 700
 
+    def __init__(self, **kwargs):
+        # help_text is a constructor arg on Wagtail's RawHTMLBlock, not a Meta
+        # option, so defaulting it here is what gives every registration the
+        # notice without repeating it at each one.
+        kwargs.setdefault("help_text", RAW_HTML_SECURITY_NOTICE)
+        super().__init__(**kwargs)
+
     def clean(self, value):
         value = super().clean(value)
         if value and not html_is_balanced(value):
@@ -1024,13 +1079,17 @@ class RawHTMLBlock(WagtailRawHTMLBlock):
 
     class Meta:
         icon = "code"
-        label = _("Raw HTML")
+        label = _("Custom embed")
         template = "wtrx/components/streamfield/blocks/raw_html_block.html"
-        description = _(
-            "Paste in HTML supplied by another service -- an embed, a widget, "
-            "a snippet of markup. It is rendered exactly as given, so only use "
-            "it for code you trust. Tag balance is validated on save; markup "
-            "safety is not."
+        description = format_lazy(
+            "{notice} {body}",
+            notice=RAW_HTML_SECURITY_NOTICE,
+            body=_(
+                "Paste in HTML supplied by another service -- an embed, a "
+                "widget, a snippet of markup. It is rendered exactly as given, "
+                "so only use it for code you trust. Tag balance is validated "
+                "on save; markup safety is not."
+            ),
         )
         preview_value = (
             '<div style="border:2px dashed #9aa5a8;border-radius:8px;padding:24px;'
@@ -1808,6 +1867,11 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
     folded every existing page's heading/text pair into this field's HTML on
     upgrade; see that migration for the exact transform.
 
+    An optional CTA (link_text + one of link_page/link_url) renders under the
+    copy in the text column. Unlike CalloutBlock's, it is always the filled
+    primary style — this block has no background field, so the template has
+    no on_light flag to pick an outline variant with.
+
     `size` controls the image column's fixed width (see
     IMAGE_TEXT_SIZE_CHOICES); it defaults to "default" so harvested preview
     JSON saved before this field existed (AGENTS.md rule #45 /
@@ -1844,6 +1908,45 @@ class ImageTextBlock(ContentPreviewMixin, StructBlock):
             "looks wrong cropped."
         ),
     )
+    # Flat link_text/link_page/link_url triple rather than a nested
+    # ButtonBlock: that is what CardBlock, FeaturePanelBlock,
+    # CardCarouselBlock, PageCardsBlock, QuoteBlock and CalloutBlock all do.
+    # ButtonBlock is only ever mounted inside a StreamBlock in this codebase,
+    # never as a StructBlock sub-field.
+    #
+    # Declared last on purpose. Wagtail's declarative metaclass orders a
+    # struct's admin form fields by a module-global creation counter rather
+    # than by MRO or declaration position within the class (AGENTS.md pitfall
+    # #45), so fields added at the end of the class body sort to the end of
+    # the form -- which is where a CTA belongs, under the copy it follows.
+    link_text = CharBlock(
+        required=False,
+        label=_("Link text"),
+        help_text=_("CTA button label. Leave blank to omit the button."),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+    link_style = ChoiceBlock(
+        choices=BUTTON_STYLE_CHOICES,
+        default="primary",
+        label=_("Link style"),
+        help_text=_("Button style for the CTA above."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
 
     class Meta:
         icon = "image"
@@ -1864,10 +1967,11 @@ class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
     component with two configurations, not two blocks.
 
     Distinct from ImageTextBlock: that block has no panel at all — image and
-    text sit directly on the page background, top-aligned, with no eyebrow
-    and no CTA. This one is a self-contained card with its own fill, border
-    radius and internal padding, and its columns are vertically centered
-    against each other.
+    text sit directly on the page background, top-aligned, with no eyebrow.
+    (It does now carry an optional CTA of its own, so the button is no longer
+    the distinguishing feature; the panel is.) This one is a self-contained
+    card with its own fill, border radius and internal padding, and its
+    columns are vertically centered against each other.
 
     Distinct from CalloutBlock: that block is text-only on a solid color
     (any background image is a faint full-bleed watermark, not a subject);
@@ -3361,6 +3465,9 @@ class HeroBlock(StructBlock):
         # Normalise to the same shape expected by components/hero.html.
         ctx["hero"] = {
             "variant": "banner",
+            # No pre-header on a mid-body hero: it is a page-opening device
+            # (see HeroMixin.hero_panels), not a section-level one.
+            "pre_header": None,
             "headline": value.get("headline"),
             "copy": value.get("content"),
             "copy_is_block": False,
@@ -3552,6 +3659,7 @@ class SectionContentBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
 
     text = TextBlock()
     lead_text = LeadTextBlock()
+    heading = HeadingBlock()
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()
@@ -3770,6 +3878,7 @@ class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
 
     text = TextBlock()
     lead_text = LeadTextBlock()
+    heading = HeadingBlock()
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()

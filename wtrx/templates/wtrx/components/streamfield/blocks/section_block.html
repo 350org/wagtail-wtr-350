@@ -14,10 +14,16 @@ like before this field existed.
 The fill comes from the shared background palette (.wtr-bg-{color} in
 main.css), the same one the callout, feature panel, hero banner and signup
 panel draw from. The fill is an inset rounded panel, not a full-bleed band:
-the outer wrapper is `max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8` — the
-exact class combination image_block.html and the nav (header.html) use — so
-a section's coloured edge lines up with an ImageBlock's photo edge above or
-below it, and it carries the same rounded-lg. It used to have its own
+the outer wrapper is `max-w-[1500px] mx-auto px-4` — the exact class
+combination every other full-width block uses (image_block.html,
+quote_block.html, timeline_block.html, signup_actionkit_block.html,
+feature_panel_block.html, donate_fundraiseup_block.html) and the one the
+page hero uses (components/hero.html) — so a section's coloured edge lines
+up with an ImageBlock's photo edge above or below it and with the hero at
+the top of the page, and it carries the same rounded-lg. The gutter is a
+flat 16px at every breakpoint, deliberately: the nav (header.html) still
+steps 16/24/32 with the viewport, so full-width content is inset less than
+the header above it from sm: up. It used to have its own
 five-entry list
 (light/dark/primary/secondary/muted) built out of raw Tailwind colour
 utilities; `background_key` maps those old stored values onto the palette's
@@ -28,7 +34,7 @@ question, so a child block that needs to invert (text_block.html's prose)
 asks the tone once instead of naming every dark colour in the palette.
 {% endcomment %}
 {% with bg=value.background|background_key on_light=value.background|background_is_light %}
-<div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+<div class="max-w-[1500px] mx-auto px-4">
 <section
     class="wtr-section w-full overflow-hidden rounded-lg wtr-bg-{{ bg }}
            {% if on_light %}text-dark{% else %}text-light{% endif %}

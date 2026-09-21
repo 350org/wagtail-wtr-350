@@ -23,8 +23,10 @@ which SimpleTestCase doesn't have.
 
 from datetime import timedelta
 import json
+import pathlib
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.utils import timezone
@@ -60,6 +62,7 @@ from wtrx.blocks import (
     ImageCardListItemBlock,
     ImageGridBlock,
     ImageGridItemBlock,
+    HeadingBlock,
     ImageTextBlock,
     LogoGridBlock,
     LogoGridItemBlock,
@@ -67,6 +70,8 @@ from wtrx.blocks import (
     PersonCardBlock,
     PersonCardGridBlock,
     QuoteBlock,
+    RAW_HTML_SECURITY_NOTICE,
+    BUTTON_STYLE_CHOICES,
     RawHTMLBlock,
     SectionBlock,
     SectionContentBlock,
@@ -760,6 +765,7 @@ class TestSectionBlockStructure(SimpleTestCase):
     EXPECTED_BLOCK_NAMES = {
         "text",
         "lead_text",
+        "heading",
         "image",
         "video",
         "button",
@@ -1489,14 +1495,179 @@ class TestImageCardListBlockFields(SimpleTestCase):
         self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
 
 
+class TestHeadingBlock(SimpleTestCase):
+    """HeadingBlock: a single required CharBlock rendering a centered H2."""
+
+    def test_has_expected_fields(self):
+        self.assertEqual(set(HeadingBlock().declared_blocks.keys()), {"heading"})
+
+    def test_heading_is_required(self):
+        with self.assertRaises(ValidationError):
+            HeadingBlock().clean({"heading": ""})
+
+    def test_clean_accepts_a_heading(self):
+        cleaned = HeadingBlock().clean({"heading": "Our campaigns"})
+        self.assertEqual(cleaned["heading"], "Our campaigns")
+
+    def test_renders_a_centered_h2_matching_the_card_row_heading(self):
+        html = HeadingBlock().render(
+            HeadingBlock().to_python({"heading": "Our campaigns"})
+        )
+        self.assertIn("<h2", html)
+        self.assertIn("mx-auto max-w-3xl text-center", html)
+        # Same type ramp as card_grid_block.html's own heading.
+        self.assertIn("text-3xl", html)
+        self.assertIn("sm:text-4xl", html)
+        self.assertIn("lg:text-5xl", html)
+        self.assertIn("Our campaigns", html)
+
+    def test_registered_in_both_stream_blocks(self):
+        self.assertIn("heading", BodyStreamBlock().child_blocks)
+        self.assertIn("heading", SectionContentBlock().child_blocks)
+
+    def test_h2_carries_no_bottom_margin_utility(self):
+        """
+        The 40px below a standalone heading comes from main.css's
+        data-block-type='heading' body-stack rule, not from an mb-* on the
+        h2 itself -- in the page body loop the gap between two blocks is
+        the earlier block's margin-block-end, so an mb-10 here would sum
+        with the loop's own space-y-24/32 to 136px instead of replacing it.
+        card_grid_block.html's h2 DOES carry mb-10, because there the 40px
+        is internal to one block (see AGENTS.md pitfalls #39/#64).
+        """
+        html = HeadingBlock().render(
+            HeadingBlock().to_python({"heading": "Our campaigns"})
+        )
+        self.assertNotRegex(html, r'class="[^"]*\bmb-\d')
+
+    def test_body_stack_rule_matches_the_card_row_heading_gap(self):
+        """
+        The two headings have to sit the same distance off their content or
+        a page carrying both reads with two heading rhythms. Nothing in
+        code links them (AGENTS.md pitfall #64), so this pins the pair:
+        card_grid_block.html's own mb-10 and main.css's 2.5rem rule are
+        both 40px, and a change to either alone fails here.
+        """
+        css = (
+            pathlib.Path(settings.BASE_DIR) / "static_src" / "css" / "main.css"
+        ).read_text()
+        self.assertRegex(
+            css,
+            r"\.wtr-body-stack > \[data-block-type='heading'\] \{\s*"
+            r"margin-block-end: 2\.5rem;",
+        )
+
+        card_grid = (
+            pathlib.Path(settings.BASE_DIR)
+            / "wtrx"
+            / "templates"
+            / "wtrx"
+            / "components"
+            / "streamfield"
+            / "blocks"
+            / "card_grid_block.html"
+        ).read_text()
+        self.assertIn("mb-10", card_grid)  # 2.5rem == mb-10 == 40px
+
+
+class TestRawHTMLBlockSecurityNotice(SimpleTestCase):
+    """
+    The notice has to reach an editor who opened an existing block rather
+    than coming through the picker, so it is the field's help_text as well
+    as part of Meta.description.
+    """
+
+    def test_help_text_is_the_notice(self):
+        self.assertEqual(
+            str(RawHTMLBlock().field.help_text), str(RAW_HTML_SECURITY_NOTICE)
+        )
+
+    def test_description_leads_with_the_same_notice(self):
+        self.assertTrue(
+            str(RawHTMLBlock().get_description()).startswith(
+                str(RAW_HTML_SECURITY_NOTICE)
+            )
+        )
+
+    def test_registrations_inherit_it(self):
+        for stream in (BodyStreamBlock(), SectionContentBlock()):
+            with self.subTest(stream=type(stream).__name__):
+                block = stream.child_blocks["raw_html"]
+                self.assertEqual(
+                    str(block.field.help_text), str(RAW_HTML_SECURITY_NOTICE)
+                )
+
+
+class TestImageTextBlockCTA(SimpleTestCase):
+    """
+    ImageTextBlock's optional CTA — the same flat link_text/link_page/link_url
+    triple CardBlock, FeaturePanelBlock, CardCarouselBlock, PageCardsBlock,
+    QuoteBlock and CalloutBlock all use.
+
+    The both-links rule is exercised through _validate_at_most_one_link
+    directly rather than through StructBlock.clean(), matching how the other
+    link-bearing blocks are tested here: a full clean() needs a RichText
+    value and a real Page row for the chooser, neither of which this rule
+    depends on.
+    """
+
+    def test_link_style_offers_the_shared_button_choices(self):
+        """
+        Same set ButtonBlock offers (BUTTON_STYLE_CHOICES), defaulting to
+        primary so harvested preview JSON and existing content saved before
+        this field existed revive unchanged.
+        """
+        field = ImageTextBlock().declared_blocks["link_style"]
+        self.assertEqual(
+            [c[0] for c in field.field.choices if c[0]],
+            [c[0] for c in BUTTON_STYLE_CHOICES],
+        )
+        self.assertEqual(field.get_default(), "primary")
+
+    def test_declares_the_link_triple(self):
+        fields = ImageTextBlock().declared_blocks
+        for name in ("link_text", "link_page", "link_url"):
+            self.assertIn(name, fields)
+
+    def test_link_fields_are_all_optional(self):
+        fields = ImageTextBlock().declared_blocks
+        for name in ("link_text", "link_page", "link_url"):
+            self.assertFalse(fields[name].required, name)
+
+    def test_clean_is_wired_up(self):
+        """clean() is overridden here, not inherited from StructBlock."""
+        self.assertIn("clean", ImageTextBlock.__dict__)
+
+    def test_both_page_and_url_is_rejected(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "https://example.com"}, {}
+        )
+        self.assertIn("link_page", errors)
+        self.assertIn("link_url", errors)
+
+    def test_no_link_at_all_is_allowed(self):
+        errors = _validate_at_most_one_link({"link_page": None, "link_url": ""}, {})
+        self.assertEqual(errors, {})
+
+
 class TestImageTextBlockFields(SimpleTestCase):
-    """ImageTextBlock field structure: image + content (heading+text merged), all required."""
+    """ImageTextBlock field structure: image + content (heading+text merged), plus an optional CTA."""
 
     def test_has_expected_fields(self):
         block = ImageTextBlock()
         self.assertEqual(
             set(block.declared_blocks.keys()),
-            {"image", "content", "alignment", "size", "crop"},
+            {
+                "image",
+                "content",
+                "alignment",
+                "size",
+                "crop",
+                "link_text",
+                "link_page",
+                "link_url",
+                "link_style",
+            },
         )
 
     def test_crop_defaults_to_true(self):

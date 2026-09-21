@@ -8,7 +8,7 @@ Full-bleed-ish width: this block is special-cased in content_page.html/
 home_page.html (alongside "callout"/"image_text"/etc.) to skip the shared
 `mx-auto max-w-5xl px-4 sm:px-6 lg:px-8` wrapper, so it owns its own width
 instead — wider than the narrower text column other blocks sit in.
-Capped at max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 — the exact same
+Capped at max-w-[1500px] mx-auto px-4 — the exact same
 class combination as the nav's own container (header.html) — not the
 two-tier w-full-outer/max-w-inner split callout_block.html uses, since
 that would let the image's content edge reach the full 1500px unpadded,
@@ -28,7 +28,7 @@ of these blocks, not fixed here — fixing it needs a way for a block's
 template to know it's being rendered inside a SectionBlock vs. at the page
 body's top level.
 {% endcomment %}
-<div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+<div class="max-w-[1500px] mx-auto px-4">
     <figure class="wtr-image relative">
         {% image value.image width-1600 as img %}
         <img
