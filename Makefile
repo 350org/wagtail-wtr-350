@@ -1,6 +1,10 @@
 .PHONY: help venv dev dev-server build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db import-media quickstart messages compile-messages locales
 
-LOCALE_ARGS = $$(.venv/bin/python -c "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'wagtail_wtr.settings.dev'); django.setup(); from django.conf import settings; print(' '.join('--locale=' + code for code, _ in settings.WAGTAIL_CONTENT_LANGUAGES if code != settings.LANGUAGE_CODE))")
+# Catalogues are built for the languages that already have one, not for every
+# language in settings -- most are offered in the admin without being served
+# yet, and would otherwise gain 600 empty strings each. Add a new one
+# explicitly: `make messages LOCALES="ja nl"`.
+LOCALE_ARGS = $$(ls locale 2>/dev/null | sed 's/^/--locale=/' | tr '\n' ' ')
 
 TAILWIND := ./node_modules/.bin/tailwindcss
 CSS_IN := ./static_src/css/main.css
@@ -24,7 +28,7 @@ help:
 	@echo "  make test                        - Run test suite"
 	@echo "  make load-data                   - Migrate + load demo fixtures"
 	@echo "  make test-page                   - Create (or refresh) the block test page"
-	@echo "  make locales                     - Create Locale rows for every configured language"
+	@echo "  make locales [LOCALES=\"pt-br fr-fr\"] - Report locales, or create the named ones"
 	@echo "  make messages                    - Update .po translation catalogues from source"
 	@echo "  make compile-messages            - Compile .po catalogues to .mo (needs gettext)"
 	@echo "  make provision SITE=x ENV=y      - Provision AWS S3 bucket + IAM user (ENV: staging|production)"
@@ -98,8 +102,11 @@ load-data:
 test-page:
 	.venv/bin/python manage.py create_test_page --force
 
+# Locale rows are created by name, not wholesale: WAGTAIL_CONTENT_LANGUAGES
+# offers every language any 350 site might need, and only a few are real
+# content. With no LOCALES, this reports what exists and what is available.
 locales:
-	.venv/bin/python manage.py bootstrap_locales
+	.venv/bin/python manage.py bootstrap_locales $(LOCALES)
 
 # UI-chrome translations ({% trans %} in templates, gettext_lazy in Python).
 # Editor-entered content is translated in the admin by wagtail-localize instead
@@ -108,13 +115,14 @@ locales:
 # Catalogues live in two places, both updated here: locale/ for templates/ and
 # wagtail_wtr/, and wtrx/locale/ for the app (Django finds an app's own
 # catalogue automatically, and wtrx ships as a package).
-# The language list comes from WAGTAIL_CONTENT_LANGUAGES, not from `--all`:
-# `--all` globs the locale/ directories that already exist, so a language added
-# in settings but never yet compiled would be silently skipped. English is the
-# source language and gets no catalogue. wtrx/ is ignored by the project run and
-# handled by its own, so each string lands in exactly one catalogue.
+# English is the source language and gets no catalogue. wtrx/ is ignored by the
+# project run and handled by its own, so each string lands in exactly one
+# catalogue.
 messages:
 	@mkdir -p locale wtrx/locale
+	@if [ -n "$(LOCALES)" ]; then \
+		for code in $(LOCALES); do mkdir -p locale/$$code wtrx/locale/$$code; done; \
+	fi
 	@LOCALES=$(LOCALE_ARGS); \
 	echo "Updating catalogues for:$$LOCALES"; \
 	.venv/bin/python manage.py makemessages $$LOCALES --no-obsolete \

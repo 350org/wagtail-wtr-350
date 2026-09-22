@@ -457,16 +457,20 @@ WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
 ]
 ```
 
-Adding a language takes a deploy (the list above) plus its `Locale` row:
+`WAGTAIL_CONTENT_LANGUAGES` lists every language any 350 site might need, so
+one can be chosen in the admin without a deploy. A language becomes real when it
+gets a `Locale` row, which is a separate, deliberate step:
 
 ```bash
-make locales          # creates a Locale row per configured language, idempotent
+make locales                             # report: what exists, what's available
+make locales LOCALES="pt-br fr-fr"       # create those two
 ```
 
-Order matters, and the admin gives no hint about it: Settings > Locales can only
-offer languages already listed in `WAGTAIL_CONTENT_LANGUAGES`. Once every
-configured language has a row, the "Add" button opens a form with an empty
-dropdown and appears to do nothing.
+Only create what you will use: a `Locale` appears in every "translate into" menu,
+and `Locale` FKs are `on_delete=PROTECT`, so once a page uses one it cannot be
+removed. Settings > Locales can only offer languages already in the settings
+list, so once every configured language has a row its "Add" button opens a form
+with an empty dropdown and appears to do nothing.
 
 Two separate things get translated:
 

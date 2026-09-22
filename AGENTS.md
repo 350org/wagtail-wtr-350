@@ -1331,11 +1331,16 @@ gate.
     forces the `TemplateResponse` to render **inside** that block, because a
     TemplateResponse renders lazily, after the context manager would have
     exited.
-68. **Translation catalogues: `makemessages --all` only updates locales that
-    already have a directory.** It globs `locale/*`, so a language added to
-    `WAGTAIL_CONTENT_LANGUAGES` but never yet compiled is silently skipped —
-    which is why `make messages` derives `--locale=` arguments from settings
-    instead. Catalogues live in two places: `locale/` for `templates/` and
+68. **Catalogues are built for the languages in use, not the languages on
+    offer.** `WAGTAIL_CONTENT_LANGUAGES` lists every language any 350 site
+    might need so it can be picked in the admin; most have no content and no
+    `Locale` row. `make messages` therefore derives its `--locale=` arguments
+    from the directories already under `locale/`, and a new language is added
+    explicitly (`make messages LOCALES="ja nl"`, which creates the directory
+    first). Deriving from settings instead would add ~600 empty strings per
+    offered language. Note `makemessages --all` is not the answer either: it
+    globs `locale/*` too, but would silently skip a language you just asked
+    for. Catalogues live in two places: `locale/` for `templates/` and
     `wagtail_wtr/`, and `wtrx/locale/` for the app (the project run ignores
     `wtrx` so each string lands in exactly one catalogue, and the app run
     needs `wtrx/locale/` to exist first). `compilemessages` must be given
@@ -1368,7 +1373,22 @@ gate.
     Deletion is one-way in practice: `Locale` FKs are `on_delete=PROTECT`, so a
     locale with pages cannot be removed.
 
-71. **Two kinds of locale, and the difference decides the URL.** A *country
+71. **Offering a language and creating it are separate steps, deliberately.**
+    `WAGTAIL_CONTENT_LANGUAGES` covers every 350 site (Japanese, Turkish,
+    Dutch, Filipino, Latin American Spanish and so on) so any of them can be
+    picked in the admin without a deploy-and-wait. A language becomes real when
+    it gets a `Locale` row, and `manage.py bootstrap_locales` takes the
+    languages to create by name — `--all` exists but is not the default. A
+    stray row is not free: it appears in every "translate into" menu, and
+    `Locale` FKs are `on_delete=PROTECT`, so once a page uses it, it cannot be
+    removed. Run with no arguments for a report of what exists versus what is
+    available.
+    **An English-language country site needs no locale at all** — Aotearoa,
+    Australia, Canada, US and Pacific are sections under the English Home with
+    their own navigation and footer overrides. Language is the only axis that
+    changes the URL (rule #10).
+
+72. **Two kinds of locale, and the difference decides the URL.** A *country
     variant* (`pt-br`, `fr-fr`, `de-de`, `id-id`) is a country site with its
     own content and navigation, served under its own name via
     `WTRX_LANGUAGE_URL_PREFIXES` (`/brasil/`, `/france/`). A *plain code*
@@ -1388,7 +1408,7 @@ gate.
     back to the source page when no translation is live. Not a bug, and the
     same reason an alias parent shows English (pitfall #69).
 
-72. **A language tree's URL prefix is mapped, not its language code.**
+73. **A language tree's URL prefix is mapped, not its language code.**
     Django ties the prefix to the code, so French would serve at `/fr/` and
     there is no setting for it. `WTRX_LANGUAGE_URL_PREFIXES` maps a code to a
     segment instead (`fr` → `france`, `pt` → `brasil`), which is what lets the
@@ -1404,7 +1424,11 @@ gate.
     `is_language_prefix_patterns_used()` finds i18n URLs by `isinstance`, and
     `LocaleMiddleware` reads its answer to decide whether to force the default
     language on an unprefixed path.
-    A mapped language is reachable **only** at its prefix — `/pt/` 404s — so
+    A prefix may be more than one segment: `fr-ca` maps to `canada/fr`, so
+    Canadian French sits inside the English-first Canadian section instead of
+    under `/france/`. Longest prefix wins, so `canada` alone still belongs to
+    the English page of that name.
+    A mapped language is reachable **only** at its prefix — `/pt-br/` 404s — so
     each tree has one canonical URL. Two consequences worth knowing: a mapped
     prefix shadows any top-level English page with the same slug, and the
     prefix is per *language*, so a Portuguese translation of a global page

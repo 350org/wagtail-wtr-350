@@ -9,6 +9,7 @@ See settings/base.py WAGTAIL_CONTENT_LANGUAGES and the `language_links` /
 import json
 from io import StringIO
 
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -34,23 +35,46 @@ def _locale(code):
 
 
 class TestBootstrapLocales(TestCase):
-    """`manage.py bootstrap_locales` is how an environment gets its Locale rows."""
+    """
+    `manage.py bootstrap_locales` is how an environment gets its Locale rows.
 
-    def test_creates_every_configured_language_and_is_idempotent(self):
-        call_command("bootstrap_locales", stdout=StringIO())
+    It creates the languages it is given, not every one in settings: the
+    settings list offers every language any 350 site might need, and a stray
+    Locale row shows up in every "translate into" menu and cannot be removed
+    once a page uses it (`on_delete=PROTECT`).
+    """
+
+    def test_creates_only_the_languages_it_is_given(self):
+        call_command("bootstrap_locales", "pt-br", "fr-fr", stdout=StringIO())
         codes = set(Locale.objects.values_list("language_code", flat=True))
+        self.assertEqual(codes, {"en", "pt-br", "fr-fr"})
+
+    def test_is_idempotent(self):
+        call_command("bootstrap_locales", "pt-br", stdout=StringIO())
+        call_command("bootstrap_locales", "pt-br", stdout=StringIO())
+        self.assertEqual(Locale.objects.filter(language_code="pt-br").count(), 1)
+
+    def test_no_arguments_reports_without_writing(self):
+        before = Locale.objects.count()
+        out = StringIO()
+        call_command("bootstrap_locales", stdout=out)
+        self.assertEqual(Locale.objects.count(), before)
+        self.assertIn("Available but not created", out.getvalue())
+
+    def test_all_flag_creates_every_configured_language(self):
+        call_command("bootstrap_locales", "--all", stdout=StringIO())
         self.assertEqual(
-            codes,
-            {"en", "es", "pt", "pt-br", "fr", "fr-fr", "de", "de-de", "id", "id-id"},
+            Locale.objects.count(), len(settings.WAGTAIL_CONTENT_LANGUAGES)
         )
 
-        # A second run must not create duplicates or raise.
-        call_command("bootstrap_locales", stdout=StringIO())
-        self.assertEqual(Locale.objects.count(), 10)
+    def test_unconfigured_language_is_refused(self):
+        """A Locale for a language settings doesn't offer has no way to serve."""
+        with self.assertRaises(CommandError):
+            call_command("bootstrap_locales", "kl", stdout=StringIO())
 
     def test_dry_run_writes_nothing(self):
         before = Locale.objects.count()
-        call_command("bootstrap_locales", "--dry-run", stdout=StringIO())
+        call_command("bootstrap_locales", "pt-br", "--dry-run", stdout=StringIO())
         self.assertEqual(Locale.objects.count(), before)
 
 
@@ -564,3 +588,47 @@ class TestNamedLanguageUrlPrefixes(TestCase):
         self.assertEqual(
             Client().get("/brasil/sobre-prefix/")["Content-Language"], "pt-br"
         )
+
+
+class TestMultiSegmentPrefix(TestCase):
+    """
+    A mapped prefix may be more than one segment. Canadian French serves at
+    `/canada/fr/`, inside the English-first Canadian section, rather than under
+    `/france/` — which is where it would land if France held plain `fr`.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.fr_ca = _locale("fr-ca")
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-multi", locale=_english())
+        root.add_child(instance=cls.home)
+        site = Site.objects.get(is_default_site=True)
+        site.root_page = cls.home
+        site.save()
+
+        cls.canada = ContentPage(title="Canada", slug="canada", locale=_english())
+        cls.home.add_child(instance=cls.canada)
+
+        cls.home_fr_ca = cls.home.copy_for_translation(cls.fr_ca)
+        cls.home_fr_ca.save_revision().publish()
+        cls.fr_ca_page = ContentPage(
+            title="À propos", slug="a-propos", locale=cls.fr_ca
+        )
+        cls.home_fr_ca.add_child(instance=cls.fr_ca_page)
+
+    def test_serves_under_the_two_segment_prefix(self):
+        response = Client().get("/canada/fr/a-propos/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'lang="fr-ca"')
+
+    def test_page_url_uses_the_two_segment_prefix(self):
+        self.assertEqual(
+            Page.objects.get(pk=self.fr_ca_page.pk).url, "/canada/fr/a-propos/"
+        )
+
+    def test_the_english_section_above_it_is_untouched(self):
+        """`canada` alone must not be claimed by the `canada/fr` prefix."""
+        response = Client().get("/canada/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'lang="en"')

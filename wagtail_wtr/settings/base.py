@@ -136,6 +136,16 @@ USE_TZ = True
 # they match the country sites 350.org already publishes: /fr/, /pt/, /de/,
 # /id/. Adding a language here is a deploy; creating its Locale row is not
 # (Settings > Locales, or `manage.py bootstrap_locales`).
+# Every language any 350 site needs is listed here so it can be chosen in the
+# admin; only a handful have a Locale row, and only those exist as content.
+# `manage.py bootstrap_locales` names the ones to create -- it deliberately does
+# not create all of these.
+#
+# An English-language country site (Aotearoa, Australia, Canada, US, Pacific)
+# needs no locale at all: it is a section under the English Home, with its own
+# navigation and footer overrides. Language is the only axis that changes the
+# URL.
+#
 # Two kinds of language here, and the distinction is the whole scheme:
 #
 #   - A country variant (pt-br, fr-fr) is a country site: its own content, its
@@ -149,15 +159,34 @@ USE_TZ = True
 # translation work.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
+    # Spanish
     ("es", _("Spanish")),
+    ("es-419", _("Spanish (Latin America)")),
+    # Portuguese
     ("pt", _("Portuguese")),
     ("pt-br", _("Brazilian Portuguese")),
+    # French
     ("fr", _("French")),
     ("fr-fr", _("French (France)")),
+    ("fr-ca", _("French (Canada)")),
+    # German
     ("de", _("German")),
     ("de-de", _("German (Germany)")),
+    # Indonesian
     ("id", _("Indonesian")),
     ("id-id", _("Indonesian (Indonesia)")),
+    # Japanese
+    ("ja", _("Japanese")),
+    ("ja-jp", _("Japanese (Japan)")),
+    # Turkish
+    ("tr", _("Turkish")),
+    ("tr-tr", _("Turkish (Türkiye)")),
+    # Dutch
+    ("nl", _("Dutch")),
+    ("nl-nl", _("Dutch (Netherlands)")),
+    # Filipino
+    ("fil", _("Filipino")),
+    ("fil-ph", _("Filipino (Philippines)")),
 ]
 
 # The path segment each country site serves under. These are the URLs those
@@ -167,8 +196,15 @@ WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
 WTRX_LANGUAGE_URL_PREFIXES = {
     "pt-br": "brasil",
     "fr-fr": "france",
-    "id-id": "indonesia",
     "de-de": "germany",
+    "id-id": "indonesia",
+    "es-419": "latinoamerica",
+    "ja-jp": "japan",
+    "tr-tr": "turkiye",
+    "nl-nl": "nederland",
+    # A prefix may be more than one segment: Canadian French belongs inside the
+    # (English-first) Canadian site rather than under /france/.
+    "fr-ca": "canada/fr",
 }
 
 # Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx

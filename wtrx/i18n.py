@@ -7,9 +7,9 @@ are the country sites that already exist at `/brasil/`, `/france/`,
 `/indonesia/` and `/germany/`, and those URLs are in circulation -- so the
 prefix is mapped instead of the pages being moved behind redirects.
 
-`WTRX_LANGUAGE_URL_PREFIXES` (settings) maps a language code to the path
-segment it serves under. A language with no entry keeps its own code, and the
-default language stays unprefixed as before.
+`WTRX_LANGUAGE_URL_PREFIXES` (settings) maps a language code to the path it
+serves under -- one segment (`france`) or more (`canada/fr`). A language with
+no entry keeps its own code, and the default language stays unprefixed.
 
 Two pieces have to agree on the mapping, which is why both live here:
 
@@ -60,15 +60,22 @@ def language_from_url_prefix(path):
     """
     The language a request path belongs to, or None for the default language.
 
-    Deliberately not Django's `get_language_from_path()`: this matches the
-    first path segment against the *mapped* prefixes only, so a language with a
-    named prefix is not also reachable at its bare code.
+    Deliberately not Django's `get_language_from_path()`: that matches the
+    first path segment against language *codes*, so a mapped prefix means
+    nothing to it, and a language with a mapped prefix would also answer at its
+    bare code.
+
+    Longest prefix wins, so a prefix may be more than one segment:
+    `canada/fr` (Canadian French) sits inside the English-first Canadian
+    section without `canada` alone claiming anything.
     """
-    segment = path.lstrip("/").split("/", 1)[0]
-    if not segment:
+    stripped = path.lstrip("/")
+    if not stripped:
         return None
-    for code, prefix in language_url_prefixes().items():
-        if segment == prefix:
+    for code, prefix in sorted(
+        language_url_prefixes().items(), key=lambda item: -len(item[1])
+    ):
+        if stripped == prefix or stripped.startswith(prefix + "/"):
             return code
     return None
 
