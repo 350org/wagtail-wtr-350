@@ -84,10 +84,10 @@ fill" — that distinction is gone now that every card uses it).
                 <p class="mt-2 flex-1 {{ description_size|default:"text-base" }} text-dark">{{ card.description }}</p>
             {% endif %}
         {% endif %}
-        {% if card.link_page or card.link_url %}
+        {% if card.link_page or card.link_url or card.link_document %}
             <div class="mt-4">
                 {% trans "Learn more" as default_link_text %}
-                {% include "wtrx/components/button.html" with text=card.link_text|default:default_link_text link_page=card.link_page link_url=card.link_url style="outline" %}
+                {% include "wtrx/components/button.html" with text=card.link_text|default:default_link_text link_page=card.link_page link_url=card.link_url link_document=card.link_document style="outline" %}
             </div>
         {% endif %}
     </div>

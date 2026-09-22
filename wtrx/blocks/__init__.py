@@ -57,6 +57,7 @@ from wagtail.blocks import (
 from wagtail.blocks import RawHTMLBlock as WagtailRawHTMLBlock
 from wagtail.blocks.stream_block import StreamBlockAdapter
 from wagtail.contrib.table_block.blocks import TableBlock as WagtailTableBlock
+from wagtail.documents.blocks import DocumentChooserBlock
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Site
 from wagtail.snippets.blocks import SnippetChooserBlock
@@ -317,18 +318,25 @@ def _validate_at_most_one_link(cleaned, errors, extra_fields=()):
 
     The base pair is link_page/link_url, which every caller has.
     ``extra_fields`` names further link fields a block also offers —
-    FeaturePanelBlock passes ("anchor",) — so a block that gained a third
-    target does not need its own copy of this check. Blocks that pass
-    nothing keep the original two-field message verbatim.
+    FeaturePanelBlock/ImageCardListItemBlock pass ("anchor",), CardBlock
+    passes ("link_document",) — so a block that gained a third target does
+    not need its own copy of this check. Blocks that pass nothing keep the
+    original two-field message verbatim. Each extra-field combination gets
+    its own full sentence rather than one built by joining field names, to
+    keep every message a single translatable string.
 
     Modifies the errors dict in place and returns it.
     """
     fields = ("link_page", "link_url", *extra_fields)
     set_fields = [name for name in fields if cleaned.get(name)]
     if len(set_fields) > 1:
-        if extra_fields:
+        if extra_fields == ("anchor",):
             msg = ValidationError(
                 _("Provide only one of link page, link URL, or anchor.")
+            )
+        elif extra_fields == ("link_document",):
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, or link document.")
             )
         else:
             msg = ValidationError(
@@ -1145,7 +1153,12 @@ class CardBlock(ContentPreviewMixin, StructBlock):
 
     When an icon is set, it renders at 24x24 beside the content block. Used
     directly in the StreamField and as the child block of CardGridBlock. At
-    most one of link_page or link_url may be set. clean() enforces this.
+    most one of link_page, link_url, or link_document may be set. clean()
+    enforces this. link_document was originally a "document-link" Draftail
+    feature inside `content` (letting an editor link arbitrary text to an
+    uploaded Document), replaced by this structured field so a document
+    behaves as a third CTA target alongside link_page/link_url instead of a
+    freeform in-body link.
 
     `content` used to be two fields — `heading` (CharBlock, required) and
     `description` (a plain TextBlock, optional — no markup at all, unlike
@@ -1181,12 +1194,20 @@ class CardBlock(ContentPreviewMixin, StructBlock):
     link_page = PageChooserBlock(
         required=False,
         label=_("Link page"),
-        help_text=_("Internal link. Set either this or Link URL, not both."),
+        help_text=_("Internal link. Set only one of link page, link URL, or link document."),
     )
     link_url = URLBlock(
         required=False,
         label=_("Link URL"),
-        help_text=_("External link. Set either this or Link page, not both."),
+        help_text=_("External link. Set only one of link page, link URL, or link document."),
+    )
+    link_document = DocumentChooserBlock(
+        required=False,
+        label=_("Link document"),
+        help_text=_(
+            "Link to an uploaded document (e.g. a PDF). Set only one of "
+            "link page, link URL, or link document."
+        ),
     )
     link_text = CharBlock(
         required=False,
@@ -1196,7 +1217,7 @@ class CardBlock(ContentPreviewMixin, StructBlock):
     )
     def clean(self, value):
         cleaned = super().clean(value)
-        errors = _validate_at_most_one_link(cleaned, {})
+        errors = _validate_at_most_one_link(cleaned, {}, extra_fields=("link_document",))
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned

@@ -67,9 +67,7 @@ RICHTEXT_FEATURES_HEADING_H2 = ["h2", "bold", "italic", "link", "ai"]
 
 RICHTEXT_FEATURES_HEADINGS_H2_H3 = ["h2", "h3", "bold", "italic", "link", "ol", "ul", "ai"]
 
-# RICHTEXT_FEATURES_HEADING_H3: inline formatting + h3 + document-link. For a
-# card-shaped block whose heading rendered as an H3, not an H2 (CardBlock,
-# ImageCardListItemBlock). document-link lets an editor link text in the
-# card's body to an uploaded Document (e.g. a PDF) — added for CardGridBlock's
-# cards; ImageCardListItemBlock picks it up too since both share this list.
-RICHTEXT_FEATURES_HEADING_H3 = ["h3", "bold", "italic", "link", "document-link", "ai"]
+# RICHTEXT_FEATURES_HEADING_H3: inline formatting + h3 only. For a card-shaped
+# block whose heading rendered as an H3, not an H2 (CardBlock,
+# ImageCardListItemBlock).
+RICHTEXT_FEATURES_HEADING_H3 = ["h3", "bold", "italic", "link", "ai"]

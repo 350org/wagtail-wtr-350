@@ -492,7 +492,7 @@ class TestQuoteBlockValidation(SimpleTestCase):
 
     def test_anchor_is_ignored_by_callers_that_do_not_declare_it(self):
         """
-        The two-field callers (QuoteBlock, CardBlock, CardCarouselBlock)
+        The two-field callers (QuoteBlock, CardCarouselBlock's own CTA)
         have no anchor field at all, so a stray key must not be treated as
         a competing link target.
         """
@@ -826,6 +826,7 @@ class TestCardBlockFields(SimpleTestCase):
             "image",
             "link_page",
             "link_url",
+            "link_document",
             "link_text",
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
@@ -837,6 +838,43 @@ class TestCardBlockFields(SimpleTestCase):
     def test_content_supports_h3(self):
         block = CardBlock()
         self.assertIn("h3", block.declared_blocks["content"].features)
+
+    def test_content_has_no_document_link_feature(self):
+        """
+        document-link used to live inline in `content` as a Draftail
+        feature; it's now the structured `link_document` field below,
+        alongside link_page/link_url, so it must not also remain here.
+        """
+        block = CardBlock()
+        self.assertNotIn("document-link", block.declared_blocks["content"].features)
+
+    def test_link_document_is_optional(self):
+        block = CardBlock()
+        self.assertFalse(block.declared_blocks["link_document"].required)
+
+    def test_link_document_alone_no_error(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": None, "link_url": "", "link_document": object()},
+            {},
+            extra_fields=("link_document",),
+        )
+        self.assertEqual(errors, {})
+
+    def test_link_document_conflicts_with_link_url(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": None, "link_url": "https://example.com", "link_document": object()},
+            {},
+            extra_fields=("link_document",),
+        )
+        self.assertEqual(set(errors), {"link_url", "link_document"})
+
+    def test_link_document_conflicts_with_link_page(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "", "link_document": object()},
+            {},
+            extra_fields=("link_document",),
+        )
+        self.assertEqual(set(errors), {"link_page", "link_document"})
 
 
 class TestImageGridItemBlockFields(SimpleTestCase):
