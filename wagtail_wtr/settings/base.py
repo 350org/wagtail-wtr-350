@@ -146,47 +146,38 @@ USE_TZ = True
 # navigation and footer overrides. Language is the only axis that changes the
 # URL.
 #
-# Two kinds of language here, and the distinction is the whole scheme:
+# A language is split into a country variant and a plain code only where it has
+# more than one home:
 #
-#   - A country variant (pt-br, fr-fr) is a country site: its own content, its
-#     own navigation, served under its own name (/brasil/, /france/).
-#   - A plain code (pt, fr, es) is for translating an individual global page,
-#     served under the code (/es/about/).
+#   - Portuguese, Spanish and French do. The plain code stays free for
+#     translating a global page (/pt/about/), and the country site takes a
+#     variant (pt-br at /brasil/). Without that, a Portuguese translation of a
+#     global page would land inside the Brazilian site.
+#   - German, Indonesian, Japanese, Turkish, Dutch and Filipino do not: each
+#     has one site, so the language is the site. A German translation belongs
+#     on the German site, at /germany/.
 #
-# Keeping them apart is what stops a Portuguese translation of a global page
-# landing inside the Brazilian site. A country variant inherits its base
-# language's catalogue (pt-br reads locale/pt/), so the split costs no extra
-# translation work.
+# A country variant inherits its base language's catalogue (pt-br reads
+# locale/pt/), so splitting costs no extra translation work.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
-    # Spanish
+    # Spanish, Portuguese and French each have more than one home, so the plain
+    # code stays free for translations and the country site takes a variant.
     ("es", _("Spanish")),
-    ("es-419", _("Spanish (Latin America)")),
-    # Portuguese
+    ("es-419", _("Latin American Spanish")),
     ("pt", _("Portuguese")),
     ("pt-br", _("Brazilian Portuguese")),
-    # French
     ("fr", _("French")),
     ("fr-fr", _("French (France)")),
-    ("fr-ca", _("French (Canada)")),
-    # German
+    ("fr-ca", _("Canadian French")),
+    # One site each, so one locale each: the language is the site, and a
+    # translation into it belongs there.
     ("de", _("German")),
-    ("de-de", _("German (Germany)")),
-    # Indonesian
     ("id", _("Indonesian")),
-    ("id-id", _("Indonesian (Indonesia)")),
-    # Japanese
     ("ja", _("Japanese")),
-    ("ja-jp", _("Japanese (Japan)")),
-    # Turkish
     ("tr", _("Turkish")),
-    ("tr-tr", _("Turkish (Türkiye)")),
-    # Dutch
     ("nl", _("Dutch")),
-    ("nl-nl", _("Dutch (Netherlands)")),
-    # Filipino
     ("fil", _("Filipino")),
-    ("fil-ph", _("Filipino (Philippines)")),
 ]
 
 # The path segment each country site serves under. These are the URLs those
@@ -196,14 +187,15 @@ WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
 WTRX_LANGUAGE_URL_PREFIXES = {
     "pt-br": "brasil",
     "fr-fr": "france",
-    "de-de": "germany",
-    "id-id": "indonesia",
     "es-419": "latinoamerica",
-    "ja-jp": "japan",
-    "tr-tr": "turkiye",
-    "nl-nl": "nederland",
+    "de": "germany",
+    "id": "indonesia",
+    "ja": "japan",
+    "tr": "turkiye",
+    "nl": "nederland",
+    "fil": "pilipinas",
     # A prefix may be more than one segment: Canadian French belongs inside the
-    # (English-first) Canadian site rather than under /france/.
+    # Canadian site rather than under /france/.
     "fr-ca": "canada/fr",
 }
 

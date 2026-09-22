@@ -1388,16 +1388,20 @@ gate.
     their own navigation and footer overrides. Language is the only axis that
     changes the URL (rule #10).
 
-72. **Two kinds of locale, and the difference decides the URL.** A *country
-    variant* (`pt-br`, `fr-fr`, `de-de`, `id-id`) is a country site with its
-    own content and navigation, served under its own name via
-    `WTRX_LANGUAGE_URL_PREFIXES` (`/brasil/`, `/france/`). A *plain code*
-    (`pt`, `fr`, `es`) exists for translating an individual global page and
-    serves under the code (`/es/about/`). Keeping them apart is the whole
-    point: with the Brasil site on plain `pt`, a Portuguese translation of a
-    global page would land at `/brasil/about/`, inside the Brazilian site —
-    the same way a French translation of `/canada/` lands under `/france/` if
-    France holds plain `fr`. Splitting costs nothing in translation work: a
+72. **A language is split into a country variant and a plain code only where
+    it has more than one home.** Portuguese, Spanish and French do: the plain
+    code stays free for translating a global page (`/pt/about/`) and the
+    country site takes a variant (`pt-br` at `/brasil/`, `fr-fr` at
+    `/france/`, `es-419` at `/latinoamerica/`). Without that, a Portuguese
+    translation of a global page would land at `/brasil/about/`, inside the
+    Brazilian site. German, Indonesian, Japanese, Turkish, Dutch and Filipino
+    do **not**: each has one 350 site, so the language *is* the site — `de`
+    serves `/germany/`, and a German translation belongs there. Splitting them
+    anyway produces two entries called "German", which is why a label needing a
+    parenthetical disambiguator (`French (France)`) is the signal that a split
+    is real; where the parenthetical would only restate the language, the
+    variant is not needed. Standard adjectival names are preferred where they
+    exist: Brazilian Portuguese, Canadian French, Latin American Spanish. Splitting costs nothing in translation work: a
     country variant falls back to its base language's catalogue, so `pt-br`
     reads `locale/pt/` and needs no `.po` of its own. Retagging a country site
     from `pt` to `pt-br` changes no URLs (the prefix maps to the slug it

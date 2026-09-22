@@ -432,8 +432,9 @@ There are two kinds of locale, and which one a page uses decides its URL:
 
 | Kind | Example | Serves at | For |
 |---|---|---|---|
-| Country variant | `pt-br`, `fr-fr` | `/brasil/`, `/france/` | A country site: its own content and navigation |
+| Country variant | `pt-br`, `fr-fr`, `es-419` | `/brasil/`, `/france/`, `/latinoamerica/` | A country site, where its language has more than one home |
 | Plain language code | `es`, `pt`, `fr` | `/es/about/` | Translating an individual global page |
+| Plain code *as* a site | `de`, `id`, `ja` | `/germany/`, `/indonesia/` | A language with one 350 site: the language is the site |
 
 A country variant's URL comes from `WTRX_LANGUAGE_URL_PREFIXES`, which is how
 the country sites keep the URLs they already had; a plain code serves under the

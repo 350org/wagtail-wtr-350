@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-22 01:28+0000\n"
+"POT-Creation-Date: 2026-09-22 02:13+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -86,84 +86,58 @@ msgid_plural "Used %(usage_count)s times"
 msgstr[0] "Utilisé %(usage_count)s fois"
 msgstr[1] "Utilisé %(usage_count)s fois"
 
-#: wagtail_wtr/settings/base.py:161
+#: wagtail_wtr/settings/base.py:163
 msgid "English"
 msgstr "Anglais"
 
-#: wagtail_wtr/settings/base.py:163
+#: wagtail_wtr/settings/base.py:166
 msgid "Spanish"
 msgstr "Espagnol"
 
-#: wagtail_wtr/settings/base.py:164
-msgid "Spanish (Latin America)"
-msgstr ""
+#: wagtail_wtr/settings/base.py:167
+msgid "Latin American Spanish"
+msgstr "Espagnol d’Amérique latine"
 
-#: wagtail_wtr/settings/base.py:166
+#: wagtail_wtr/settings/base.py:168
 msgid "Portuguese"
 msgstr "Portugais"
 
-#: wagtail_wtr/settings/base.py:167
+#: wagtail_wtr/settings/base.py:169
 msgid "Brazilian Portuguese"
 msgstr "Portugais brésilien"
 
-#: wagtail_wtr/settings/base.py:169
+#: wagtail_wtr/settings/base.py:170
 msgid "French"
 msgstr "Français"
 
-#: wagtail_wtr/settings/base.py:170
+#: wagtail_wtr/settings/base.py:171
 msgid "French (France)"
 msgstr "Français (France)"
 
-#: wagtail_wtr/settings/base.py:171
-#, fuzzy
-#| msgid "French (France)"
-msgid "French (Canada)"
-msgstr "Français (France)"
+#: wagtail_wtr/settings/base.py:172
+msgid "Canadian French"
+msgstr "Français canadien"
 
-#: wagtail_wtr/settings/base.py:173
+#: wagtail_wtr/settings/base.py:175
 msgid "German"
 msgstr "Allemand"
-
-#: wagtail_wtr/settings/base.py:174
-msgid "German (Germany)"
-msgstr "Allemand (Allemagne)"
 
 #: wagtail_wtr/settings/base.py:176
 msgid "Indonesian"
 msgstr "Indonésien"
 
 #: wagtail_wtr/settings/base.py:177
-msgid "Indonesian (Indonesia)"
-msgstr "Indonésien (Indonésie)"
+msgid "Japanese"
+msgstr "Japonais"
+
+#: wagtail_wtr/settings/base.py:178
+msgid "Turkish"
+msgstr "Turc"
 
 #: wagtail_wtr/settings/base.py:179
-msgid "Japanese"
-msgstr ""
+msgid "Dutch"
+msgstr "Néerlandais"
 
 #: wagtail_wtr/settings/base.py:180
-msgid "Japanese (Japan)"
-msgstr ""
-
-#: wagtail_wtr/settings/base.py:182
-msgid "Turkish"
-msgstr ""
-
-#: wagtail_wtr/settings/base.py:183
-msgid "Turkish (Türkiye)"
-msgstr ""
-
-#: wagtail_wtr/settings/base.py:185
-msgid "Dutch"
-msgstr ""
-
-#: wagtail_wtr/settings/base.py:186
-msgid "Dutch (Netherlands)"
-msgstr ""
-
-#: wagtail_wtr/settings/base.py:188
 msgid "Filipino"
-msgstr ""
-
-#: wagtail_wtr/settings/base.py:189
-msgid "Filipino (Philippines)"
-msgstr ""
+msgstr "Filipino"
