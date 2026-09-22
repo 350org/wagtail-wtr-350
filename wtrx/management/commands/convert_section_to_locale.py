@@ -44,6 +44,8 @@ from django.db import transaction
 from wagtail.contrib.redirects.models import Redirect
 from wagtail.models import Locale, Page, Revision, Site
 
+from wtrx.i18n import url_prefix_for_language
+
 
 class Command(BaseCommand):
     help = "Move a section to Root and retag it (and its descendants) to a locale."
@@ -118,14 +120,32 @@ class Command(BaseCommand):
         self.stdout.write(
             "Move        : " + ("already at Root level" if already_at_root else "to Root level")
         )
+        # The prefix, not the bare code: a country site serves at its country
+        # slug (pt-br -> /brasil/), so reporting /pt-br/ here would tell an
+        # operator every URL is about to move when in fact none of them are.
+        prefix = url_prefix_for_language(locale.language_code)
         self.stdout.write(
             "Serves as   : "
             + (
-                f"the {locale.language_code} counterpart of {site_root.title!r} -> /{locale.language_code}/"
+                f"the {locale.language_code} counterpart of {site_root.title!r} -> /{prefix}/"
                 if link_to_site_root
                 else "standalone (no URL until linked)"
             )
         )
+        if link_to_site_root:
+            # Every descendant keeps its path below the section root, so the
+            # whole tree's URLs are unchanged exactly when the section already
+            # sits at the prefix it is about to serve under.
+            section_url = old_urls.get(page.pk)
+            unchanged = section_url == f"/{prefix}/"
+            self.stdout.write(
+                "URLs        : "
+                + (
+                    f"unchanged ({section_url} is already the {locale.language_code} prefix)"
+                    if unchanged
+                    else f"{section_url} -> /{prefix}/ for all {len(pages)} pages, redirects created"
+                )
+            )
 
         if dry_run:
             self.stdout.write(self.style.WARNING("\nDry run — nothing written."))
@@ -155,7 +175,9 @@ class Command(BaseCommand):
 
             revisions = self._retag_revisions(pages, locale)
 
-            # Root paths are cached for an hour and are what maps this tree to a URL.
+            # Root paths are cached for an hour and are what maps this tree to a
+            # URL. This clears the cache in THIS process only -- see the warning
+            # printed below.
             Site.clear_site_root_paths_cache()
 
             redirects = 0
@@ -168,6 +190,23 @@ class Command(BaseCommand):
                 f"\nConverted {len(pages)} pages and {revisions} revisions, "
                 f"created {redirects} redirects. "
                 f"Section now serves at {page.url or '(no URL)'}"
+            )
+        )
+        # Wagtail caches the site root paths for an hour, and with a per-process
+        # cache backend (LocMemCache is Django's default, and nothing here
+        # configures another) clearing it above reached this process alone. Any
+        # worker still holding the pre-conversion copy will not match the moved
+        # pages' url_path against any root path, so `page.url` returns None for
+        # every page in this tree -- emptying nav links, sitemap entries and
+        # canonical/hreflang tags, and showing "no site set up for this
+        # location" in the admin. Serving is unaffected (routing goes through
+        # Site.find_for_request, not these paths), which is what makes it easy
+        # to miss.
+        self.stdout.write(
+            self.style.WARNING(
+                "\nRestart the application workers now. Wagtail's site root path "
+                "cache is per-process and one hour long; until every worker is "
+                "restarted, URLs generated for these pages will be empty."
             )
         )
 

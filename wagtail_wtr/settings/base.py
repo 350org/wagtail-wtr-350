@@ -140,73 +140,80 @@ LANGUAGE_CODE = "en"
 TIME_ZONE = "UTC"
 USE_TZ = True
 
-# Each language is its own page tree under Root, served at /<code>/ (English,
-# the default, keeps the unprefixed URLs). The codes are the URL prefixes, and
-# they match the country sites 350.org already publishes: /fr/, /pt/, /de/,
-# /id/. Adding a language here is a deploy; creating its Locale row is not
-# (Settings > Locales, or `manage.py bootstrap_locales`).
-# Every language any 350 site needs is listed here so it can be chosen in the
-# admin; only a handful have a Locale row, and only those exist as content.
-# `manage.py bootstrap_locales` names the ones to create -- it deliberately does
-# not create all of these.
+# Each language is its own page tree under Root, and its URL follows one rule:
 #
-# An English-language country site (Aotearoa, Australia, Canada, US, Pacific)
-# needs no locale at all: it is a section under the English Home, with its own
-# navigation and footer overrides. Language is the only axis that changes the
-# URL.
+#   a country site        -> the country slug              /brasil, /france
+#   a country translation -> that slug, then the language   /brasil/en, /canada/fr
+#   a global language     -> its own language code          /es, /fr
+#   English (the default) -> unprefixed                     /
 #
-# One entry per language, because no language currently needs two. A language
-# gets a second, plain-code entry only when it has both a country site and
-# somewhere neutral to translate into -- French will, once Canada (fr-ca) is
-# created alongside France, at which point `fr` comes back for /fr/about/.
+# A country slug serves that country's own language with no language segment of
+# its own: /brasil is Portuguese, /france is French, /canada is English. A
+# second language on the same country site is a translation of it and nests
+# underneath, so the country keeps one address and one tree per language.
+# WTRX_LANGUAGE_URL_PREFIXES below maps each code to its segment; a code with
+# no entry serves under itself, which is what the global languages rely on.
 #
-# `es` is the other shape: Spanish has no country site here, so it is purely a
-# translation target and serves under its own code (/es/about/).
+# Adding a language here is a deploy; creating its Locale row is not (Settings
+# > Locales, or `manage.py bootstrap_locales`). Every language any 350 site
+# needs is listed so it can be chosen in the admin; only a handful have a
+# Locale row, and only those exist as content. A language with no Locale does
+# not resolve at its prefix, so an entry here is inert until someone creates it.
 #
-# A regional code keeps its precision even where it is the only home for that
-# language: pt-br and fr-fr say what the content is, and leaving pt and fr
-# unoffered means either can be added later without retagging the site. Their
-# catalogues are `locale/pt/` and `locale/fr/` -- a regional variant falls back
-# to its base language, so those directories must stay even though `pt` and
-# `fr` are not offered languages.
+# An English-language country site (Aotearoa, Australia, US, Pacific) needs no
+# locale at all: it is a section under the English Home with its own navigation
+# and footer overrides. Canada is the exception, because it is the one country
+# site with a second language: /canada is en-ca and /canada/fr is fr-ca.
+#
+# Codes are `language-country`, matching the segment order of the URL they
+# serve (es-fr -> /france/es). A language with a single home keeps its plain
+# code whatever its URL: German is `de` and serves at /germany/, and only needs
+# a `de-de` if Germany ever gains a second language.
+#
+# `pt` is not offered -- Portuguese has only Brazil -- but `locale/pt/` must
+# stay regardless. A country code falls back to its base language for UI
+# chrome, so pt-br reads locale/pt/ and would otherwise lose every translated
+# string. `locale/fr/` backs plain `fr`, fr-fr and fr-ca alike.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
-    ("en-ca", _("Canadian English")),
-    # Spanish, Portuguese and French each have more than one home, so the plain
-    # code stays free for translations and the country site takes a variant.
     ("es", _("Spanish")),
-    ("pt-br", _("Brazilian Portuguese")),
-    ("fr-fr", _("French")),
-    ("fr-ca", _("Canadian French")),
-    # One site each, so one locale each: the language is the site, and a
-    # translation into it belongs there.
     ("de", _("German")),
+    ("fr", _("French")),
     ("id", _("Indonesian")),
     ("ja", _("Japanese")),
     ("tr", _("Turkish")),
     ("nl", _("Dutch")),
     ("fil", _("Filipino")),
+    # Countries
+    ("en-ca", _("English - Canada")),
+    ("fr-ca", _("French - Canada")),
+    ("pt-br", _("Portuguese - Brazil")),
+    ("en-br", _("English - Brazil")),
+    ("fr-fr", _("French - France")),
+    ("es-fr", _("Spanish - France")),
 ]
 
-# The path segment each country site serves under. These are the URLs those
-# sites already have, kept as-is rather than moved to /pt-br/, /fr-fr/ and
-# redirected. A language with no entry serves under its own code, which is
-# what the plain codes above are for (/es/about/). See wtrx/i18n.py.
+# The segment each language serves under. A country site takes the country
+# slug -- the URLs these sites already publish, kept as-is rather than moved to
+# /pt-br/ and redirected -- and a translation of that site nests one level
+# under it. A code with no entry here serves under itself, which is how the
+# global languages get /es/ and /fr/. See wtrx/i18n.py; longest prefix wins, so
+# `brasil/en` is matched before `brasil` and the two stay independent.
 WTRX_LANGUAGE_URL_PREFIXES = {
+    # Country sites, each at its own slug in that country's own language.
     "pt-br": "brasil",
     "fr-fr": "france",
+    "en-ca": "canada",
     "de": "germany",
     "id": "indonesia",
     "ja": "japan",
     "tr": "turkiye",
     "nl": "nederland",
     "fil": "pilipinas",
-    # A prefix may be more than one segment: Canadian French belongs inside the
-    # Canadian site rather than under /france/.
+    # Translations of a country site, nested under that site's slug.
     "fr-ca": "canada/fr",
-    # Offered ahead of the conversion: until en-ca has a Locale row, /canada/
-    # stays an ordinary English page. See wtrx/i18n.py.
-    "en-ca": "canada",
+    "en-br": "brasil/en",
+    "es-fr": "france/es",
 }
 
 # Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx

@@ -7,6 +7,8 @@ from django.urls import include, path
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.contrib.sitemaps.views import sitemap
+
+from wtrx.sitemaps import AllLocalesSitemap
 from wagtail.documents import urls as wagtaildocs_urls
 
 from wtrx import views
@@ -17,7 +19,13 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
-    path("sitemap.xml", sitemap, name="sitemap"),
+    # Every language tree, not just the default one -- see wtrx/sitemaps.py.
+    path(
+        "sitemap.xml",
+        sitemap,
+        {"sitemaps": {"pages": AllLocalesSitemap}},
+        name="sitemap",
+    ),
     path("i18n/", include("django.conf.urls.i18n")),
     # Health check for zero-downtime deploys (Render, load balancers, etc.)
     path(

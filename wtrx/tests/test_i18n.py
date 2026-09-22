@@ -7,7 +7,9 @@ See settings/base.py WAGTAIL_CONTENT_LANGUAGES and the `language_links` /
 """
 
 import json
+import re
 from io import StringIO
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
@@ -20,8 +22,10 @@ from django.utils import translation
 from wagtail.blocks import CharBlock, RichTextBlock
 from wagtail.contrib.redirects.models import Redirect
 from wagtail.models import Locale, Page, Site
+from wagtail.search.backends import get_search_backend
 from wagtail_localize.segments.extract import StreamFieldSegmentExtractor
 
+from wtrx.i18n import language_from_url_prefix, url_prefix_for_language
 from wtrx.models import ContentPage, HomePage
 
 
@@ -461,6 +465,50 @@ class TestConvertSectionToLocale(TestCase):
         with self.assertRaises(CommandError):
             self._convert(str(other.pk), "es")
 
+    def test_a_real_run_says_to_restart_the_workers(self):
+        """
+        Wagtail's site root path cache is per-process and an hour long, so
+        clearing it inside the command reaches only the command's own process.
+        A worker still holding the old copy matches none of the moved pages'
+        url_paths and returns `url = None` for all of them -- empty nav links,
+        sitemap entries and canonical tags -- while still serving the pages
+        fine, which is what makes it easy to miss.
+        """
+        output = self._convert(str(self.section.pk), "es")
+
+        self.assertIn("Restart the application workers", output)
+
+    def test_a_dry_run_does_not(self):
+        output = self._convert(str(self.section.pk), "es", "--dry-run")
+
+        self.assertNotIn("Restart the application workers", output)
+
+    def test_dry_run_reports_the_mapped_prefix_not_the_bare_code(self):
+        """
+        The report has to name the URL the tree will actually serve at.
+
+        pt-br serves at /brasil/, so a report saying `-> /pt-br/` would tell an
+        operator that every URL is about to move when in fact none of them are
+        — the difference between a routine conversion and one that looks like
+        it needs thousands of redirects.
+        """
+        _locale("pt-br")
+        already_named = HomePage(title="Brasil", slug="brasil", locale=_english())
+        self.home.add_child(instance=already_named)
+
+        output = self._convert(str(already_named.pk), "pt-br", "--dry-run")
+
+        self.assertIn("-> /brasil/", output)
+        self.assertNotIn("-> /pt-br/", output)
+        self.assertIn("unchanged", output)
+
+    def test_dry_run_reports_when_urls_do_move(self):
+        """The other branch: a slug that is not already the mapped prefix."""
+        output = self._convert(str(self.section.pk), "es", "--dry-run")
+
+        self.assertIn("/brasil-regional/ -> /es/", output)
+        self.assertNotIn("unchanged", output)
+
     def test_no_redirects_needed_when_the_url_does_not_change(self):
         """
         A country site converted to its country-variant locale keeps every URL
@@ -590,45 +638,288 @@ class TestNamedLanguageUrlPrefixes(TestCase):
         )
 
 
-class TestMultiSegmentPrefix(TestCase):
+class TestCountrySlugScheme(TestCase):
     """
-    A mapped prefix may be more than one segment. Canadian French serves at
-    `/canada/fr/`, inside the English-first Canadian section, rather than under
-    `/france/` — which is where it would land if France held plain `fr`.
+    Every language's URL follows one rule (settings/base.py):
+
+        a country site        -> the country slug             /brasil
+        a country translation -> that slug, then the language /brasil/en
+        a global language     -> its own code                 /es
+        English (the default) -> unprefixed                   /
+
+    A country slug carries no language segment of its own, so /brasil is
+    Portuguese and /canada is English. A second language on the same country
+    site nests underneath it, which is what the multi-segment prefix support
+    in wtrx/i18n.py exists for -- and why longest-prefix-wins matters: both
+    `brasil` and `brasil/en` are mapped, and each has to keep its own tree.
     """
 
     @classmethod
     def setUpTestData(cls):
+        cls.pt_br = _locale("pt-br")
+        cls.en_br = _locale("en-br")
         cls.fr_ca = _locale("fr-ca")
+        cls.es = _locale("es")
+
         root = Page.objects.filter(depth=1).first()
-        cls.home = HomePage(title="Home", slug="home-multi", locale=_english())
+        cls.home = HomePage(title="Home", slug="home-scheme", locale=_english())
         root.add_child(instance=cls.home)
         site = Site.objects.get(is_default_site=True)
         site.root_page = cls.home
         site.save()
 
-        cls.canada = ContentPage(title="Canada", slug="canada", locale=_english())
-        cls.home.add_child(instance=cls.canada)
-
-        cls.home_fr_ca = cls.home.copy_for_translation(cls.fr_ca)
-        cls.home_fr_ca.save_revision().publish()
-        cls.fr_ca_page = ContentPage(
-            title="À propos", slug="a-propos", locale=cls.fr_ca
+        cls.english_page = ContentPage(
+            title="About", slug="about-scheme", locale=_english()
         )
-        cls.home_fr_ca.add_child(instance=cls.fr_ca_page)
+        cls.home.add_child(instance=cls.english_page)
 
-    def test_serves_under_the_two_segment_prefix(self):
-        response = Client().get("/canada/fr/a-propos/")
+        def tree(locale, slug):
+            home = cls.home.copy_for_translation(locale)
+            home.save_revision().publish()
+            page = ContentPage(title=slug, slug=slug, locale=locale)
+            home.add_child(instance=page)
+            return page
+
+        cls.pt_page = tree(cls.pt_br, "sobre-scheme")
+        cls.en_br_page = tree(cls.en_br, "about-brasil")
+        cls.fr_ca_page = tree(cls.fr_ca, "a-propos-canada")
+        cls.es_page = tree(cls.es, "sobre-global")
+
+    # --- a country site sits at its slug, in its own language ---
+
+    def test_country_site_serves_at_its_slug(self):
+        response = Client().get("/brasil/sobre-scheme/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'lang="pt-br"')
+
+    def test_country_site_is_not_also_served_under_its_code(self):
+        """One canonical URL per tree."""
+        self.assertEqual(Client().get("/pt-br/sobre-scheme/").status_code, 404)
+
+    # --- a translation of a country site nests under that slug ---
+
+    def test_country_translation_nests_under_the_country_slug(self):
+        response = Client().get("/brasil/en/about-brasil/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'lang="en-br"')
+
+    def test_canadian_french_nests_under_canada(self):
+        response = Client().get("/canada/fr/a-propos-canada/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'lang="fr-ca"')
 
-    def test_page_url_uses_the_two_segment_prefix(self):
-        self.assertEqual(
-            Page.objects.get(pk=self.fr_ca_page.pk).url, "/canada/fr/a-propos/"
-        )
+    def test_the_nested_prefix_does_not_swallow_the_country_site(self):
+        """`brasil/en` is mapped too, and must not claim plain `/brasil/`."""
+        self.assertEqual(language_from_url_prefix("/brasil/sobre-scheme/"), "pt-br")
+        self.assertEqual(language_from_url_prefix("/brasil/en/about-brasil/"), "en-br")
 
-    def test_the_english_section_above_it_is_untouched(self):
-        """`canada` alone must not be claimed by the `canada/fr` prefix."""
-        response = Client().get("/canada/")
+    def test_a_translation_is_not_served_at_its_bare_code(self):
+        self.assertEqual(Client().get("/en-br/about-brasil/").status_code, 404)
+
+    # --- a global language keeps its own code ---
+
+    def test_global_language_serves_under_its_code(self):
+        response = Client().get("/es/sobre-global/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'lang="es"')
+
+    def test_english_stays_unprefixed(self):
+        response = Client().get("/about-scheme/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'lang="en"')
+
+    # --- generated URLs agree with all of the above ---
+
+    def test_page_urls_use_the_scheme(self):
+        self.assertEqual(
+            Page.objects.get(pk=self.pt_page.pk).url, "/brasil/sobre-scheme/"
+        )
+        self.assertEqual(
+            Page.objects.get(pk=self.en_br_page.pk).url, "/brasil/en/about-brasil/"
+        )
+        self.assertEqual(
+            Page.objects.get(pk=self.fr_ca_page.pk).url,
+            "/canada/fr/a-propos-canada/",
+        )
+        self.assertEqual(
+            Page.objects.get(pk=self.es_page.pk).url, "/es/sobre-global/"
+        )
+        self.assertEqual(
+            Page.objects.get(pk=self.english_page.pk).url, "/about-scheme/"
+        )
+
+    def test_reverse_uses_the_scheme(self):
+        """
+        The canary for `LocalePrefixPattern`, which is not public Django API.
+        """
+        for code, expected in [
+            ("pt-br", "/brasil/search/"),
+            ("en-br", "/brasil/en/search/"),
+            ("fr-ca", "/canada/fr/search/"),
+            ("es", "/es/search/"),
+            ("en", "/search/"),
+        ]:
+            with self.subTest(code=code), translation.override(code):
+                self.assertEqual(reverse("search"), expected)
+
+    def test_canadian_english_owns_the_canada_slug(self):
+        """`/canada/` is en-ca's, which is what makes the section convertible."""
+        self.assertEqual(url_prefix_for_language("en-ca"), "canada")
+
+
+class TestPrefixWithoutALocale(TestCase):
+    """
+    A language is offered in settings long before it is created, so most mapped
+    prefixes have no `Locale` row behind them. Such a prefix must not resolve:
+    it would activate a language with no content, `Page.localized` would fall
+    back to the English source page, and the English home would be served at a
+    second URL — a duplicate for search engines, and in practice a 500.
+
+    This is also what makes a prefix safe to map ahead of the conversion, which
+    is how `en-ca` -> `canada` is configured today.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-uncreated", locale=_english())
+        root.add_child(instance=cls.home)
+        site = Site.objects.get(is_default_site=True)
+        site.root_page = cls.home
+        site.save()
+
+    def test_mapped_prefix_does_not_resolve_without_a_locale(self):
+        """`ja` is configured and mapped to `japan`, but is not created here."""
+        self.assertFalse(Locale.objects.filter(language_code="ja").exists())
+        self.assertEqual(Client().get("/japan/").status_code, 404)
+
+    def test_path_is_not_claimed_for_the_language(self):
+        from wtrx.i18n import language_from_url_prefix, url_prefix_for_language
+
+        self.assertIsNone(language_from_url_prefix("/japan/"))
+
+    def test_the_same_prefix_resolves_once_the_locale_exists(self):
+        """The guard is about the Locale row, not about the mapping."""
+        from wtrx.i18n import language_from_url_prefix, url_prefix_for_language
+
+        _locale("ja")
+        self.assertEqual(language_from_url_prefix("/japan/"), "ja")
+
+    def test_an_unmapped_english_path_is_unaffected(self):
+        response = Client().get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'lang="en"')
+
+
+class TestSearchIsScopedToTheActiveLocale(TestCase):
+    """
+    Each language is its own page tree, so an unscoped search returns every
+    site's content at once — a visitor searching from /brasil/ would get
+    French and German pages they cannot read, at URLs outside the site they
+    are on. With a single locale this could not happen; it became reachable
+    the moment the country sites became language trees.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pt_br = _locale("pt-br")
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-search", locale=_english())
+        root.add_child(instance=cls.home)
+        site = Site.objects.get(is_default_site=True)
+        site.root_page = cls.home
+        site.save()
+
+        # The same distinctive word in both trees.
+        cls.english_hit = ContentPage(
+            title="Climate elsewhere", slug="climate-en", locale=_english()
+        )
+        cls.home.add_child(instance=cls.english_hit)
+
+        cls.home_pt = cls.home.copy_for_translation(cls.pt_br)
+        cls.home_pt.save_revision().publish()
+        cls.pt_hit = ContentPage(
+            title="Climate brasileiro", slug="climate-pt", locale=cls.pt_br
+        )
+        cls.home_pt.add_child(instance=cls.pt_hit)
+
+        # The database backend indexes on a signal that does not fire for pages
+        # built in setUpTestData, so without this both searches return nothing
+        # and the test would pass for the wrong reason.
+        backend = get_search_backend()
+        for page in (cls.english_hit, cls.pt_hit):
+            backend.add(Page.objects.get(pk=page.pk))
+
+    def _titles(self, url):
+        response = Client().get(url, {"query": "Climate"})
+        self.assertEqual(response.status_code, 200)
+        return [p.title for p in response.context["search_results"]]
+
+    def test_a_country_site_searches_only_its_own_tree(self):
+        titles = self._titles("/brasil/search/")
+        self.assertIn("Climate brasileiro", titles)
+        self.assertNotIn("Climate elsewhere", titles)
+
+    def test_english_search_does_not_return_other_languages(self):
+        titles = self._titles("/search/")
+        self.assertIn("Climate elsewhere", titles)
+        self.assertNotIn("Climate brasileiro", titles)
+
+
+class TestSitemapCoversEveryLanguageTree(TestCase):
+    """
+    Wagtail's own sitemap lists `site.root_page.get_descendants()`. Each
+    language is its own tree at Root level, so the country sites are siblings
+    of the English home rather than descendants — and the stock sitemap drops
+    every page in them without erroring. See wtrx/sitemaps.py.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pt_br = _locale("pt-br")
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-sitemap", locale=_english())
+        root.add_child(instance=cls.home)
+        site = Site.objects.get(is_default_site=True)
+        site.root_page = cls.home
+        site.save()
+
+        cls.english_page = ContentPage(
+            title="About", slug="about-sitemap", locale=_english()
+        )
+        cls.home.add_child(instance=cls.english_page)
+
+        cls.home_pt = cls.home.copy_for_translation(cls.pt_br)
+        cls.home_pt.save_revision().publish()
+        cls.pt_page = ContentPage(title="Sobre", slug="sobre-sitemap", locale=cls.pt_br)
+        cls.home_pt.add_child(instance=cls.pt_page)
+
+        cls.hidden = ContentPage(
+            title="Hidden", slug="hidden-sitemap", locale=cls.pt_br, hide_from_search=True
+        )
+        cls.home_pt.add_child(instance=cls.hidden)
+
+    def _paths(self):
+        """Sitemap <loc>s as paths. They carry the Site's hostname, not
+        `testserver`, so strip whatever host is there rather than a literal."""
+        response = Client().get("/sitemap.xml")
+        self.assertEqual(response.status_code, 200)
+        locs = re.findall(r"<loc>([^<]+)</loc>", response.content.decode())
+        return [urlparse(loc).path for loc in locs]
+
+    def test_a_country_trees_pages_are_listed(self):
+        paths = self._paths()
+        self.assertIn("/brasil/sobre-sitemap/", paths)
+
+    def test_the_default_tree_is_still_listed(self):
+        paths = self._paths()
+        self.assertIn("/about-sitemap/", paths)
+        self.assertIn("/", paths)
+
+    def test_every_language_home_is_listed(self):
+        paths = self._paths()
+        self.assertIn("/brasil/", paths)
+
+    def test_hide_from_search_is_still_honoured_in_a_country_tree(self):
+        paths = self._paths()
+        self.assertNotIn("/brasil/hidden-sitemap/", paths)

@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
-from wagtail.models import Page, Site
+from wagtail.models import Locale, Page, Site
 
 from .integrations import actionkit
 from .integrations.actionkit import ActionKitError
@@ -116,11 +116,20 @@ def search(request):
     search_query = request.GET.get("query", None)
 
     if search_query:
-        # Search all live pages, then post-filter pages that have opted out.
-        # hide_from_search sits on each concrete BasePage subclass table, so a
-        # single-query ORM filter is not possible without a raw join. The
-        # post-filter approach is the accepted Wagtail pattern.
-        raw_results = Page.objects.live().search(search_query)
+        # Scoped to the language being browsed. Each language is its own page
+        # tree (one per locale), so an unscoped search returns every site's
+        # content at once -- a visitor searching from /brasil/ would get mostly
+        # French and Indonesian pages, none of which they can read, and all at
+        # URLs outside the site they are on. `get_active()` follows the URL
+        # prefix via LocaleMiddleware and falls back to the default locale.
+        #
+        # Search all live pages in that locale, then post-filter pages that
+        # have opted out. hide_from_search sits on each concrete BasePage
+        # subclass table, so a single-query ORM filter is not possible without
+        # a raw join. The post-filter approach is the accepted Wagtail pattern.
+        raw_results = (
+            Page.objects.live().filter(locale=Locale.get_active()).search(search_query)
+        )
         search_results = [
             p for p in raw_results if not getattr(p.specific, "hide_from_search", False)
         ]

@@ -1,15 +1,24 @@
 """
 Named URL prefixes for language trees: `/france/` rather than `/fr/`.
 
-Django ties a language tree's URL prefix to its language code, so French lives
-at `/fr/` and there is no setting to change it. This project's language trees
-are the country sites that already exist at `/brasil/`, `/france/`,
-`/indonesia/` and `/germany/`, and those URLs are in circulation -- so the
-prefix is mapped instead of the pages being moved behind redirects.
+Django ties a language tree's URL prefix to its language code, so French would
+live at `/fr-fr/` and there is no setting to change it. This project addresses
+its trees by country instead, which is what the sites already publish:
+
+    a country site        -> the country slug             /brasil
+    a country translation -> that slug, then the language /brasil/en
+    a global language     -> its own code                 /es
+    English (the default) -> unprefixed                   /
 
 `WTRX_LANGUAGE_URL_PREFIXES` (settings) maps a language code to the path it
-serves under -- one segment (`france`) or more (`canada/fr`). A language with
-no entry keeps its own code, and the default language stays unprefixed.
+serves under. A language with no entry keeps its own code, and the default
+language stays unprefixed.
+
+A prefix may be more than one segment, and that is load-bearing rather than
+decorative: a country slug serves that country's own language with no language
+segment (`/brasil` is Portuguese), so a second language on the same site has to
+nest under it (`/brasil/en`). Both segments are mapped independently, and
+longest-prefix-wins is what keeps the two trees apart.
 
 Two pieces have to agree on the mapping, which is why both live here:
 
@@ -67,9 +76,10 @@ def language_from_url_prefix(path):
     nothing to it, and a language with a mapped prefix would also answer at its
     bare code.
 
-    Longest prefix wins, so a prefix may be more than one segment:
-    `canada/fr` (Canadian French) sits inside the English-first Canadian
-    section without `canada` alone claiming anything.
+    Longest prefix wins, which is what lets a country translation nest inside
+    its country site: `brasil/en` is tested before `brasil`, so `/brasil/en/`
+    is Brazilian English while `/brasil/` stays Portuguese. Without the
+    ordering the shorter prefix would swallow every path beneath it.
     """
     stripped = path.lstrip("/")
     if not stripped:
