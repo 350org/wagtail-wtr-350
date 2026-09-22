@@ -147,25 +147,21 @@ USE_TZ = True
 # URL.
 #
 # A language is split into a country variant and a plain code only where it has
-# more than one home:
+# more than one home. French does: France (fr-fr, /france/) and Canada (fr-ca),
+# so plain `fr` stays free for translating a global page. Everything else has
+# one home, so the language is the site -- `de` serves /germany/, `es` serves
+# Spanish, and a translation into one belongs there.
 #
-#   - Portuguese, Spanish and French do. The plain code stays free for
-#     translating a global page (/pt/about/), and the country site takes a
-#     variant (pt-br at /brasil/). Without that, a Portuguese translation of a
-#     global page would land inside the Brazilian site.
-#   - German, Indonesian, Japanese, Turkish, Dutch and Filipino do not: each
-#     has one site, so the language is the site. A German translation belongs
-#     on the German site, at /germany/.
-#
-# A country variant inherits its base language's catalogue (pt-br reads
-# locale/pt/), so splitting costs no extra translation work.
+# `pt-br` keeps its name rather than collapsing to `pt`: Brazilian Portuguese is
+# what the site is, and leaving `pt` unused means Portuguese elsewhere can be
+# added later without retagging 885 pages. Its catalogue is `locale/pt/` -- a
+# country variant falls back to its base language, so that directory must stay
+# even though `pt` is not an offered language.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
     # Spanish, Portuguese and French each have more than one home, so the plain
     # code stays free for translations and the country site takes a variant.
     ("es", _("Spanish")),
-    ("es-419", _("Latin American Spanish")),
-    ("pt", _("Portuguese")),
     ("pt-br", _("Brazilian Portuguese")),
     ("fr", _("French")),
     ("fr-fr", _("French (France)")),
@@ -187,7 +183,6 @@ WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
 WTRX_LANGUAGE_URL_PREFIXES = {
     "pt-br": "brasil",
     "fr-fr": "france",
-    "es-419": "latinoamerica",
     "de": "germany",
     "id": "indonesia",
     "ja": "japan",

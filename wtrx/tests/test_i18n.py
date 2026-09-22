@@ -144,7 +144,7 @@ class TestLocalisedServing(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.pt = _locale("pt")
+        cls.es = _locale("es")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-i18n", locale=_english())
         root.add_child(instance=cls.home)
@@ -156,37 +156,37 @@ class TestLocalisedServing(TestCase):
         cls.home.add_child(instance=cls.english_page)
 
         # The Portuguese tree: a translation of Home, with its own child.
-        cls.home_pt = cls.home.copy_for_translation(cls.pt)
-        cls.home_pt.title = "Início"
-        cls.home_pt.save_revision().publish()
-        cls.portuguese_page = ContentPage(
-            title="Sobre", slug="sobre", locale=cls.pt
+        cls.home_es = cls.home.copy_for_translation(cls.es)
+        cls.home_es.title = "Inicio"
+        cls.home_es.save_revision().publish()
+        cls.spanish_page = ContentPage(
+            title="Sobre", slug="sobre", locale=cls.es
         )
-        cls.home_pt.add_child(instance=cls.portuguese_page)
+        cls.home_es.add_child(instance=cls.spanish_page)
 
     def setUp(self):
         self.client = Client()
 
-    def test_portuguese_page_serves_under_its_language_prefix(self):
-        response = self.client.get("/pt/sobre/")
+    def test_translated_page_serves_under_its_language_prefix(self):
+        response = self.client.get("/es/sobre/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'lang="pt"')
+        self.assertContains(response, 'lang="es"')
 
     def test_english_page_keeps_unprefixed_url_and_english_lang(self):
         """Also guards against language leaking between requests in a process."""
-        self.client.get("/pt/sobre/")
+        self.client.get("/es/sobre/")
         response = self.client.get("/about/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'lang="en"')
 
     def test_english_page_is_not_reachable_under_a_language_prefix(self):
-        """`/pt/about/` would be an English page duplicated at a second URL."""
-        self.assertEqual(self.client.get("/pt/about/").status_code, 404)
+        """`/es/about/` would be an English page duplicated at a second URL."""
+        self.assertEqual(self.client.get("/es/about/").status_code, 404)
 
     def test_new_child_page_inherits_its_parent_language(self):
         child = ContentPage(title="Equipe", slug="equipe")
-        self.portuguese_page.add_child(instance=child)
-        self.assertEqual(child.locale, self.pt)
+        self.spanish_page.add_child(instance=child)
+        self.assertEqual(child.locale, self.es)
 
     def test_preview_renders_in_the_pages_own_language(self):
         """
@@ -197,8 +197,8 @@ class TestLocalisedServing(TestCase):
         request = RequestFactory().get("/admin/pages/1/edit/preview/")
         request.user = AnonymousUser()
         with translation.override("en"):
-            response = self.portuguese_page.serve_preview(request, "")
-            self.assertContains(response, 'lang="pt"')
+            response = self.spanish_page.serve_preview(request, "")
+            self.assertContains(response, 'lang="es"')
             # The override is scoped: it must not leak past the call.
             self.assertEqual(translation.get_language(), "en")
 
@@ -208,7 +208,7 @@ class TestLanguageLinks(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.pt = _locale("pt")
+        cls.es = _locale("es")
         cls.fr = _locale("fr")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-links", locale=_english())
@@ -217,16 +217,16 @@ class TestLanguageLinks(TestCase):
         site.root_page = cls.home
         site.save()
 
-        cls.home_pt = cls.home.copy_for_translation(cls.pt)
-        cls.home_pt.save_revision().publish()
+        cls.home_es = cls.home.copy_for_translation(cls.es)
+        cls.home_es.save_revision().publish()
         cls.home_fr = cls.home.copy_for_translation(cls.fr)
         cls.home_fr.save_revision().publish()
 
         cls.about = ContentPage(title="About", slug="about-links", locale=_english())
         cls.home.add_child(instance=cls.about)
-        cls.about_pt = cls.about.copy_for_translation(cls.pt)
-        cls.about_pt.slug = "sobre-links"
-        cls.about_pt.save_revision().publish()
+        cls.about_es = cls.about.copy_for_translation(cls.es)
+        cls.about_es.slug = "sobre-links"
+        cls.about_es.save_revision().publish()
 
     def _render(self, template_string, page):
         request = RequestFactory().get("/")
@@ -239,7 +239,7 @@ class TestLanguageLinks(TestCase):
             "{% language_links as links %}{% for l in links %}{{ l.code }}:{{ l.url }} {% endfor %}",
             self.about,
         )
-        self.assertIn("pt:/pt/sobre-links/", output)
+        self.assertIn("es:/es/sobre-links/", output)
 
     def test_falls_back_to_the_language_home_when_untranslated(self):
         """A French visitor should reach the French site, not a 404."""
@@ -255,7 +255,7 @@ class TestLanguageLinks(TestCase):
             self.about,
         )
         self.assertIn("en:True", output)
-        self.assertIn("pt:False", output)
+        self.assertIn("es:False", output)
 
 
 class TestTranslationAlternates(TestCase):
@@ -263,7 +263,7 @@ class TestTranslationAlternates(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.pt = _locale("pt")
+        cls.es = _locale("es")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-alt", locale=_english())
         root.add_child(instance=cls.home)
@@ -271,13 +271,13 @@ class TestTranslationAlternates(TestCase):
         site.root_page = cls.home
         site.save()
 
-        cls.home_pt = cls.home.copy_for_translation(cls.pt)
-        cls.home_pt.save_revision().publish()
+        cls.home_es = cls.home.copy_for_translation(cls.es)
+        cls.home_es.save_revision().publish()
 
         cls.about = ContentPage(title="About", slug="about-alt", locale=_english())
         cls.home.add_child(instance=cls.about)
-        cls.about_pt = cls.about.copy_for_translation(cls.pt)
-        cls.about_pt.save_revision().publish()
+        cls.about_es = cls.about.copy_for_translation(cls.es)
+        cls.about_es.save_revision().publish()
 
         cls.untranslated = ContentPage(
             title="Press", slug="press-alt", locale=_english()
@@ -293,7 +293,7 @@ class TestTranslationAlternates(TestCase):
         return output.split()
 
     def test_emits_each_language_plus_x_default(self):
-        self.assertEqual(sorted(self._codes(self.about)), ["en", "pt", "x-default"])
+        self.assertEqual(sorted(self._codes(self.about)), ["en", "es", "x-default"])
 
     def test_emits_nothing_for_an_untranslated_page(self):
         """A lone self-referencing alternate tells search engines nothing."""
@@ -309,7 +309,7 @@ class TestLocalizedNavigationLinks(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.pt = _locale("pt")
+        cls.es = _locale("es")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-nav", locale=_english())
         root.add_child(instance=cls.home)
@@ -317,16 +317,16 @@ class TestLocalizedNavigationLinks(TestCase):
         site.root_page = cls.home
         site.save()
 
-        cls.home_pt = cls.home.copy_for_translation(cls.pt)
-        cls.home_pt.save_revision().publish()
+        cls.home_es = cls.home.copy_for_translation(cls.es)
+        cls.home_es.save_revision().publish()
 
         cls.translated = ContentPage(
             title="About", slug="about-nav", locale=_english()
         )
         cls.home.add_child(instance=cls.translated)
-        cls.translated_pt = cls.translated.copy_for_translation(cls.pt)
-        cls.translated_pt.slug = "sobre-nav"
-        cls.translated_pt.save_revision().publish()
+        cls.translated_es = cls.translated.copy_for_translation(cls.es)
+        cls.translated_es.slug = "sobre-nav"
+        cls.translated_es.save_revision().publish()
 
         cls.untranslated = ContentPage(
             title="Press", slug="press-nav", locale=_english()
@@ -339,12 +339,12 @@ class TestLocalizedNavigationLinks(TestCase):
         ).render(Context({"page": page, "request": RequestFactory().get("/")}))
 
     def test_link_resolves_to_the_translation_in_that_language(self):
-        with translation.override("pt"):
-            self.assertEqual(self._url(self.translated), "/pt/sobre-nav/")
+        with translation.override("es"):
+            self.assertEqual(self._url(self.translated), "/es/sobre-nav/")
 
     def test_untranslated_link_falls_back_to_the_source_page(self):
         """Better a link to the English page than a dead link."""
-        with translation.override("pt"):
+        with translation.override("es"):
             self.assertEqual(self._url(self.untranslated), "/press-nav/")
 
     def test_english_pages_are_unaffected(self):
@@ -362,7 +362,7 @@ class TestConvertSectionToLocale(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.pt = _locale("pt")
+        cls.es = _locale("es")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-conv", locale=_english())
         root.add_child(instance=cls.home)
@@ -389,40 +389,40 @@ class TestConvertSectionToLocale(TestCase):
         return out.getvalue()
 
     def test_section_moves_to_root_and_serves_under_the_language_prefix(self):
-        self._convert(str(self.section.pk), "pt")
+        self._convert(str(self.section.pk), "es")
         section = Page.objects.get(pk=self.section.pk)
         self.assertEqual(section.depth, 2)
-        self.assertEqual(section.locale, self.pt)
-        self.assertEqual(section.url, "/pt/")
-        self.assertEqual(Page.objects.get(pk=self.child.pk).url, "/pt/sobre/")
+        self.assertEqual(section.locale, self.es)
+        self.assertEqual(section.url, "/es/")
+        self.assertEqual(Page.objects.get(pk=self.child.pk).url, "/es/sobre/")
 
     def test_every_descendant_is_retagged(self):
-        self._convert(str(self.section.pk), "pt")
-        self.assertEqual(Page.objects.get(pk=self.child.pk).locale, self.pt)
+        self._convert(str(self.section.pk), "es")
+        self.assertEqual(Page.objects.get(pk=self.child.pk).locale, self.es)
         self.assertEqual(Page.objects.get(pk=self.bystander.pk).locale, _english())
 
     def test_section_root_becomes_the_site_roots_counterpart(self):
         """That shared key is what gives the tree a URL at all."""
-        self._convert(str(self.section.pk), "pt")
+        self._convert(str(self.section.pk), "es")
         section = Page.objects.get(pk=self.section.pk)
         self.assertEqual(section.translation_key, self.home.translation_key)
-        self.assertEqual(self.home.get_translation(self.pt).pk, section.pk)
+        self.assertEqual(self.home.get_translation(self.es).pk, section.pk)
 
     def test_descendants_get_their_own_identity(self):
         """They are this language's pages, not translations of English ones."""
-        self._convert(str(self.section.pk), "pt")
+        self._convert(str(self.section.pk), "es")
         child = Page.objects.get(pk=self.child.pk)
         self.assertNotEqual(child.translation_key, self.child.translation_key)
         self.assertEqual(child.get_translations().count(), 0)
 
     def test_stored_revisions_are_retagged_too(self):
         """Otherwise reverting an old revision silently restores the old locale."""
-        self._convert(str(self.section.pk), "pt")
+        self._convert(str(self.section.pk), "es")
         child = Page.objects.get(pk=self.child.pk)
         revisions = list(child.revisions.all())
         self.assertTrue(revisions)
         for revision in revisions:
-            self.assertEqual(revision.content["locale"], self.pt.pk)
+            self.assertEqual(revision.content["locale"], self.es.pk)
             self.assertEqual(revision.content["translation_key"], str(child.translation_key))
 
     def test_old_urls_redirect_to_the_moved_pages(self):
@@ -430,7 +430,7 @@ class TestConvertSectionToLocale(TestCase):
         Wagtail's own move-time autocreation cannot cover this: mid-conversion
         the page is still English and at Root, where it has no URL yet.
         """
-        self._convert(str(self.section.pk), "pt")
+        self._convert(str(self.section.pk), "es")
         root_redirect = Redirect.objects.filter(old_path="/brasil-regional").first()
         self.assertIsNotNone(root_redirect)
         self.assertEqual(root_redirect.redirect_page.pk, self.section.pk)
@@ -445,21 +445,21 @@ class TestConvertSectionToLocale(TestCase):
         manages to is exactly what cannot be relied on (it wrote none at all
         for the real 885-page section).
         """
-        output = self._convert(str(self.section.pk), "pt", "--no-redirects")
+        output = self._convert(str(self.section.pk), "es", "--no-redirects")
         self.assertIn("created 0 redirects", output)
 
     def test_dry_run_writes_nothing(self):
-        self._convert(str(self.section.pk), "pt", "--dry-run")
+        self._convert(str(self.section.pk), "es", "--dry-run")
         section = Page.objects.get(pk=self.section.pk)
         self.assertEqual(section.locale, _english())
         self.assertEqual(section.depth, 3)
 
     def test_refuses_when_the_language_already_has_a_site_root_counterpart(self):
-        self._convert(str(self.section.pk), "pt")
+        self._convert(str(self.section.pk), "es")
         other = HomePage(title="Outro", slug="outro", locale=_english())
         self.home.add_child(instance=other)
         with self.assertRaises(CommandError):
-            self._convert(str(other.pk), "pt")
+            self._convert(str(other.pk), "es")
 
     def test_no_redirects_needed_when_the_url_does_not_change(self):
         """
@@ -481,7 +481,7 @@ class TestConvertSectionToLocale(TestCase):
 
     def test_refuses_to_convert_the_site_root(self):
         with self.assertRaises(CommandError):
-            self._convert(str(self.home.pk), "pt")
+            self._convert(str(self.home.pk), "es")
 
 
 class TestAliasPagesAreNotAdvertisedAsTranslations(TestCase):

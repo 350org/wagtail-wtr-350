@@ -1389,14 +1389,18 @@ gate.
     changes the URL (rule #10).
 
 72. **A language is split into a country variant and a plain code only where
-    it has more than one home.** Portuguese, Spanish and French do: the plain
-    code stays free for translating a global page (`/pt/about/`) and the
-    country site takes a variant (`pt-br` at `/brasil/`, `fr-fr` at
-    `/france/`, `es-419` at `/latinoamerica/`). Without that, a Portuguese
-    translation of a global page would land at `/brasil/about/`, inside the
-    Brazilian site. German, Indonesian, Japanese, Turkish, Dutch and Filipino
-    do **not**: each has one 350 site, so the language *is* the site — `de`
-    serves `/germany/`, and a German translation belongs there. Splitting them
+    it has more than one home.** French does — France (`fr-fr` at `/france/`)
+    and Canada (`fr-ca`) — so plain `fr` stays free for translating a global
+    page at `/fr/about/`. Everything else has one home, so the language *is*
+    the site: `de` serves `/germany/`, `id` serves `/indonesia/`, and `es` is
+    simply Spanish. A translation into one of those belongs on that site.
+    `pt-br` is the exception that proves the rule: Brasil is the only
+    Portuguese site, but the locale keeps its precise name and `pt` is left
+    unoffered rather than collapsed, so Portuguese elsewhere can be added later
+    without retagging 885 pages. **`locale/pt/` must stay** even though `pt` is
+    not an offered language — a country variant falls back to its base
+    language's catalogue, so deleting that directory would strip the Brazilian
+    site's chrome translations. Splitting them
     anyway produces two entries called "German", which is why a label needing a
     parenthetical disambiguator (`French (France)`) is the signal that a split
     is real; where the parenthetical would only restate the language, the
