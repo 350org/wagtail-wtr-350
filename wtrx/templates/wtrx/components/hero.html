@@ -70,7 +70,7 @@
   rather than a full control bar. Poster fallback chain (wagtailmedia
   thumbnail → hero.image rendition → none) lives in components/
   _hero_background_video.html, shared by both variants since the logic is
-  identical, just at different sizes (video_class/poster_spec).
+  identical, just at different sizes (video_class/poster_img).
 
   Page templates pass `hero` via the template context (set in get_context()).
   HeroBlock.get_context() builds this dict automatically (video is always
@@ -257,7 +257,8 @@
                 {% if hero.image or hero.video %}
                     <div class="relative min-h-[220px]">
                         {% if hero.video %}
-                            {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1000x800" %}
+                            {% image hero.image fill-1000x800 as hero_poster %}
+                            {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_img=hero_poster %}
                             {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-3 right-3" %}
                         {% elif hero.image %}
                             {% image hero.image fill-1000x800 as bg %}
@@ -327,7 +328,8 @@
              {% if hero.video %}data-hero{% endif %}>
 
             {% if hero.video %}
-                {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_spec="fill-1600x700" %}
+                {% image hero.image fill-1600x700 as hero_poster %}
+                {% include "wtrx/components/_hero_background_video.html" with video_class="absolute inset-0 h-full w-full object-cover" poster_img=hero_poster %}
                 {% include "wtrx/components/_hero_video_toggle.html" with toggle_class="absolute top-4 right-4 z-10 sm:top-6 sm:right-6" %}
             {% elif hero.image %}
                 {% image hero.image fill-1600x700 as bg %}
