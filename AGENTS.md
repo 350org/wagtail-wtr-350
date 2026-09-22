@@ -1368,7 +1368,27 @@ gate.
     Deletion is one-way in practice: `Locale` FKs are `on_delete=PROTECT`, so a
     locale with pages cannot be removed.
 
-71. **A language tree's URL prefix is mapped, not its language code.**
+71. **Two kinds of locale, and the difference decides the URL.** A *country
+    variant* (`pt-br`, `fr-fr`, `de-de`, `id-id`) is a country site with its
+    own content and navigation, served under its own name via
+    `WTRX_LANGUAGE_URL_PREFIXES` (`/brasil/`, `/france/`). A *plain code*
+    (`pt`, `fr`, `es`) exists for translating an individual global page and
+    serves under the code (`/es/about/`). Keeping them apart is the whole
+    point: with the Brasil site on plain `pt`, a Portuguese translation of a
+    global page would land at `/brasil/about/`, inside the Brazilian site —
+    the same way a French translation of `/canada/` lands under `/france/` if
+    France holds plain `fr`. Splitting costs nothing in translation work: a
+    country variant falls back to its base language's catalogue, so `pt-br`
+    reads `locale/pt/` and needs no `.po` of its own. Retagging a country site
+    from `pt` to `pt-br` changes no URLs (the prefix maps to the slug it
+    already has), so `convert_section_to_locale <id> pt-br` reports `created 0
+    redirects` — that zero is the signal it was a pure relabel.
+    A plain locale with no content yet still answers at its prefix: `/pt/`
+    returns 200 showing the **English** home, because `Page.localized` falls
+    back to the source page when no translation is live. Not a bug, and the
+    same reason an alias parent shows English (pitfall #69).
+
+72. **A language tree's URL prefix is mapped, not its language code.**
     Django ties the prefix to the code, so French would serve at `/fr/` and
     there is no setting for it. `WTRX_LANGUAGE_URL_PREFIXES` maps a code to a
     segment instead (`fr` → `france`, `pt` → `brasil`), which is what lets the

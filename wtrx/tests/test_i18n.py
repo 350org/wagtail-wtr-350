@@ -39,11 +39,14 @@ class TestBootstrapLocales(TestCase):
     def test_creates_every_configured_language_and_is_idempotent(self):
         call_command("bootstrap_locales", stdout=StringIO())
         codes = set(Locale.objects.values_list("language_code", flat=True))
-        self.assertEqual(codes, {"en", "pt", "es", "fr", "de", "id"})
+        self.assertEqual(
+            codes,
+            {"en", "es", "pt", "pt-br", "fr", "fr-fr", "de", "de-de", "id", "id-id"},
+        )
 
         # A second run must not create duplicates or raise.
         call_command("bootstrap_locales", stdout=StringIO())
-        self.assertEqual(Locale.objects.count(), 6)
+        self.assertEqual(Locale.objects.count(), 10)
 
     def test_dry_run_writes_nothing(self):
         before = Locale.objects.count()
@@ -141,20 +144,20 @@ class TestLocalisedServing(TestCase):
         self.client = Client()
 
     def test_portuguese_page_serves_under_its_language_prefix(self):
-        response = self.client.get("/brasil/sobre/")
+        response = self.client.get("/pt/sobre/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'lang="pt"')
 
     def test_english_page_keeps_unprefixed_url_and_english_lang(self):
         """Also guards against language leaking between requests in a process."""
-        self.client.get("/brasil/sobre/")
+        self.client.get("/pt/sobre/")
         response = self.client.get("/about/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'lang="en"')
 
     def test_english_page_is_not_reachable_under_a_language_prefix(self):
-        """`/brasil/about/` would be an English page duplicated at a second URL."""
-        self.assertEqual(self.client.get("/brasil/about/").status_code, 404)
+        """`/pt/about/` would be an English page duplicated at a second URL."""
+        self.assertEqual(self.client.get("/pt/about/").status_code, 404)
 
     def test_new_child_page_inherits_its_parent_language(self):
         child = ContentPage(title="Equipe", slug="equipe")
@@ -212,7 +215,7 @@ class TestLanguageLinks(TestCase):
             "{% language_links as links %}{% for l in links %}{{ l.code }}:{{ l.url }} {% endfor %}",
             self.about,
         )
-        self.assertIn("pt:/brasil/sobre-links/", output)
+        self.assertIn("pt:/pt/sobre-links/", output)
 
     def test_falls_back_to_the_language_home_when_untranslated(self):
         """A French visitor should reach the French site, not a 404."""
@@ -220,7 +223,7 @@ class TestLanguageLinks(TestCase):
             "{% language_links as links %}{% for l in links %}{{ l.code }}:{{ l.url }} {% endfor %}",
             self.about,
         )
-        self.assertIn("fr:/france/", output)
+        self.assertIn("fr:/fr/", output)
 
     def test_current_language_is_marked_and_not_linked(self):
         output = self._render(
@@ -313,7 +316,7 @@ class TestLocalizedNavigationLinks(TestCase):
 
     def test_link_resolves_to_the_translation_in_that_language(self):
         with translation.override("pt"):
-            self.assertEqual(self._url(self.translated), "/brasil/sobre-nav/")
+            self.assertEqual(self._url(self.translated), "/pt/sobre-nav/")
 
     def test_untranslated_link_falls_back_to_the_source_page(self):
         """Better a link to the English page than a dead link."""
@@ -366,8 +369,8 @@ class TestConvertSectionToLocale(TestCase):
         section = Page.objects.get(pk=self.section.pk)
         self.assertEqual(section.depth, 2)
         self.assertEqual(section.locale, self.pt)
-        self.assertEqual(section.url, "/brasil/")
-        self.assertEqual(Page.objects.get(pk=self.child.pk).url, "/brasil/sobre/")
+        self.assertEqual(section.url, "/pt/")
+        self.assertEqual(Page.objects.get(pk=self.child.pk).url, "/pt/sobre/")
 
     def test_every_descendant_is_retagged(self):
         self._convert(str(self.section.pk), "pt")
@@ -436,17 +439,18 @@ class TestConvertSectionToLocale(TestCase):
 
     def test_no_redirects_needed_when_the_url_does_not_change(self):
         """
-        A section whose slug already matches its language's mapped prefix
-        (`/brasil/` for pt) keeps every URL it had, so conversion is invisible
-        from outside and there is nothing to redirect.
+        A country site converted to its country-variant locale keeps every URL
+        it had -- pt-br maps to `brasil`, the slug it already has -- so the
+        conversion is invisible from outside and there is nothing to redirect.
         """
+        _locale("pt-br")
         already_named = HomePage(title="Brasil", slug="brasil", locale=_english())
         self.home.add_child(instance=already_named)
         child = ContentPage(title="Nos", slug="nos", locale=_english())
         already_named.add_child(instance=child)
         before = Page.objects.get(pk=child.pk).url
 
-        output = self._convert(str(already_named.pk), "pt")
+        output = self._convert(str(already_named.pk), "pt-br")
 
         self.assertEqual(Page.objects.get(pk=child.pk).url, before)
         self.assertIn("created 0 redirects", output)
@@ -485,14 +489,15 @@ class TestAliasPagesAreNotAdvertisedAsTranslations(TestCase):
 
 class TestNamedLanguageUrlPrefixes(TestCase):
     """
-    A language tree serves under the segment WTRX_LANGUAGE_URL_PREFIXES maps
-    it to (`/brasil/`, not `/pt/`), so the country sites keep the URLs they
-    already have instead of moving behind redirects. See wtrx/i18n.py.
+    A country site serves under the segment WTRX_LANGUAGE_URL_PREFIXES maps
+    its locale to (`pt-br` -> `/brasil/`), keeping the URL it already has
+    instead of moving behind a redirect. A plain translation locale has no
+    mapping and serves under its own code (`/es/`). See wtrx/i18n.py.
     """
 
     @classmethod
     def setUpTestData(cls):
-        cls.pt = _locale("pt")
+        cls.pt_br = _locale("pt-br")
         cls.es = _locale("es")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-prefix", locale=_english())
@@ -504,10 +509,10 @@ class TestNamedLanguageUrlPrefixes(TestCase):
         cls.english_page = ContentPage(title="About", slug="about-prefix", locale=_english())
         cls.home.add_child(instance=cls.english_page)
 
-        cls.home_pt = cls.home.copy_for_translation(cls.pt)
-        cls.home_pt.save_revision().publish()
-        cls.pt_page = ContentPage(title="Sobre", slug="sobre-prefix", locale=cls.pt)
-        cls.home_pt.add_child(instance=cls.pt_page)
+        cls.home_pt_br = cls.home.copy_for_translation(cls.pt_br)
+        cls.home_pt_br.save_revision().publish()
+        cls.pt_page = ContentPage(title="Sobre", slug="sobre-prefix", locale=cls.pt_br)
+        cls.home_pt_br.add_child(instance=cls.pt_page)
 
         cls.home_es = cls.home.copy_for_translation(cls.es)
         cls.home_es.save_revision().publish()
@@ -515,11 +520,11 @@ class TestNamedLanguageUrlPrefixes(TestCase):
     def test_mapped_language_serves_under_its_name(self):
         response = Client().get("/brasil/sobre-prefix/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'lang="pt"')
+        self.assertContains(response, 'lang="pt-br"')
 
     def test_mapped_language_is_not_also_served_under_its_code(self):
         """One canonical URL per tree — no duplicate for search engines."""
-        self.assertEqual(Client().get("/pt/sobre-prefix/").status_code, 404)
+        self.assertEqual(Client().get("/pt-br/sobre-prefix/").status_code, 404)
 
     def test_unmapped_language_keeps_its_code(self):
         """A language used for occasional translations needs no named prefix."""
@@ -538,7 +543,7 @@ class TestNamedLanguageUrlPrefixes(TestCase):
         if an upgrade changes how the prefix is built, this fails here rather
         than silently on the site.
         """
-        with translation.override("pt"):
+        with translation.override("pt-br"):
             self.assertEqual(reverse("search"), "/brasil/search/")
         with translation.override("es"):
             self.assertEqual(reverse("search"), "/es/search/")
@@ -557,5 +562,5 @@ class TestNamedLanguageUrlPrefixes(TestCase):
 
     def test_content_language_header_matches_the_prefix(self):
         self.assertEqual(
-            Client().get("/brasil/sobre-prefix/")["Content-Language"], "pt"
+            Client().get("/brasil/sobre-prefix/")["Content-Language"], "pt-br"
         )

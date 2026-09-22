@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-21 21:06+0000\n"
+"POT-Creation-Date: 2026-09-22 01:20+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,95 +18,99 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: blocks/__init__.py:81
+#: blocks/__init__.py:84
+msgid "Please talk to Tech & Security before using."
+msgstr "Harap bicarakan dengan tim Tech & Security sebelum menggunakannya."
+
+#: blocks/__init__.py:87
 msgid "Primary"
 msgstr "Utama"
 
-#: blocks/__init__.py:82
+#: blocks/__init__.py:88
 msgid "Secondary"
 msgstr "Sekunder"
 
-#: blocks/__init__.py:83
+#: blocks/__init__.py:89
 msgid "Outline"
 msgstr "Garis luar"
 
-#: blocks/__init__.py:84
+#: blocks/__init__.py:90
 msgid "Urgent"
 msgstr "Mendesak"
 
-#: blocks/__init__.py:95
+#: blocks/__init__.py:101
 msgid "Regular"
 msgstr "Biasa"
 
-#: blocks/__init__.py:96 blocks/__init__.py:175
+#: blocks/__init__.py:102 blocks/__init__.py:181
 msgid "Large"
 msgstr "Besar"
 
-#: blocks/__init__.py:106
+#: blocks/__init__.py:112
 msgid "Image left"
 msgstr "Gambar di kiri"
 
-#: blocks/__init__.py:107
+#: blocks/__init__.py:113
 msgid "Image right"
 msgstr "Gambar di kanan"
 
-#: blocks/__init__.py:116
+#: blocks/__init__.py:122
 msgid "Small (280px)"
 msgstr "Kecil (280px)"
 
-#: blocks/__init__.py:117
+#: blocks/__init__.py:123
 msgid "Default (378px)"
 msgstr "Bawaan (378px)"
 
-#: blocks/__init__.py:118
+#: blocks/__init__.py:124
 msgid "Large (480px)"
 msgstr "Besar (480px)"
 
-#: blocks/__init__.py:140
+#: blocks/__init__.py:146
 msgid "White"
 msgstr "Putih"
 
-#: blocks/__init__.py:141
+#: blocks/__init__.py:147
 msgid "Light grey"
 msgstr "Abu-abu muda"
 
-#: blocks/__init__.py:142
+#: blocks/__init__.py:148
 msgid "Dark grey"
 msgstr "Abu-abu tua"
 
-#: blocks/__init__.py:143
+#: blocks/__init__.py:149
 msgid "Navy"
 msgstr "Biru dongker"
 
-#: blocks/__init__.py:144
+#: blocks/__init__.py:150
 msgid "Red"
 msgstr "Merah"
 
-#: blocks/__init__.py:145
+#: blocks/__init__.py:151
 msgid "350 Blue"
 msgstr "Biru 350"
 
-#: blocks/__init__.py:173
+#: blocks/__init__.py:179
 msgid "Small"
 msgstr "Kecil"
 
-#: blocks/__init__.py:174
+#: blocks/__init__.py:180
 msgid "Medium"
 msgstr "Sedang"
 
-#: blocks/__init__.py:186
+#: blocks/__init__.py:192
 msgid "Narrow (800px)"
 msgstr "Sempit (800px)"
 
-#: blocks/__init__.py:187
+#: blocks/__init__.py:193
 msgid "Default (1152px)"
 msgstr "Bawaan (1152px)"
 
-#: blocks/__init__.py:188
+#: blocks/__init__.py:194
 msgid "Wide (1266px)"
 msgstr "Lebar (1266px)"
 
-#: blocks/__init__.py:266
+#: blocks/__init__.py:272
 msgid ""
 "This does not appear to be an Action Network URL. Expected a URL like "
 "https://actionnetwork.org/forms/your-form-slug"
@@ -114,7 +118,7 @@ msgstr ""
 "Alamat ini sepertinya bukan URL Action Network. Format yang diharapkan "
 "seperti https://actionnetwork.org/forms/your-form-slug"
 
-#: blocks/__init__.py:276
+#: blocks/__init__.py:282
 msgid ""
 "Could not find a form slug in this URL. Expected a URL like "
 "https://actionnetwork.org/forms/your-form-slug"
@@ -122,7 +126,7 @@ msgstr ""
 "Tidak ditemukan slug formulir pada URL ini. Format yang diharapkan seperti "
 "https://actionnetwork.org/forms/your-form-slug"
 
-#: blocks/__init__.py:288
+#: blocks/__init__.py:294
 #, python-format
 msgid ""
 "Unsupported Action Network action type '%(url_type)s'. Currently supported: "
@@ -131,32 +135,32 @@ msgstr ""
 "Jenis aksi Action Network tidak didukung: “%(url_type)s”. Jenis yang saat "
 "ini didukung: %(supported)s."
 
-#: blocks/__init__.py:298
+#: blocks/__init__.py:304
 #, python-format
 msgid "The URL slug '%(slug)s' contains unexpected characters."
 msgstr "Slug URL “%(slug)s” mengandung karakter yang tidak diharapkan."
 
-#: blocks/__init__.py:325 blocks/__init__.py:921
+#: blocks/__init__.py:331 blocks/__init__.py:969
 msgid "Provide only one of link page, link URL, or anchor."
 msgstr "Isi salah satu saja: halaman tujuan, URL, atau jangkar."
 
-#: blocks/__init__.py:329
+#: blocks/__init__.py:335
 msgid "Provide either a link page or a link URL, not both."
 msgstr "Isi halaman tujuan atau URL, jangan keduanya."
 
-#: blocks/__init__.py:577
+#: blocks/__init__.py:583
 msgid "A future powered by people"
 msgstr "Masa depan yang digerakkan oleh rakyat"
 
-#: blocks/__init__.py:587 blocks/__init__.py:678
+#: blocks/__init__.py:593 blocks/__init__.py:684
 msgid "Jane Doe"
 msgstr "Siti Rahayu"
 
-#: blocks/__init__.py:588 blocks/__init__.py:679
+#: blocks/__init__.py:594 blocks/__init__.py:685
 msgid "Regional Organising Lead"
 msgstr "Koordinator Pengorganisasian Wilayah"
 
-#: blocks/__init__.py:591
+#: blocks/__init__.py:597
 msgid ""
 "Jane coordinates campaign partners across the region and has organised with "
 "the climate movement for over a decade."
@@ -164,20 +168,20 @@ msgstr ""
 "Siti mengoordinasikan mitra kampanye di wilayahnya dan telah berorganisasi "
 "di gerakan iklim selama lebih dari satu dekade."
 
-#: blocks/__init__.py:659
+#: blocks/__init__.py:665
 #, python-format
 msgid "Partner Organization %(n)d"
 msgstr "Organisasi Mitra %(n)d"
 
-#: blocks/__init__.py:707
+#: blocks/__init__.py:713
 msgid "Sign up"
 msgstr "Daftar"
 
-#: blocks/__init__.py:726 blocks/__init__.py:3251
+#: blocks/__init__.py:732 blocks/__init__.py:3355
 msgid "Text"
 msgstr "Teks"
 
-#: blocks/__init__.py:729
+#: blocks/__init__.py:735
 msgid ""
 "Rich text: paragraphs, headings, lists, bold/italic and links. The default "
 "choice for ordinary body copy."
@@ -185,11 +189,11 @@ msgstr ""
 "Teks kaya: paragraf, judul, daftar, tebal/miring, dan tautan. Pilihan bawaan"
 " untuk badan teks biasa."
 
-#: blocks/__init__.py:757
+#: blocks/__init__.py:763
 msgid "Lead paragraph"
 msgstr "Paragraf pembuka"
 
-#: blocks/__init__.py:760
+#: blocks/__init__.py:766
 msgid ""
 "A larger introductory paragraph for opening a page or section. "
 "Bold/italic/links only — use a regular Text block for headings or lists."
@@ -197,7 +201,7 @@ msgstr ""
 "Paragraf pembuka berukuran lebih besar untuk membuka halaman atau bagian. "
 "Hanya tebal/miring/tautan — gunakan blok Teks biasa untuk judul atau daftar."
 
-#: blocks/__init__.py:768
+#: blocks/__init__.py:774
 msgid ""
 "<p>A short, larger opening statement that sits above the regular body "
 "copy.</p>"
@@ -205,19 +209,42 @@ msgstr ""
 "<p>Pernyataan pembuka singkat berukuran lebih besar yang ditempatkan di atas"
 " badan teks.</p>"
 
-#: blocks/__init__.py:786 blocks/__init__.py:803 blocks/__init__.py:1152
-#: blocks/__init__.py:1218 blocks/__init__.py:1409 blocks/__init__.py:1421
-#: blocks/__init__.py:1794 blocks/__init__.py:1851 blocks/__init__.py:1936
-#: blocks/__init__.py:2231 blocks/__init__.py:2622 blocks/__init__.py:3096
-#: blocks/__init__.py:3189 blocks/__init__.py:3378
+#: blocks/__init__.py:806 blocks/__init__.py:812 blocks/__init__.py:1429
+#: blocks/__init__.py:1642 blocks/__init__.py:1732 blocks/__init__.py:1784
+#: blocks/__init__.py:1850 blocks/__init__.py:2279
+msgid "Heading"
+msgstr "Judul"
+
+#: blocks/__init__.py:807
+#| msgid "Section heading, rendered as an H2."
+msgid "Section heading, rendered as a centered H2."
+msgstr "Judul bagian, ditampilkan sebagai H2."
+
+#: blocks/__init__.py:815
+msgid ""
+"A standalone centered section heading (H2), matching the heading style used "
+"above card rows."
+msgstr ""
+"Judul bagian mandiri yang terpusat (H2), dengan gaya yang sama seperti judul"
+" di atas baris kartu."
+
+#: blocks/__init__.py:818
+msgid "What we're working on"
+msgstr "Yang sedang kami kerjakan"
+
+#: blocks/__init__.py:834 blocks/__init__.py:851 blocks/__init__.py:1211
+#: blocks/__init__.py:1277 blocks/__init__.py:1468 blocks/__init__.py:1480
+#: blocks/__init__.py:1853 blocks/__init__.py:1915 blocks/__init__.py:2040
+#: blocks/__init__.py:2335 blocks/__init__.py:2726 blocks/__init__.py:3200
+#: blocks/__init__.py:3293 blocks/__init__.py:3482
 msgid "Image"
 msgstr "Gambar"
 
-#: blocks/__init__.py:789 blocks/__init__.py:1412
+#: blocks/__init__.py:837 blocks/__init__.py:1471
 msgid "Alt text"
 msgstr "Teks alternatif"
 
-#: blocks/__init__.py:791 blocks/__init__.py:1414
+#: blocks/__init__.py:839 blocks/__init__.py:1473
 msgid ""
 "Overrides the image description for screen readers. Leave blank to use the "
 "description set on the image itself."
@@ -225,73 +252,73 @@ msgstr ""
 "Menggantikan deskripsi gambar untuk pembaca layar. Kosongkan untuk memakai "
 "deskripsi yang tersimpan pada gambar itu sendiri."
 
-#: blocks/__init__.py:797 blocks/__init__.py:827
+#: blocks/__init__.py:845 blocks/__init__.py:875
 msgid "Caption"
 msgstr "Keterangan"
 
-#: blocks/__init__.py:798
+#: blocks/__init__.py:846
 msgid "Optional caption displayed below the image."
 msgstr "Keterangan opsional yang ditampilkan di bawah gambar."
 
-#: blocks/__init__.py:817
+#: blocks/__init__.py:865
 msgid "Embed URL"
 msgstr "URL sematan"
 
-#: blocks/__init__.py:818
+#: blocks/__init__.py:866
 msgid "YouTube, Vimeo, or other oEmbed-compatible URL."
 msgstr "YouTube, Vimeo, atau URL lain yang kompatibel dengan oEmbed."
 
-#: blocks/__init__.py:822 blocks/__init__.py:2236
+#: blocks/__init__.py:870 blocks/__init__.py:2340
 msgid "Media file"
 msgstr "Berkas media"
 
-#: blocks/__init__.py:823
+#: blocks/__init__.py:871
 msgid "An uploaded video file from the media library."
 msgstr "Berkas video yang diunggah dari pustaka media."
 
-#: blocks/__init__.py:836
+#: blocks/__init__.py:884
 msgid "Provide either an embed URL or a media file."
 msgstr "Isi URL sematan atau berkas media."
 
-#: blocks/__init__.py:841
+#: blocks/__init__.py:889
 msgid "Provide either an embed URL or a media file, not both."
 msgstr "Isi URL sematan atau berkas media, jangan keduanya."
 
-#: blocks/__init__.py:851
+#: blocks/__init__.py:899
 msgid "Video"
 msgstr "Video"
 
-#: blocks/__init__.py:878 blocks/__init__.py:1954 blocks/__init__.py:2014
-#: blocks/__init__.py:2118 blocks/__init__.py:2415 blocks/__init__.py:2738
+#: blocks/__init__.py:926 blocks/__init__.py:2058 blocks/__init__.py:2118
+#: blocks/__init__.py:2222 blocks/__init__.py:2519 blocks/__init__.py:2842
 msgid "Button text"
 msgstr "Teks tombol"
 
-#: blocks/__init__.py:881 blocks/__init__.py:1156 blocks/__init__.py:1631
-#: blocks/__init__.py:1959 blocks/__init__.py:2019 blocks/__init__.py:2248
-#: blocks/__init__.py:2336 blocks/__init__.py:3254
+#: blocks/__init__.py:929 blocks/__init__.py:1215 blocks/__init__.py:1690
+#: blocks/__init__.py:1961 blocks/__init__.py:2063 blocks/__init__.py:2123
+#: blocks/__init__.py:2352 blocks/__init__.py:2440 blocks/__init__.py:3358
 msgid "Link page"
 msgstr "Halaman tujuan"
 
-#: blocks/__init__.py:882
+#: blocks/__init__.py:930
 msgid "Internal page link. Set only one of the three link fields."
 msgstr ""
 "Tautan ke halaman internal. Isi salah satu saja dari tiga kolom tautan."
 
-#: blocks/__init__.py:886 blocks/__init__.py:1161 blocks/__init__.py:1636
-#: blocks/__init__.py:1964 blocks/__init__.py:2024 blocks/__init__.py:2253
-#: blocks/__init__.py:2341 blocks/__init__.py:3259
+#: blocks/__init__.py:934 blocks/__init__.py:1220 blocks/__init__.py:1695
+#: blocks/__init__.py:1966 blocks/__init__.py:2068 blocks/__init__.py:2128
+#: blocks/__init__.py:2357 blocks/__init__.py:2445 blocks/__init__.py:3363
 msgid "Link URL"
 msgstr "URL tautan"
 
-#: blocks/__init__.py:887 blocks/__init__.py:1965
+#: blocks/__init__.py:935 blocks/__init__.py:2069
 msgid "External link. Set only one of the three link fields."
 msgstr "Tautan eksternal. Isi salah satu saja dari tiga kolom tautan."
 
-#: blocks/__init__.py:891 blocks/__init__.py:1969 site_settings.py:68
+#: blocks/__init__.py:939 blocks/__init__.py:2073 site_settings.py:68
 msgid "Anchor"
 msgstr "Jangkar"
 
-#: blocks/__init__.py:893 blocks/__init__.py:1971
+#: blocks/__init__.py:941 blocks/__init__.py:2075
 msgid ""
 "Jump to a block on this same page, by its Anchor ID and without the # symbol"
 " (e.g. 'petition'). Set only one of the three link fields."
@@ -299,23 +326,23 @@ msgstr ""
 "Melompat ke blok di halaman yang sama, berdasarkan ID jangkarnya dan tanpa "
 "simbol # (misalnya “petition”). Isi salah satu saja dari tiga kolom tautan."
 
-#: blocks/__init__.py:901
+#: blocks/__init__.py:949
 msgid "Style"
 msgstr "Gaya"
 
-#: blocks/__init__.py:906
+#: blocks/__init__.py:954
 msgid "Size"
 msgstr "Ukuran"
 
-#: blocks/__init__.py:916
+#: blocks/__init__.py:964
 msgid "Provide a link page, a link URL, or an anchor."
 msgstr "Isi halaman tujuan, URL, atau jangkar."
 
-#: blocks/__init__.py:936
+#: blocks/__init__.py:984
 msgid "Button"
 msgstr "Tombol"
 
-#: blocks/__init__.py:939
+#: blocks/__init__.py:987
 msgid ""
 "A single call-to-action button. Links to a page on this site, an external "
 "URL, or an anchor further down the same page."
@@ -323,29 +350,29 @@ msgstr ""
 "Satu tombol ajakan bertindak. Menautkan ke halaman di situs ini, URL "
 "eksternal, atau jangkar di bagian bawah halaman yang sama."
 
-#: blocks/__init__.py:943 blocks/__init__.py:1011
+#: blocks/__init__.py:991 blocks/__init__.py:1059
 #: templates/wtrx/components/streamfield/blocks/card_carousel_block.html:131
 msgid "Take action"
 msgstr "Ikut beraksi"
 
-#: blocks/__init__.py:951
+#: blocks/__init__.py:999
 msgid "Horizontal"
 msgstr "Horizontal"
 
-#: blocks/__init__.py:952
+#: blocks/__init__.py:1000
 msgid "Vertical"
 msgstr "Vertikal"
 
-#: blocks/__init__.py:981
+#: blocks/__init__.py:1029
 msgid "Buttons"
 msgstr "Tombol"
 
-#: blocks/__init__.py:985 blocks/__init__.py:3087 blocks/__init__.py:3180
+#: blocks/__init__.py:1033 blocks/__init__.py:3191 blocks/__init__.py:3284
 #: site_settings.py:572
 msgid "Layout"
 msgstr "Tata letak"
 
-#: blocks/__init__.py:987
+#: blocks/__init__.py:1035
 msgid ""
 "Horizontal lays buttons out in centered rows. Vertical stacks them in a "
 "centered column."
@@ -353,11 +380,11 @@ msgstr ""
 "Horizontal menata tombol dalam baris yang terpusat. Vertikal menumpuknya "
 "dalam kolom yang terpusat."
 
-#: blocks/__init__.py:1002
+#: blocks/__init__.py:1050
 msgid "Button Group"
 msgstr "Grup tombol"
 
-#: blocks/__init__.py:1005
+#: blocks/__init__.py:1053
 msgid ""
 "Two or more call-to-action buttons, laid out horizontally or vertically. Use"
 " the single Button block instead for one CTA."
@@ -365,12 +392,12 @@ msgstr ""
 "Dua tombol ajakan bertindak atau lebih, ditata secara horizontal atau "
 "vertikal. Gunakan blok Tombol jika hanya ada satu ajakan bertindak."
 
-#: blocks/__init__.py:1019 blocks/__init__.py:1166
+#: blocks/__init__.py:1067 blocks/__init__.py:1225
 #: templates/wtrx/components/card.html:90
 msgid "Learn more"
 msgstr "Pelajari lebih lanjut"
 
-#: blocks/__init__.py:1050 validators.py:75
+#: blocks/__init__.py:1105 validators.py:75
 msgid ""
 "This HTML appears to have mismatched or unclosed tags — check that every "
 "opening tag has a matching closing tag."
@@ -378,11 +405,12 @@ msgstr ""
 "HTML ini tampaknya memiliki tag yang tidak berpasangan atau belum ditutup — "
 "periksa bahwa setiap tag pembuka memiliki tag penutup."
 
-#: blocks/__init__.py:1059
-msgid "Raw HTML"
-msgstr "HTML mentah"
+#: blocks/__init__.py:1114
+#| msgid "Custom code"
+msgid "Custom embed"
+msgstr "Kode khusus"
 
-#: blocks/__init__.py:1062
+#: blocks/__init__.py:1120
 msgid ""
 "Paste in HTML supplied by another service -- an embed, a widget, a snippet "
 "of markup. It is rendered exactly as given, so only use it for code you "
@@ -393,11 +421,11 @@ msgstr ""
 "kode yang tepercaya. Keseimbangan tag diperiksa saat menyimpan; keamanan "
 "markup tidak."
 
-#: blocks/__init__.py:1089
+#: blocks/__init__.py:1148
 msgid "Table"
 msgstr "Tabel"
 
-#: blocks/__init__.py:1092
+#: blocks/__init__.py:1151
 msgid ""
 "A simple data table, edited as a spreadsheet-style grid. The first row and "
 "column can each be marked as headers."
@@ -405,67 +433,68 @@ msgstr ""
 "Tabel data sederhana yang disunting seperti lembar kerja. Baris pertama dan "
 "kolom pertama masing-masing dapat ditandai sebagai kepala tabel."
 
-#: blocks/__init__.py:1135
+#: blocks/__init__.py:1194
 msgid "Tag"
 msgstr "Label"
 
-#: blocks/__init__.py:1136
+#: blocks/__init__.py:1195
 msgid ""
 "Optional short label displayed as a pill above the heading (e.g. 'Global')."
 msgstr ""
 "Label singkat opsional yang ditampilkan sebagai pil di atas judul (misalnya "
 "“Global”)."
 
-#: blocks/__init__.py:1140 site_settings.py:1184
+#: blocks/__init__.py:1199 site_settings.py:1184
 msgid "Icon"
 msgstr "Ikon"
 
-#: blocks/__init__.py:1142
+#: blocks/__init__.py:1201
 msgid ""
 "Optional small icon image (ideally square) displayed beside the content."
 msgstr ""
 "Gambar ikon kecil opsional (sebaiknya persegi) yang ditampilkan di samping "
 "konten."
 
-#: blocks/__init__.py:1147 blocks/__init__.py:1315 blocks/__init__.py:1768
-#: blocks/__init__.py:1854 blocks/__init__.py:1933 blocks/__init__.py:2009
-#: blocks/__init__.py:2096 blocks/__init__.py:2227 blocks/__init__.py:2323
-#: blocks/__init__.py:2406 blocks/__init__.py:2614 blocks/__init__.py:2732
-#: blocks/__init__.py:2832 blocks/__init__.py:3066 blocks/__init__.py:3373
-#: blocks/__init__.py:3615 blocks/__init__.py:3691 models.py:663 models.py:732
-#: models.py:812 models.py:1004 models.py:1243 models.py:1454
+#: blocks/__init__.py:1206 blocks/__init__.py:1374 blocks/__init__.py:1827
+#: blocks/__init__.py:1918 blocks/__init__.py:2037 blocks/__init__.py:2113
+#: blocks/__init__.py:2200 blocks/__init__.py:2331 blocks/__init__.py:2427
+#: blocks/__init__.py:2510 blocks/__init__.py:2718 blocks/__init__.py:2836
+#: blocks/__init__.py:2936 blocks/__init__.py:3170 blocks/__init__.py:3477
+#: blocks/__init__.py:3723 blocks/__init__.py:3799 models.py:689 models.py:784
+#: models.py:870 models.py:1062 models.py:1301 models.py:1512
 msgid "Content"
 msgstr "Konten"
 
-#: blocks/__init__.py:1148
+#: blocks/__init__.py:1207
 msgid "Type your heading as an H3 at the top, then optional supporting copy."
 msgstr "Tulis judul sebagai H3 di bagian atas, lalu teks pendukung opsional."
 
-#: blocks/__init__.py:1157 blocks/__init__.py:1960 blocks/__init__.py:2020
-#: blocks/__init__.py:2249 blocks/__init__.py:2337 blocks/__init__.py:3255
+#: blocks/__init__.py:1216 blocks/__init__.py:1962 blocks/__init__.py:2064
+#: blocks/__init__.py:2124 blocks/__init__.py:2353 blocks/__init__.py:2441
+#: blocks/__init__.py:3359
 msgid "Internal link. Set either this or Link URL, not both."
 msgstr "Tautan internal. Isi kolom ini atau URL tautan, jangan keduanya."
 
-#: blocks/__init__.py:1162 blocks/__init__.py:2025 blocks/__init__.py:2254
-#: blocks/__init__.py:2342 blocks/__init__.py:3260
+#: blocks/__init__.py:1221 blocks/__init__.py:1967 blocks/__init__.py:2129
+#: blocks/__init__.py:2358 blocks/__init__.py:2446 blocks/__init__.py:3364
 msgid "External link. Set either this or Link page, not both."
 msgstr "Tautan eksternal. Isi kolom ini atau halaman tujuan, jangan keduanya."
 
-#: blocks/__init__.py:1167 blocks/__init__.py:2243 blocks/__init__.py:2331
-#: site_settings.py:44 site_settings.py:55 site_settings.py:66
-#: site_settings.py:89
+#: blocks/__init__.py:1226 blocks/__init__.py:1956 blocks/__init__.py:2347
+#: blocks/__init__.py:2435 site_settings.py:44 site_settings.py:55
+#: site_settings.py:66 site_settings.py:89
 msgid "Link text"
 msgstr "Teks tautan"
 
-#: blocks/__init__.py:1168
+#: blocks/__init__.py:1227
 msgid "Label for the card's CTA button."
 msgstr "Label tombol ajakan bertindak pada kartu."
 
-#: blocks/__init__.py:1195 blocks/__init__.py:1223 blocks/__init__.py:1774
+#: blocks/__init__.py:1254 blocks/__init__.py:1282 blocks/__init__.py:1833
 msgid "Card"
 msgstr "Kartu"
 
-#: blocks/__init__.py:1198
+#: blocks/__init__.py:1257
 msgid ""
 "A single linked card: heading, short description, optional image, tag and "
 "icon. Usually reached for via Card Grid, which lays several out together."
@@ -474,42 +503,42 @@ msgstr ""
 "ikon opsional. Biasanya dipakai lewat Kisi Kartu, yang menata beberapa kartu"
 " sekaligus."
 
-#: blocks/__init__.py:1231
+#: blocks/__init__.py:1290
 msgid "Name"
 msgstr "Nama"
 
-#: blocks/__init__.py:1234
+#: blocks/__init__.py:1293
 msgid "Role / title"
 msgstr "Peran / jabatan"
 
-#: blocks/__init__.py:1238
+#: blocks/__init__.py:1297
 msgid "Photo"
 msgstr "Foto"
 
-#: blocks/__init__.py:1242
+#: blocks/__init__.py:1301
 msgid "Bio"
 msgstr "Biodata"
 
-#: blocks/__init__.py:1246
+#: blocks/__init__.py:1305
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:31
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:53
 msgid "Email"
 msgstr "Surel"
 
-#: blocks/__init__.py:1250
+#: blocks/__init__.py:1309
 msgid "Phone"
 msgstr "Telepon"
 
-#: blocks/__init__.py:1254 templates/wtrx/components/person_card.html:115
+#: blocks/__init__.py:1313 templates/wtrx/components/person_card.html:115
 #: templates/wtrx/components/person_card.html:132
 msgid "Website"
 msgstr "Situs web"
 
-#: blocks/__init__.py:1266
+#: blocks/__init__.py:1325
 msgid "Person"
 msgstr "Orang"
 
-#: blocks/__init__.py:1269
+#: blocks/__init__.py:1328
 msgid ""
 "A person: photo, name, role and short bio, with optional contact details. "
 "Use for staff, spokespeople or board listings."
@@ -517,32 +546,27 @@ msgstr ""
 "Seseorang: foto, nama, peran, dan biodata singkat, dengan detail kontak "
 "opsional. Gunakan untuk staf, juru bicara, atau anggota dewan."
 
-#: blocks/__init__.py:1331
+#: blocks/__init__.py:1390
 msgid "Title"
 msgstr "Judul"
 
-#: blocks/__init__.py:1336
+#: blocks/__init__.py:1395
 msgid "Accordion item"
 msgstr "Item akordeon"
 
-#: blocks/__init__.py:1370 blocks/__init__.py:1583 blocks/__init__.py:1673
-#: blocks/__init__.py:1725 blocks/__init__.py:1791 blocks/__init__.py:2175
-msgid "Heading"
-msgstr "Judul"
-
-#: blocks/__init__.py:1371 blocks/__init__.py:1584 blocks/__init__.py:2176
+#: blocks/__init__.py:1430 blocks/__init__.py:1643 blocks/__init__.py:2280
 msgid "Section heading, rendered as an H2."
 msgstr "Judul bagian, ditampilkan sebagai H2."
 
-#: blocks/__init__.py:1377 blocks/__init__.py:1798 blocks/__init__.py:2030
+#: blocks/__init__.py:1436 blocks/__init__.py:1857 blocks/__init__.py:2134
 msgid "Cards"
 msgstr "Kartu"
 
-#: blocks/__init__.py:1392
+#: blocks/__init__.py:1451
 msgid "Card Grid"
 msgstr "Kisi Kartu"
 
-#: blocks/__init__.py:1395
+#: blocks/__init__.py:1454
 msgid ""
 "An auto-responsive grid of 2-12 linked cards, laid out automatically — never"
 " a lone card on its own row. There are no column controls."
@@ -551,15 +575,15 @@ msgstr ""
 "menyisakan satu kartu sendirian dalam satu baris. Tidak ada pengaturan "
 "kolom."
 
-#: blocks/__init__.py:1590
+#: blocks/__init__.py:1649
 msgid "Images"
 msgstr "Gambar"
 
-#: blocks/__init__.py:1605
+#: blocks/__init__.py:1664
 msgid "Image Grid"
 msgstr "Kisi Gambar"
 
-#: blocks/__init__.py:1608
+#: blocks/__init__.py:1667
 msgid ""
 "An auto-responsive grid of 2-24 photos, cropped to a consistent square "
 "shape. No per-image captions. There are no column controls."
@@ -567,15 +591,15 @@ msgstr ""
 "Kisi responsif berisi 2-24 foto, dipotong menjadi bentuk persegi yang "
 "seragam. Tanpa keterangan per gambar. Tidak ada pengaturan kolom."
 
-#: blocks/__init__.py:1621 blocks/__init__.py:1649
+#: blocks/__init__.py:1680 blocks/__init__.py:1708
 msgid "Logo"
 msgstr "Logo"
 
-#: blocks/__init__.py:1623
+#: blocks/__init__.py:1682
 msgid "Organization name"
 msgstr "Nama organisasi"
 
-#: blocks/__init__.py:1625
+#: blocks/__init__.py:1684
 msgid ""
 "Used as alt text if the image has no description, and as the logo's "
 "accessible label if it links out."
@@ -583,24 +607,24 @@ msgstr ""
 "Dipakai sebagai teks alternatif jika gambar tidak memiliki deskripsi, dan "
 "sebagai label aksesibilitas logo jika logo tersebut bertaut keluar."
 
-#: blocks/__init__.py:1632
+#: blocks/__init__.py:1691
 msgid "Internal page link. Set only one of the two link fields."
 msgstr ""
 "Tautan ke halaman internal. Isi salah satu saja dari dua kolom tautan."
 
-#: blocks/__init__.py:1637
+#: blocks/__init__.py:1696
 msgid "External link. Set only one of the two link fields."
 msgstr "Tautan eksternal. Isi salah satu saja dari dua kolom tautan."
 
-#: blocks/__init__.py:1678 site_settings.py:468
+#: blocks/__init__.py:1737 site_settings.py:468
 msgid "Logos"
 msgstr "Logo"
 
-#: blocks/__init__.py:1692
+#: blocks/__init__.py:1751
 msgid "Logo Grid"
 msgstr "Kisi Logo"
 
-#: blocks/__init__.py:1695
+#: blocks/__init__.py:1754
 msgid ""
 "A grid of 2-30 partner/funder logos, sized consistently. Logos may "
 "optionally link out."
@@ -608,15 +632,15 @@ msgstr ""
 "Kisi berisi 2-30 logo mitra atau pendana dengan ukuran seragam. Logo boleh "
 "bertaut keluar."
 
-#: blocks/__init__.py:1730
+#: blocks/__init__.py:1789
 msgid "People"
 msgstr "Orang"
 
-#: blocks/__init__.py:1742
+#: blocks/__init__.py:1801
 msgid "Person Card Grid"
 msgstr "Kisi Kartu Orang"
 
-#: blocks/__init__.py:1745
+#: blocks/__init__.py:1804
 msgid ""
 "A grid of up to 12 people, laid out automatically — never a lone card on its"
 " own row. There are no column controls."
@@ -624,47 +648,47 @@ msgstr ""
 "Kisi berisi hingga 12 orang, ditata otomatis — tidak pernah menyisakan satu "
 "kartu sendirian dalam satu baris. Tidak ada pengaturan kolom."
 
-#: blocks/__init__.py:1769
+#: blocks/__init__.py:1828
 msgid "Type your heading as an H3 at the top, then the supporting copy."
 msgstr "Tulis judul sebagai H3 di bagian atas, lalu teks pendukungnya."
 
-#: blocks/__init__.py:1792
+#: blocks/__init__.py:1851
 msgid "Centered heading above the image and cards."
 msgstr "Judul terpusat di atas gambar dan kartu."
 
-#: blocks/__init__.py:1803 blocks/__init__.py:1860 blocks/__init__.py:2641
+#: blocks/__init__.py:1862 blocks/__init__.py:1924 blocks/__init__.py:2745
 msgid "Image alignment"
 msgstr "Perataan gambar"
 
-#: blocks/__init__.py:1804
+#: blocks/__init__.py:1863
 msgid "Which side the image sits on — the cards sit on the opposite side."
 msgstr "Sisi tempat gambar berada — kartu berada di sisi sebaliknya."
 
-#: blocks/__init__.py:1809
+#: blocks/__init__.py:1868
 msgid "Image Card List"
 msgstr "Daftar Kartu Bergambar"
 
-#: blocks/__init__.py:1855
+#: blocks/__init__.py:1919
 msgid "Type your heading as an H2 at the top, then the body text."
 msgstr "Tulis judul sebagai H2 di bagian atas, lalu badan teksnya."
 
-#: blocks/__init__.py:1861
+#: blocks/__init__.py:1925
 msgid "Which side the image sits on — the text sits on the opposite side."
 msgstr "Sisi tempat gambar berada — teks berada di sisi sebaliknya."
 
-#: blocks/__init__.py:1866
+#: blocks/__init__.py:1930
 msgid "Image size"
 msgstr "Ukuran gambar"
 
-#: blocks/__init__.py:1867
+#: blocks/__init__.py:1931
 msgid "How wide the image column is."
 msgstr "Lebar kolom gambar."
 
-#: blocks/__init__.py:1872
+#: blocks/__init__.py:1936
 msgid "Crop to square"
 msgstr "Potong menjadi persegi"
 
-#: blocks/__init__.py:1874
+#: blocks/__init__.py:1938
 msgid ""
 "Uncheck to show the image at its natural aspect ratio instead of cropping it"
 " to a square — useful for a logo or other image that looks wrong cropped."
@@ -673,15 +697,28 @@ msgstr ""
 "memotongnya menjadi persegi — berguna untuk logo atau gambar lain yang "
 "terlihat salah bila dipotong."
 
-#: blocks/__init__.py:1882
+#: blocks/__init__.py:1957 blocks/__init__.py:2348 blocks/__init__.py:2436
+msgid "CTA button label. Leave blank to omit the button."
+msgstr "Label tombol ajakan bertindak. Kosongkan untuk menghilangkan tombol."
+
+#: blocks/__init__.py:1972
+#| msgid "Link text"
+msgid "Link style"
+msgstr "Teks tautan"
+
+#: blocks/__init__.py:1973
+msgid "Button style for the CTA above."
+msgstr "Gaya tombol untuk ajakan bertindak di atas."
+
+#: blocks/__init__.py:1985
 msgid "Image + Text"
 msgstr "Gambar + Teks"
 
-#: blocks/__init__.py:1925 blocks/__init__.py:3057 blocks/__init__.py:3159
+#: blocks/__init__.py:2029 blocks/__init__.py:3161 blocks/__init__.py:3263
 msgid "Eyebrow"
 msgstr "Kepala label"
 
-#: blocks/__init__.py:1927
+#: blocks/__init__.py:2031
 msgid ""
 "Optional short label shown in a pill above the heading, e.g. \"Featured "
 "Campaign\". Leave blank to omit the pill."
@@ -689,25 +726,25 @@ msgstr ""
 "Label singkat opsional yang ditampilkan dalam pil di atas judul, misalnya "
 "“Kampanye Unggulan”. Kosongkan untuk menghilangkan pil."
 
-#: blocks/__init__.py:1934 blocks/__init__.py:2097 blocks/__init__.py:2733
-#: blocks/__init__.py:2833
+#: blocks/__init__.py:2038 blocks/__init__.py:2201 blocks/__init__.py:2837
+#: blocks/__init__.py:2937
 msgid "Type your heading as an H2 at the top, then optional supporting copy."
 msgstr "Tulis judul sebagai H2 di bagian atas, lalu teks pendukung opsional."
 
-#: blocks/__init__.py:1940
+#: blocks/__init__.py:2044
 msgid "Alignment"
 msgstr "Perataan"
 
-#: blocks/__init__.py:1941
+#: blocks/__init__.py:2045
 msgid "Which side of the panel the image sits on."
 msgstr "Sisi panel tempat gambar berada."
 
-#: blocks/__init__.py:1946 blocks/__init__.py:3075 blocks/__init__.py:3168
-#: blocks/__init__.py:3635
+#: blocks/__init__.py:2050 blocks/__init__.py:3179 blocks/__init__.py:3272
+#: blocks/__init__.py:3743
 msgid "Background"
 msgstr "Latar"
 
-#: blocks/__init__.py:1948
+#: blocks/__init__.py:2052
 msgid ""
 "Panel fill. The dark colors invert the text, pill and button colors; White "
 "and Light grey keep them dark."
@@ -715,29 +752,29 @@ msgstr ""
 "Warna isian panel. Warna gelap membalik warna teks, pil, dan tombol; Putih "
 "dan Abu-abu muda membiarkannya tetap gelap."
 
-#: blocks/__init__.py:1955 blocks/__init__.py:2015
+#: blocks/__init__.py:2059 blocks/__init__.py:2119
 msgid "Optional CTA button label. Leave blank to omit the button."
 msgstr ""
 "Label tombol ajakan bertindak opsional. Kosongkan untuk menghilangkan "
 "tombol."
 
-#: blocks/__init__.py:1985
+#: blocks/__init__.py:2089
 msgid "Feature Panel"
 msgstr "Panel Sorotan"
 
-#: blocks/__init__.py:2010
+#: blocks/__init__.py:2114
 msgid "Type your heading as an H2 at the top, then the supporting copy."
 msgstr "Tulis judul sebagai H2 di bagian atas, lalu teks pendukungnya."
 
-#: blocks/__init__.py:2042
+#: blocks/__init__.py:2146
 msgid "Card Carousel"
 msgstr "Karosel Kartu"
 
-#: blocks/__init__.py:2101
+#: blocks/__init__.py:2205
 msgid "Index page"
 msgstr "Halaman indeks"
 
-#: blocks/__init__.py:2103
+#: blocks/__init__.py:2207
 msgid ""
 "The 3 most recently published pages under this index page are shown as "
 "cards."
@@ -745,11 +782,11 @@ msgstr ""
 "3 halaman yang paling baru terbit di bawah halaman indeks ini ditampilkan "
 "sebagai kartu."
 
-#: blocks/__init__.py:2109
+#: blocks/__init__.py:2213
 msgid "Category"
 msgstr "Kategori"
 
-#: blocks/__init__.py:2111
+#: blocks/__init__.py:2215
 msgid ""
 "Optional. Only applies when Index page above is a Blog/press releases index "
 "— shows only posts in this category."
@@ -757,38 +794,38 @@ msgstr ""
 "Opsional. Hanya berlaku bila halaman indeks di atas adalah indeks blog atau "
 "siaran pers — hanya menampilkan tulisan dalam kategori tersebut."
 
-#: blocks/__init__.py:2117 templates/wtrx/components/person_card.html:52
+#: blocks/__init__.py:2221 templates/wtrx/components/person_card.html:52
 msgid "Read more"
 msgstr "Selengkapnya"
 
-#: blocks/__init__.py:2120
+#: blocks/__init__.py:2224
 msgid ""
 "Optional CTA button below the cards. Always links to the index page above."
 msgstr ""
 "Tombol ajakan bertindak opsional di bawah kartu. Selalu menautkan ke halaman"
 " indeks di atas."
 
-#: blocks/__init__.py:2160
+#: blocks/__init__.py:2264
 msgid "Page Cards"
 msgstr "Kartu Halaman"
 
-#: blocks/__init__.py:2181
+#: blocks/__init__.py:2285
 msgid "Items"
 msgstr "Item"
 
-#: blocks/__init__.py:2186
+#: blocks/__init__.py:2290
 msgid "Accordion"
 msgstr "Akordeon"
 
-#: blocks/__init__.py:2202
+#: blocks/__init__.py:2306
 msgid "Read the full story"
 msgstr "Baca kisah selengkapnya"
 
-#: blocks/__init__.py:2232
+#: blocks/__init__.py:2336
 msgid "Set either this or Media file, not both."
 msgstr "Isi kolom ini atau berkas media, jangan keduanya."
 
-#: blocks/__init__.py:2238
+#: blocks/__init__.py:2342
 msgid ""
 "An uploaded video file from the media library. Set either this or Image, not"
 " both."
@@ -796,34 +833,30 @@ msgstr ""
 "Berkas video yang diunggah dari pustaka media. Isi kolom ini atau gambar, "
 "jangan keduanya."
 
-#: blocks/__init__.py:2244 blocks/__init__.py:2332
-msgid "CTA button label. Leave blank to omit the button."
-msgstr "Label tombol ajakan bertindak. Kosongkan untuk menghilangkan tombol."
-
-#: blocks/__init__.py:2259
+#: blocks/__init__.py:2363
 msgid "Media alignment"
 msgstr "Perataan media"
 
-#: blocks/__init__.py:2261
+#: blocks/__init__.py:2365
 msgid ""
 "Which side the (~80%-width) image sits on — the text sits on the opposite "
 "side."
 msgstr ""
 "Sisi tempat gambar (selebar ~80%) berada — teks berada di sisi sebaliknya."
 
-#: blocks/__init__.py:2272
+#: blocks/__init__.py:2376
 msgid "Provide either an image or a media file."
 msgstr "Isi gambar atau berkas media."
 
-#: blocks/__init__.py:2277
+#: blocks/__init__.py:2381
 msgid "Provide either an image or a media file, not both."
 msgstr "Isi gambar atau berkas media, jangan keduanya."
 
-#: blocks/__init__.py:2288
+#: blocks/__init__.py:2392
 msgid "Quote"
 msgstr "Kutipan"
 
-#: blocks/__init__.py:2291
+#: blocks/__init__.py:2395
 msgid ""
 "A large pull-quote set beside an image or video, with an optional button. "
 "Best used once on a page, for a testimonial or key line."
@@ -832,7 +865,7 @@ msgstr ""
 "opsional. Sebaiknya dipakai sekali per halaman, untuk testimoni atau kalimat"
 " kunci."
 
-#: blocks/__init__.py:2325
+#: blocks/__init__.py:2429
 msgid ""
 "Optional heading (H2) and/or subheading (H3) at the top, followed by an "
 "optional paragraph and/or bulleted or numbered list."
@@ -840,15 +873,15 @@ msgstr ""
 "Judul (H2) dan/atau subjudul (H3) opsional di bagian atas, diikuti paragraf "
 "opsional dan/atau daftar berbutir atau bernomor."
 
-#: blocks/__init__.py:2347 blocks/__init__.py:3388
+#: blocks/__init__.py:2451 blocks/__init__.py:3492
 msgid "Color"
 msgstr "Warna"
 
-#: blocks/__init__.py:2351
+#: blocks/__init__.py:2455
 msgid "Background image"
 msgstr "Gambar latar"
 
-#: blocks/__init__.py:2353
+#: blocks/__init__.py:2457
 msgid ""
 "Optional. Rendered as a subtle, low-opacity texture behind the text — not a "
 "full photo background."
@@ -856,11 +889,11 @@ msgstr ""
 "Opsional. Ditampilkan sebagai tekstur halus beropasitas rendah di belakang "
 "teks — bukan sebagai foto latar penuh."
 
-#: blocks/__init__.py:2366
+#: blocks/__init__.py:2470
 msgid "Callout"
 msgstr "Sorotan"
 
-#: blocks/__init__.py:2369
+#: blocks/__init__.py:2473
 msgid ""
 "A solid-colour panel with a heading and a call-to-action button. Use it to "
 "break up a long page and push readers toward one action."
@@ -868,7 +901,7 @@ msgstr ""
 "Panel berwarna solid dengan judul dan tombol ajakan bertindak. Gunakan untuk"
 " memecah halaman yang panjang dan mengarahkan pembaca pada satu tindakan."
 
-#: blocks/__init__.py:2408 blocks/__init__.py:2616
+#: blocks/__init__.py:2512 blocks/__init__.py:2720
 msgid ""
 "Type your heading as an H2 at the top, optionally followed by an H3 "
 "subheading, then optional supporting copy."
@@ -876,21 +909,21 @@ msgstr ""
 "Tulis judul sebagai H2 di bagian atas, boleh diikuti subjudul H3, lalu teks "
 "pendukung opsional."
 
-#: blocks/__init__.py:2414 blocks/__init__.py:2463 blocks/__init__.py:2475
+#: blocks/__init__.py:2518 blocks/__init__.py:2567 blocks/__init__.py:2579
 #: templates/wtrx/components/streamfield/blocks/donate_block.html:7
 #: templates/wtrx/components/streamfield/blocks/donate_fundraiseup_block.html:84
 msgid "Donate"
 msgstr "Donasi"
 
-#: blocks/__init__.py:2416 blocks/__init__.py:2739
+#: blocks/__init__.py:2520 blocks/__init__.py:2843
 msgid "Leave blank to use the site default button label."
 msgstr "Kosongkan untuk memakai label tombol bawaan situs."
 
-#: blocks/__init__.py:2421
+#: blocks/__init__.py:2525
 msgid "Override amounts"
 msgstr "Ganti nominal"
 
-#: blocks/__init__.py:2423
+#: blocks/__init__.py:2527
 msgid ""
 "Optional list of suggested donation amounts. Leave empty to use the site-"
 "wide defaults."
@@ -898,11 +931,11 @@ msgstr ""
 "Daftar opsional nominal donasi yang disarankan. Kosongkan untuk memakai "
 "nilai bawaan situs."
 
-#: blocks/__init__.py:2429
+#: blocks/__init__.py:2533
 msgid "Override URL"
 msgstr "Ganti URL"
 
-#: blocks/__init__.py:2431
+#: blocks/__init__.py:2535
 msgid ""
 "Optional override for the donation URL. Overrides the site-wide donation "
 "base URL from IntegrationSettings."
@@ -910,7 +943,7 @@ msgstr ""
 "Penggantian opsional untuk URL donasi. Menimpa URL dasar donasi situs dari "
 "pengaturan integrasi."
 
-#: blocks/__init__.py:2466
+#: blocks/__init__.py:2570
 msgid ""
 "A donation ask with suggested amounts, linking out to ActBlue. Amounts and "
 "the destination come from Settings > Integrations unless overridden here."
@@ -919,12 +952,12 @@ msgstr ""
 "Nominal dan tujuannya berasal dari Pengaturan > Integrasi, kecuali diganti "
 "di sini."
 
-#: blocks/__init__.py:2506 integrations/fundraiseup.py:76
+#: blocks/__init__.py:2610 integrations/fundraiseup.py:76
 msgid "Form ID — United States visitors"
 msgstr "ID formulir — pengunjung dari Amerika Serikat"
 
-#: blocks/__init__.py:2508 blocks/__init__.py:2516 blocks/__init__.py:2524
-#: blocks/__init__.py:2532 blocks/__init__.py:2549
+#: blocks/__init__.py:2612 blocks/__init__.py:2620 blocks/__init__.py:2628
+#: blocks/__init__.py:2636 blocks/__init__.py:2653
 msgid ""
 "Overrides the site-wide value for this block only. Leave blank to use the "
 "site default."
@@ -932,23 +965,23 @@ msgstr ""
 "Menimpa nilai situs hanya untuk blok ini. Kosongkan untuk memakai nilai "
 "bawaan situs."
 
-#: blocks/__init__.py:2514 integrations/fundraiseup.py:81
+#: blocks/__init__.py:2618 integrations/fundraiseup.py:81
 msgid "Form ID — Netherlands visitors"
 msgstr "ID formulir — pengunjung dari Belanda"
 
-#: blocks/__init__.py:2522 integrations/fundraiseup.py:86
+#: blocks/__init__.py:2626 integrations/fundraiseup.py:86
 msgid "Form ID — Canada visitors"
 msgstr "ID formulir — pengunjung dari Kanada"
 
-#: blocks/__init__.py:2530 integrations/fundraiseup.py:91
+#: blocks/__init__.py:2634 integrations/fundraiseup.py:91
 msgid "Form ID — United Kingdom visitors"
 msgstr "ID formulir — pengunjung dari Britania Raya"
 
-#: blocks/__init__.py:2538 integrations/fundraiseup.py:96
+#: blocks/__init__.py:2642 integrations/fundraiseup.py:96
 msgid "Other European country codes"
 msgstr "Kode negara Eropa lainnya"
 
-#: blocks/__init__.py:2540
+#: blocks/__init__.py:2644
 msgid ""
 "Comma-separated two-letter ISO country codes (e.g. DE,FR,ES,IT) that should "
 "use the \"other European visitors\" form ID below, for this block only. "
@@ -958,15 +991,15 @@ msgstr ""
 "harus memakai ID formulir “pengunjung Eropa lainnya” di bawah, khusus untuk "
 "blok ini. Kosongkan untuk memakai daftar milik seluruh situs."
 
-#: blocks/__init__.py:2547 integrations/fundraiseup.py:106
+#: blocks/__init__.py:2651 integrations/fundraiseup.py:106
 msgid "Form ID — all other European visitors"
 msgstr "ID formulir — seluruh pengunjung Eropa lainnya"
 
-#: blocks/__init__.py:2555 integrations/fundraiseup.py:114
+#: blocks/__init__.py:2659 integrations/fundraiseup.py:114
 msgid "Form ID — all other visitors"
 msgstr "ID formulir — seluruh pengunjung lainnya"
 
-#: blocks/__init__.py:2557
+#: blocks/__init__.py:2661
 msgid ""
 "Overrides the site-wide default for this block only, and also becomes this "
 "block's own fallback for any region left blank above. Leave entirely blank "
@@ -976,25 +1009,25 @@ msgstr ""
 "cadangan blok ini untuk wilayah mana pun yang dikosongkan di atas. Kosongkan"
 " seluruhnya untuk memakai nilai bawaan situs di semua wilayah."
 
-#: blocks/__init__.py:2566 blocks/__init__.py:2649
+#: blocks/__init__.py:2670 blocks/__init__.py:2753
 msgid "Advanced settings"
 msgstr "Pengaturan lanjutan"
 
-#: blocks/__init__.py:2626 blocks/__init__.py:3100 blocks/__init__.py:3193
-#: blocks/__init__.py:3382
+#: blocks/__init__.py:2730 blocks/__init__.py:3204 blocks/__init__.py:3297
+#: blocks/__init__.py:3486
 msgid "Image caption"
 msgstr "Keterangan gambar"
 
-#: blocks/__init__.py:2627 blocks/__init__.py:3101 blocks/__init__.py:3194
+#: blocks/__init__.py:2731 blocks/__init__.py:3205 blocks/__init__.py:3298
 msgid "Optional caption overlaid on the image, e.g. a photo credit."
 msgstr ""
 "Keterangan opsional yang ditumpangkan pada gambar, misalnya kredit foto."
 
-#: blocks/__init__.py:2631
+#: blocks/__init__.py:2735
 msgid "Designation ID"
 msgstr "ID peruntukan"
 
-#: blocks/__init__.py:2633
+#: blocks/__init__.py:2737
 msgid ""
 "Optional Fundraise Up designation ID to route this donation to a specific "
 "fund. Applies on top of whichever region-specific form the visitor is shown."
@@ -1003,7 +1036,7 @@ msgstr ""
 "tertentu. Berlaku di atas formulir wilayah mana pun yang ditampilkan kepada "
 "pengunjung."
 
-#: blocks/__init__.py:2643
+#: blocks/__init__.py:2747
 msgid ""
 "Which side the image sits on — the dark panel sits on the opposite side. Has"
 " no effect when no image is set."
@@ -1011,32 +1044,32 @@ msgstr ""
 "Sisi tempat gambar berada — panel gelap berada di sisi sebaliknya. Tidak "
 "berpengaruh bila tidak ada gambar."
 
-#: blocks/__init__.py:2710
+#: blocks/__init__.py:2814
 msgid "Donate (Fundraise Up)"
 msgstr "Donasi (Fundraise Up)"
 
-#: blocks/__init__.py:2737
+#: blocks/__init__.py:2841
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:45
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:80
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:17
 msgid "Sign Up"
 msgstr "Pendaftaran"
 
-#: blocks/__init__.py:2743
+#: blocks/__init__.py:2847
 msgid "Form page"
 msgstr "Halaman formulir"
 
-#: blocks/__init__.py:2744
+#: blocks/__init__.py:2848
 msgid "The FormPage whose form will be rendered inline."
 msgstr ""
 "Halaman formulir yang formulirnya akan ditampilkan menyatu di halaman."
 
-#: blocks/__init__.py:2748 blocks/__init__.py:2844 blocks/__init__.py:3121
-#: blocks/__init__.py:3214
+#: blocks/__init__.py:2852 blocks/__init__.py:2948 blocks/__init__.py:3225
+#: blocks/__init__.py:3318
 msgid "Success message"
 msgstr "Pesan keberhasilan"
 
-#: blocks/__init__.py:2750
+#: blocks/__init__.py:2854
 msgid ""
 "Message shown after successful submission. Leave blank for a generic thank-"
 "you."
@@ -1044,11 +1077,11 @@ msgstr ""
 "Pesan yang ditampilkan setelah pengiriman berhasil. Kosongkan untuk ucapan "
 "terima kasih umum."
 
-#: blocks/__init__.py:2756
+#: blocks/__init__.py:2860
 msgid "Sign Up (Wagtail Forms)"
 msgstr "Pendaftaran (formulir Wagtail)"
 
-#: blocks/__init__.py:2759
+#: blocks/__init__.py:2863
 msgid ""
 "A form built in this CMS (a Form page), rendered inline. Use it when the "
 "submissions should live here rather than on an external platform."
@@ -1057,15 +1090,15 @@ msgstr ""
 "halaman. Gunakan bila datanya harus tersimpan di sini, bukan di platform "
 "luar."
 
-#: blocks/__init__.py:2804
+#: blocks/__init__.py:2908
 msgid "Success message content"
 msgstr "Isi pesan keberhasilan"
 
-#: blocks/__init__.py:2836
+#: blocks/__init__.py:2940
 msgid "Action Network URL"
 msgstr "URL Action Network"
 
-#: blocks/__init__.py:2838
+#: blocks/__init__.py:2942
 msgid ""
 "Paste the full Action Network form URL (e.g. "
 "https://actionnetwork.org/forms/your-form-slug)."
@@ -1073,7 +1106,7 @@ msgstr ""
 "Tempelkan URL lengkap formulir Action Network (misalnya "
 "https://actionnetwork.org/forms/your-form-slug)."
 
-#: blocks/__init__.py:2846
+#: blocks/__init__.py:2950
 msgid ""
 "Optional. Replaces Action Network's default thank-you screen after a "
 "successful signup."
@@ -1081,24 +1114,24 @@ msgstr ""
 "Opsional. Menggantikan layar terima kasih bawaan Action Network setelah "
 "pendaftaran berhasil."
 
-#: blocks/__init__.py:2852 blocks/__init__.py:3114 blocks/__init__.py:3207
-#: blocks/__init__.py:3657
+#: blocks/__init__.py:2956 blocks/__init__.py:3218 blocks/__init__.py:3311
+#: blocks/__init__.py:3765
 msgid "Anchor ID"
 msgstr "ID jangkar"
 
-#: blocks/__init__.py:2854 blocks/__init__.py:3116 blocks/__init__.py:3209
-#: blocks/__init__.py:3659
+#: blocks/__init__.py:2958 blocks/__init__.py:3220 blocks/__init__.py:3313
+#: blocks/__init__.py:3767
 msgid ""
 "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
 msgstr ""
 "Opsional. Menambahkan atribut id untuk tautan langsung (misalnya “contact” →"
 " #contact)."
 
-#: blocks/__init__.py:2889
+#: blocks/__init__.py:2993
 msgid "Sign Up (Action Network)"
 msgstr "Pendaftaran (Action Network)"
 
-#: blocks/__init__.py:2892
+#: blocks/__init__.py:2996
 msgid ""
 "An Action Network form embedded in the page, from its public URL. Supporters"
 " sign up without leaving the site."
@@ -1106,7 +1139,7 @@ msgstr ""
 "Formulir Action Network yang disematkan di halaman, diambil dari URL "
 "publiknya. Pendukung mendaftar tanpa meninggalkan situs."
 
-#: blocks/__init__.py:3059 blocks/__init__.py:3161
+#: blocks/__init__.py:3163 blocks/__init__.py:3265
 msgid ""
 "Optional short label shown as a pill above the heading (e.g. 'Sign the "
 "Petition')."
@@ -1114,7 +1147,7 @@ msgstr ""
 "Label singkat opsional yang ditampilkan sebagai pil di atas judul (misalnya "
 "“Tanda tangani petisi”)."
 
-#: blocks/__init__.py:3068
+#: blocks/__init__.py:3172
 msgid ""
 "Type your heading as an H2 at the top, then optional supporting copy, shown "
 "above the ActionKit form."
@@ -1122,7 +1155,7 @@ msgstr ""
 "Tulis judul sebagai H2 di bagian atas, lalu teks pendukung opsional, yang "
 "tampil di atas formulir ActionKit."
 
-#: blocks/__init__.py:3077 blocks/__init__.py:3170
+#: blocks/__init__.py:3181 blocks/__init__.py:3274
 msgid ""
 "Panel fill behind the heading, copy and form. The same palette as the page "
 "hero banner, callout and section blocks."
@@ -1130,15 +1163,15 @@ msgstr ""
 "Warna isian panel di belakang judul, teks, dan formulir. Palet yang sama "
 "dengan spanduk hero, blok sorotan, dan blok bagian."
 
-#: blocks/__init__.py:3083 blocks/__init__.py:3176
+#: blocks/__init__.py:3187 blocks/__init__.py:3280
 msgid "Side by side"
 msgstr "Berdampingan"
 
-#: blocks/__init__.py:3084 blocks/__init__.py:3177
+#: blocks/__init__.py:3188 blocks/__init__.py:3281
 msgid "Stacked vertically"
 msgstr "Bertumpuk vertikal"
 
-#: blocks/__init__.py:3089 blocks/__init__.py:3182
+#: blocks/__init__.py:3193 blocks/__init__.py:3286
 msgid ""
 "Side by side splits copy and form into two columns (default). Stacked "
 "vertically runs image, copy and form down a single narrow column — better "
@@ -1148,11 +1181,11 @@ msgstr ""
 " vertikal menyusun gambar, teks, dan formulir dalam satu kolom sempit — "
 "lebih cocok untuk formulir panjang dengan banyak kolom isian."
 
-#: blocks/__init__.py:3104 blocks/__init__.py:3197
+#: blocks/__init__.py:3208 blocks/__init__.py:3301
 msgid "ActionKit Page Shortname"
 msgstr "Nama pendek halaman ActionKit"
 
-#: blocks/__init__.py:3106 blocks/__init__.py:3199
+#: blocks/__init__.py:3210 blocks/__init__.py:3303
 msgid ""
 "The ActionKit page's short name (e.g. 'join'). Its signup form is fetched "
 "from ActionKit and rendered automatically — whatever fields that page is "
@@ -1162,7 +1195,7 @@ msgstr ""
 "diambil dari ActionKit dan ditampilkan otomatis — kolom apa pun yang diatur "
 "pada halaman tersebut akan muncul, tanpa pengaturan tambahan di sini."
 
-#: blocks/__init__.py:3123 blocks/__init__.py:3216
+#: blocks/__init__.py:3227 blocks/__init__.py:3320
 msgid ""
 "Optional. When set, a successful signup shows this message in place of the "
 "form instead of redirecting to ActionKit's own thank-you page. ActionKit's "
@@ -1182,42 +1215,42 @@ msgstr ""
 "ActionKit, konsekuensi yang sama seperti yang sudah diterima penerusan ini "
 "di tempat lain."
 
-#: blocks/__init__.py:3137 blocks/__init__.py:3230
+#: blocks/__init__.py:3241 blocks/__init__.py:3334
 msgid "Sign Up (ActionKit)"
 msgstr "Pendaftaran (ActionKit)"
 
-#: blocks/__init__.py:3272
+#: blocks/__init__.py:3376
 msgid "Announcement bar"
 msgstr "Bilah pengumuman"
 
-#: blocks/__init__.py:3307 blocks/__init__.py:3341
+#: blocks/__init__.py:3411 blocks/__init__.py:3445
 msgid "Call to action"
 msgstr "Ajakan bertindak"
 
-#: blocks/__init__.py:3367
+#: blocks/__init__.py:3471
 msgid "Headline"
 msgstr "Judul utama"
 
-#: blocks/__init__.py:3368
+#: blocks/__init__.py:3472
 msgid "The hero heading text."
 msgstr "Teks judul hero."
 
-#: blocks/__init__.py:3374
+#: blocks/__init__.py:3478
 msgid "Optional supporting copy below the headline."
 msgstr "Teks pendukung opsional di bawah judul."
 
-#: blocks/__init__.py:3383
+#: blocks/__init__.py:3487
 msgid ""
 "Optional caption overlaid at the bottom of the image, e.g. a photo credit."
 msgstr ""
 "Keterangan opsional yang ditumpangkan di bagian bawah gambar, misalnya "
 "kredit foto."
 
-#: blocks/__init__.py:3416 models.py:328 models.py:357
+#: blocks/__init__.py:3523 models.py:346 models.py:379 models.py:773
 msgid "Hero"
 msgstr "Hero"
 
-#: blocks/__init__.py:3419
+#: blocks/__init__.py:3526
 msgid ""
 "A full-width banner with a headline, supporting copy and a coloured "
 "background -- for opening a section mid-page. A page's own hero is set on "
@@ -1227,7 +1260,7 @@ msgstr ""
 "untuk membuka sebuah bagian di tengah halaman. Hero milik halaman itu "
 "sendiri diatur pada halamannya, bukan dengan blok ini."
 
-#: blocks/__init__.py:3637
+#: blocks/__init__.py:3745
 msgid ""
 "Full-bleed fill behind the whole section. The dark colors invert the text "
 "inside it."
@@ -1235,15 +1268,15 @@ msgstr ""
 "Isian selebar penuh di belakang seluruh bagian. Warna gelap membalik teks di"
 " dalamnya."
 
-#: blocks/__init__.py:3644
+#: blocks/__init__.py:3752
 msgid "Padding"
 msgstr "Jarak dalam"
 
-#: blocks/__init__.py:3649
+#: blocks/__init__.py:3757
 msgid "Content width"
 msgstr "Lebar konten"
 
-#: blocks/__init__.py:3651
+#: blocks/__init__.py:3759
 msgid ""
 "How wide the section's content column is. Narrow suits a text + accordion "
 "stack; wide suits a full-bleed video or image."
@@ -1251,15 +1284,15 @@ msgstr ""
 "Lebar kolom konten bagian ini. Sempit cocok untuk susunan teks + akordeon; "
 "lebar cocok untuk video atau gambar selebar penuh."
 
-#: blocks/__init__.py:3665
+#: blocks/__init__.py:3773
 msgid "Section"
 msgstr "Bagian"
 
-#: blocks/__init__.py:3704 blocks/__init__.py:3711
+#: blocks/__init__.py:3812 blocks/__init__.py:3819
 msgid "Year"
 msgstr "Tahun"
 
-#: blocks/__init__.py:3705
+#: blocks/__init__.py:3813
 msgid ""
 "E.g. '2019'. Used to build the year-jump navigation and this year's anchor "
 "link."
@@ -1267,11 +1300,11 @@ msgstr ""
 "Misalnya “2019”. Dipakai untuk membangun navigasi lompat tahun dan tautan "
 "jangkar tahun ini."
 
-#: blocks/__init__.py:3767
+#: blocks/__init__.py:3875
 msgid "Years"
 msgstr "Tahun"
 
-#: blocks/__init__.py:3779
+#: blocks/__init__.py:3887
 msgid "Timeline"
 msgstr "Lini masa"
 
@@ -1293,7 +1326,7 @@ msgstr "kredit"
 msgid "Photographer or source attribution (e.g. 'Photo: Jane Smith')."
 msgstr "Atribusi fotografer atau sumber (misalnya “Foto: Siti Rahayu”)."
 
-#: images.py:39 models.py:478
+#: images.py:39 models.py:500
 msgid "image"
 msgstr "gambar"
 
@@ -1421,7 +1454,7 @@ msgstr ""
 "variabel lingkungan WTRX_ACTIONKIT_API_PASSWORD, yang menimpa nilai ini agar"
 " rahasianya tidak tersimpan di basis data."
 
-#: integrations/actionkit.py:311 integrations/actionkit.py:317 models.py:1445
+#: integrations/actionkit.py:311 integrations/actionkit.py:317 models.py:1503
 msgid "ActionKit"
 msgstr "ActionKit"
 
@@ -1697,7 +1730,7 @@ msgstr "SEO"
 msgid "hero headline"
 msgstr "judul hero"
 
-#: models.py:248 models.py:462
+#: models.py:248 models.py:484
 msgid ""
 "Optional. Overrides the page title as the displayed heading. Leave blank to "
 "use the page title."
@@ -1709,7 +1742,7 @@ msgstr ""
 msgid "hero copy"
 msgstr "teks hero"
 
-#: models.py:256 models.py:470
+#: models.py:256 models.py:492
 msgid "Optional subtext displayed below the headline."
 msgstr "Teks opsional yang ditampilkan di bawah judul."
 
@@ -1743,10 +1776,26 @@ msgstr ""
 "dipakai."
 
 #: models.py:288
+#| msgid "hero headline"
+msgid "hero pre-header"
+msgstr "judul hero"
+
+#: models.py:290
+#| msgid ""
+#| "Optional short label shown as a pill above the heading (e.g. 'Sign the "
+#| "Petition')."
+msgid ""
+"Optional short line shown above the headline, e.g. \"Welcome to 350 "
+"Canada\"."
+msgstr ""
+"Label singkat opsional yang ditampilkan sebagai pil di atas judul (misalnya "
+"“Tanda tangani petisi”)."
+
+#: models.py:297
 msgid "hero image caption"
 msgstr "keterangan gambar hero"
 
-#: models.py:290
+#: models.py:299
 msgid ""
 "Optional caption overlaid at the bottom of the hero image or video, e.g. a "
 "photo credit."
@@ -1754,11 +1803,11 @@ msgstr ""
 "Keterangan opsional yang ditumpangkan di bagian bawah gambar atau video "
 "hero, misalnya kredit foto."
 
-#: models.py:298
+#: models.py:307
 msgid "hero banner color"
 msgstr "warna spanduk hero"
 
-#: models.py:300
+#: models.py:309
 msgid ""
 "Background color for the compact hero banner. Only affects pages whose hero "
 "renders as a banner (i.e. every page except the homepage)."
@@ -1766,51 +1815,51 @@ msgstr ""
 "Warna latar spanduk hero ringkas. Hanya memengaruhi halaman yang heronya "
 "tampil sebagai spanduk (yaitu semua halaman kecuali beranda)."
 
-#: models.py:307 models.py:706 models.py:777 models.py:1180
+#: models.py:316 models.py:732 models.py:835 models.py:1238
 msgid "hero call to action"
 msgstr "ajakan bertindak hero"
 
-#: models.py:308
+#: models.py:317
 msgid "Optional button or signup bar shown below the hero copy. At most one."
 msgstr ""
 "Tombol atau bilah pendaftaran opsional yang tampil di bawah teks hero. "
 "Paling banyak satu."
 
-#: models.py:428
+#: models.py:450
 msgid "published at"
 msgstr "terbit pada"
 
-#: models.py:429
+#: models.py:451
 msgid "The date shown on this page and used to order listings."
 msgstr ""
 "Tanggal yang ditampilkan di halaman ini dan dipakai untuk mengurutkan "
 "daftar."
 
-#: models.py:460
+#: models.py:482
 msgid "headline"
 msgstr "judul"
 
-#: models.py:469
+#: models.py:491
 msgid "copy"
 msgstr "teks"
 
-#: models.py:484
+#: models.py:506
 msgid "banner color"
 msgstr "warna spanduk"
 
-#: models.py:495
+#: models.py:517
 msgid "Header"
 msgstr "Kepala halaman"
 
-#: models.py:546
+#: models.py:572
 msgid "name"
 msgstr "nama"
 
-#: models.py:550
+#: models.py:576
 msgid "slug"
 msgstr "slug"
 
-#: models.py:551
+#: models.py:577
 msgid ""
 "Used in the blog's category filter URL. Auto-filled from the name if left "
 "blank."
@@ -1818,27 +1867,27 @@ msgstr ""
 "Dipakai pada URL filter kategori blog. Terisi otomatis dari nama bila "
 "dikosongkan."
 
-#: models.py:561
+#: models.py:587
 msgid "blog category"
 msgstr "kategori blog"
 
-#: models.py:562
+#: models.py:588
 msgid "blog categories"
 msgstr "kategori blog"
 
-#: models.py:633 models.py:714 models.py:793 models.py:980
+#: models.py:659 models.py:749 models.py:851 models.py:1038
 msgid "body"
 msgstr "badan"
 
-#: models.py:634 models.py:715 models.py:981
+#: models.py:660 models.py:750 models.py:1039
 msgid "Page body content."
 msgstr "Konten badan halaman."
 
-#: models.py:639
+#: models.py:665
 msgid "transparent header"
 msgstr "kepala halaman transparan"
 
-#: models.py:641
+#: models.py:667
 msgid ""
 "Make the header transparent so the hero image extends behind it. "
 "Automatically uses the dark logo variant when enabled."
@@ -1846,73 +1895,85 @@ msgstr ""
 "Membuat kepala halaman transparan sehingga gambar hero memanjang di "
 "belakangnya. Otomatis memakai varian logo gelap saat diaktifkan."
 
-#: models.py:653
+#: models.py:679
 msgid "Header options"
 msgstr "Opsi kepala halaman"
 
-#: models.py:664 models.py:733 models.py:813 models.py:1005 models.py:1244
-#: models.py:1455
+#: models.py:690 models.py:785 models.py:871 models.py:1063 models.py:1302
+#: models.py:1513
 msgid "Promote"
 msgstr "Promosi"
 
-#: models.py:665 models.py:734 models.py:814 models.py:1006 models.py:1245
-#: models.py:1456
+#: models.py:691 models.py:786 models.py:872 models.py:1064 models.py:1303
+#: models.py:1514
 msgid "Settings"
 msgstr "Pengaturan"
 
-#: models.py:679
+#: models.py:705
 msgid "home page"
 msgstr "beranda"
 
-#: models.py:680
+#: models.py:706
 msgid "home pages"
 msgstr "beranda"
 
-#: models.py:707 models.py:778 models.py:1181
+#: models.py:733 models.py:836 models.py:1239
 msgid "Optional button shown below the hero copy. At most one."
 msgstr "Tombol opsional yang tampil di bawah teks hero. Paling banyak satu."
 
-#: models.py:751
+#: models.py:739
+msgid "hide hero"
+msgstr "sembunyikan hero"
+
+#: models.py:741
+msgid ""
+"Hide the hero banner entirely and start the page at its body. The page title"
+" is still announced to screen readers."
+msgstr ""
+"Sembunyikan spanduk hero sepenuhnya dan mulai halaman dari badan teksnya. "
+"Judul halaman tetap diumumkan kepada pembaca layar."
+
+#: models.py:803
 msgid "content page"
 msgstr "halaman konten"
 
-#: models.py:752
+#: models.py:804
 msgid "content pages"
 msgstr "halaman konten"
 
-#: models.py:785 models.py:1407
+#: models.py:843 models.py:1465
 msgid "intro"
 msgstr "pengantar"
 
-#: models.py:787
+#: models.py:845
 msgid "Optional introductory text displayed above the child page listing."
 msgstr "Teks pengantar opsional yang ditampilkan di atas daftar halaman anak."
 
-#: models.py:794
+#: models.py:852
 msgid "Optional body content displayed below the child page listing."
 msgstr "Konten opsional yang ditampilkan di bawah daftar halaman anak."
 
-#: models.py:831
+#: models.py:889
 msgid "index page"
 msgstr "halaman indeks"
 
-#: models.py:832
+#: models.py:890
 msgid "index pages"
 msgstr "halaman indeks"
 
-#: models.py:940
+#: models.py:998
 msgid "author"
 msgstr "penulis"
 
-#: models.py:941
+#: models.py:999
 msgid "Defaults to whoever creates this post. Editable."
 msgstr "Bawaannya siapa pun yang membuat tulisan ini. Dapat diubah."
 
-#: models.py:946
+#: models.py:1004
 msgid "author name"
 msgstr "nama penulis"
 
-#: models.py:948
+#: models.py:1006
 msgid ""
 "Byline for a guest writer or imported post who doesn't have a site account. "
 "Ignored if Author (above) is set."
@@ -1920,11 +1981,11 @@ msgstr ""
 "Nama penulis tamu atau tulisan impor yang tidak punya akun di situs. "
 "Diabaikan bila Penulis (di atas) sudah diisi."
 
-#: models.py:955
+#: models.py:1013
 msgid "author title"
 msgstr "jabatan penulis"
 
-#: models.py:957
+#: models.py:1015
 msgid ""
 "Optional role/affiliation shown next to Author name, e.g. \"Senior "
 "Campaigner at Oil Change International\"."
@@ -1932,15 +1993,15 @@ msgstr ""
 "Peran atau afiliasi opsional yang tampil di samping nama penulis, misalnya "
 "“Kampanyer Senior di Oil Change International”."
 
-#: models.py:965
+#: models.py:1023
 msgid "categories"
 msgstr "kategori"
 
-#: models.py:969
+#: models.py:1027
 msgid "hide from blogroll"
 msgstr "sembunyikan dari daftar blog"
 
-#: models.py:971
+#: models.py:1029
 msgid ""
 "Exclude this post from the Blogs page listing and from any \"latest posts\" "
 "cards elsewhere on the site (e.g. Page Cards on the home page). The post is "
@@ -1950,29 +2011,29 @@ msgstr ""
 "terbaru” mana pun di bagian lain situs (misalnya Kartu Halaman di beranda). "
 "Tulisan tetap dapat diakses langsung dan tetap muncul di pencarian."
 
-#: models.py:1014
+#: models.py:1072
 msgid "post"
 msgstr "tulisan"
 
-#: models.py:1015 models.py:1139
+#: models.py:1073 models.py:1197
 msgid "posts"
 msgstr "tulisan"
 
-#: models.py:1140
+#: models.py:1198
 #, python-format
 msgid "Related %(label)s"
 msgstr "%(label)s terkait"
 
-#: models.py:1141
+#: models.py:1199
 #, python-format
 msgid "Read more %(label)s"
 msgstr "Baca %(label)s lainnya"
 
-#: models.py:1187
+#: models.py:1245
 msgid "related posts intro"
 msgstr "pengantar tulisan terkait"
 
-#: models.py:1189
+#: models.py:1247
 msgid ""
 "Supporting copy under the \"Related …\" heading at the bottom of each post "
 "under this page. Falls back to this page's header copy when blank."
@@ -1980,11 +2041,11 @@ msgstr ""
 "Teks pendukung di bawah judul “… terkait” di bagian bawah setiap tulisan "
 "pada halaman ini. Bila kosong, memakai teks kepala halaman ini."
 
-#: models.py:1200
+#: models.py:1258
 msgid "default card image"
 msgstr "gambar kartu bawaan"
 
-#: models.py:1202
+#: models.py:1260
 msgid ""
 "Shown for any post under this page that has no image of its own (no header "
 "image, and none found in its body content) wherever it's shown as a card — "
@@ -2001,11 +2062,11 @@ msgstr ""
 " Pers, yang pernyataannya sering tidak berfoto. Kosongkan bila tidak ingin "
 "ada gambar cadangan."
 
-#: models.py:1217
+#: models.py:1275
 msgid "default hero image"
 msgstr "gambar hero bawaan"
 
-#: models.py:1219
+#: models.py:1277
 msgid ""
 "Shown as the header image for any post under this page that has no image of "
 "its own, instead of Default card image (above) — for when the two should "
@@ -2020,27 +2081,27 @@ msgstr ""
 "kosong, memakai Gambar kartu bawaan. Kosongkan keduanya bila tidak ingin ada"
 " gambar cadangan."
 
-#: models.py:1257 models.py:1258
+#: models.py:1315 models.py:1316
 msgid "Blogs"
 msgstr "Blog"
 
-#: models.py:1408
+#: models.py:1466
 msgid "Optional introductory text displayed above the form."
 msgstr "Teks pengantar opsional yang ditampilkan di atas formulir."
 
-#: models.py:1413
+#: models.py:1471
 msgid "thank you text"
 msgstr "teks terima kasih"
 
-#: models.py:1414
+#: models.py:1472
 msgid "Text displayed after a successful form submission."
 msgstr "Teks yang ditampilkan setelah formulir berhasil dikirim."
 
-#: models.py:1419
+#: models.py:1477
 msgid "ActionKit page name"
 msgstr "nama halaman ActionKit"
 
-#: models.py:1421
+#: models.py:1479
 msgid ""
 "The ActionKit page short name this form submits to. Only used when the "
 "ActionKit integration (Settings → Integrations) is enabled. Leave blank to "
@@ -2050,19 +2111,19 @@ msgstr ""
 "Hanya dipakai bila integrasi ActionKit (Pengaturan → Integrasi) aktif. "
 "Kosongkan untuk menonaktifkan penerusan ke ActionKit pada formulir ini."
 
-#: models.py:1433
+#: models.py:1491
 msgid "Form fields"
 msgstr "Kolom formulir"
 
-#: models.py:1441
+#: models.py:1499
 msgid "Email notifications"
 msgstr "Notifikasi surel"
 
-#: models.py:1468
+#: models.py:1526
 msgid "form page"
 msgstr "halaman formulir"
 
-#: models.py:1469
+#: models.py:1527
 msgid "form pages"
 msgstr "halaman formulir"
 

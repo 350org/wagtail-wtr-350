@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-21 21:06+0000\n"
+"POT-Creation-Date: 2026-09-22 01:20+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,95 +18,99 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: blocks/__init__.py:81
+#: blocks/__init__.py:84
+msgid "Please talk to Tech & Security before using."
+msgstr "Veuillez en parler à l’équipe Tech & Sécurité avant utilisation."
+
+#: blocks/__init__.py:87
 msgid "Primary"
 msgstr "Principal"
 
-#: blocks/__init__.py:82
+#: blocks/__init__.py:88
 msgid "Secondary"
 msgstr "Secondaire"
 
-#: blocks/__init__.py:83
+#: blocks/__init__.py:89
 msgid "Outline"
 msgstr "Contour"
 
-#: blocks/__init__.py:84
+#: blocks/__init__.py:90
 msgid "Urgent"
 msgstr "Urgent"
 
-#: blocks/__init__.py:95
+#: blocks/__init__.py:101
 msgid "Regular"
 msgstr "Normal"
 
-#: blocks/__init__.py:96 blocks/__init__.py:175
+#: blocks/__init__.py:102 blocks/__init__.py:181
 msgid "Large"
 msgstr "Grand"
 
-#: blocks/__init__.py:106
+#: blocks/__init__.py:112
 msgid "Image left"
 msgstr "Image à gauche"
 
-#: blocks/__init__.py:107
+#: blocks/__init__.py:113
 msgid "Image right"
 msgstr "Image à droite"
 
-#: blocks/__init__.py:116
+#: blocks/__init__.py:122
 msgid "Small (280px)"
 msgstr "Petite (280px)"
 
-#: blocks/__init__.py:117
+#: blocks/__init__.py:123
 msgid "Default (378px)"
 msgstr "Par défaut (378px)"
 
-#: blocks/__init__.py:118
+#: blocks/__init__.py:124
 msgid "Large (480px)"
 msgstr "Grande (480px)"
 
-#: blocks/__init__.py:140
+#: blocks/__init__.py:146
 msgid "White"
 msgstr "Blanc"
 
-#: blocks/__init__.py:141
+#: blocks/__init__.py:147
 msgid "Light grey"
 msgstr "Gris clair"
 
-#: blocks/__init__.py:142
+#: blocks/__init__.py:148
 msgid "Dark grey"
 msgstr "Gris foncé"
 
-#: blocks/__init__.py:143
+#: blocks/__init__.py:149
 msgid "Navy"
 msgstr "Bleu marine"
 
-#: blocks/__init__.py:144
+#: blocks/__init__.py:150
 msgid "Red"
 msgstr "Rouge"
 
-#: blocks/__init__.py:145
+#: blocks/__init__.py:151
 msgid "350 Blue"
 msgstr "Bleu 350"
 
-#: blocks/__init__.py:173
+#: blocks/__init__.py:179
 msgid "Small"
 msgstr "Petit"
 
-#: blocks/__init__.py:174
+#: blocks/__init__.py:180
 msgid "Medium"
 msgstr "Moyen"
 
-#: blocks/__init__.py:186
+#: blocks/__init__.py:192
 msgid "Narrow (800px)"
 msgstr "Étroit (800px)"
 
-#: blocks/__init__.py:187
+#: blocks/__init__.py:193
 msgid "Default (1152px)"
 msgstr "Par défaut (1152px)"
 
-#: blocks/__init__.py:188
+#: blocks/__init__.py:194
 msgid "Wide (1266px)"
 msgstr "Large (1266px)"
 
-#: blocks/__init__.py:266
+#: blocks/__init__.py:272
 msgid ""
 "This does not appear to be an Action Network URL. Expected a URL like "
 "https://actionnetwork.org/forms/your-form-slug"
@@ -114,7 +118,7 @@ msgstr ""
 "Cette adresse ne semble pas être une URL Action Network. Format attendu : "
 "https://actionnetwork.org/forms/your-form-slug"
 
-#: blocks/__init__.py:276
+#: blocks/__init__.py:282
 msgid ""
 "Could not find a form slug in this URL. Expected a URL like "
 "https://actionnetwork.org/forms/your-form-slug"
@@ -122,7 +126,7 @@ msgstr ""
 "Impossible de trouver un slug de formulaire dans cette URL. Format attendu :"
 " https://actionnetwork.org/forms/your-form-slug"
 
-#: blocks/__init__.py:288
+#: blocks/__init__.py:294
 #, python-format
 msgid ""
 "Unsupported Action Network action type '%(url_type)s'. Currently supported: "
@@ -131,33 +135,33 @@ msgstr ""
 "Type d’action Action Network non pris en charge : « %(url_type)s ». Types "
 "actuellement pris en charge : %(supported)s."
 
-#: blocks/__init__.py:298
+#: blocks/__init__.py:304
 #, python-format
 msgid "The URL slug '%(slug)s' contains unexpected characters."
 msgstr "Le slug d’URL « %(slug)s » contient des caractères inattendus."
 
-#: blocks/__init__.py:325 blocks/__init__.py:921
+#: blocks/__init__.py:331 blocks/__init__.py:969
 msgid "Provide only one of link page, link URL, or anchor."
 msgstr "Renseignez un seul champ parmi page de destination, URL ou ancre."
 
-#: blocks/__init__.py:329
+#: blocks/__init__.py:335
 msgid "Provide either a link page or a link URL, not both."
 msgstr ""
 "Renseignez soit une page de destination, soit une URL, mais pas les deux."
 
-#: blocks/__init__.py:577
+#: blocks/__init__.py:583
 msgid "A future powered by people"
 msgstr "Un avenir porté par les gens"
 
-#: blocks/__init__.py:587 blocks/__init__.py:678
+#: blocks/__init__.py:593 blocks/__init__.py:684
 msgid "Jane Doe"
 msgstr "Jeanne Dupont"
 
-#: blocks/__init__.py:588 blocks/__init__.py:679
+#: blocks/__init__.py:594 blocks/__init__.py:685
 msgid "Regional Organising Lead"
 msgstr "Responsable de la mobilisation régionale"
 
-#: blocks/__init__.py:591
+#: blocks/__init__.py:597
 msgid ""
 "Jane coordinates campaign partners across the region and has organised with "
 "the climate movement for over a decade."
@@ -165,20 +169,20 @@ msgstr ""
 "Jeanne coordonne les partenaires de campagne dans la région et milite au "
 "sein du mouvement climatique depuis plus de dix ans."
 
-#: blocks/__init__.py:659
+#: blocks/__init__.py:665
 #, python-format
 msgid "Partner Organization %(n)d"
 msgstr "Organisation partenaire %(n)d"
 
-#: blocks/__init__.py:707
+#: blocks/__init__.py:713
 msgid "Sign up"
 msgstr "S’inscrire"
 
-#: blocks/__init__.py:726 blocks/__init__.py:3251
+#: blocks/__init__.py:732 blocks/__init__.py:3355
 msgid "Text"
 msgstr "Texte"
 
-#: blocks/__init__.py:729
+#: blocks/__init__.py:735
 msgid ""
 "Rich text: paragraphs, headings, lists, bold/italic and links. The default "
 "choice for ordinary body copy."
@@ -186,11 +190,11 @@ msgstr ""
 "Texte enrichi : paragraphes, titres, listes, gras/italique et liens. Le "
 "choix par défaut pour le corps de texte ordinaire."
 
-#: blocks/__init__.py:757
+#: blocks/__init__.py:763
 msgid "Lead paragraph"
 msgstr "Paragraphe d’introduction"
 
-#: blocks/__init__.py:760
+#: blocks/__init__.py:766
 msgid ""
 "A larger introductory paragraph for opening a page or section. "
 "Bold/italic/links only — use a regular Text block for headings or lists."
@@ -199,7 +203,7 @@ msgstr ""
 " Gras/italique/liens uniquement — utilisez un bloc Texte ordinaire pour les "
 "titres ou les listes."
 
-#: blocks/__init__.py:768
+#: blocks/__init__.py:774
 msgid ""
 "<p>A short, larger opening statement that sits above the regular body "
 "copy.</p>"
@@ -207,19 +211,42 @@ msgstr ""
 "<p>Une courte déclaration d’ouverture, en plus grand, placée au-dessus du "
 "corps de texte.</p>"
 
-#: blocks/__init__.py:786 blocks/__init__.py:803 blocks/__init__.py:1152
-#: blocks/__init__.py:1218 blocks/__init__.py:1409 blocks/__init__.py:1421
-#: blocks/__init__.py:1794 blocks/__init__.py:1851 blocks/__init__.py:1936
-#: blocks/__init__.py:2231 blocks/__init__.py:2622 blocks/__init__.py:3096
-#: blocks/__init__.py:3189 blocks/__init__.py:3378
+#: blocks/__init__.py:806 blocks/__init__.py:812 blocks/__init__.py:1429
+#: blocks/__init__.py:1642 blocks/__init__.py:1732 blocks/__init__.py:1784
+#: blocks/__init__.py:1850 blocks/__init__.py:2279
+msgid "Heading"
+msgstr "Titre"
+
+#: blocks/__init__.py:807
+#| msgid "Section heading, rendered as an H2."
+msgid "Section heading, rendered as a centered H2."
+msgstr "Titre de section, rendu en H2."
+
+#: blocks/__init__.py:815
+msgid ""
+"A standalone centered section heading (H2), matching the heading style used "
+"above card rows."
+msgstr ""
+"Un titre de section centré autonome (H2), dans le même style que le titre "
+"affiché au-dessus des rangées de cartes."
+
+#: blocks/__init__.py:818
+msgid "What we're working on"
+msgstr "Ce sur quoi nous travaillons"
+
+#: blocks/__init__.py:834 blocks/__init__.py:851 blocks/__init__.py:1211
+#: blocks/__init__.py:1277 blocks/__init__.py:1468 blocks/__init__.py:1480
+#: blocks/__init__.py:1853 blocks/__init__.py:1915 blocks/__init__.py:2040
+#: blocks/__init__.py:2335 blocks/__init__.py:2726 blocks/__init__.py:3200
+#: blocks/__init__.py:3293 blocks/__init__.py:3482
 msgid "Image"
 msgstr "Image"
 
-#: blocks/__init__.py:789 blocks/__init__.py:1412
+#: blocks/__init__.py:837 blocks/__init__.py:1471
 msgid "Alt text"
 msgstr "Texte alternatif"
 
-#: blocks/__init__.py:791 blocks/__init__.py:1414
+#: blocks/__init__.py:839 blocks/__init__.py:1473
 msgid ""
 "Overrides the image description for screen readers. Leave blank to use the "
 "description set on the image itself."
@@ -227,76 +254,76 @@ msgstr ""
 "Remplace la description de l’image pour les lecteurs d’écran. Laissez vide "
 "pour utiliser la description définie sur l’image elle-même."
 
-#: blocks/__init__.py:797 blocks/__init__.py:827
+#: blocks/__init__.py:845 blocks/__init__.py:875
 msgid "Caption"
 msgstr "Légende"
 
-#: blocks/__init__.py:798
+#: blocks/__init__.py:846
 msgid "Optional caption displayed below the image."
 msgstr "Légende facultative affichée sous l’image."
 
-#: blocks/__init__.py:817
+#: blocks/__init__.py:865
 msgid "Embed URL"
 msgstr "URL d’intégration"
 
-#: blocks/__init__.py:818
+#: blocks/__init__.py:866
 msgid "YouTube, Vimeo, or other oEmbed-compatible URL."
 msgstr "YouTube, Vimeo ou toute autre URL compatible oEmbed."
 
-#: blocks/__init__.py:822 blocks/__init__.py:2236
+#: blocks/__init__.py:870 blocks/__init__.py:2340
 msgid "Media file"
 msgstr "Fichier multimédia"
 
-#: blocks/__init__.py:823
+#: blocks/__init__.py:871
 msgid "An uploaded video file from the media library."
 msgstr "Un fichier vidéo téléversé depuis la médiathèque."
 
-#: blocks/__init__.py:836
+#: blocks/__init__.py:884
 msgid "Provide either an embed URL or a media file."
 msgstr "Renseignez soit une URL d’intégration, soit un fichier multimédia."
 
-#: blocks/__init__.py:841
+#: blocks/__init__.py:889
 msgid "Provide either an embed URL or a media file, not both."
 msgstr ""
 "Renseignez soit une URL d’intégration, soit un fichier multimédia, mais pas "
 "les deux."
 
-#: blocks/__init__.py:851
+#: blocks/__init__.py:899
 msgid "Video"
 msgstr "Vidéo"
 
-#: blocks/__init__.py:878 blocks/__init__.py:1954 blocks/__init__.py:2014
-#: blocks/__init__.py:2118 blocks/__init__.py:2415 blocks/__init__.py:2738
+#: blocks/__init__.py:926 blocks/__init__.py:2058 blocks/__init__.py:2118
+#: blocks/__init__.py:2222 blocks/__init__.py:2519 blocks/__init__.py:2842
 msgid "Button text"
 msgstr "Texte du bouton"
 
-#: blocks/__init__.py:881 blocks/__init__.py:1156 blocks/__init__.py:1631
-#: blocks/__init__.py:1959 blocks/__init__.py:2019 blocks/__init__.py:2248
-#: blocks/__init__.py:2336 blocks/__init__.py:3254
+#: blocks/__init__.py:929 blocks/__init__.py:1215 blocks/__init__.py:1690
+#: blocks/__init__.py:1961 blocks/__init__.py:2063 blocks/__init__.py:2123
+#: blocks/__init__.py:2352 blocks/__init__.py:2440 blocks/__init__.py:3358
 msgid "Link page"
 msgstr "Page de destination"
 
-#: blocks/__init__.py:882
+#: blocks/__init__.py:930
 msgid "Internal page link. Set only one of the three link fields."
 msgstr ""
 "Lien vers une page interne. Ne renseignez qu’un seul des trois champs de "
 "lien."
 
-#: blocks/__init__.py:886 blocks/__init__.py:1161 blocks/__init__.py:1636
-#: blocks/__init__.py:1964 blocks/__init__.py:2024 blocks/__init__.py:2253
-#: blocks/__init__.py:2341 blocks/__init__.py:3259
+#: blocks/__init__.py:934 blocks/__init__.py:1220 blocks/__init__.py:1695
+#: blocks/__init__.py:1966 blocks/__init__.py:2068 blocks/__init__.py:2128
+#: blocks/__init__.py:2357 blocks/__init__.py:2445 blocks/__init__.py:3363
 msgid "Link URL"
 msgstr "URL du lien"
 
-#: blocks/__init__.py:887 blocks/__init__.py:1965
+#: blocks/__init__.py:935 blocks/__init__.py:2069
 msgid "External link. Set only one of the three link fields."
 msgstr "Lien externe. Ne renseignez qu’un seul des trois champs de lien."
 
-#: blocks/__init__.py:891 blocks/__init__.py:1969 site_settings.py:68
+#: blocks/__init__.py:939 blocks/__init__.py:2073 site_settings.py:68
 msgid "Anchor"
 msgstr "Ancre"
 
-#: blocks/__init__.py:893 blocks/__init__.py:1971
+#: blocks/__init__.py:941 blocks/__init__.py:2075
 msgid ""
 "Jump to a block on this same page, by its Anchor ID and without the # symbol"
 " (e.g. 'petition'). Set only one of the three link fields."
@@ -305,23 +332,23 @@ msgstr ""
 "sans le symbole # (par exemple « petition »). Ne renseignez qu’un seul des "
 "trois champs de lien."
 
-#: blocks/__init__.py:901
+#: blocks/__init__.py:949
 msgid "Style"
 msgstr "Style"
 
-#: blocks/__init__.py:906
+#: blocks/__init__.py:954
 msgid "Size"
 msgstr "Taille"
 
-#: blocks/__init__.py:916
+#: blocks/__init__.py:964
 msgid "Provide a link page, a link URL, or an anchor."
 msgstr "Renseignez une page de destination, une URL ou une ancre."
 
-#: blocks/__init__.py:936
+#: blocks/__init__.py:984
 msgid "Button"
 msgstr "Bouton"
 
-#: blocks/__init__.py:939
+#: blocks/__init__.py:987
 msgid ""
 "A single call-to-action button. Links to a page on this site, an external "
 "URL, or an anchor further down the same page."
@@ -329,29 +356,29 @@ msgstr ""
 "Un bouton d’appel à l’action unique. Renvoie vers une page de ce site, une "
 "URL externe ou une ancre plus bas dans la même page."
 
-#: blocks/__init__.py:943 blocks/__init__.py:1011
+#: blocks/__init__.py:991 blocks/__init__.py:1059
 #: templates/wtrx/components/streamfield/blocks/card_carousel_block.html:131
 msgid "Take action"
 msgstr "Passez à l’action"
 
-#: blocks/__init__.py:951
+#: blocks/__init__.py:999
 msgid "Horizontal"
 msgstr "Horizontal"
 
-#: blocks/__init__.py:952
+#: blocks/__init__.py:1000
 msgid "Vertical"
 msgstr "Vertical"
 
-#: blocks/__init__.py:981
+#: blocks/__init__.py:1029
 msgid "Buttons"
 msgstr "Boutons"
 
-#: blocks/__init__.py:985 blocks/__init__.py:3087 blocks/__init__.py:3180
+#: blocks/__init__.py:1033 blocks/__init__.py:3191 blocks/__init__.py:3284
 #: site_settings.py:572
 msgid "Layout"
 msgstr "Disposition"
 
-#: blocks/__init__.py:987
+#: blocks/__init__.py:1035
 msgid ""
 "Horizontal lays buttons out in centered rows. Vertical stacks them in a "
 "centered column."
@@ -359,11 +386,11 @@ msgstr ""
 "Horizontal dispose les boutons en rangées centrées. Vertical les empile en "
 "colonne centrée."
 
-#: blocks/__init__.py:1002
+#: blocks/__init__.py:1050
 msgid "Button Group"
 msgstr "Groupe de boutons"
 
-#: blocks/__init__.py:1005
+#: blocks/__init__.py:1053
 msgid ""
 "Two or more call-to-action buttons, laid out horizontally or vertically. Use"
 " the single Button block instead for one CTA."
@@ -371,12 +398,12 @@ msgstr ""
 "Deux boutons d’appel à l’action ou plus, disposés horizontalement ou "
 "verticalement. Utilisez plutôt le bloc Bouton pour un seul appel à l’action."
 
-#: blocks/__init__.py:1019 blocks/__init__.py:1166
+#: blocks/__init__.py:1067 blocks/__init__.py:1225
 #: templates/wtrx/components/card.html:90
 msgid "Learn more"
 msgstr "En savoir plus"
 
-#: blocks/__init__.py:1050 validators.py:75
+#: blocks/__init__.py:1105 validators.py:75
 msgid ""
 "This HTML appears to have mismatched or unclosed tags — check that every "
 "opening tag has a matching closing tag."
@@ -384,11 +411,12 @@ msgstr ""
 "Ce code HTML semble contenir des balises non appariées ou non fermées — "
 "vérifiez que chaque balise ouvrante a bien une balise fermante."
 
-#: blocks/__init__.py:1059
-msgid "Raw HTML"
-msgstr "HTML brut"
+#: blocks/__init__.py:1114
+#| msgid "Custom code"
+msgid "Custom embed"
+msgstr "Code personnalisé"
 
-#: blocks/__init__.py:1062
+#: blocks/__init__.py:1120
 msgid ""
 "Paste in HTML supplied by another service -- an embed, a widget, a snippet "
 "of markup. It is rendered exactly as given, so only use it for code you "
@@ -399,11 +427,11 @@ msgstr ""
 "que pour du code de confiance. L’équilibre des balises est vérifié à "
 "l’enregistrement ; la sécurité du balisage ne l’est pas."
 
-#: blocks/__init__.py:1089
+#: blocks/__init__.py:1148
 msgid "Table"
 msgstr "Tableau"
 
-#: blocks/__init__.py:1092
+#: blocks/__init__.py:1151
 msgid ""
 "A simple data table, edited as a spreadsheet-style grid. The first row and "
 "column can each be marked as headers."
@@ -412,73 +440,74 @@ msgstr ""
 "première ligne et la première colonne peuvent chacune être définies comme "
 "en-têtes."
 
-#: blocks/__init__.py:1135
+#: blocks/__init__.py:1194
 msgid "Tag"
 msgstr "Étiquette"
 
-#: blocks/__init__.py:1136
+#: blocks/__init__.py:1195
 msgid ""
 "Optional short label displayed as a pill above the heading (e.g. 'Global')."
 msgstr ""
 "Court libellé facultatif affiché sous forme de pastille au-dessus du titre "
 "(par exemple « Mondial »)."
 
-#: blocks/__init__.py:1140 site_settings.py:1184
+#: blocks/__init__.py:1199 site_settings.py:1184
 msgid "Icon"
 msgstr "Icône"
 
-#: blocks/__init__.py:1142
+#: blocks/__init__.py:1201
 msgid ""
 "Optional small icon image (ideally square) displayed beside the content."
 msgstr ""
 "Petite image d’icône facultative (idéalement carrée) affichée à côté du "
 "contenu."
 
-#: blocks/__init__.py:1147 blocks/__init__.py:1315 blocks/__init__.py:1768
-#: blocks/__init__.py:1854 blocks/__init__.py:1933 blocks/__init__.py:2009
-#: blocks/__init__.py:2096 blocks/__init__.py:2227 blocks/__init__.py:2323
-#: blocks/__init__.py:2406 blocks/__init__.py:2614 blocks/__init__.py:2732
-#: blocks/__init__.py:2832 blocks/__init__.py:3066 blocks/__init__.py:3373
-#: blocks/__init__.py:3615 blocks/__init__.py:3691 models.py:663 models.py:732
-#: models.py:812 models.py:1004 models.py:1243 models.py:1454
+#: blocks/__init__.py:1206 blocks/__init__.py:1374 blocks/__init__.py:1827
+#: blocks/__init__.py:1918 blocks/__init__.py:2037 blocks/__init__.py:2113
+#: blocks/__init__.py:2200 blocks/__init__.py:2331 blocks/__init__.py:2427
+#: blocks/__init__.py:2510 blocks/__init__.py:2718 blocks/__init__.py:2836
+#: blocks/__init__.py:2936 blocks/__init__.py:3170 blocks/__init__.py:3477
+#: blocks/__init__.py:3723 blocks/__init__.py:3799 models.py:689 models.py:784
+#: models.py:870 models.py:1062 models.py:1301 models.py:1512
 msgid "Content"
 msgstr "Contenu"
 
-#: blocks/__init__.py:1148
+#: blocks/__init__.py:1207
 msgid "Type your heading as an H3 at the top, then optional supporting copy."
 msgstr ""
 "Saisissez votre titre en H3 en haut, puis un texte d’accompagnement "
 "facultatif."
 
-#: blocks/__init__.py:1157 blocks/__init__.py:1960 blocks/__init__.py:2020
-#: blocks/__init__.py:2249 blocks/__init__.py:2337 blocks/__init__.py:3255
+#: blocks/__init__.py:1216 blocks/__init__.py:1962 blocks/__init__.py:2064
+#: blocks/__init__.py:2124 blocks/__init__.py:2353 blocks/__init__.py:2441
+#: blocks/__init__.py:3359
 msgid "Internal link. Set either this or Link URL, not both."
 msgstr ""
 "Lien interne. Renseignez soit ce champ, soit l’URL du lien, mais pas les "
 "deux."
 
-#: blocks/__init__.py:1162 blocks/__init__.py:2025 blocks/__init__.py:2254
-#: blocks/__init__.py:2342 blocks/__init__.py:3260
+#: blocks/__init__.py:1221 blocks/__init__.py:1967 blocks/__init__.py:2129
+#: blocks/__init__.py:2358 blocks/__init__.py:2446 blocks/__init__.py:3364
 msgid "External link. Set either this or Link page, not both."
 msgstr ""
 "Lien externe. Renseignez soit ce champ, soit la page de destination, mais "
 "pas les deux."
 
-#: blocks/__init__.py:1167 blocks/__init__.py:2243 blocks/__init__.py:2331
-#: site_settings.py:44 site_settings.py:55 site_settings.py:66
-#: site_settings.py:89
+#: blocks/__init__.py:1226 blocks/__init__.py:1956 blocks/__init__.py:2347
+#: blocks/__init__.py:2435 site_settings.py:44 site_settings.py:55
+#: site_settings.py:66 site_settings.py:89
 msgid "Link text"
 msgstr "Texte du lien"
 
-#: blocks/__init__.py:1168
+#: blocks/__init__.py:1227
 msgid "Label for the card's CTA button."
 msgstr "Libellé du bouton d’appel à l’action de la carte."
 
-#: blocks/__init__.py:1195 blocks/__init__.py:1223 blocks/__init__.py:1774
+#: blocks/__init__.py:1254 blocks/__init__.py:1282 blocks/__init__.py:1833
 msgid "Card"
 msgstr "Carte"
 
-#: blocks/__init__.py:1198
+#: blocks/__init__.py:1257
 msgid ""
 "A single linked card: heading, short description, optional image, tag and "
 "icon. Usually reached for via Card Grid, which lays several out together."
@@ -487,42 +516,42 @@ msgstr ""
 "facultatives. On y accède généralement via la Grille de cartes, qui en "
 "dispose plusieurs ensemble."
 
-#: blocks/__init__.py:1231
+#: blocks/__init__.py:1290
 msgid "Name"
 msgstr "Nom"
 
-#: blocks/__init__.py:1234
+#: blocks/__init__.py:1293
 msgid "Role / title"
 msgstr "Rôle / fonction"
 
-#: blocks/__init__.py:1238
+#: blocks/__init__.py:1297
 msgid "Photo"
 msgstr "Photo"
 
-#: blocks/__init__.py:1242
+#: blocks/__init__.py:1301
 msgid "Bio"
 msgstr "Biographie"
 
-#: blocks/__init__.py:1246
+#: blocks/__init__.py:1305
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:31
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:53
 msgid "Email"
 msgstr "Courriel"
 
-#: blocks/__init__.py:1250
+#: blocks/__init__.py:1309
 msgid "Phone"
 msgstr "Téléphone"
 
-#: blocks/__init__.py:1254 templates/wtrx/components/person_card.html:115
+#: blocks/__init__.py:1313 templates/wtrx/components/person_card.html:115
 #: templates/wtrx/components/person_card.html:132
 msgid "Website"
 msgstr "Site web"
 
-#: blocks/__init__.py:1266
+#: blocks/__init__.py:1325
 msgid "Person"
 msgstr "Personne"
 
-#: blocks/__init__.py:1269
+#: blocks/__init__.py:1328
 msgid ""
 "A person: photo, name, role and short bio, with optional contact details. "
 "Use for staff, spokespeople or board listings."
@@ -531,32 +560,27 @@ msgstr ""
 "facultatives. À utiliser pour l’équipe, les porte-parole ou le conseil "
 "d’administration."
 
-#: blocks/__init__.py:1331
+#: blocks/__init__.py:1390
 msgid "Title"
 msgstr "Titre"
 
-#: blocks/__init__.py:1336
+#: blocks/__init__.py:1395
 msgid "Accordion item"
 msgstr "Élément d’accordéon"
 
-#: blocks/__init__.py:1370 blocks/__init__.py:1583 blocks/__init__.py:1673
-#: blocks/__init__.py:1725 blocks/__init__.py:1791 blocks/__init__.py:2175
-msgid "Heading"
-msgstr "Titre"
-
-#: blocks/__init__.py:1371 blocks/__init__.py:1584 blocks/__init__.py:2176
+#: blocks/__init__.py:1430 blocks/__init__.py:1643 blocks/__init__.py:2280
 msgid "Section heading, rendered as an H2."
 msgstr "Titre de section, rendu en H2."
 
-#: blocks/__init__.py:1377 blocks/__init__.py:1798 blocks/__init__.py:2030
+#: blocks/__init__.py:1436 blocks/__init__.py:1857 blocks/__init__.py:2134
 msgid "Cards"
 msgstr "Cartes"
 
-#: blocks/__init__.py:1392
+#: blocks/__init__.py:1451
 msgid "Card Grid"
 msgstr "Grille de cartes"
 
-#: blocks/__init__.py:1395
+#: blocks/__init__.py:1454
 msgid ""
 "An auto-responsive grid of 2-12 linked cards, laid out automatically — never"
 " a lone card on its own row. There are no column controls."
@@ -565,15 +589,15 @@ msgstr ""
 " — jamais une carte seule sur sa propre ligne. Il n’y a pas de réglage de "
 "colonnes."
 
-#: blocks/__init__.py:1590
+#: blocks/__init__.py:1649
 msgid "Images"
 msgstr "Images"
 
-#: blocks/__init__.py:1605
+#: blocks/__init__.py:1664
 msgid "Image Grid"
 msgstr "Grille d’images"
 
-#: blocks/__init__.py:1608
+#: blocks/__init__.py:1667
 msgid ""
 "An auto-responsive grid of 2-24 photos, cropped to a consistent square "
 "shape. No per-image captions. There are no column controls."
@@ -581,15 +605,15 @@ msgstr ""
 "Une grille adaptative de 2 à 24 photos, recadrées au même format carré. Pas "
 "de légende par image. Il n’y a pas de réglage de colonnes."
 
-#: blocks/__init__.py:1621 blocks/__init__.py:1649
+#: blocks/__init__.py:1680 blocks/__init__.py:1708
 msgid "Logo"
 msgstr "Logo"
 
-#: blocks/__init__.py:1623
+#: blocks/__init__.py:1682
 msgid "Organization name"
 msgstr "Nom de l’organisation"
 
-#: blocks/__init__.py:1625
+#: blocks/__init__.py:1684
 msgid ""
 "Used as alt text if the image has no description, and as the logo's "
 "accessible label if it links out."
@@ -597,25 +621,25 @@ msgstr ""
 "Utilisé comme texte alternatif si l’image n’a pas de description, et comme "
 "libellé accessible du logo s’il renvoie vers un lien."
 
-#: blocks/__init__.py:1632
+#: blocks/__init__.py:1691
 msgid "Internal page link. Set only one of the two link fields."
 msgstr ""
 "Lien vers une page interne. Ne renseignez qu’un seul des deux champs de "
 "lien."
 
-#: blocks/__init__.py:1637
+#: blocks/__init__.py:1696
 msgid "External link. Set only one of the two link fields."
 msgstr "Lien externe. Ne renseignez qu’un seul des deux champs de lien."
 
-#: blocks/__init__.py:1678 site_settings.py:468
+#: blocks/__init__.py:1737 site_settings.py:468
 msgid "Logos"
 msgstr "Logos"
 
-#: blocks/__init__.py:1692
+#: blocks/__init__.py:1751
 msgid "Logo Grid"
 msgstr "Grille de logos"
 
-#: blocks/__init__.py:1695
+#: blocks/__init__.py:1754
 msgid ""
 "A grid of 2-30 partner/funder logos, sized consistently. Logos may "
 "optionally link out."
@@ -623,15 +647,15 @@ msgstr ""
 "Une grille de 2 à 30 logos de partenaires ou de bailleurs, dimensionnés de "
 "façon homogène. Les logos peuvent renvoyer vers un lien."
 
-#: blocks/__init__.py:1730
+#: blocks/__init__.py:1789
 msgid "People"
 msgstr "Personnes"
 
-#: blocks/__init__.py:1742
+#: blocks/__init__.py:1801
 msgid "Person Card Grid"
 msgstr "Grille de cartes de personnes"
 
-#: blocks/__init__.py:1745
+#: blocks/__init__.py:1804
 msgid ""
 "A grid of up to 12 people, laid out automatically — never a lone card on its"
 " own row. There are no column controls."
@@ -639,47 +663,47 @@ msgstr ""
 "Une grille d’un maximum de 12 personnes, disposées automatiquement — jamais "
 "une carte seule sur sa propre ligne. Il n’y a pas de réglage de colonnes."
 
-#: blocks/__init__.py:1769
+#: blocks/__init__.py:1828
 msgid "Type your heading as an H3 at the top, then the supporting copy."
 msgstr "Saisissez votre titre en H3 en haut, puis le texte d’accompagnement."
 
-#: blocks/__init__.py:1792
+#: blocks/__init__.py:1851
 msgid "Centered heading above the image and cards."
 msgstr "Titre centré au-dessus de l’image et des cartes."
 
-#: blocks/__init__.py:1803 blocks/__init__.py:1860 blocks/__init__.py:2641
+#: blocks/__init__.py:1862 blocks/__init__.py:1924 blocks/__init__.py:2745
 msgid "Image alignment"
 msgstr "Alignement de l’image"
 
-#: blocks/__init__.py:1804
+#: blocks/__init__.py:1863
 msgid "Which side the image sits on — the cards sit on the opposite side."
 msgstr "Le côté où se place l’image — les cartes se placent du côté opposé."
 
-#: blocks/__init__.py:1809
+#: blocks/__init__.py:1868
 msgid "Image Card List"
 msgstr "Liste de cartes avec image"
 
-#: blocks/__init__.py:1855
+#: blocks/__init__.py:1919
 msgid "Type your heading as an H2 at the top, then the body text."
 msgstr "Saisissez votre titre en H2 en haut, puis le corps du texte."
 
-#: blocks/__init__.py:1861
+#: blocks/__init__.py:1925
 msgid "Which side the image sits on — the text sits on the opposite side."
 msgstr "Le côté où se place l’image — le texte se place du côté opposé."
 
-#: blocks/__init__.py:1866
+#: blocks/__init__.py:1930
 msgid "Image size"
 msgstr "Taille de l’image"
 
-#: blocks/__init__.py:1867
+#: blocks/__init__.py:1931
 msgid "How wide the image column is."
 msgstr "La largeur de la colonne d’image."
 
-#: blocks/__init__.py:1872
+#: blocks/__init__.py:1936
 msgid "Crop to square"
 msgstr "Recadrer en carré"
 
-#: blocks/__init__.py:1874
+#: blocks/__init__.py:1938
 msgid ""
 "Uncheck to show the image at its natural aspect ratio instead of cropping it"
 " to a square — useful for a logo or other image that looks wrong cropped."
@@ -688,15 +712,29 @@ msgstr ""
 "recadrer en carré — utile pour un logo ou toute autre image qui se prête mal"
 " au recadrage."
 
-#: blocks/__init__.py:1882
+#: blocks/__init__.py:1957 blocks/__init__.py:2348 blocks/__init__.py:2436
+msgid "CTA button label. Leave blank to omit the button."
+msgstr ""
+"Libellé du bouton d’appel à l’action. Laissez vide pour masquer le bouton."
+
+#: blocks/__init__.py:1972
+#| msgid "Link text"
+msgid "Link style"
+msgstr "Texte du lien"
+
+#: blocks/__init__.py:1973
+msgid "Button style for the CTA above."
+msgstr "Style du bouton d’appel à l’action ci-dessus."
+
+#: blocks/__init__.py:1985
 msgid "Image + Text"
 msgstr "Image + texte"
 
-#: blocks/__init__.py:1925 blocks/__init__.py:3057 blocks/__init__.py:3159
+#: blocks/__init__.py:2029 blocks/__init__.py:3161 blocks/__init__.py:3263
 msgid "Eyebrow"
 msgstr "Surtitre"
 
-#: blocks/__init__.py:1927
+#: blocks/__init__.py:2031
 msgid ""
 "Optional short label shown in a pill above the heading, e.g. \"Featured "
 "Campaign\". Leave blank to omit the pill."
@@ -704,27 +742,27 @@ msgstr ""
 "Court libellé facultatif affiché dans une pastille au-dessus du titre, par "
 "exemple « Campagne à la une ». Laissez vide pour masquer la pastille."
 
-#: blocks/__init__.py:1934 blocks/__init__.py:2097 blocks/__init__.py:2733
-#: blocks/__init__.py:2833
+#: blocks/__init__.py:2038 blocks/__init__.py:2201 blocks/__init__.py:2837
+#: blocks/__init__.py:2937
 msgid "Type your heading as an H2 at the top, then optional supporting copy."
 msgstr ""
 "Saisissez votre titre en H2 en haut, puis un texte d’accompagnement "
 "facultatif."
 
-#: blocks/__init__.py:1940
+#: blocks/__init__.py:2044
 msgid "Alignment"
 msgstr "Alignement"
 
-#: blocks/__init__.py:1941
+#: blocks/__init__.py:2045
 msgid "Which side of the panel the image sits on."
 msgstr "Le côté du panneau où se place l’image."
 
-#: blocks/__init__.py:1946 blocks/__init__.py:3075 blocks/__init__.py:3168
-#: blocks/__init__.py:3635
+#: blocks/__init__.py:2050 blocks/__init__.py:3179 blocks/__init__.py:3272
+#: blocks/__init__.py:3743
 msgid "Background"
 msgstr "Arrière-plan"
 
-#: blocks/__init__.py:1948
+#: blocks/__init__.py:2052
 msgid ""
 "Panel fill. The dark colors invert the text, pill and button colors; White "
 "and Light grey keep them dark."
@@ -733,29 +771,29 @@ msgstr ""
 "texte, de la pastille et du bouton ; le blanc et le gris clair les laissent "
 "foncés."
 
-#: blocks/__init__.py:1955 blocks/__init__.py:2015
+#: blocks/__init__.py:2059 blocks/__init__.py:2119
 msgid "Optional CTA button label. Leave blank to omit the button."
 msgstr ""
 "Libellé facultatif du bouton d’appel à l’action. Laissez vide pour masquer "
 "le bouton."
 
-#: blocks/__init__.py:1985
+#: blocks/__init__.py:2089
 msgid "Feature Panel"
 msgstr "Panneau mis en avant"
 
-#: blocks/__init__.py:2010
+#: blocks/__init__.py:2114
 msgid "Type your heading as an H2 at the top, then the supporting copy."
 msgstr "Saisissez votre titre en H2 en haut, puis le texte d’accompagnement."
 
-#: blocks/__init__.py:2042
+#: blocks/__init__.py:2146
 msgid "Card Carousel"
 msgstr "Carrousel de cartes"
 
-#: blocks/__init__.py:2101
+#: blocks/__init__.py:2205
 msgid "Index page"
 msgstr "Page d’index"
 
-#: blocks/__init__.py:2103
+#: blocks/__init__.py:2207
 msgid ""
 "The 3 most recently published pages under this index page are shown as "
 "cards."
@@ -763,11 +801,11 @@ msgstr ""
 "Les 3 pages les plus récemment publiées sous cette page d’index sont "
 "affichées sous forme de cartes."
 
-#: blocks/__init__.py:2109
+#: blocks/__init__.py:2213
 msgid "Category"
 msgstr "Catégorie"
 
-#: blocks/__init__.py:2111
+#: blocks/__init__.py:2215
 msgid ""
 "Optional. Only applies when Index page above is a Blog/press releases index "
 "— shows only posts in this category."
@@ -776,39 +814,39 @@ msgstr ""
 "blog ou de communiqués — n’affiche alors que les publications de cette "
 "catégorie."
 
-#: blocks/__init__.py:2117 templates/wtrx/components/person_card.html:52
+#: blocks/__init__.py:2221 templates/wtrx/components/person_card.html:52
 msgid "Read more"
 msgstr "Lire la suite"
 
-#: blocks/__init__.py:2120
+#: blocks/__init__.py:2224
 msgid ""
 "Optional CTA button below the cards. Always links to the index page above."
 msgstr ""
 "Bouton d’appel à l’action facultatif sous les cartes. Renvoie toujours vers "
 "la page d’index ci-dessus."
 
-#: blocks/__init__.py:2160
+#: blocks/__init__.py:2264
 msgid "Page Cards"
 msgstr "Cartes de pages"
 
-#: blocks/__init__.py:2181
+#: blocks/__init__.py:2285
 msgid "Items"
 msgstr "Éléments"
 
-#: blocks/__init__.py:2186
+#: blocks/__init__.py:2290
 msgid "Accordion"
 msgstr "Accordéon"
 
-#: blocks/__init__.py:2202
+#: blocks/__init__.py:2306
 msgid "Read the full story"
 msgstr "Lire l’article complet"
 
-#: blocks/__init__.py:2232
+#: blocks/__init__.py:2336
 msgid "Set either this or Media file, not both."
 msgstr ""
 "Renseignez soit ce champ, soit le fichier multimédia, mais pas les deux."
 
-#: blocks/__init__.py:2238
+#: blocks/__init__.py:2342
 msgid ""
 "An uploaded video file from the media library. Set either this or Image, not"
 " both."
@@ -816,16 +854,11 @@ msgstr ""
 "Un fichier vidéo téléversé depuis la médiathèque. Renseignez soit ce champ, "
 "soit l’image, mais pas les deux."
 
-#: blocks/__init__.py:2244 blocks/__init__.py:2332
-msgid "CTA button label. Leave blank to omit the button."
-msgstr ""
-"Libellé du bouton d’appel à l’action. Laissez vide pour masquer le bouton."
-
-#: blocks/__init__.py:2259
+#: blocks/__init__.py:2363
 msgid "Media alignment"
 msgstr "Alignement du média"
 
-#: blocks/__init__.py:2261
+#: blocks/__init__.py:2365
 msgid ""
 "Which side the (~80%-width) image sits on — the text sits on the opposite "
 "side."
@@ -833,20 +866,20 @@ msgstr ""
 "Le côté où se place l’image (environ 80 % de largeur) — le texte se place du"
 " côté opposé."
 
-#: blocks/__init__.py:2272
+#: blocks/__init__.py:2376
 msgid "Provide either an image or a media file."
 msgstr "Renseignez soit une image, soit un fichier multimédia."
 
-#: blocks/__init__.py:2277
+#: blocks/__init__.py:2381
 msgid "Provide either an image or a media file, not both."
 msgstr ""
 "Renseignez soit une image, soit un fichier multimédia, mais pas les deux."
 
-#: blocks/__init__.py:2288
+#: blocks/__init__.py:2392
 msgid "Quote"
 msgstr "Citation"
 
-#: blocks/__init__.py:2291
+#: blocks/__init__.py:2395
 msgid ""
 "A large pull-quote set beside an image or video, with an optional button. "
 "Best used once on a page, for a testimonial or key line."
@@ -855,7 +888,7 @@ msgstr ""
 "un bouton facultatif. À utiliser une seule fois par page, pour un témoignage"
 " ou une phrase clé."
 
-#: blocks/__init__.py:2325
+#: blocks/__init__.py:2429
 msgid ""
 "Optional heading (H2) and/or subheading (H3) at the top, followed by an "
 "optional paragraph and/or bulleted or numbered list."
@@ -863,15 +896,15 @@ msgstr ""
 "Titre (H2) et/ou sous-titre (H3) facultatifs en haut, suivis d’un paragraphe"
 " facultatif et/ou d’une liste à puces ou numérotée."
 
-#: blocks/__init__.py:2347 blocks/__init__.py:3388
+#: blocks/__init__.py:2451 blocks/__init__.py:3492
 msgid "Color"
 msgstr "Couleur"
 
-#: blocks/__init__.py:2351
+#: blocks/__init__.py:2455
 msgid "Background image"
 msgstr "Image d’arrière-plan"
 
-#: blocks/__init__.py:2353
+#: blocks/__init__.py:2457
 msgid ""
 "Optional. Rendered as a subtle, low-opacity texture behind the text — not a "
 "full photo background."
@@ -879,11 +912,11 @@ msgstr ""
 "Facultatif. Rendue comme une texture discrète et peu opaque derrière le "
 "texte — pas comme une photo de fond pleine page."
 
-#: blocks/__init__.py:2366
+#: blocks/__init__.py:2470
 msgid "Callout"
 msgstr "Encadré"
 
-#: blocks/__init__.py:2369
+#: blocks/__init__.py:2473
 msgid ""
 "A solid-colour panel with a heading and a call-to-action button. Use it to "
 "break up a long page and push readers toward one action."
@@ -892,7 +925,7 @@ msgstr ""
 "utiliser pour aérer une page longue et orienter les lecteurs vers une "
 "action."
 
-#: blocks/__init__.py:2408 blocks/__init__.py:2616
+#: blocks/__init__.py:2512 blocks/__init__.py:2720
 msgid ""
 "Type your heading as an H2 at the top, optionally followed by an H3 "
 "subheading, then optional supporting copy."
@@ -900,21 +933,21 @@ msgstr ""
 "Saisissez votre titre en H2 en haut, éventuellement suivi d’un sous-titre "
 "H3, puis un texte d’accompagnement facultatif."
 
-#: blocks/__init__.py:2414 blocks/__init__.py:2463 blocks/__init__.py:2475
+#: blocks/__init__.py:2518 blocks/__init__.py:2567 blocks/__init__.py:2579
 #: templates/wtrx/components/streamfield/blocks/donate_block.html:7
 #: templates/wtrx/components/streamfield/blocks/donate_fundraiseup_block.html:84
 msgid "Donate"
 msgstr "Faire un don"
 
-#: blocks/__init__.py:2416 blocks/__init__.py:2739
+#: blocks/__init__.py:2520 blocks/__init__.py:2843
 msgid "Leave blank to use the site default button label."
 msgstr "Laissez vide pour utiliser le libellé de bouton par défaut du site."
 
-#: blocks/__init__.py:2421
+#: blocks/__init__.py:2525
 msgid "Override amounts"
 msgstr "Remplacer les montants"
 
-#: blocks/__init__.py:2423
+#: blocks/__init__.py:2527
 msgid ""
 "Optional list of suggested donation amounts. Leave empty to use the site-"
 "wide defaults."
@@ -922,11 +955,11 @@ msgstr ""
 "Liste facultative de montants de don suggérés. Laissez vide pour utiliser "
 "les valeurs par défaut du site."
 
-#: blocks/__init__.py:2429
+#: blocks/__init__.py:2533
 msgid "Override URL"
 msgstr "Remplacer l’URL"
 
-#: blocks/__init__.py:2431
+#: blocks/__init__.py:2535
 msgid ""
 "Optional override for the donation URL. Overrides the site-wide donation "
 "base URL from IntegrationSettings."
@@ -934,7 +967,7 @@ msgstr ""
 "Remplacement facultatif de l’URL de don. Prévaut sur l’URL de don du site "
 "définie dans les paramètres d’intégrations."
 
-#: blocks/__init__.py:2466
+#: blocks/__init__.py:2570
 msgid ""
 "A donation ask with suggested amounts, linking out to ActBlue. Amounts and "
 "the destination come from Settings > Integrations unless overridden here."
@@ -943,12 +976,12 @@ msgstr ""
 "montants et la destination proviennent de Paramètres > Intégrations, sauf "
 "s’ils sont remplacés ici."
 
-#: blocks/__init__.py:2506 integrations/fundraiseup.py:76
+#: blocks/__init__.py:2610 integrations/fundraiseup.py:76
 msgid "Form ID — United States visitors"
 msgstr "Identifiant de formulaire — visiteurs des États-Unis"
 
-#: blocks/__init__.py:2508 blocks/__init__.py:2516 blocks/__init__.py:2524
-#: blocks/__init__.py:2532 blocks/__init__.py:2549
+#: blocks/__init__.py:2612 blocks/__init__.py:2620 blocks/__init__.py:2628
+#: blocks/__init__.py:2636 blocks/__init__.py:2653
 msgid ""
 "Overrides the site-wide value for this block only. Leave blank to use the "
 "site default."
@@ -956,23 +989,23 @@ msgstr ""
 "Remplace la valeur du site pour ce bloc uniquement. Laissez vide pour "
 "utiliser la valeur par défaut du site."
 
-#: blocks/__init__.py:2514 integrations/fundraiseup.py:81
+#: blocks/__init__.py:2618 integrations/fundraiseup.py:81
 msgid "Form ID — Netherlands visitors"
 msgstr "Identifiant de formulaire — visiteurs des Pays-Bas"
 
-#: blocks/__init__.py:2522 integrations/fundraiseup.py:86
+#: blocks/__init__.py:2626 integrations/fundraiseup.py:86
 msgid "Form ID — Canada visitors"
 msgstr "Identifiant de formulaire — visiteurs du Canada"
 
-#: blocks/__init__.py:2530 integrations/fundraiseup.py:91
+#: blocks/__init__.py:2634 integrations/fundraiseup.py:91
 msgid "Form ID — United Kingdom visitors"
 msgstr "Identifiant de formulaire — visiteurs du Royaume-Uni"
 
-#: blocks/__init__.py:2538 integrations/fundraiseup.py:96
+#: blocks/__init__.py:2642 integrations/fundraiseup.py:96
 msgid "Other European country codes"
 msgstr "Autres codes de pays européens"
 
-#: blocks/__init__.py:2540
+#: blocks/__init__.py:2644
 msgid ""
 "Comma-separated two-letter ISO country codes (e.g. DE,FR,ES,IT) that should "
 "use the \"other European visitors\" form ID below, for this block only. "
@@ -983,15 +1016,15 @@ msgstr ""
 "visiteurs européens » ci-dessous, pour ce bloc uniquement. Laissez vide pour"
 " utiliser la liste du site."
 
-#: blocks/__init__.py:2547 integrations/fundraiseup.py:106
+#: blocks/__init__.py:2651 integrations/fundraiseup.py:106
 msgid "Form ID — all other European visitors"
 msgstr "Identifiant de formulaire — tous les autres visiteurs européens"
 
-#: blocks/__init__.py:2555 integrations/fundraiseup.py:114
+#: blocks/__init__.py:2659 integrations/fundraiseup.py:114
 msgid "Form ID — all other visitors"
 msgstr "Identifiant de formulaire — tous les autres visiteurs"
 
-#: blocks/__init__.py:2557
+#: blocks/__init__.py:2661
 msgid ""
 "Overrides the site-wide default for this block only, and also becomes this "
 "block's own fallback for any region left blank above. Leave entirely blank "
@@ -1002,25 +1035,25 @@ msgstr ""
 "dessus. Laissez tout vide pour utiliser partout la valeur par défaut du "
 "site."
 
-#: blocks/__init__.py:2566 blocks/__init__.py:2649
+#: blocks/__init__.py:2670 blocks/__init__.py:2753
 msgid "Advanced settings"
 msgstr "Paramètres avancés"
 
-#: blocks/__init__.py:2626 blocks/__init__.py:3100 blocks/__init__.py:3193
-#: blocks/__init__.py:3382
+#: blocks/__init__.py:2730 blocks/__init__.py:3204 blocks/__init__.py:3297
+#: blocks/__init__.py:3486
 msgid "Image caption"
 msgstr "Légende de l’image"
 
-#: blocks/__init__.py:2627 blocks/__init__.py:3101 blocks/__init__.py:3194
+#: blocks/__init__.py:2731 blocks/__init__.py:3205 blocks/__init__.py:3298
 msgid "Optional caption overlaid on the image, e.g. a photo credit."
 msgstr ""
 "Légende facultative superposée à l’image, par exemple un crédit photo."
 
-#: blocks/__init__.py:2631
+#: blocks/__init__.py:2735
 msgid "Designation ID"
 msgstr "Identifiant de désignation"
 
-#: blocks/__init__.py:2633
+#: blocks/__init__.py:2737
 msgid ""
 "Optional Fundraise Up designation ID to route this donation to a specific "
 "fund. Applies on top of whichever region-specific form the visitor is shown."
@@ -1029,7 +1062,7 @@ msgstr ""
 " un fonds précis. S’applique en plus du formulaire régional affiché au "
 "visiteur."
 
-#: blocks/__init__.py:2643
+#: blocks/__init__.py:2747
 msgid ""
 "Which side the image sits on — the dark panel sits on the opposite side. Has"
 " no effect when no image is set."
@@ -1037,31 +1070,31 @@ msgstr ""
 "Le côté où se place l’image — le panneau foncé se place du côté opposé. Sans"
 " effet si aucune image n’est définie."
 
-#: blocks/__init__.py:2710
+#: blocks/__init__.py:2814
 msgid "Donate (Fundraise Up)"
 msgstr "Faire un don (Fundraise Up)"
 
-#: blocks/__init__.py:2737
+#: blocks/__init__.py:2841
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:45
 #: templates/wtrx/components/streamfield/blocks/signup_action_network_block.html:80
 #: templates/wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html:17
 msgid "Sign Up"
 msgstr "Inscription"
 
-#: blocks/__init__.py:2743
+#: blocks/__init__.py:2847
 msgid "Form page"
 msgstr "Page de formulaire"
 
-#: blocks/__init__.py:2744
+#: blocks/__init__.py:2848
 msgid "The FormPage whose form will be rendered inline."
 msgstr "La page de formulaire dont le formulaire sera affiché en ligne."
 
-#: blocks/__init__.py:2748 blocks/__init__.py:2844 blocks/__init__.py:3121
-#: blocks/__init__.py:3214
+#: blocks/__init__.py:2852 blocks/__init__.py:2948 blocks/__init__.py:3225
+#: blocks/__init__.py:3318
 msgid "Success message"
 msgstr "Message de confirmation"
 
-#: blocks/__init__.py:2750
+#: blocks/__init__.py:2854
 msgid ""
 "Message shown after successful submission. Leave blank for a generic thank-"
 "you."
@@ -1069,11 +1102,11 @@ msgstr ""
 "Message affiché après un envoi réussi. Laissez vide pour un remerciement "
 "générique."
 
-#: blocks/__init__.py:2756
+#: blocks/__init__.py:2860
 msgid "Sign Up (Wagtail Forms)"
 msgstr "Inscription (formulaires Wagtail)"
 
-#: blocks/__init__.py:2759
+#: blocks/__init__.py:2863
 msgid ""
 "A form built in this CMS (a Form page), rendered inline. Use it when the "
 "submissions should live here rather than on an external platform."
@@ -1082,15 +1115,15 @@ msgstr ""
 " utiliser lorsque les réponses doivent être conservées ici plutôt que sur "
 "une plateforme externe."
 
-#: blocks/__init__.py:2804
+#: blocks/__init__.py:2908
 msgid "Success message content"
 msgstr "Contenu du message de confirmation"
 
-#: blocks/__init__.py:2836
+#: blocks/__init__.py:2940
 msgid "Action Network URL"
 msgstr "URL Action Network"
 
-#: blocks/__init__.py:2838
+#: blocks/__init__.py:2942
 msgid ""
 "Paste the full Action Network form URL (e.g. "
 "https://actionnetwork.org/forms/your-form-slug)."
@@ -1098,7 +1131,7 @@ msgstr ""
 "Collez l’URL complète du formulaire Action Network (par exemple "
 "https://actionnetwork.org/forms/your-form-slug)."
 
-#: blocks/__init__.py:2846
+#: blocks/__init__.py:2950
 msgid ""
 "Optional. Replaces Action Network's default thank-you screen after a "
 "successful signup."
@@ -1106,24 +1139,24 @@ msgstr ""
 "Facultatif. Remplace l’écran de remerciement par défaut d’Action Network "
 "après une inscription réussie."
 
-#: blocks/__init__.py:2852 blocks/__init__.py:3114 blocks/__init__.py:3207
-#: blocks/__init__.py:3657
+#: blocks/__init__.py:2956 blocks/__init__.py:3218 blocks/__init__.py:3311
+#: blocks/__init__.py:3765
 msgid "Anchor ID"
 msgstr "Identifiant d’ancre"
 
-#: blocks/__init__.py:2854 blocks/__init__.py:3116 blocks/__init__.py:3209
-#: blocks/__init__.py:3659
+#: blocks/__init__.py:2958 blocks/__init__.py:3220 blocks/__init__.py:3313
+#: blocks/__init__.py:3767
 msgid ""
 "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
 msgstr ""
 "Facultatif. Ajoute un attribut id permettant un lien direct (par exemple « "
 "contact » → #contact)."
 
-#: blocks/__init__.py:2889
+#: blocks/__init__.py:2993
 msgid "Sign Up (Action Network)"
 msgstr "Inscription (Action Network)"
 
-#: blocks/__init__.py:2892
+#: blocks/__init__.py:2996
 msgid ""
 "An Action Network form embedded in the page, from its public URL. Supporters"
 " sign up without leaving the site."
@@ -1131,7 +1164,7 @@ msgstr ""
 "Un formulaire Action Network intégré à la page, à partir de son URL "
 "publique. Les sympathisants s’inscrivent sans quitter le site."
 
-#: blocks/__init__.py:3059 blocks/__init__.py:3161
+#: blocks/__init__.py:3163 blocks/__init__.py:3265
 msgid ""
 "Optional short label shown as a pill above the heading (e.g. 'Sign the "
 "Petition')."
@@ -1139,7 +1172,7 @@ msgstr ""
 "Court libellé facultatif affiché sous forme de pastille au-dessus du titre "
 "(par exemple « Signez la pétition »)."
 
-#: blocks/__init__.py:3068
+#: blocks/__init__.py:3172
 msgid ""
 "Type your heading as an H2 at the top, then optional supporting copy, shown "
 "above the ActionKit form."
@@ -1147,7 +1180,7 @@ msgstr ""
 "Saisissez votre titre en H2 en haut, puis un texte d’accompagnement "
 "facultatif, affiché au-dessus du formulaire ActionKit."
 
-#: blocks/__init__.py:3077 blocks/__init__.py:3170
+#: blocks/__init__.py:3181 blocks/__init__.py:3274
 msgid ""
 "Panel fill behind the heading, copy and form. The same palette as the page "
 "hero banner, callout and section blocks."
@@ -1155,15 +1188,15 @@ msgstr ""
 "Remplissage du panneau derrière le titre, le texte et le formulaire. La même"
 " palette que la bannière du hero, l’encadré et les blocs de section."
 
-#: blocks/__init__.py:3083 blocks/__init__.py:3176
+#: blocks/__init__.py:3187 blocks/__init__.py:3280
 msgid "Side by side"
 msgstr "Côte à côte"
 
-#: blocks/__init__.py:3084 blocks/__init__.py:3177
+#: blocks/__init__.py:3188 blocks/__init__.py:3281
 msgid "Stacked vertically"
 msgstr "Empilé verticalement"
 
-#: blocks/__init__.py:3089 blocks/__init__.py:3182
+#: blocks/__init__.py:3193 blocks/__init__.py:3286
 msgid ""
 "Side by side splits copy and form into two columns (default). Stacked "
 "vertically runs image, copy and form down a single narrow column — better "
@@ -1174,11 +1207,11 @@ msgstr ""
 "une seule colonne étroite — préférable pour les formulaires longs comportant"
 " de nombreux champs."
 
-#: blocks/__init__.py:3104 blocks/__init__.py:3197
+#: blocks/__init__.py:3208 blocks/__init__.py:3301
 msgid "ActionKit Page Shortname"
 msgstr "Nom court de la page ActionKit"
 
-#: blocks/__init__.py:3106 blocks/__init__.py:3199
+#: blocks/__init__.py:3210 blocks/__init__.py:3303
 msgid ""
 "The ActionKit page's short name (e.g. 'join'). Its signup form is fetched "
 "from ActionKit and rendered automatically — whatever fields that page is "
@@ -1189,7 +1222,7 @@ msgstr ""
 " champs configurés sur cette page apparaîtront tels quels, sans autre "
 "réglage ici."
 
-#: blocks/__init__.py:3123 blocks/__init__.py:3216
+#: blocks/__init__.py:3227 blocks/__init__.py:3320
 msgid ""
 "Optional. When set, a successful signup shows this message in place of the "
 "form instead of redirecting to ActionKit's own thank-you page. ActionKit's "
@@ -1208,42 +1241,42 @@ msgstr ""
 " déjà) — ce qui ne passe pas par la vérification recaptcha d’ActionKit, le "
 "même compromis que ce transfert accepte déjà ailleurs."
 
-#: blocks/__init__.py:3137 blocks/__init__.py:3230
+#: blocks/__init__.py:3241 blocks/__init__.py:3334
 msgid "Sign Up (ActionKit)"
 msgstr "Inscription (ActionKit)"
 
-#: blocks/__init__.py:3272
+#: blocks/__init__.py:3376
 msgid "Announcement bar"
 msgstr "Bandeau d’annonce"
 
-#: blocks/__init__.py:3307 blocks/__init__.py:3341
+#: blocks/__init__.py:3411 blocks/__init__.py:3445
 msgid "Call to action"
 msgstr "Appel à l’action"
 
-#: blocks/__init__.py:3367
+#: blocks/__init__.py:3471
 msgid "Headline"
 msgstr "Titre principal"
 
-#: blocks/__init__.py:3368
+#: blocks/__init__.py:3472
 msgid "The hero heading text."
 msgstr "Le texte du titre du hero."
 
-#: blocks/__init__.py:3374
+#: blocks/__init__.py:3478
 msgid "Optional supporting copy below the headline."
 msgstr "Texte d’accompagnement facultatif sous le titre."
 
-#: blocks/__init__.py:3383
+#: blocks/__init__.py:3487
 msgid ""
 "Optional caption overlaid at the bottom of the image, e.g. a photo credit."
 msgstr ""
 "Légende facultative superposée en bas de l’image, par exemple un crédit "
 "photo."
 
-#: blocks/__init__.py:3416 models.py:328 models.py:357
+#: blocks/__init__.py:3523 models.py:346 models.py:379 models.py:773
 msgid "Hero"
 msgstr "Hero"
 
-#: blocks/__init__.py:3419
+#: blocks/__init__.py:3526
 msgid ""
 "A full-width banner with a headline, supporting copy and a coloured "
 "background -- for opening a section mid-page. A page's own hero is set on "
@@ -1253,7 +1286,7 @@ msgstr ""
 "fond coloré — pour ouvrir une section en milieu de page. Le hero propre à "
 "une page se règle sur la page elle-même, pas avec ce bloc."
 
-#: blocks/__init__.py:3637
+#: blocks/__init__.py:3745
 msgid ""
 "Full-bleed fill behind the whole section. The dark colors invert the text "
 "inside it."
@@ -1261,15 +1294,15 @@ msgstr ""
 "Remplissage pleine largeur derrière toute la section. Les couleurs foncées "
 "inversent le texte qu’elle contient."
 
-#: blocks/__init__.py:3644
+#: blocks/__init__.py:3752
 msgid "Padding"
 msgstr "Marge intérieure"
 
-#: blocks/__init__.py:3649
+#: blocks/__init__.py:3757
 msgid "Content width"
 msgstr "Largeur du contenu"
 
-#: blocks/__init__.py:3651
+#: blocks/__init__.py:3759
 msgid ""
 "How wide the section's content column is. Narrow suits a text + accordion "
 "stack; wide suits a full-bleed video or image."
@@ -1278,15 +1311,15 @@ msgstr ""
 "empilement texte + accordéon ; large convient à une vidéo ou une image "
 "pleine largeur."
 
-#: blocks/__init__.py:3665
+#: blocks/__init__.py:3773
 msgid "Section"
 msgstr "Section"
 
-#: blocks/__init__.py:3704 blocks/__init__.py:3711
+#: blocks/__init__.py:3812 blocks/__init__.py:3819
 msgid "Year"
 msgstr "Année"
 
-#: blocks/__init__.py:3705
+#: blocks/__init__.py:3813
 msgid ""
 "E.g. '2019'. Used to build the year-jump navigation and this year's anchor "
 "link."
@@ -1294,11 +1327,11 @@ msgstr ""
 "Par exemple « 2019 ». Sert à construire la navigation par année et le lien "
 "d’ancre de cette année."
 
-#: blocks/__init__.py:3767
+#: blocks/__init__.py:3875
 msgid "Years"
 msgstr "Années"
 
-#: blocks/__init__.py:3779
+#: blocks/__init__.py:3887
 msgid "Timeline"
 msgstr "Chronologie"
 
@@ -1322,7 +1355,7 @@ msgstr ""
 "Attribution au photographe ou à la source (par exemple « Photo : Jeanne "
 "Dupont »)."
 
-#: images.py:39 models.py:478
+#: images.py:39 models.py:500
 msgid "image"
 msgstr "image"
 
@@ -1453,7 +1486,7 @@ msgstr ""
 "variable d’environnement WTRX_ACTIONKIT_API_PASSWORD, qui remplace cette "
 "valeur afin que le secret ne soit pas stocké en base de données."
 
-#: integrations/actionkit.py:311 integrations/actionkit.py:317 models.py:1445
+#: integrations/actionkit.py:311 integrations/actionkit.py:317 models.py:1503
 msgid "ActionKit"
 msgstr "ActionKit"
 
@@ -1732,7 +1765,7 @@ msgstr "SEO"
 msgid "hero headline"
 msgstr "titre du hero"
 
-#: models.py:248 models.py:462
+#: models.py:248 models.py:484
 msgid ""
 "Optional. Overrides the page title as the displayed heading. Leave blank to "
 "use the page title."
@@ -1744,7 +1777,7 @@ msgstr ""
 msgid "hero copy"
 msgstr "texte du hero"
 
-#: models.py:256 models.py:470
+#: models.py:256 models.py:492
 msgid "Optional subtext displayed below the headline."
 msgstr "Texte facultatif affiché sous le titre."
 
@@ -1778,10 +1811,26 @@ msgstr ""
 "l’image du hero ci-dessus est utilisée."
 
 #: models.py:288
+#| msgid "hero headline"
+msgid "hero pre-header"
+msgstr "titre du hero"
+
+#: models.py:290
+#| msgid ""
+#| "Optional short label shown as a pill above the heading (e.g. 'Sign the "
+#| "Petition')."
+msgid ""
+"Optional short line shown above the headline, e.g. \"Welcome to 350 "
+"Canada\"."
+msgstr ""
+"Court libellé facultatif affiché sous forme de pastille au-dessus du titre "
+"(par exemple « Signez la pétition »)."
+
+#: models.py:297
 msgid "hero image caption"
 msgstr "légende de l’image du hero"
 
-#: models.py:290
+#: models.py:299
 msgid ""
 "Optional caption overlaid at the bottom of the hero image or video, e.g. a "
 "photo credit."
@@ -1789,11 +1838,11 @@ msgstr ""
 "Légende facultative superposée en bas de l’image ou de la vidéo du hero, par"
 " exemple un crédit photo."
 
-#: models.py:298
+#: models.py:307
 msgid "hero banner color"
 msgstr "couleur de la bannière du hero"
 
-#: models.py:300
+#: models.py:309
 msgid ""
 "Background color for the compact hero banner. Only affects pages whose hero "
 "renders as a banner (i.e. every page except the homepage)."
@@ -1802,49 +1851,49 @@ msgstr ""
 "dont le hero s’affiche en bannière (c’est-à-dire toutes les pages sauf la "
 "page d’accueil)."
 
-#: models.py:307 models.py:706 models.py:777 models.py:1180
+#: models.py:316 models.py:732 models.py:835 models.py:1238
 msgid "hero call to action"
 msgstr "appel à l’action du hero"
 
-#: models.py:308
+#: models.py:317
 msgid "Optional button or signup bar shown below the hero copy. At most one."
 msgstr ""
 "Bouton ou barre d’inscription facultatif affiché sous le texte du hero. Un "
 "seul au maximum."
 
-#: models.py:428
+#: models.py:450
 msgid "published at"
 msgstr "publié le"
 
-#: models.py:429
+#: models.py:451
 msgid "The date shown on this page and used to order listings."
 msgstr "La date affichée sur cette page et utilisée pour trier les listes."
 
-#: models.py:460
+#: models.py:482
 msgid "headline"
 msgstr "titre"
 
-#: models.py:469
+#: models.py:491
 msgid "copy"
 msgstr "texte"
 
-#: models.py:484
+#: models.py:506
 msgid "banner color"
 msgstr "couleur de la bannière"
 
-#: models.py:495
+#: models.py:517
 msgid "Header"
 msgstr "En-tête"
 
-#: models.py:546
+#: models.py:572
 msgid "name"
 msgstr "nom"
 
-#: models.py:550
+#: models.py:576
 msgid "slug"
 msgstr "slug"
 
-#: models.py:551
+#: models.py:577
 msgid ""
 "Used in the blog's category filter URL. Auto-filled from the name if left "
 "blank."
@@ -1852,27 +1901,27 @@ msgstr ""
 "Utilisé dans l’URL de filtre par catégorie du blog. Rempli automatiquement à"
 " partir du nom s’il est laissé vide."
 
-#: models.py:561
+#: models.py:587
 msgid "blog category"
 msgstr "catégorie de blog"
 
-#: models.py:562
+#: models.py:588
 msgid "blog categories"
 msgstr "catégories de blog"
 
-#: models.py:633 models.py:714 models.py:793 models.py:980
+#: models.py:659 models.py:749 models.py:851 models.py:1038
 msgid "body"
 msgstr "corps"
 
-#: models.py:634 models.py:715 models.py:981
+#: models.py:660 models.py:750 models.py:1039
 msgid "Page body content."
 msgstr "Contenu du corps de la page."
 
-#: models.py:639
+#: models.py:665
 msgid "transparent header"
 msgstr "en-tête transparent"
 
-#: models.py:641
+#: models.py:667
 msgid ""
 "Make the header transparent so the hero image extends behind it. "
 "Automatically uses the dark logo variant when enabled."
@@ -1880,75 +1929,87 @@ msgstr ""
 "Rend l’en-tête transparent afin que l’image du hero se prolonge derrière "
 "lui. Utilise automatiquement la variante de logo foncé lorsqu’il est activé."
 
-#: models.py:653
+#: models.py:679
 msgid "Header options"
 msgstr "Options d’en-tête"
 
-#: models.py:664 models.py:733 models.py:813 models.py:1005 models.py:1244
-#: models.py:1455
+#: models.py:690 models.py:785 models.py:871 models.py:1063 models.py:1302
+#: models.py:1513
 msgid "Promote"
 msgstr "Promotion"
 
-#: models.py:665 models.py:734 models.py:814 models.py:1006 models.py:1245
-#: models.py:1456
+#: models.py:691 models.py:786 models.py:872 models.py:1064 models.py:1303
+#: models.py:1514
 msgid "Settings"
 msgstr "Paramètres"
 
-#: models.py:679
+#: models.py:705
 msgid "home page"
 msgstr "page d’accueil"
 
-#: models.py:680
+#: models.py:706
 msgid "home pages"
 msgstr "pages d’accueil"
 
-#: models.py:707 models.py:778 models.py:1181
+#: models.py:733 models.py:836 models.py:1239
 msgid "Optional button shown below the hero copy. At most one."
 msgstr "Bouton facultatif affiché sous le texte du hero. Un seul au maximum."
 
-#: models.py:751
+#: models.py:739
+msgid "hide hero"
+msgstr "masquer le hero"
+
+#: models.py:741
+msgid ""
+"Hide the hero banner entirely and start the page at its body. The page title"
+" is still announced to screen readers."
+msgstr ""
+"Masquer entièrement la bannière du hero et commencer la page par son corps. "
+"Le titre de la page reste annoncé aux lecteurs d’écran."
+
+#: models.py:803
 msgid "content page"
 msgstr "page de contenu"
 
-#: models.py:752
+#: models.py:804
 msgid "content pages"
 msgstr "pages de contenu"
 
-#: models.py:785 models.py:1407
+#: models.py:843 models.py:1465
 msgid "intro"
 msgstr "introduction"
 
-#: models.py:787
+#: models.py:845
 msgid "Optional introductory text displayed above the child page listing."
 msgstr ""
 "Texte d’introduction facultatif affiché au-dessus de la liste des pages "
 "enfants."
 
-#: models.py:794
+#: models.py:852
 msgid "Optional body content displayed below the child page listing."
 msgstr "Contenu facultatif affiché sous la liste des pages enfants."
 
-#: models.py:831
+#: models.py:889
 msgid "index page"
 msgstr "page d’index"
 
-#: models.py:832
+#: models.py:890
 msgid "index pages"
 msgstr "pages d’index"
 
-#: models.py:940
+#: models.py:998
 msgid "author"
 msgstr "auteur"
 
-#: models.py:941
+#: models.py:999
 msgid "Defaults to whoever creates this post. Editable."
 msgstr "Par défaut, la personne qui crée cette publication. Modifiable."
 
-#: models.py:946
+#: models.py:1004
 msgid "author name"
 msgstr "nom de l’auteur"
 
-#: models.py:948
+#: models.py:1006
 msgid ""
 "Byline for a guest writer or imported post who doesn't have a site account. "
 "Ignored if Author (above) is set."
@@ -1956,11 +2017,11 @@ msgstr ""
 "Signature pour une personne invitée ou une publication importée qui n’a pas "
 "de compte sur le site. Ignoré si le champ Auteur (ci-dessus) est renseigné."
 
-#: models.py:955
+#: models.py:1013
 msgid "author title"
 msgstr "fonction de l’auteur"
 
-#: models.py:957
+#: models.py:1015
 msgid ""
 "Optional role/affiliation shown next to Author name, e.g. \"Senior "
 "Campaigner at Oil Change International\"."
@@ -1968,15 +2029,15 @@ msgstr ""
 "Rôle ou affiliation facultatif affiché à côté du nom de l’auteur, par "
 "exemple « Chargée de campagne senior à Oil Change International »."
 
-#: models.py:965
+#: models.py:1023
 msgid "categories"
 msgstr "catégories"
 
-#: models.py:969
+#: models.py:1027
 msgid "hide from blogroll"
 msgstr "masquer de la liste du blog"
 
-#: models.py:971
+#: models.py:1029
 msgid ""
 "Exclude this post from the Blogs page listing and from any \"latest posts\" "
 "cards elsewhere on the site (e.g. Page Cards on the home page). The post is "
@@ -1987,29 +2048,29 @@ msgstr ""
 "cartes de pages sur la page d’accueil). La publication reste accessible "
 "directement et apparaît toujours dans la recherche."
 
-#: models.py:1014
+#: models.py:1072
 msgid "post"
 msgstr "publication"
 
-#: models.py:1015 models.py:1139
+#: models.py:1073 models.py:1197
 msgid "posts"
 msgstr "publications"
 
-#: models.py:1140
+#: models.py:1198
 #, python-format
 msgid "Related %(label)s"
 msgstr "%(label)s liés"
 
-#: models.py:1141
+#: models.py:1199
 #, python-format
 msgid "Read more %(label)s"
 msgstr "Lire plus de %(label)s"
 
-#: models.py:1187
+#: models.py:1245
 msgid "related posts intro"
 msgstr "introduction des publications liées"
 
-#: models.py:1189
+#: models.py:1247
 msgid ""
 "Supporting copy under the \"Related …\" heading at the bottom of each post "
 "under this page. Falls back to this page's header copy when blank."
@@ -2017,11 +2078,11 @@ msgstr ""
 "Texte d’accompagnement sous le titre « … liés » en bas de chaque publication"
 " sous cette page. À défaut, le texte d’en-tête de cette page est utilisé."
 
-#: models.py:1200
+#: models.py:1258
 msgid "default card image"
 msgstr "image de carte par défaut"
 
-#: models.py:1202
+#: models.py:1260
 msgid ""
 "Shown for any post under this page that has no image of its own (no header "
 "image, and none found in its body content) wherever it's shown as a card — "
@@ -2038,11 +2099,11 @@ msgstr ""
 "vide. Utile pour une page Communiqués de presse, où un communiqué n’a "
 "souvent pas de photo. Laissez vide pour ne pas avoir d’image de repli."
 
-#: models.py:1217
+#: models.py:1275
 msgid "default hero image"
 msgstr "image de hero par défaut"
 
-#: models.py:1219
+#: models.py:1277
 msgid ""
 "Shown as the header image for any post under this page that has no image of "
 "its own, instead of Default card image (above) — for when the two should "
@@ -2057,27 +2118,27 @@ msgstr ""
 "l’image de carte par défaut est utilisée. Laissez les deux vides pour ne pas"
 " avoir d’image de repli."
 
-#: models.py:1257 models.py:1258
+#: models.py:1315 models.py:1316
 msgid "Blogs"
 msgstr "Blogs"
 
-#: models.py:1408
+#: models.py:1466
 msgid "Optional introductory text displayed above the form."
 msgstr "Texte d’introduction facultatif affiché au-dessus du formulaire."
 
-#: models.py:1413
+#: models.py:1471
 msgid "thank you text"
 msgstr "texte de remerciement"
 
-#: models.py:1414
+#: models.py:1472
 msgid "Text displayed after a successful form submission."
 msgstr "Texte affiché après l’envoi réussi du formulaire."
 
-#: models.py:1419
+#: models.py:1477
 msgid "ActionKit page name"
 msgstr "nom de la page ActionKit"
 
-#: models.py:1421
+#: models.py:1479
 msgid ""
 "The ActionKit page short name this form submits to. Only used when the "
 "ActionKit integration (Settings → Integrations) is enabled. Leave blank to "
@@ -2088,19 +2149,19 @@ msgstr ""
 "Intégrations) est activée. Laissez vide pour désactiver le transfert vers "
 "ActionKit pour ce formulaire."
 
-#: models.py:1433
+#: models.py:1491
 msgid "Form fields"
 msgstr "Champs du formulaire"
 
-#: models.py:1441
+#: models.py:1499
 msgid "Email notifications"
 msgstr "Notifications par e-mail"
 
-#: models.py:1468
+#: models.py:1526
 msgid "form page"
 msgstr "page de formulaire"
 
-#: models.py:1469
+#: models.py:1527
 msgid "form pages"
 msgstr "pages de formulaire"
 

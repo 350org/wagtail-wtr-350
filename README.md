@@ -428,10 +428,20 @@ Root
 └── France (fr)    ->  example.org/france/
 ```
 
-The prefix is the language code by default (`/es/`), or the segment
-`WTRX_LANGUAGE_URL_PREFIXES` maps that language to — which is how the country
-sites keep the URLs they already had. A mapped language serves only at its
-prefix, so there is one canonical URL per tree.
+There are two kinds of locale, and which one a page uses decides its URL:
+
+| Kind | Example | Serves at | For |
+|---|---|---|---|
+| Country variant | `pt-br`, `fr-fr` | `/brasil/`, `/france/` | A country site: its own content and navigation |
+| Plain language code | `es`, `pt`, `fr` | `/es/about/` | Translating an individual global page |
+
+A country variant's URL comes from `WTRX_LANGUAGE_URL_PREFIXES`, which is how
+the country sites keep the URLs they already had; a plain code serves under the
+code itself. Keeping the two apart is what stops a Portuguese translation of a
+global page landing inside the Brazilian site. A country variant inherits its
+base language's catalogue (`pt-br` reads `locale/pt/`), so there is no extra
+translation work. A mapped language serves only at its prefix, so there is one
+canonical URL per tree.
 
 A translated page is a real, separately editable page linked to its source, so
 it can have its own slug (`/about/` -> `/pt/sobre-nos/`) and can hold pages that

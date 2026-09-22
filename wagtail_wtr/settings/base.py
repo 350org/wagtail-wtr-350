@@ -136,25 +136,39 @@ USE_TZ = True
 # they match the country sites 350.org already publishes: /fr/, /pt/, /de/,
 # /id/. Adding a language here is a deploy; creating its Locale row is not
 # (Settings > Locales, or `manage.py bootstrap_locales`).
+# Two kinds of language here, and the distinction is the whole scheme:
+#
+#   - A country variant (pt-br, fr-fr) is a country site: its own content, its
+#     own navigation, served under its own name (/brasil/, /france/).
+#   - A plain code (pt, fr, es) is for translating an individual global page,
+#     served under the code (/es/about/).
+#
+# Keeping them apart is what stops a Portuguese translation of a global page
+# landing inside the Brazilian site. A country variant inherits its base
+# language's catalogue (pt-br reads locale/pt/), so the split costs no extra
+# translation work.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
-    ("pt", _("Portuguese")),
     ("es", _("Spanish")),
+    ("pt", _("Portuguese")),
+    ("pt-br", _("Brazilian Portuguese")),
     ("fr", _("French")),
+    ("fr-fr", _("French (France)")),
     ("de", _("German")),
+    ("de-de", _("German (Germany)")),
     ("id", _("Indonesian")),
+    ("id-id", _("Indonesian (Indonesia)")),
 ]
 
-# The path segment each language serves under, where it should not be the
-# language code. These are the country sites' existing URLs, kept as-is rather
-# than moved to /pt/, /fr/ and redirected. A language with no entry here serves
-# under its own code (Spanish at /es/), which suits a language used for
-# occasional translations rather than a whole site. See wtrx/i18n.py.
+# The path segment each country site serves under. These are the URLs those
+# sites already have, kept as-is rather than moved to /pt-br/, /fr-fr/ and
+# redirected. A language with no entry serves under its own code, which is
+# what the plain codes above are for (/es/about/). See wtrx/i18n.py.
 WTRX_LANGUAGE_URL_PREFIXES = {
-    "pt": "brasil",
-    "fr": "france",
-    "id": "indonesia",
-    "de": "germany",
+    "pt-br": "brasil",
+    "fr-fr": "france",
+    "id-id": "indonesia",
+    "de-de": "germany",
 }
 
 # Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx

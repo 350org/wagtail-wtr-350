@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-21 21:06+0000\n"
+"POT-Creation-Date: 2026-09-22 01:20+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -85,26 +85,44 @@ msgid "Used %(usage_count)s time"
 msgid_plural "Used %(usage_count)s times"
 msgstr[0] "Digunakan %(usage_count)s kali"
 
-#: wagtail_wtr/settings/base.py:140
+#: wagtail_wtr/settings/base.py:151
 msgid "English"
 msgstr "Inggris"
 
-#: wagtail_wtr/settings/base.py:141
-msgid "Portuguese"
-msgstr "Portugis"
-
-#: wagtail_wtr/settings/base.py:142
+#: wagtail_wtr/settings/base.py:152
 msgid "Spanish"
 msgstr "Spanyol"
 
-#: wagtail_wtr/settings/base.py:143
+#: wagtail_wtr/settings/base.py:153
+msgid "Portuguese"
+msgstr "Portugis"
+
+#: wagtail_wtr/settings/base.py:154
+#| msgid "Portuguese"
+msgid "Brazilian Portuguese"
+msgstr "Portugis Brasil"
+
+#: wagtail_wtr/settings/base.py:155
 msgid "French"
 msgstr "Prancis"
 
-#: wagtail_wtr/settings/base.py:144
+#: wagtail_wtr/settings/base.py:156
+msgid "French (France)"
+msgstr "Prancis (Prancis)"
+
+#: wagtail_wtr/settings/base.py:157
 msgid "German"
 msgstr "Jerman"
 
-#: wagtail_wtr/settings/base.py:145
+#: wagtail_wtr/settings/base.py:158
+msgid "German (Germany)"
+msgstr "Jerman (Jerman)"
+
+#: wagtail_wtr/settings/base.py:159
 msgid "Indonesian"
 msgstr "Indonesia"
+
+#: wagtail_wtr/settings/base.py:160
+#| msgid "Indonesian"
+msgid "Indonesian (Indonesia)"
+msgstr "Indonesia (Indonesia)"
