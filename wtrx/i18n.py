@@ -25,9 +25,11 @@ Two pieces have to agree on the mapping, which is why both live here:
   to the Accept-Language header -- serving the French tree in English, or
   404ing it outright.
 
-A language with a mapped prefix is reachable **only** at that prefix: `/fr/`
+A language with a mapped prefix is reachable **only** at that prefix: `/fr-fr/`
 does not resolve, so each tree has exactly one canonical URL and no competing
-duplicate for search engines to index.
+duplicate for search engines to index. A prefix whose language has no `Locale`
+row does not resolve either, so a mapping can be added here before the locale
+is created without exposing anything.
 
 `LocalePrefixPattern` is not part of Django's public API. `test_i18n.py`
 asserts both directions (resolving and reversing) so a Django upgrade that
@@ -72,12 +74,30 @@ def language_from_url_prefix(path):
     stripped = path.lstrip("/")
     if not stripped:
         return None
+
+    candidate = None
     for code, prefix in sorted(
         language_url_prefixes().items(), key=lambda item: -len(item[1])
     ):
         if stripped == prefix or stripped.startswith(prefix + "/"):
-            return code
-    return None
+            candidate = code
+            break
+    if candidate is None:
+        return None
+
+    # A language on offer is not a language in use. Without this, /japan/
+    # would resolve for `ja` before anyone has created that Locale, and
+    # `Page.localized` would fall back to the English home -- serving the
+    # English site at a second URL. Unrecognised here, the path is treated as
+    # an ordinary English one and 404s, which is what it should do.
+    #
+    # One query, and only for a path that already matched a prefix: an English
+    # URL never reaches it.
+    from wagtail.models import Locale
+
+    if not Locale.objects.filter(language_code=candidate).exists():
+        return None
+    return candidate
 
 
 class NamedLocalePrefixPattern(LocalePrefixPattern):

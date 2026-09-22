@@ -162,6 +162,7 @@ USE_TZ = True
 # `fr` are not offered languages.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
+    ("en-ca", _("Canadian English")),
     # Spanish, Portuguese and French each have more than one home, so the plain
     # code stays free for translations and the country site takes a variant.
     ("es", _("Spanish")),
@@ -194,6 +195,9 @@ WTRX_LANGUAGE_URL_PREFIXES = {
     # A prefix may be more than one segment: Canadian French belongs inside the
     # Canadian site rather than under /france/.
     "fr-ca": "canada/fr",
+    # Offered ahead of the conversion: until en-ca has a Locale row, /canada/
+    # stays an ordinary English page. See wtrx/i18n.py.
+    "en-ca": "canada",
 }
 
 # Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx
