@@ -47,6 +47,15 @@ INSTALLED_APPS = [
     "wagtail.images",
     "wagtail.search",
     "wagtail.admin",
+    # Wagtail's own Locale admin, not wagtail_localize.locales. That app is a
+    # fork of this one whose only addition is the "Synchronise content from
+    # another locale" panel, which mirrors one locale's whole tree into another
+    # as alias pages. This project's language trees are independent sites, so
+    # enabling it for one would spray the English tree into it. The fork also
+    # carries pre-rework admin templates, which render a label-less button on
+    # the locale form. LocaleSynchronization and its machinery live in
+    # wagtail_localize core, so dropping the app removes the UI for that
+    # setting and nothing else.
     "wagtail.locales",
     "wagtail",
     "wagtail_localize",
@@ -65,7 +74,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
+    "wtrx.i18n.NamedPrefixLocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -131,12 +140,85 @@ LANGUAGE_CODE = "en"
 TIME_ZONE = "UTC"
 USE_TZ = True
 
+# Each language is its own page tree under Root, and its URL follows one rule:
+#
+#   a country site        -> the country slug              /brasil, /france
+#   a country translation -> that slug, then the language   /brasil/en, /canada/fr
+#   a global language     -> its own language code          /es, /fr
+#   English (the default) -> unprefixed                     /
+#
+# A country slug serves that country's own language with no language segment of
+# its own: /brasil is Portuguese, /france is French, /canada is English. A
+# second language on the same country site is a translation of it and nests
+# underneath, so the country keeps one address and one tree per language.
+# WTRX_LANGUAGE_URL_PREFIXES below maps each code to its segment; a code with
+# no entry serves under itself, which is what the global languages rely on.
+#
+# Adding a language here is a deploy; creating its Locale row is not (Settings
+# > Locales, or `manage.py bootstrap_locales`). Every language any 350 site
+# needs is listed so it can be chosen in the admin; only a handful have a
+# Locale row, and only those exist as content. A language with no Locale does
+# not resolve at its prefix, so an entry here is inert until someone creates it.
+#
+# An English-language country site (Aotearoa, Australia, US, Pacific) needs no
+# locale at all: it is a section under the English Home with its own navigation
+# and footer overrides. Canada is the exception, because it is the one country
+# site with a second language: /canada is en-ca and /canada/fr is fr-ca.
+#
+# Codes are `language-country`, matching the segment order of the URL they
+# serve (es-fr -> /france/es). A language with a single home keeps its plain
+# code whatever its URL: German is `de` and serves at /germany/, and only needs
+# a `de-de` if Germany ever gains a second language.
+#
+# `pt` is not offered -- Portuguese has only Brazil -- but `locale/pt/` must
+# stay regardless. A country code falls back to its base language for UI
+# chrome, so pt-br reads locale/pt/ and would otherwise lose every translated
+# string. `locale/fr/` backs plain `fr`, fr-fr and fr-ca alike.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
-    # Sites add languages as needed:
-    # ('es', _('Spanish')),
-    # ('fr', _('French')),
+    ("es", _("Spanish")),
+    ("de", _("German")),
+    ("fr", _("French")),
+    ("id", _("Indonesian")),
+    ("ja", _("Japanese")),
+    ("tr", _("Turkish")),
+    ("nl", _("Dutch")),
+    ("fil", _("Filipino")),
+    # Countries
+    ("en-ca", _("English - Canada")),
+    ("fr-ca", _("French - Canada")),
+    ("pt-br", _("Portuguese - Brazil")),
+    ("en-br", _("English - Brazil")),
+    ("fr-fr", _("French - France")),
+    ("es-fr", _("Spanish - France")),
 ]
+
+# The segment each language serves under. A country site takes the country
+# slug -- the URLs these sites already publish, kept as-is rather than moved to
+# /pt-br/ and redirected -- and a translation of that site nests one level
+# under it. A code with no entry here serves under itself, which is how the
+# global languages get /es/ and /fr/. See wtrx/i18n.py; longest prefix wins, so
+# `brasil/en` is matched before `brasil` and the two stay independent.
+WTRX_LANGUAGE_URL_PREFIXES = {
+    # Country sites, each at its own slug in that country's own language.
+    "pt-br": "brasil",
+    "fr-fr": "france",
+    "en-ca": "canada",
+    "de": "germany",
+    "id": "indonesia",
+    "ja": "japan",
+    "tr": "turkiye",
+    "nl": "nederland",
+    "fil": "pilipinas",
+    # Translations of a country site, nested under that site's slug.
+    "fr-ca": "canada/fr",
+    "en-br": "brasil/en",
+    "es-fr": "france/es",
+}
+
+# Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx
+# ships its own under wtrx/locale/, which Django discovers automatically.
+LOCALE_PATHS = [os.path.join(BASE_DIR, "locale")]
 
 # Static files
 STATICFILES_FINDERS = [

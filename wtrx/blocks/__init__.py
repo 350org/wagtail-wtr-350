@@ -348,6 +348,38 @@ def _validate_at_most_one_link(cleaned, errors, extra_fields=()):
 
 
 # ---------------------------------------------------------------------------
+# Translation safety
+# ---------------------------------------------------------------------------
+
+
+class IdentifierBlock(CharBlock):
+    """
+    A CharBlock holding a machine identifier rather than prose.
+
+    An ActionKit form shortname, a Fundraise Up element ID and an in-page
+    anchor slug are all strings, but translating one breaks whatever it points
+    at: a translated `short_form_id` fetches a form that does not exist, and a
+    translated `anchor_id` silently breaks every link aimed at it.
+    wagtail-localize extracts every CharBlock as a translatable segment by
+    default, so these fields opt out through its two documented per-block hooks
+    (`segments/extract.py` and `segments/ingest.py` check for them before
+    falling back to type-based handling). The value is copied to the
+    translation untouched and never reaches a translator, human or machine.
+
+    Storage and admin form are CharBlock's -- switching a field to this changes
+    the block definition, not its data.
+    """
+
+    def get_translatable_segments(self, value):
+        """Nothing to translate: keep this field out of the segment editor."""
+        return []
+
+    def restore_translated_segments(self, value, segments):
+        """Paired with the above. Nothing is extracted, so nothing is restored."""
+        return value
+
+
+# ---------------------------------------------------------------------------
 # Content blocks
 # ---------------------------------------------------------------------------
 
@@ -910,7 +942,7 @@ class ButtonBlock(StructBlock):
         label=_("Link URL"),
         help_text=_("External link. Set only one of the three link fields."),
     )
-    anchor = CharBlock(
+    anchor = IdentifierBlock(
         required=False,
         label=_("Anchor"),
         help_text=_(
@@ -2057,7 +2089,7 @@ class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
         label=_("Link URL"),
         help_text=_("External link. Set only one of the three link fields."),
     )
-    anchor = CharBlock(
+    anchor = IdentifierBlock(
         required=False,
         label=_("Anchor"),
         help_text=_(
@@ -2594,7 +2626,7 @@ class FundraiseUpAdvancedSettingsBlock(StructBlock):
     otherwise dominate the form above the block's actual content fields.
     """
 
-    element_id_us = CharBlock(
+    element_id_us = IdentifierBlock(
         required=False,
         label=_("Form ID — United States visitors"),
         help_text=_(
@@ -2602,7 +2634,7 @@ class FundraiseUpAdvancedSettingsBlock(StructBlock):
             "blank to use the site default."
         ),
     )
-    element_id_nl = CharBlock(
+    element_id_nl = IdentifierBlock(
         required=False,
         label=_("Form ID — Netherlands visitors"),
         help_text=_(
@@ -2610,7 +2642,7 @@ class FundraiseUpAdvancedSettingsBlock(StructBlock):
             "blank to use the site default."
         ),
     )
-    element_id_ca = CharBlock(
+    element_id_ca = IdentifierBlock(
         required=False,
         label=_("Form ID — Canada visitors"),
         help_text=_(
@@ -2618,7 +2650,7 @@ class FundraiseUpAdvancedSettingsBlock(StructBlock):
             "blank to use the site default."
         ),
     )
-    element_id_gb = CharBlock(
+    element_id_gb = IdentifierBlock(
         required=False,
         label=_("Form ID — United Kingdom visitors"),
         help_text=_(
@@ -2626,7 +2658,7 @@ class FundraiseUpAdvancedSettingsBlock(StructBlock):
             "blank to use the site default."
         ),
     )
-    eu_country_codes = CharBlock(
+    eu_country_codes = IdentifierBlock(
         required=False,
         label=_("Other European country codes"),
         help_text=_(
@@ -2635,7 +2667,7 @@ class FundraiseUpAdvancedSettingsBlock(StructBlock):
             "for this block only. Leave blank to use the site-wide list."
         ),
     )
-    element_id_eu = CharBlock(
+    element_id_eu = IdentifierBlock(
         required=False,
         label=_("Form ID — all other European visitors"),
         help_text=_(
@@ -2643,7 +2675,7 @@ class FundraiseUpAdvancedSettingsBlock(StructBlock):
             "blank to use the site default."
         ),
     )
-    element_id_default = CharBlock(
+    element_id_default = IdentifierBlock(
         required=False,
         label=_("Form ID — all other visitors"),
         help_text=_(
@@ -2719,7 +2751,7 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
         label=_("Image caption"),
         help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
     )
-    designation_id = CharBlock(
+    designation_id = IdentifierBlock(
         required=False,
         label=_("Designation ID"),
         help_text=_(
@@ -2940,7 +2972,7 @@ class SignupActionNetworkBlock(StructBlock):
             "after a successful signup."
         ),
     )
-    anchor_id = CharBlock(
+    anchor_id = IdentifierBlock(
         required=False,
         label=_("Anchor ID"),
         help_text=_(
@@ -3193,7 +3225,7 @@ class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, Struct
         label=_("Image caption"),
         help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
     )
-    short_form_id = CharBlock(
+    short_form_id = IdentifierBlock(
         label=_("ActionKit Page Shortname"),
         help_text=_(
             "The ActionKit page's short name (e.g. 'join'). Its signup form "
@@ -3202,7 +3234,7 @@ class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, Struct
             "setup needed here."
         ),
     )
-    anchor_id = CharBlock(
+    anchor_id = IdentifierBlock(
         required=False,
         label=_("Anchor ID"),
         help_text=_(
@@ -3286,7 +3318,7 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
         label=_("Image caption"),
         help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
     )
-    short_form_id = CharBlock(
+    short_form_id = IdentifierBlock(
         label=_("ActionKit Page Shortname"),
         help_text=_(
             "The ActionKit page's short name (e.g. 'join'). Its signup form "
@@ -3295,7 +3327,7 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
             "setup needed here."
         ),
     )
-    anchor_id = CharBlock(
+    anchor_id = IdentifierBlock(
         required=False,
         label=_("Anchor ID"),
         help_text=_(
@@ -3749,7 +3781,7 @@ class SectionBlock(ContentPreviewMixin, StructBlock):
             "accordion stack; wide suits a full-bleed video or image."
         ),
     )
-    anchor_id = CharBlock(
+    anchor_id = IdentifierBlock(
         required=False,
         label=_("Anchor ID"),
         help_text=_(
@@ -3796,7 +3828,7 @@ class TimelineYearBlock(StructBlock):
     (AGENTS.md pitfall #46).
     """
 
-    year = CharBlock(
+    year = IdentifierBlock(
         max_length=9,
         label=_("Year"),
         help_text=_("E.g. '2019'. Used to build the year-jump navigation and this year's anchor link."),

@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import HttpResponse
@@ -8,16 +7,25 @@ from django.urls import include, path
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.contrib.sitemaps.views import sitemap
+
+from wtrx.sitemaps import AllLocalesSitemap
 from wagtail.documents import urls as wagtaildocs_urls
 
 from wtrx import views
+from wtrx.i18n import named_i18n_patterns
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
-    path("sitemap.xml", sitemap, name="sitemap"),
+    # Every language tree, not just the default one -- see wtrx/sitemaps.py.
+    path(
+        "sitemap.xml",
+        sitemap,
+        {"sitemaps": {"pages": AllLocalesSitemap}},
+        name="sitemap",
+    ),
     path("i18n/", include("django.conf.urls.i18n")),
     # Health check for zero-downtime deploys (Render, load balancers, etc.)
     path(
@@ -32,13 +40,15 @@ urlpatterns = [
     ),
 ]
 
-urlpatterns += i18n_patterns(
+urlpatterns += named_i18n_patterns(
     path("search/", views.search, name="search"),
     path("no-cms-access/", views.no_cms_access, name="no_cms_access"),
     path("", include(wagtail_urls)),
-    # English (the default language) is served at / without a language prefix.
-    # Non-default languages added by forks are still prefixed (e.g. /es/).
-    # LocaleMiddleware handles language detection; see base.py LANGUAGES setting.
+    # English (the default language) is served at / without a prefix. Every
+    # other language is prefixed, by the segment WTRX_LANGUAGE_URL_PREFIXES
+    # maps it to (/brasil/, /france/) or by its own code where it maps to
+    # nothing (/es/). See wtrx/i18n.py for why both the pattern and the
+    # middleware are ours.
     prefix_default_language=False,
 )
 

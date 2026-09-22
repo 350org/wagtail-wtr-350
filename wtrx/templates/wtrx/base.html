@@ -9,6 +9,16 @@
     {% if page.full_url or page.canonical_url %}
         <link rel="canonical" href="{{ page.canonical_url|default:page.full_url }}" />
     {% endif %}
+    {% comment %}
+    hreflang alternates for genuinely linked translations of this page. Emitted
+    only for pages that are translations of one another (Wagtail's
+    translation_key linkage), never across unrelated regional sections — see
+    the language_links docstring in wtrx_tags.
+    {% endcomment %}
+    {% page_translation_alternates as alternates %}
+    {% for alternate in alternates %}
+        <link rel="alternate" hreflang="{{ alternate.code }}" href="{{ alternate.url }}" />
+    {% endfor %}
     {% comment %}Open Graph / Twitter Card — only rendered when a page object is in context.{% endcomment %}
     {% if page %}
     {% with meta_img=page.meta_image|default:settings.wtrx.BrandingSEOSettings.default_meta_image og_title=page.seo_title|default:page.title og_desc=page.search_description|default:settings.wtrx.BrandingSEOSettings.site_description %}

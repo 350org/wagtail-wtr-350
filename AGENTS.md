@@ -327,6 +327,18 @@ ES modules, 4-space indent, semicolons required.
      — a signature-drift mismatch surfaces as `TypeError: unexpected
      keyword argument 'temperature'` from the Draftail AI toolbar actions.
 
+10. **Multilingual is one page tree per language, under Root**: `Home (en)`
+    at `/`, `Home (pt)` at `/pt/`, `Home (fr)` at `/fr/` — Wagtail's own
+    model, `WAGTAIL_I18N_ENABLED = True`, `LocaleMiddleware` and
+    `i18n_patterns` all kept. Language is the axis that changes the URL; an
+    English-language *region* (`/canada/`) is an ordinary section under the
+    English Home and has nothing to do with locales. A translated page is a
+    real page linked to its source by `translation_key`, so it can carry its
+    own slug (`/about/` → `/pt/sobre-nos/`) and a language tree can hold
+    pages that exist in that language only. See pitfall #65 for why the
+    alternative (regional subtrees under Home at `/brasil/`, flag off) was
+    rejected.
+
 ## Error Handling
 
 - Use Wagtail's built-in `clean()` validation on blocks.
@@ -1268,3 +1280,283 @@ gate.
     full-bleed block-type list — like the card families it owns a
     `max-w-[1218px]` tier that is unreachable inside the shared body
     column.
+65. **The URL prefix is the language code, and `WAGTAIL_I18N_ENABLED` has to
+    stay on.** Routing is `Page.route_for_request()` →
+    `site.root_page.localized.route(...)`: the prefix in the URL sets the
+    active language, which picks which root page (translation) serves the
+    request. `Site.get_site_root_paths()` emits one root path per translation
+    of the site root, all on the **same** Site — so languages need no extra
+    `Site` row and no extra domain. A `Site` is matched by hostname+port only,
+    never by path, which is why an extra domain is the *only* way to give a
+    region its own root URL (and the only way to give it its own
+    `BaseSiteSetting` row — branding, integrations and consent config are
+    per-Site, shared across languages).
+    An earlier design put regional sites *under* Home (`/brasil/`) with the
+    flag off. It was rejected: with the flag off, translation tooling has to
+    be rebuilt by hand, and with the flag on, `chooser.BrowseView.get()`
+    filters pages to the parent's locale, which also backs
+    `CopyForm.new_parent_page` — making "copy the English Home into the
+    Brazilian section" impossible in the admin. 350.org's live sites already
+    use `/fr/`, `/pt/`, `/de/`, `/id/`, and `/brasil` already redirects to
+    `/pt`, so the native scheme matches the public URLs.
+    Two behaviours worth knowing: `prefix_default_language=False` makes
+    `LocaleMiddleware.process_request` force `LANGUAGE_CODE` on any unprefixed
+    path, so a Portuguese browser hitting `/about/` gets **English**, with no
+    auto-redirect (the redirect branch only runs when the default language is
+    itself prefixed); and `Vary: Accept-Language` is added to unprefixed
+    (English) responses only — prefixed ones escape it, so the Cloudflare
+    cache fragments on English URLs, not `/pt/` ones.
+66. **A CharBlock holding an identifier must be an `IdentifierBlock`**
+    (`wtrx/blocks/__init__.py`). wagtail-localize extracts *every*
+    `CharBlock`/`TextBlock`/`RichTextBlock` as a translatable segment, so
+    without this an ActionKit `short_form_id`, an `anchor_id`/`anchor`, a
+    Fundraise Up `designation_id`/`element_id_*` or a `TimelineYearBlock.year`
+    is handed to a translator (or a machine) and comes back broken — a form
+    that no longer resolves, an in-page link that no longer lands. The opt-out
+    is wagtail-localize's own per-block pair, `get_translatable_segments()`
+    (`segments/extract.py`) and `restore_translated_segments()`
+    (`segments/ingest.py`), both checked before its type-based fallback.
+    Switching a field to it is a block-definition change only — same storage,
+    same admin widget, one auto-generated `AlterField` migration.
+    `slug` **is** deliberately translatable (that is what produces
+    `/pt/sobre-nos/`). `wtrx/tests/test_i18n.py` asserts the exclusions
+    against the real extractor; add a case there when adding a new
+    identifier field.
+67. **Preview renders in the editor's language unless a page overrides it.**
+    A served page gets its language from the URL prefix, but preview is
+    requested from an admin URL *outside* `i18n_patterns`, and Wagtail's
+    `Page.serve_preview()` never touches the active translation — so a
+    Portuguese page previews with English chrome. `BasePage.serve_preview()`
+    wraps `super()` in `translation.override(self.locale.language_code)` and
+    forces the `TemplateResponse` to render **inside** that block, because a
+    TemplateResponse renders lazily, after the context manager would have
+    exited.
+68. **Catalogues are built for the languages in use, not the languages on
+    offer.** `WAGTAIL_CONTENT_LANGUAGES` lists every language any 350 site
+    might need so it can be picked in the admin; most have no content and no
+    `Locale` row. `make messages` therefore derives its `--locale=` arguments
+    from the directories already under `locale/`, and a new language is added
+    explicitly (`make messages LOCALES="ja nl"`, which creates the directory
+    first). Deriving from settings instead would add ~600 empty strings per
+    offered language. Note `makemessages --all` is not the answer either: it
+    globs `locale/*` too, but would silently skip a language you just asked
+    for. Catalogues live in two places: `locale/` for `templates/` and
+    `wagtail_wtr/`, and `wtrx/locale/` for the app (the project run ignores
+    `wtrx` so each string lands in exactly one catalogue, and the app run
+    needs `wtrx/locale/` to exist first). `compilemessages` must be given
+    `--ignore=.venv`, or it walks into site-packages and recompiles every
+    installed package's catalogues. `.po` is committed, `.mo` is gitignored
+    build output compiled in the Dockerfile — which pins
+    `DJANGO_SETTINGS_MODULE=wagtail_wtr.settings.base` so the build never
+    depends on runtime secrets.
+69. **The language switcher is built and tested but deliberately not
+    rendered.** Both `{% include %}`s were removed from `header.html` (one per
+    mobile menu panel); `language_switcher.html` and the `language_links` tag
+    stay in place, so turning it back on is re-adding the include. The
+    `hreflang` alternates in `<head>` are a separate mechanism
+    (`page_translation_alternates`) and are unaffected — search engines still
+    see every translation. How it works, for when it returns:
+    **it is links, not `set_language`.** The old
+    `language_switcher.html` POSTed to Django's `set_language` with
+    `next=request.path`, which switches the *interface* language and returns
+    to the same path — in this architecture that path belongs to another
+    language's tree and usually does not exist (translated slugs differ).
+    `language_links` (`wtrx_tags.py`) resolves each language through the
+    page's real translations, falling back to that language's home page, and
+    omits a language with neither. `page_translation_alternates` is its
+    stricter sibling for `<head>`: hreflang alternates are emitted only for
+    genuinely linked pages (never the home-page fallback, which would claim
+    two unrelated pages are the same content), plus `x-default` for the
+    default language.
+
+70. **"Add locale" in the admin does nothing when every configured language
+    already has a row.** `LocaleForm` (`wagtail/locales/forms.py`) builds its
+    `language_code` choices from `WAGTAIL_CONTENT_LANGUAGES` *minus* the
+    languages that already have a `Locale`, so once `bootstrap_locales` has
+    run there is nothing left to offer: the create view still returns 200, but
+    with an empty dropdown, and the button reads as broken. Adding a language
+    is therefore always two steps in this order — settings entry (a code
+    change and a deploy), then the `Locale` row (`make locales`, or the admin).
+    Deletion is one-way in practice: `Locale` FKs are `on_delete=PROTECT`, so a
+    locale with pages cannot be removed.
+
+71. **Offering a language and creating it are separate steps, deliberately.**
+    `WAGTAIL_CONTENT_LANGUAGES` covers every 350 site (Japanese, Turkish,
+    Dutch, Filipino and so on) so any of them can be picked in the admin
+    without a deploy-and-wait. A language becomes real when
+    it gets a `Locale` row, and `manage.py bootstrap_locales` takes the
+    languages to create by name — `--all` exists but is not the default. A
+    stray row is not free: it appears in every "translate into" menu, and
+    `Locale` FKs are `on_delete=PROTECT`, so once a page uses it, it cannot be
+    removed. Run with no arguments for a report of what exists versus what is
+    available.
+    **An English-language country site needs no locale at all** — Aotearoa,
+    Australia, US and Pacific are sections under the English Home with their
+    own navigation and footer overrides. Language is the only axis that changes
+    the URL (rule #10). Canada is the one exception, offered as `en-ca` and
+    mapped to `canada`, so the section can be converted into a real locale
+    later without a further deploy. Being *offered* changes nothing on its
+    own — until `en-ca` has a `Locale` row the prefix does not resolve and
+    `/canada/` stays an ordinary English page (pitfall #75).
+
+72. **A country translation needs its own language code, because one locale
+    maps to exactly one URL prefix.** `/brasil/en` cannot be served by the
+    global `en` locale — that one already owns `/`. Brazilian English is a
+    separate code (`en-br`) with its own prefix (`brasil/en`) and its own page
+    tree. This is the single constraint the whole URL scheme falls out of, and
+    it is why a country site's second language is never "the same tree at
+    another address".
+    Codes are `language-country`, matching the segment order of the URL they
+    serve: `es-fr` → `/france/es`. Labels follow it too — `Language - Country`
+    ("Portuguese - Brazil", "Spanish - France") for an entry below the
+    `# Countries` comment in `WAGTAIL_CONTENT_LANGUAGES`, the bare language
+    name above it. Don't reach for an adjectival form ("Brazilian
+    Portuguese"): the flat pattern keeps a long admin dropdown scannable and
+    sorts a country's entries together.
+    A language with a single home keeps its plain code whatever its URL —
+    German is `de` and serves at `/germany/`, and only needs a `de-de` if
+    Germany gains a second language. Plain `fr` and `es` are the other shape:
+    global languages with no country site, serving at `/fr/` and `/es/`.
+    **`locale/pt/` must stay** even though `pt` is not an offered language: a
+    country code falls back to its base language's catalogue, so `pt-br` reads
+    `locale/pt/` and deleting it would strip the Brazilian site's chrome
+    translations. `locale/fr/` backs plain `fr`, `fr-fr` and `fr-ca` alike.
+
+73. **The URL is addressed by country, not by language code, and a country
+    translation nests under its country slug.** Django ties a tree's prefix to
+    its language code, so the French site (`fr-fr`) would serve at `/fr-fr/`
+    and there is no setting for it. `WTRX_LANGUAGE_URL_PREFIXES` maps each code
+    to a path segment instead, giving one rule:
+
+    | Kind | Prefix | Example |
+    |---|---|---|
+    | A country site | the country slug | `pt-br` → `/brasil` |
+    | A country translation | that slug, then the language | `en-br` → `/brasil/en` |
+    | A global language | its own code | `es` → `/es` |
+    | English (the default) | none | `/` |
+
+    A country slug carries **no language segment of its own** — `/brasil` is
+    Portuguese, `/canada` is English — which is exactly why a second language
+    on that site has to nest. So **multi-segment prefixes are load-bearing
+    here, not a nicety**: `brasil` and `brasil/en` are both mapped, and
+    `language_from_url_prefix()` sorts longest-first so the shorter one cannot
+    swallow every path beneath it. Reordering or shortcutting that sort silently
+    routes `/brasil/en/...` to the Portuguese tree.
+    `wtrx/i18n.py` holds both halves, and both are required: a
+    `LocalePrefixPattern` subclass (what `reverse()` writes and what the
+    resolver strips) **and** a `LocaleMiddleware` subclass (Django's
+    `get_language_from_path()` matches the first segment against language
+    codes, so `/france/` means nothing to it and the tree would serve in
+    English or 404). Subclassing rather than reimplementing is load-bearing:
+    `is_language_prefix_patterns_used()` finds i18n URLs by `isinstance`, and
+    `LocaleMiddleware` reads its answer to decide whether to force the default
+    language on an unprefixed path.
+    A mapped language is reachable **only** at its prefix — `/pt-br/` and
+    `/en-br/` both 404 — so each tree has one canonical URL. Two consequences
+    worth knowing: a mapped prefix shadows any top-level English page with the
+    same slug, and the prefix is per *language*, so a Portuguese translation of
+    a global page lands under `/brasil/` whether or not it is Brazilian.
+    `LocalePrefixPattern` is not public Django API; `test_i18n.py`
+    (`TestCountrySlugScheme`) asserts resolving and reversing in both
+    directions so an upgrade that changes it fails the suite, not the site.
+
+74. **Install `wagtail.locales`, not `wagtail_localize.locales`.** The latter
+    is a fork of the former whose only addition is a "Synchronise content from
+    another locale" panel on the locale form. That setting mirrors one
+    locale's entire tree into another as alias pages — right for the
+    parallel-tree model it was written for, actively destructive here, where
+    the language trees are independent country sites: switching it on for one
+    would spray thousands of English alias pages into it, from a screen
+    editors visit for the ordinary reason of adding a language. The fork also
+    carries pre-rework admin templates, which render a label-less button on
+    that form. `LocaleSynchronization` and its machinery live in
+    `wagtail_localize` core, so dropping the *app* removes the UI for that one
+    setting and nothing else — wagtail-localize's actual translation features
+    are unaffected. wagtail-localize's own README says to install its fork;
+    this project deliberately does not.
+75. **A mapped URL prefix whose language has no `Locale` row must not
+    resolve.** `WAGTAIL_CONTENT_LANGUAGES` offers far more languages than any
+    environment creates (pitfall #71), and every one of them gets a prefix
+    from `WTRX_LANGUAGE_URL_PREFIXES`. Without a guard, each mapped-but-
+    uncreated language answers at its prefix: the language activates, nothing
+    exists in it, `Page.localized` falls back to the source page, and the
+    English home is served at a second URL — a duplicate for crawlers, and in
+    practice a 500 once the hero reaches media the locale has none of.
+    `language_from_url_prefix()` (`wtrx/i18n.py`) therefore ends with a
+    `Locale.objects.filter(...).exists()` check and returns `None` when it
+    fails, so the path is treated as an ordinary English one and 404s. The
+    query costs nothing in the common case — it runs only for a path that has
+    already matched a prefix, so an English URL never reaches it. The useful
+    consequence is that a prefix can be **mapped ahead of its locale**:
+    `en-ca` → `canada` is configured today while `/canada/` is still an
+    ordinary English page, and it starts serving the language tree the moment
+    the locale is created. `test_i18n.py`'s `TestPrefixWithoutALocale` covers
+    both halves.
+76. **Converting an existing English section into a language tree is
+    `manage.py convert_section_to_locale`, and cannot be done in the admin.**
+    `Page.locale` is `editable=False` so no form exposes it, and
+    `Page.can_move_to()` refuses a parent whose locale differs — with a
+    carve-out for Root, which is the only reason the move half is possible.
+    Three things have to happen together: the section root moves to Root
+    level, every descendant is retagged, and the section root becomes the
+    target locale's counterpart of the **site root** — without that last step
+    the tree has no URL at all, since `Site.get_site_root_paths()` walks
+    `root_page.get_translations()` and `page.url` returns `None` for a tree it
+    does not cover. Redirects are built afterwards from URLs captured before
+    the first write, **not** by Wagtail's
+    `autocreate_redirects_on_page_move`: that runs during the move, when the
+    page is still in the old locale and sitting at Root where no site root
+    path covers it, so the "new" URL it records is `None`. A section whose
+    slug already matches its language's mapped prefix (`/brasil/` for `pt-br`)
+    keeps every URL and needs no redirects — the conversion is invisible from
+    outside. This is **not** wagtail-localize's "Translate this page", which
+    copies a page into another locale and leaves the original behind: these
+    pages *are* the country site, not a translation of one, so nothing is
+    duplicated and no `TranslationSource` is created.
+    **The dry-run report must name the mapped prefix, not the language code.**
+    It once printed `-> /{locale.language_code}/`, which for a country site is
+    never where it lands (`pt-br` serves at `/brasil/`) — an operator reading
+    that would think 2,947 URLs were about to move when none were. It now
+    resolves through `url_prefix_for_language()` and prints a `URLs:` line
+    saying whether the tree's addresses change, which is exactly when redirects
+    get created. Writes go through `Page.objects.bulk_update()`, so no
+    `post_save` fires; that is safe only because the database search backend
+    filters `locale_id`/`path`/`depth` on the live columns rather than an
+    index, and the conversion changes no indexed text. On Elasticsearch it
+    would need a reindex.
+    **Restart every worker after a conversion.** Wagtail caches the site root
+    paths for an hour in Django's cache, and nothing here configures a backend,
+    so it is `LocMemCache` — per-process. `Site.clear_site_root_paths_cache()`
+    inside the command therefore clears one process. A worker holding the old
+    copy matches none of the moved pages' `url_path`s and returns `url = None`
+    for the whole tree: empty nav links, no sitemap entries, no canonical or
+    hreflang tags, and "There is no site set up for this location" in the page
+    explorer. Nothing raises, and the pages still *serve* correctly the entire
+    time — routing uses `Site.find_for_request()`, not these paths — so the
+    only symptom is generated URLs quietly going missing. The same trap applies
+    to any code that moves pages across a site root boundary, not just this
+    command.
+77. **A language tree is a *sibling* of the site root, not a descendant — so
+    anything that walks down from the site root silently misses every country
+    site.** This is the shape of bug the multilingual migration introduces, and
+    it never raises: the code keeps working, it just quietly covers one
+    language. Two real instances, both found only by checking rather than by a
+    failing test:
+    - **`sitemap.xml`.** Wagtail's `Sitemap.items()` is
+      `site.root_page.get_descendants(inclusive=True)`, which after the
+      migration returned 7,055 English URLs and **zero** for the 2,947 pages
+      across `/brasil/`, `/france/`, `/germany/`, `/indonesia/` and
+      `/canada/`. `wtrx/sitemaps.py`'s `AllLocalesSitemap` finds the trees the
+      same way routing does — each language root is a translation of the site
+      root — and unions their subtrees.
+    - **The search view.** `Page.objects.live().search(...)` spans every
+      locale, so `/brasil/search/` returned mostly French and Indonesian
+      pages, at URLs outside the site the visitor was on. Now filtered by
+      `Locale.get_active()`, which follows the URL prefix through
+      `LocaleMiddleware` and falls back to the default locale.
+    When adding anything that enumerates "the site's pages" — a feed, an
+    export, a report, a bulk operation — enumerate the **language roots**
+    (`site.root_page.get_translations(inclusive=True)`) and union their
+    descendants, rather than descending from `site.root_page` alone. Both cases
+    have regression tests in `test_i18n.py` that fail against the stock
+    behaviour.
