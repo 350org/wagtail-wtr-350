@@ -13,6 +13,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.template import Context, Template
+from django.urls import reverse
 from django.test import Client, RequestFactory, TestCase
 from django.utils import translation
 from wagtail.blocks import CharBlock, RichTextBlock
@@ -140,20 +141,20 @@ class TestLocalisedServing(TestCase):
         self.client = Client()
 
     def test_portuguese_page_serves_under_its_language_prefix(self):
-        response = self.client.get("/pt/sobre/")
+        response = self.client.get("/brasil/sobre/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'lang="pt"')
 
     def test_english_page_keeps_unprefixed_url_and_english_lang(self):
         """Also guards against language leaking between requests in a process."""
-        self.client.get("/pt/sobre/")
+        self.client.get("/brasil/sobre/")
         response = self.client.get("/about/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'lang="en"')
 
     def test_english_page_is_not_reachable_under_a_language_prefix(self):
-        """`/pt/about/` would be an English page duplicated at a second URL."""
-        self.assertEqual(self.client.get("/pt/about/").status_code, 404)
+        """`/brasil/about/` would be an English page duplicated at a second URL."""
+        self.assertEqual(self.client.get("/brasil/about/").status_code, 404)
 
     def test_new_child_page_inherits_its_parent_language(self):
         child = ContentPage(title="Equipe", slug="equipe")
@@ -211,7 +212,7 @@ class TestLanguageLinks(TestCase):
             "{% language_links as links %}{% for l in links %}{{ l.code }}:{{ l.url }} {% endfor %}",
             self.about,
         )
-        self.assertIn("pt:/pt/sobre-links/", output)
+        self.assertIn("pt:/brasil/sobre-links/", output)
 
     def test_falls_back_to_the_language_home_when_untranslated(self):
         """A French visitor should reach the French site, not a 404."""
@@ -219,7 +220,7 @@ class TestLanguageLinks(TestCase):
             "{% language_links as links %}{% for l in links %}{{ l.code }}:{{ l.url }} {% endfor %}",
             self.about,
         )
-        self.assertIn("fr:/fr/", output)
+        self.assertIn("fr:/france/", output)
 
     def test_current_language_is_marked_and_not_linked(self):
         output = self._render(
@@ -312,7 +313,7 @@ class TestLocalizedNavigationLinks(TestCase):
 
     def test_link_resolves_to_the_translation_in_that_language(self):
         with translation.override("pt"):
-            self.assertEqual(self._url(self.translated), "/pt/sobre-nav/")
+            self.assertEqual(self._url(self.translated), "/brasil/sobre-nav/")
 
     def test_untranslated_link_falls_back_to_the_source_page(self):
         """Better a link to the English page than a dead link."""
@@ -342,7 +343,10 @@ class TestConvertSectionToLocale(TestCase):
         site.root_page = cls.home
         site.save()
 
-        cls.section = HomePage(title="Brasil", slug="brasil", locale=_english())
+        # Slug deliberately unlike pt's mapped prefix, so conversion moves URLs
+        # and redirects are needed. The real sites are the other case, covered
+        # by test_no_redirects_needed_when_the_url_does_not_change.
+        cls.section = HomePage(title="Brasil", slug="brasil-regional", locale=_english())
         cls.home.add_child(instance=cls.section)
         cls.child = ContentPage(title="Sobre", slug="sobre", locale=_english())
         cls.section.add_child(instance=cls.child)
@@ -362,8 +366,8 @@ class TestConvertSectionToLocale(TestCase):
         section = Page.objects.get(pk=self.section.pk)
         self.assertEqual(section.depth, 2)
         self.assertEqual(section.locale, self.pt)
-        self.assertEqual(section.url, "/pt/")
-        self.assertEqual(Page.objects.get(pk=self.child.pk).url, "/pt/sobre/")
+        self.assertEqual(section.url, "/brasil/")
+        self.assertEqual(Page.objects.get(pk=self.child.pk).url, "/brasil/sobre/")
 
     def test_every_descendant_is_retagged(self):
         self._convert(str(self.section.pk), "pt")
@@ -400,12 +404,12 @@ class TestConvertSectionToLocale(TestCase):
         the page is still English and at Root, where it has no URL yet.
         """
         self._convert(str(self.section.pk), "pt")
-        root_redirect = Redirect.objects.filter(old_path="/brasil").first()
+        root_redirect = Redirect.objects.filter(old_path="/brasil-regional").first()
         self.assertIsNotNone(root_redirect)
         self.assertEqual(root_redirect.redirect_page.pk, self.section.pk)
         self.assertTrue(root_redirect.is_permanent)
-        self.assertEqual(Client().get("/brasil/").status_code, 301)
-        self.assertEqual(Client().get("/brasil/sobre/").status_code, 301)
+        self.assertEqual(Client().get("/brasil-regional/").status_code, 301)
+        self.assertEqual(Client().get("/brasil-regional/sobre/").status_code, 301)
 
     def test_no_redirects_flag_skips_them(self):
         """
@@ -429,6 +433,23 @@ class TestConvertSectionToLocale(TestCase):
         self.home.add_child(instance=other)
         with self.assertRaises(CommandError):
             self._convert(str(other.pk), "pt")
+
+    def test_no_redirects_needed_when_the_url_does_not_change(self):
+        """
+        A section whose slug already matches its language's mapped prefix
+        (`/brasil/` for pt) keeps every URL it had, so conversion is invisible
+        from outside and there is nothing to redirect.
+        """
+        already_named = HomePage(title="Brasil", slug="brasil", locale=_english())
+        self.home.add_child(instance=already_named)
+        child = ContentPage(title="Nos", slug="nos", locale=_english())
+        already_named.add_child(instance=child)
+        before = Page.objects.get(pk=child.pk).url
+
+        output = self._convert(str(already_named.pk), "pt")
+
+        self.assertEqual(Page.objects.get(pk=child.pk).url, before)
+        self.assertIn("created 0 redirects", output)
 
     def test_refuses_to_convert_the_site_root(self):
         with self.assertRaises(CommandError):
@@ -460,3 +481,81 @@ class TestAliasPagesAreNotAdvertisedAsTranslations(TestCase):
             "{% for a in alts %}{{ a.code }} {% endfor %}"
         ).render(Context({"page": self.home, "request": RequestFactory().get("/")}))
         self.assertEqual(output.split(), [])
+
+
+class TestNamedLanguageUrlPrefixes(TestCase):
+    """
+    A language tree serves under the segment WTRX_LANGUAGE_URL_PREFIXES maps
+    it to (`/brasil/`, not `/pt/`), so the country sites keep the URLs they
+    already have instead of moving behind redirects. See wtrx/i18n.py.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.pt = _locale("pt")
+        cls.es = _locale("es")
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="home-prefix", locale=_english())
+        root.add_child(instance=cls.home)
+        site = Site.objects.get(is_default_site=True)
+        site.root_page = cls.home
+        site.save()
+
+        cls.english_page = ContentPage(title="About", slug="about-prefix", locale=_english())
+        cls.home.add_child(instance=cls.english_page)
+
+        cls.home_pt = cls.home.copy_for_translation(cls.pt)
+        cls.home_pt.save_revision().publish()
+        cls.pt_page = ContentPage(title="Sobre", slug="sobre-prefix", locale=cls.pt)
+        cls.home_pt.add_child(instance=cls.pt_page)
+
+        cls.home_es = cls.home.copy_for_translation(cls.es)
+        cls.home_es.save_revision().publish()
+
+    def test_mapped_language_serves_under_its_name(self):
+        response = Client().get("/brasil/sobre-prefix/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'lang="pt"')
+
+    def test_mapped_language_is_not_also_served_under_its_code(self):
+        """One canonical URL per tree — no duplicate for search engines."""
+        self.assertEqual(Client().get("/pt/sobre-prefix/").status_code, 404)
+
+    def test_unmapped_language_keeps_its_code(self):
+        """A language used for occasional translations needs no named prefix."""
+        self.assertEqual(Page.objects.get(pk=self.home_es.pk).url, "/es/")
+
+    def test_default_language_stays_unprefixed(self):
+        self.assertEqual(Page.objects.get(pk=self.english_page.pk).url, "/about-prefix/")
+        self.assertContains(Client().get("/about-prefix/"), 'lang="en"')
+
+    def test_page_urls_are_generated_with_the_mapped_prefix(self):
+        self.assertEqual(Page.objects.get(pk=self.pt_page.pk).url, "/brasil/sobre-prefix/")
+
+    def test_reverse_uses_the_mapped_prefix(self):
+        """
+        The canary for `LocalePrefixPattern`, which is not public Django API:
+        if an upgrade changes how the prefix is built, this fails here rather
+        than silently on the site.
+        """
+        with translation.override("pt"):
+            self.assertEqual(reverse("search"), "/brasil/search/")
+        with translation.override("es"):
+            self.assertEqual(reverse("search"), "/es/search/")
+        with translation.override("en"):
+            self.assertEqual(reverse("search"), "/search/")
+
+    def test_prefixed_responses_do_not_vary_on_accept_language(self):
+        """
+        A prefixed URL names its own language, so it stays cacheable per-URL.
+        Unprefixed English still varies, as Django does by default.
+        """
+        self.assertNotIn(
+            "Accept-Language", Client().get("/brasil/sobre-prefix/").get("Vary", "")
+        )
+        self.assertIn("Accept-Language", Client().get("/about-prefix/").get("Vary", ""))
+
+    def test_content_language_header_matches_the_prefix(self):
+        self.assertEqual(
+            Client().get("/brasil/sobre-prefix/")["Content-Language"], "pt"
+        )

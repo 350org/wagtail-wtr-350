@@ -423,10 +423,15 @@ English (the default) keeps unprefixed URLs:
 
 ```
 Root
-├── Home (en)   ->  example.org/
-├── Home (pt)   ->  example.org/pt/
-└── Home (fr)   ->  example.org/fr/
+├── Home (en)      ->  example.org/
+├── Brasil (pt)    ->  example.org/brasil/
+└── France (fr)    ->  example.org/france/
 ```
+
+The prefix is the language code by default (`/es/`), or the segment
+`WTRX_LANGUAGE_URL_PREFIXES` maps that language to — which is how the country
+sites keep the URLs they already had. A mapped language serves only at its
+prefix, so there is one canonical URL per tree.
 
 A translated page is a real, separately editable page linked to its source, so
 it can have its own slug (`/about/` -> `/pt/sobre-nos/`) and can hold pages that

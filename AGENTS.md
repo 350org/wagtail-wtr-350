@@ -1367,3 +1367,27 @@ gate.
     change and a deploy), then the `Locale` row (`make locales`, or the admin).
     Deletion is one-way in practice: `Locale` FKs are `on_delete=PROTECT`, so a
     locale with pages cannot be removed.
+
+71. **A language tree's URL prefix is mapped, not its language code.**
+    Django ties the prefix to the code, so French would serve at `/fr/` and
+    there is no setting for it. `WTRX_LANGUAGE_URL_PREFIXES` maps a code to a
+    segment instead (`fr` → `france`, `pt` → `brasil`), which is what lets the
+    country sites keep the URLs they already have rather than moving to `/fr/`
+    behind redirects. A language with no entry keeps its code (`/es/`), which
+    suits one used for occasional translations rather than a whole site.
+    `wtrx/i18n.py` holds both halves, and both are required: a
+    `LocalePrefixPattern` subclass (what `reverse()` writes and what the
+    resolver strips) **and** a `LocaleMiddleware` subclass (Django's
+    `get_language_from_path()` matches the first segment against language
+    codes, so `/france/` means nothing to it and the tree would serve in
+    English or 404). Subclassing rather than reimplementing is load-bearing:
+    `is_language_prefix_patterns_used()` finds i18n URLs by `isinstance`, and
+    `LocaleMiddleware` reads its answer to decide whether to force the default
+    language on an unprefixed path.
+    A mapped language is reachable **only** at its prefix — `/pt/` 404s — so
+    each tree has one canonical URL. Two consequences worth knowing: a mapped
+    prefix shadows any top-level English page with the same slug, and the
+    prefix is per *language*, so a Portuguese translation of a global page
+    lands under `/brasil/` whether or not it is Brazilian. `LocalePrefixPattern`
+    is not public Django API; `test_i18n.py` asserts resolving and reversing in
+    both directions so an upgrade that changes it fails the suite, not the site.

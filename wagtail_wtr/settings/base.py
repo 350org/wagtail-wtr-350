@@ -65,7 +65,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
+    "wtrx.i18n.NamedPrefixLocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -144,6 +144,18 @@ WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("de", _("German")),
     ("id", _("Indonesian")),
 ]
+
+# The path segment each language serves under, where it should not be the
+# language code. These are the country sites' existing URLs, kept as-is rather
+# than moved to /pt/, /fr/ and redirected. A language with no entry here serves
+# under its own code (Spanish at /es/), which suits a language used for
+# occasional translations rather than a whole site. See wtrx/i18n.py.
+WTRX_LANGUAGE_URL_PREFIXES = {
+    "pt": "brasil",
+    "fr": "france",
+    "id": "indonesia",
+    "de": "germany",
+}
 
 # Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx
 # ships its own under wtrx/locale/, which Django discovers automatically.

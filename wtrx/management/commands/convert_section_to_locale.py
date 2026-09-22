@@ -24,13 +24,16 @@ another locale and leaves the original in place, which is right for translating
 site, not a translation of anything. Nothing is duplicated and no
 TranslationSource is created.
 
-URLs change from `/brasil/<slug>/` to `/pt/<slug>/`, and this creates a
-permanent redirect per page so existing links and search results keep working.
-Wagtail's own `autocreate_redirects_on_page_move` cannot do it here: it runs
-during the move, at which point the page is still in the old locale and sitting
-at Root, where no site root path covers it -- its "new" URL is None and nothing
-usable gets recorded. The redirects are therefore built afterwards, from URLs
-captured before the first write.
+Whether any URL changes depends on `WTRX_LANGUAGE_URL_PREFIXES`: a section
+whose slug already matches its language's mapped prefix (`/brasil/` for pt)
+keeps every URL it had and needs no redirects at all -- the conversion is
+invisible from outside. Where a URL does move, a permanent redirect is created
+per page. Wagtail's own `autocreate_redirects_on_page_move` cannot do that
+here: it runs during the move, at which point the page is still in the old
+locale and sitting at Root, where no site root path covers it -- its "new" URL
+is None and nothing usable gets recorded. The redirects are therefore built
+afterwards, from URLs captured before the first write, and skipped for any page
+whose URL is unchanged.
 """
 
 import uuid
