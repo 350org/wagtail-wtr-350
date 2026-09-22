@@ -627,7 +627,7 @@ curl -s https://350.org/sitemap.xml | grep -c '<loc>'
 curl -s https://350.org/sitemap.xml | grep -c '<loc>[^<]*/brasil/'
 
 # Search must not leak other languages into a country site.
-curl -s 'https://350.org/brasil/search/?query=clima' | grep -c '/france/'   # 1 (the language switcher), not more
+curl -s 'https://350.org/brasil/search/?query=clima' | grep -c '/france/'   # 0
 ```
 
 Things the rehearsal confirmed you do **not** need to do:

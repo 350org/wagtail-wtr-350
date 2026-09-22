@@ -1579,7 +1579,10 @@ root URL and its own per-Site settings rows.)
   the active translation, so `BasePage.serve_preview()` wraps it in
   `translation.override()` and forces the `TemplateResponse` to render inside
   that block (it renders lazily otherwise).
-- [x] **Language switcher is links, not `set_language`** — `language_links`
+- [x] **Language switcher built, then deliberately left unrendered** — both
+  includes removed from `header.html`; the template and tag stay, so it is one
+  line to restore. `hreflang` alternates in `<head>` are separate and still
+  emitted. It is links, not `set_language` — `language_links`
   (`wtrx_tags.py`) resolves each language through the page's real translations
   and falls back to that language's home page, omitting a language with
   neither. `page_translation_alternates` is the stricter `<head>` sibling:

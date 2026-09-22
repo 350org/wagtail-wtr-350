@@ -1349,7 +1349,14 @@ gate.
     build output compiled in the Dockerfile — which pins
     `DJANGO_SETTINGS_MODULE=wagtail_wtr.settings.base` so the build never
     depends on runtime secrets.
-69. **The language switcher is links, not `set_language`.** The old
+69. **The language switcher is built and tested but deliberately not
+    rendered.** Both `{% include %}`s were removed from `header.html` (one per
+    mobile menu panel); `language_switcher.html` and the `language_links` tag
+    stay in place, so turning it back on is re-adding the include. The
+    `hreflang` alternates in `<head>` are a separate mechanism
+    (`page_translation_alternates`) and are unaffected — search engines still
+    see every translation. How it works, for when it returns:
+    **it is links, not `set_language`.** The old
     `language_switcher.html` POSTed to Django's `set_language` with
     `next=request.path`, which switches the *interface* language and returns
     to the same path — in this architecture that path belongs to another

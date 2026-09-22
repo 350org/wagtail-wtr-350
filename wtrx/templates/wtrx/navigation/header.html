@@ -342,8 +342,12 @@ mobile-menu.js already toggles) — no separate JS hook needed.
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            {% include "wtrx/components/language_switcher.html" %}
-                            {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+                            {% comment %}
+                            Language switcher deliberately not rendered. The
+                            template and its `language_links` tag are kept and
+                            tested; re-add the include here (and in the other
+                            menu panel below) to turn it back on.
+                            {% endcomment %}
                         </div>
                     </div>
                 {% endif %}
@@ -501,8 +505,10 @@ mobile-menu.js already toggles) — no separate JS hook needed.
                             {% endfor %}
                         </div>
                     {% endif %}
-                    {% include "wtrx/components/language_switcher.html" %}
-                    {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+                    {% comment %}
+                    Language switcher deliberately not rendered — see the note
+                    in the collapsed-desktop panel above.
+                    {% endcomment %}
                 </div>
             </div>
         </div>
