@@ -209,7 +209,7 @@ class TestLanguageLinks(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.es = _locale("es")
-        cls.fr = _locale("fr")
+        cls.fr = _locale("fr-fr")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-links", locale=_english())
         root.add_child(instance=cls.home)
@@ -247,7 +247,7 @@ class TestLanguageLinks(TestCase):
             "{% language_links as links %}{% for l in links %}{{ l.code }}:{{ l.url }} {% endfor %}",
             self.about,
         )
-        self.assertIn("fr:/fr/", output)
+        self.assertIn("fr-fr:/france/", output)
 
     def test_current_language_is_marked_and_not_linked(self):
         output = self._render(
@@ -493,7 +493,7 @@ class TestAliasPagesAreNotAdvertisedAsTranslations(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.fr = _locale("fr")
+        cls.fr = _locale("fr-fr")
         root = Page.objects.filter(depth=1).first()
         cls.home = HomePage(title="Home", slug="home-alias", locale=_english())
         root.add_child(instance=cls.home)

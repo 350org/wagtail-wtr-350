@@ -1388,33 +1388,22 @@ gate.
     their own navigation and footer overrides. Language is the only axis that
     changes the URL (rule #10).
 
-72. **A language is split into a country variant and a plain code only where
-    it has more than one home.** French does — France (`fr-fr` at `/france/`)
-    and Canada (`fr-ca`) — so plain `fr` stays free for translating a global
-    page at `/fr/about/`. Everything else has one home, so the language *is*
-    the site: `de` serves `/germany/`, `id` serves `/indonesia/`, and `es` is
-    simply Spanish. A translation into one of those belongs on that site.
-    `pt-br` is the exception that proves the rule: Brasil is the only
-    Portuguese site, but the locale keeps its precise name and `pt` is left
-    unoffered rather than collapsed, so Portuguese elsewhere can be added later
-    without retagging 885 pages. **`locale/pt/` must stay** even though `pt` is
-    not an offered language — a country variant falls back to its base
-    language's catalogue, so deleting that directory would strip the Brazilian
-    site's chrome translations. Splitting them
-    anyway produces two entries called "German", which is why a label needing a
-    parenthetical disambiguator (`French (France)`) is the signal that a split
-    is real; where the parenthetical would only restate the language, the
-    variant is not needed. Standard adjectival names are preferred where they
-    exist: Brazilian Portuguese, Canadian French, Latin American Spanish. Splitting costs nothing in translation work: a
-    country variant falls back to its base language's catalogue, so `pt-br`
-    reads `locale/pt/` and needs no `.po` of its own. Retagging a country site
-    from `pt` to `pt-br` changes no URLs (the prefix maps to the slug it
-    already has), so `convert_section_to_locale <id> pt-br` reports `created 0
-    redirects` — that zero is the signal it was a pure relabel.
-    A plain locale with no content yet still answers at its prefix: `/pt/`
-    returns 200 showing the **English** home, because `Page.localized` falls
-    back to the source page when no translation is live. Not a bug, and the
-    same reason an alias parent shows English (pitfall #69).
+72. **One entry per language, until a language needs two.** A language gets a
+    second, plain-code entry only when it has both a country site and somewhere
+    neutral to translate into. None currently do: French will, once Canada
+    (`fr-ca`) exists alongside France, at which point `fr` comes back for
+    `/fr/about/`. `es` is the other shape — Spanish has no country site here,
+    so it is purely a translation target and serves under its own code.
+    A regional code keeps its precision even where it is the only home for its
+    language: `pt-br` and `fr-fr` say what the content actually is, and leaving
+    `pt` and `fr` unoffered means either can be added later without retagging
+    the site. The label is the tell — a parenthetical that only restates the
+    language ("German (Germany)") means the split is not real; a standard
+    adjectival name (Brazilian Portuguese, Canadian French) means it is.
+    **`locale/pt/` and `locale/fr/` must stay** even though neither code is
+    offered: a regional variant falls back to its base language's catalogue, so
+    deleting those directories would strip the Brazilian and French sites'
+    chrome translations.
 
 73. **A language tree's URL prefix is mapped, not its language code.**
     Django ties the prefix to the code, so French would serve at `/fr/` and

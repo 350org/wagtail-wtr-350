@@ -146,25 +146,27 @@ USE_TZ = True
 # navigation and footer overrides. Language is the only axis that changes the
 # URL.
 #
-# A language is split into a country variant and a plain code only where it has
-# more than one home. French does: France (fr-fr, /france/) and Canada (fr-ca),
-# so plain `fr` stays free for translating a global page. Everything else has
-# one home, so the language is the site -- `de` serves /germany/, `es` serves
-# Spanish, and a translation into one belongs there.
+# One entry per language, because no language currently needs two. A language
+# gets a second, plain-code entry only when it has both a country site and
+# somewhere neutral to translate into -- French will, once Canada (fr-ca) is
+# created alongside France, at which point `fr` comes back for /fr/about/.
 #
-# `pt-br` keeps its name rather than collapsing to `pt`: Brazilian Portuguese is
-# what the site is, and leaving `pt` unused means Portuguese elsewhere can be
-# added later without retagging 885 pages. Its catalogue is `locale/pt/` -- a
-# country variant falls back to its base language, so that directory must stay
-# even though `pt` is not an offered language.
+# `es` is the other shape: Spanish has no country site here, so it is purely a
+# translation target and serves under its own code (/es/about/).
+#
+# A regional code keeps its precision even where it is the only home for that
+# language: pt-br and fr-fr say what the content is, and leaving pt and fr
+# unoffered means either can be added later without retagging the site. Their
+# catalogues are `locale/pt/` and `locale/fr/` -- a regional variant falls back
+# to its base language, so those directories must stay even though `pt` and
+# `fr` are not offered languages.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
     ("en", _("English")),
     # Spanish, Portuguese and French each have more than one home, so the plain
     # code stays free for translations and the country site takes a variant.
     ("es", _("Spanish")),
     ("pt-br", _("Brazilian Portuguese")),
-    ("fr", _("French")),
-    ("fr-fr", _("French (France)")),
+    ("fr-fr", _("French")),
     ("fr-ca", _("Canadian French")),
     # One site each, so one locale each: the language is the site, and a
     # translation into it belongs there.
