@@ -47,7 +47,16 @@ INSTALLED_APPS = [
     "wagtail.images",
     "wagtail.search",
     "wagtail.admin",
-    "wagtail_localize.locales",
+    # Wagtail's own Locale admin, not wagtail_localize.locales. That app is a
+    # fork of this one whose only addition is the "Synchronise content from
+    # another locale" panel, which mirrors one locale's whole tree into another
+    # as alias pages. This project's language trees are independent sites, so
+    # enabling it for one would spray the English tree into it. The fork also
+    # carries pre-rework admin templates, which render a label-less button on
+    # the locale form. LocaleSynchronization and its machinery live in
+    # wagtail_localize core, so dropping the app removes the UI for that
+    # setting and nothing else.
+    "wagtail.locales",
     "wagtail",
     "wagtail_localize",
     "modelcluster",
