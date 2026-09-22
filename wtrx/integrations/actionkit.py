@@ -23,6 +23,7 @@ No auth required — this is the same markup ActionKit serves to anonymous
 visitors of the hosted page, just without the surrounding site chrome.
 """
 
+import logging
 import re
 
 import requests
@@ -31,6 +32,8 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import BooleanBlock, CharBlock, StructBlock
 
 from wtrx.integrations.registry import IntegrationType, register_integration
+
+logger = logging.getLogger(__name__)
 
 
 class ActionKitError(Exception):
@@ -252,7 +255,9 @@ def fetch_and_cache_embed_form_html(hostname, short_form_id):
 
     Returns the cached (or freshly fetched) form fragment, or None if the
     fetch failed (also cached, briefly, so a broken/misconfigured page
-    doesn't get hit on every render).
+    doesn't get hit on every render). The failure itself is logged — a
+    silent None here previously left no way to tell a timeout apart from a
+    bad short_form_id or a genuine ActionKit outage from production logs.
     """
     cache_key = f"wtrx:actionkit_embed:{hostname}:{short_form_id}"
     cached = cache.get(cache_key)
@@ -263,7 +268,10 @@ def fetch_and_cache_embed_form_html(hostname, short_form_id):
 
     try:
         html = fetch_embed_form_html(hostname, short_form_id)
-    except (ActionKitError, requests.RequestException):
+    except (ActionKitError, requests.RequestException) as exc:
+        logger.warning(
+            "ActionKit embed form fetch failed for %s/%s: %s", hostname, short_form_id, exc
+        )
         cache.set(cache_key, _EMBED_FORM_FETCH_FAILED, EMBED_FORM_FAILURE_CACHE_TIMEOUT)
         return None
 
