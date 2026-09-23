@@ -474,6 +474,9 @@ class BannerHeroMixin(models.Model):
     all. Per product decision a blog post's header shouldn't offer them as
     editable options, so there's no reason for Post to carry the unused
     database columns HeroMixin would add.
+
+    No hero_copy either: a subtext line under the headline made the post
+    header too busy alongside the tag, author and date, so it was removed.
     """
 
     hero_headline = models.CharField(
@@ -484,12 +487,6 @@ class BannerHeroMixin(models.Model):
             "Optional. Overrides the page title as the displayed heading. "
             "Leave blank to use the page title."
         ),
-    )
-    hero_copy = RichTextField(
-        blank=True,
-        features=RICHTEXT_FEATURES_HERO,
-        verbose_name=_("copy"),
-        help_text=_("Optional subtext displayed below the headline."),
     )
     hero_image = models.ForeignKey(
         CustomImage,
@@ -510,7 +507,6 @@ class BannerHeroMixin(models.Model):
         MultiFieldPanel(
             [
                 FieldPanel("hero_headline"),
-                FieldPanel("hero_copy"),
                 FieldPanel("hero_image"),
                 FieldPanel("hero_banner_color"),
             ],
@@ -538,14 +534,14 @@ class BannerHeroMixin(models.Model):
             # hero.html contract complete.
             "pre_header": None,
             "headline": self.hero_headline or self.title,
-            "copy": self.hero_copy,
+            "copy": None,
             "copy_is_block": False,
             "image": self.hero_image,
             "video": None,
             "banner_color": self.hero_banner_color,
             "cta": [],
             "minimal": hero_is_minimal(
-                copy=self.hero_copy,
+                copy=None,
                 video=None,
                 cta=[],
                 tag=extra.get("tag", ""),
