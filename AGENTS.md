@@ -262,10 +262,10 @@ ES modules, 4-space indent, semicolons required.
    Signup/Donate variants stay registered in `BodyStreamBlock`/
    `SectionContentBlock` always; `IntegrationGatedStreamBlockMixin`
    (`wtrx/blocks/__init__.py`) hides disabled-integration variants from the
-   "Add block" picker at request time by overriding `sorted_child_blocks()`
+   "Add block" picker at request time by overriding `ordered_child_blocks()`
    — it never touches `child_blocks`, so previously-placed blocks keep
    rendering even if the integration is later disabled. Filtering
-   `sorted_child_blocks()` alone breaks the *editor* for already-placed
+   `ordered_child_blocks()` alone breaks the *editor* for already-placed
    gated blocks (see pitfall #52) — it also needs the companion telepath
    `GatedStreamBlockAdapter`. Request access inside a block goes through
    `wtrx/request_context.py`'s `ContextVar`, populated by

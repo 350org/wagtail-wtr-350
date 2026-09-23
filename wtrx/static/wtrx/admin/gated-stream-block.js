@@ -7,7 +7,7 @@
  * widget hydrates a page's existing value -- from the exact same
  * groupedChildBlockDefs argument the "Add block" picker uses. Filtering
  * that argument down to only the currently-enabled block types (as
- * IntegrationGatedStreamBlockMixin.sorted_child_blocks() does, so a
+ * IntegrationGatedStreamBlockMixin.ordered_child_blocks() does, so a
  * disabled integration's block type doesn't show up as addable) therefore
  * also broke hydration of any *existing* instance of that block type --
  * the widget crashed loading it, silently discarding it and everything

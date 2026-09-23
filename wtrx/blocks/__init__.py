@@ -23,7 +23,6 @@ All blocks are assembled into BodyStreamBlock at the bottom of this file.
 import copy
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
-import itertools
 import json
 import math
 from pathlib import Path
@@ -3558,7 +3557,7 @@ def _hidden_block_names_for_current_request():
 
     Reads wtrx.request_context.get_current_request() because Wagtail's
     StreamBlockAdapter.js_args() -- which grouped_child_blocks()/
-    sorted_child_blocks() ultimately feed -- is called with no request
+    ordered_child_blocks() ultimately feed -- is called with no request
     argument. See IntegrationGatedStreamBlockMixin below and
     wtrx/request_context.py.
 
@@ -3594,7 +3593,7 @@ class IntegrationGatedStreamBlockMixin:
     Mixin for BodyStreamBlock/SectionContentBlock: filters the "Add block"
     picker to exclude block types gated by a disabled integration.
 
-    sorted_child_blocks()/grouped_child_blocks() are used by Wagtail core in
+    ordered_child_blocks()/grouped_child_blocks() are used by Wagtail core in
     exactly one place server-side -- StreamBlockAdapter.js_args(), which
     builds the JS StreamField widget's block-def payload. child_blocks
     itself, which every other server-side path (value_from_datadict,
@@ -3609,7 +3608,7 @@ class IntegrationGatedStreamBlockMixin:
     (gated) groupedChildBlockDefs argument -- and childBlockDefsByName is
     what an *already-placed* block's own hydration/insert() looks itself up
     in when the widget loads a page's existing value, not just what the
-    picker offers to add. Filtering sorted_child_blocks() therefore also
+    picker offers to add. Filtering ordered_child_blocks() therefore also
     broke loading any existing instance of a gated block once its
     integration was disabled -- the widget crashed
     (TypeError: Cannot read properties of undefined (reading 'name')) and
@@ -3623,7 +3622,7 @@ class IntegrationGatedStreamBlockMixin:
     childBlockDefsByName, plus a separate hidden-names list a small client-
     side subclass (wtrx/static/wtrx/admin/gated-stream-block.js) uses to
     narrow the picker's own view afterwards. This mixin's
-    sorted_child_blocks() override still exists and is still correct for
+    ordered_child_blocks() override still exists and is still correct for
     every other server-side purpose (value_from_datadict, deserialization,
     rendering), and the "always registered, only hidden from being added"
     contract architecture rule #4 requires is now actually true end to end,
@@ -3636,8 +3635,8 @@ class IntegrationGatedStreamBlockMixin:
     SectionContentBlock doesn't need to know this mixin exists.
     """
 
-    def sorted_child_blocks(self):
-        blocks = super().sorted_child_blocks()
+    def ordered_child_blocks(self):
+        blocks = super().ordered_child_blocks()
         hidden = _hidden_block_names_for_current_request()
         if not hidden:
             return blocks
@@ -3652,7 +3651,7 @@ class GatedStreamBlockAdapter(StreamBlockAdapter):
     itself -- see telepath.AdapterRegistry.find_adapter()).
 
     Closes a gap IntegrationGatedStreamBlockMixin's own docstring didn't
-    account for: sorted_child_blocks()/grouped_child_blocks() aren't read
+    account for: ordered_child_blocks()/grouped_child_blocks() aren't read
     *only* by the "Add block" picker. StreamBlockAdapter.js_args() (the
     base class) passes the same gated grouped_child_blocks() as the JS
     StreamBlockDefinition constructor's groupedChildBlockDefs argument, and
@@ -3679,12 +3678,15 @@ class GatedStreamBlockAdapter(StreamBlockAdapter):
 
     def js_args(self, block):
         args = super().js_args(block)
-        # StreamBlock.sorted_child_blocks(), called directly on the base
-        # class rather than through `block`'s own (gated) MRO, is the same
-        # "sorted by group" computation grouped_child_blocks() itself does
-        # -- just against every real child block, ungated.
-        full_sorted = StreamBlock.sorted_child_blocks(block)
-        args[1] = itertools.groupby(full_sorted, key=lambda cb: cb.meta.group)
+        # Rebuild grouped_child_blocks() against every real child block,
+        # ungated: StreamBlock.ordered_child_blocks() is called on the base
+        # class rather than through `block`'s own (gated) MRO, then grouped
+        # the same way Wagtail's own grouped_child_blocks() does (groups in
+        # first-appearance order, returned as dict items).
+        grouped = {}
+        for child_block in StreamBlock.ordered_child_blocks(block):
+            grouped.setdefault(child_block.meta.group, []).append(child_block)
+        args[1] = grouped.items()
         args.append(sorted(_hidden_block_names_for_current_request()))
         return args
 

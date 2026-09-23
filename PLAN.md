@@ -802,7 +802,7 @@ Named `[data-theme]` presets override tokens at runtime — no rebuild needed.
 
 ```
 django>=5.2,<5.3           # Django 5.2 LTS
-wagtail>=7.0,<8.0          # Wagtail 7.0 LTS
+wagtail>=7.4,<7.5          # Wagtail 7.4
 wagtail-localize
 wagtailmedia
 modelsearch                # Required by Wagtail 7.3 (extracted from wagtail.search)

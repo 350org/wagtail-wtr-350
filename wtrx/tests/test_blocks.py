@@ -3034,7 +3034,7 @@ class TestIntegrationGatedStreamBlockVisibility(TestCase):
     """
     IntegrationGatedStreamBlockMixin (wtrx/blocks/__init__.py) filters
     BodyStreamBlock/SectionContentBlock's "Add block" picker
-    (sorted_child_blocks()/grouped_child_blocks()) by IntegrationSettings,
+    (ordered_child_blocks()/grouped_child_blocks()) by IntegrationSettings,
     without ever touching child_blocks itself — see the mixin's docstring
     for why that split matters.
     """
@@ -3064,14 +3064,14 @@ class TestIntegrationGatedStreamBlockVisibility(TestCase):
         _hidden_block_names_for_current_request()'s docstring.
         """
         self._set_integrations([])
-        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
         self.assertIn("donate", names)
         self.assertIn("signup_actionkit", names)
 
     def test_disabled_integration_hides_its_block_from_picker(self):
         self._set_integrations([])
         self._set_current_request()
-        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
         self.assertNotIn("donate", names)  # actblue disabled
         self.assertNotIn("signup_actionkit", names)  # actionkit disabled
 
@@ -3090,20 +3090,20 @@ class TestIntegrationGatedStreamBlockVisibility(TestCase):
             ]
         )
         self._set_current_request()
-        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
         self.assertIn("donate", names)
         self.assertNotIn("donate_fundraiseup", names)
 
     def test_wagtail_forms_visible_by_default(self):
         self._set_integrations([])
         self._set_current_request()
-        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
         self.assertIn("signup_wagtail_forms", names)
 
     def test_disabling_wagtail_forms_hides_it(self):
         self._set_integrations([("wagtail_forms", {"enabled": False})])
         self._set_current_request()
-        names = {b.name for b in BodyStreamBlock().sorted_child_blocks()}
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
         self.assertNotIn("signup_wagtail_forms", names)
 
     def test_child_blocks_always_contains_every_block_regardless_of_context(self):
@@ -3115,7 +3115,7 @@ class TestIntegrationGatedStreamBlockVisibility(TestCase):
         self._set_integrations([])
         self._set_current_request()
         block = BodyStreamBlock()
-        self.assertNotIn("donate", {b.name for b in block.sorted_child_blocks()})
+        self.assertNotIn("donate", {b.name for b in block.ordered_child_blocks()})
         self.assertIn("donate", block.child_blocks)
 
     def test_existing_content_of_a_now_hidden_block_type_still_round_trips(self):
@@ -3143,7 +3143,7 @@ class TestIntegrationGatedStreamBlockVisibility(TestCase):
     def test_section_content_block_also_filters(self):
         self._set_integrations([])
         self._set_current_request()
-        names = {b.name for b in SectionContentBlock().sorted_child_blocks()}
+        names = {b.name for b in SectionContentBlock().ordered_child_blocks()}
         self.assertNotIn("donate", names)
 
 
@@ -3205,7 +3205,7 @@ class TestGatedStreamBlockAdapter(TestCase):
         self.assertIn("signup_actionkit", names)
         # Sanity check against the (correctly filtered) picker, to prove
         # this isn't just "filtering silently did nothing":
-        picker_names = {b.name for b in block.sorted_child_blocks()}
+        picker_names = {b.name for b in block.ordered_child_blocks()}
         self.assertNotIn("donate", picker_names)
 
     def test_js_args_appends_hidden_block_names(self):

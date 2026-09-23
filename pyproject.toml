@@ -9,7 +9,7 @@ description = "Wagtail CMS platform for campaign, nonprofit, and organizer websi
 requires-python = ">=3.13"
 dependencies = [
     "django>=5.2,<5.3",
-    "wagtail>=7.1,<7.3",
+    "wagtail>=7.4,<7.5",
     "wagtail-localize>=1.9,<2.0",
     "wagtailmedia",
     "dj-database-url",

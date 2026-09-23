@@ -2,7 +2,7 @@
 Lightweight "current request" context, used only so StreamBlock subclasses
 (BodyStreamBlock, SectionContentBlock) can tell which site is being edited
 when they build the "Add block" picker list — see
-IntegrationGatedStreamBlockMixin.sorted_child_blocks() in wtrx/blocks/__init__.py.
+IntegrationGatedStreamBlockMixin.ordered_child_blocks() in wtrx/blocks/__init__.py.
 
 Wagtail's StreamBlockAdapter.js_args() (the Telepath adapter that serializes
 a StreamBlock's picker definitions for the admin JS) is called with no
