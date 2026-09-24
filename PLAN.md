@@ -1166,9 +1166,11 @@ is configured.
   - `purge_page_with_related(page)` purges a page and its parent if the parent is an
     `IndexPage`; silent no-op when unconfigured
 - [x] `wtrx/signals.py` — signal handlers and `connect_signals()`:
-  - `on_settings_saved` connected to `post_save` for all 5 settings models
-    (`BrandingSEOSettings`, `NavigationSettings`, `FooterSettings`, `SocialSettings`,
-    `IntegrationSettings`); calls `purge_all()` because header/footer affects every page
+  - `on_settings_saved` connected to `post_save` for every `BaseSiteSetting` model in
+    wtrx (discovered from the app registry, so new settings models are covered
+    automatically); calls `purge_all()` because header/footer affects every page
+  - Every purge is deferred with `transaction.on_commit()` so the CDN can't re-cache
+    pre-commit content
   - `on_page_published` connected to Wagtail's `page_published` signal; calls
     `purge_page_with_related()` to also refresh parent index listings
   - Signal connection deferred inside `connect_signals()` to avoid

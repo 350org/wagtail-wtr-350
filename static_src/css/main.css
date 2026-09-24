@@ -334,6 +334,14 @@ html {
  * that is (677 - 145 - 32) / 2 = 250px each, arriving at Figma's number as
  * an outcome rather than asserting it and losing to a rounding error.
  *
+ * max-width (the sm:+ rule below) holds them at that 250px whatever the
+ * button's label: the
+ * button is sized by its text, and a translated label much longer than
+ * "Join Us" (Indonesian's is ~340px) used to squeeze both fields to 152px.
+ * Now the row just grows by the button's extra width — hero.html's
+ * wrapper is capped wide enough for that — and any leftover space sits
+ * after the button, not inside the fields.
+ *
  * min-width is what still allows a wrap, just far later — below roughly a
  * 465px column the fields hit their floor and the button drops, which is
  * the right behaviour at that width. (This was `1 1 8rem`, sized for the
@@ -358,6 +366,15 @@ html {
     background-color: var(--color-neutral-50);
     border: 1px solid var(--color-neutral-400);
     border-radius: var(--radius-button);
+}
+
+/* From sm: up only — on a phone each field wraps onto a line of its own
+ * and should fill it, not stop 45px short. */
+@media (width >= 40rem) {
+    .wtr-actionkit-embed-inline .input-text,
+    .wtr-actionkit-embed-inline .input-select {
+        max-width: 250px;
+    }
 }
 
 /* :not() on the type for the same reason as the stacked variant below —
@@ -423,8 +440,15 @@ html {
 /* Disclaimer/fine-print text below the form (terms of service, privacy
  * policy, unsubscribe notice), at 14px/1.25 in --color-neutral-200
  * (#eaeaea, its own token, not white at 80%). It reaches this line via the
- * order:2 / flex-basis:100% rule above; max-width is what pulls it back
- * off full width.
+ * order:2 / flex-basis:100% rule above; the end padding is what pulls its
+ * text back to 480px.
+ *
+ * Padding, not max-width: flex line-breaking measures an item at its
+ * max-width-clamped size, so a 480px-max notice fits on the fields' row
+ * whenever the row has 480px spare — which it now does, since the fields
+ * stop at 250px and hero.html's wrapper is 1033px wide. The box has to stay
+ * full width for flex-basis:100% to force the line break. max() floors
+ * the padding at zero in a column narrower than 480px.
  *
  * 480px, not Figma's 435px, and the two numbers are measuring different
  * strings: Figma's mock carries its own placeholder wording, while what
@@ -437,11 +461,11 @@ html {
  *
  * text-wrap: balance is what makes those two lines even rather than a long
  * one over a short one — it settles at 443 + 424 and, usefully here, stays
- * there for any width past the 460px threshold, so the exact max-width
+ * there for any width past the 460px threshold, so the exact 480px
  * above is not load-bearing for evenness. Where balance is unsupported
  * this degrades to a plain greedy wrap: still two lines, just less even. */
 .wtr-actionkit-embed-inline .general-privacy-notice {
-    max-width: 480px;
+    padding-inline-end: max(0px, 100% - 480px);
     font-family: var(--font-body);
     font-size: 0.875rem;
     line-height: 1.25;

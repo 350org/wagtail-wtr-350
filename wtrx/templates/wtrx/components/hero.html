@@ -429,14 +429,16 @@
                 HeroCTABlock's docstring).
 
                 Sizing is Figma's: 20px below the headline (its Content frame's
-                gap), and a 677px-wide widget — exactly what the Signup
-                Horizontal instance measures, and just enough for its two 250px
-                fields plus the submit button on one row (250 + 250 + 144 + two
-                16px gaps). max-w-2xl (672px) fell 5px short of that and wrapped
-                the button onto its own line.
+                gap). Figma's Signup Horizontal measures 677px — two 250px
+                fields plus a 145px "Join Us" button and two 16px gaps — but
+                the cap here is the headline's 1033px instead, because the
+                fields are capped at 250px themselves (main.css) and the button
+                is sized by its label: a translated label ("Bergabung bersama
+                kami") needs ~200px more than English, and a 677px cap took
+                that room from the fields rather than giving it to the button.
                 {% endcomment %}
                 {% for cta_block in hero.cta %}
-                    <div class="mt-5 max-w-[677px]">
+                    <div class="mt-5 max-w-[1033px]">
                         {% include_block cta_block with compact=True %}
                     </div>
                 {% endfor %}
