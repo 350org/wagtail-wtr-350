@@ -10,8 +10,9 @@ Covers:
 - _purge_all_cloudflare handles missing credentials gracefully
 - _purge_all_cloudflare handles HTTP error responses gracefully
 - _purge_all_cloudflare handles network exceptions gracefully
-- on_settings_saved fires purge_all exactly once per explicit save for each of the 5 settings models
-- on_page_published / on_page_unpublished fire purge_page_with_related
+- on_settings_saved fires purge_all exactly once per explicit save for every settings model,
+  and only once the transaction commits
+- on_page_published / on_page_unpublished fire purge_page_with_related on commit
 - on_page_slug_changed purges both the new URL and the old URL (via instance_before)
 - purge_page_with_related is a silent no-op when WAGTAILFRONTENDCACHE is not configured
 - purge_page_with_related purges parent IndexPage when parent is an IndexPage
@@ -239,7 +240,8 @@ class TestOnSettingsSaved(TestCase):
 
         obj, _ = BrandingSEOSettings.objects.get_or_create(site=self.site)
         mock_purge_all.reset_mock()
-        obj.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            obj.save()
         mock_purge_all.assert_called_once()
 
     @patch("wtrx.signals.purge_all")
@@ -248,7 +250,8 @@ class TestOnSettingsSaved(TestCase):
 
         obj, _ = NavigationSettings.objects.get_or_create(site=self.site)
         mock_purge_all.reset_mock()
-        obj.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            obj.save()
         mock_purge_all.assert_called_once()
 
     @patch("wtrx.signals.purge_all")
@@ -257,7 +260,8 @@ class TestOnSettingsSaved(TestCase):
 
         obj, _ = FooterSettings.objects.get_or_create(site=self.site)
         mock_purge_all.reset_mock()
-        obj.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            obj.save()
         mock_purge_all.assert_called_once()
 
     @patch("wtrx.signals.purge_all")
@@ -266,7 +270,8 @@ class TestOnSettingsSaved(TestCase):
 
         obj, _ = SocialSettings.objects.get_or_create(site=self.site)
         mock_purge_all.reset_mock()
-        obj.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            obj.save()
         mock_purge_all.assert_called_once()
 
     @patch("wtrx.signals.purge_all")
@@ -275,7 +280,37 @@ class TestOnSettingsSaved(TestCase):
 
         obj, _ = IntegrationSettings.objects.get_or_create(site=self.site)
         mock_purge_all.reset_mock()
-        obj.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            obj.save()
+        mock_purge_all.assert_called_once()
+
+    @patch("wtrx.signals.purge_all")
+    def test_every_site_setting_model_triggers_purge_all(self, mock_purge_all):
+        """Settings models are discovered, so ones added later are covered too."""
+        from django.apps import apps
+        from wagtail.contrib.settings.models import BaseSiteSetting
+
+        models = [m for m in apps.get_app_config("wtrx").get_models() if issubclass(m, BaseSiteSetting)]
+        self.assertIn("AdminMenuSettings", [m.__name__ for m in models])
+        self.assertIn("NotFoundPageSettings", [m.__name__ for m in models])
+        for model in models:
+            with self.subTest(model=model.__name__):
+                obj, _ = model.objects.get_or_create(site=self.site)
+                mock_purge_all.reset_mock()
+                with self.captureOnCommitCallbacks(execute=True):
+                    obj.save()
+                mock_purge_all.assert_called_once()
+
+    @patch("wtrx.signals.purge_all")
+    def test_purge_waits_for_commit(self, mock_purge_all):
+        from wtrx.site_settings import FooterSettings
+
+        obj, _ = FooterSettings.objects.get_or_create(site=self.site)
+        mock_purge_all.reset_mock()
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            obj.save()
+            mock_purge_all.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
         mock_purge_all.assert_called_once()
 
 
@@ -292,7 +327,8 @@ class TestPageSignalHandlers(TestCase):
         from wtrx.signals import on_page_published
 
         fake_page = MagicMock()
-        on_page_published(sender=Page, instance=fake_page)
+        with self.captureOnCommitCallbacks(execute=True):
+            on_page_published(sender=Page, instance=fake_page)
         mock_purge.assert_called_once_with(fake_page)
 
     @patch("wtrx.signals.purge_page_with_related")
@@ -300,7 +336,8 @@ class TestPageSignalHandlers(TestCase):
         from wtrx.signals import on_page_unpublished
 
         fake_page = MagicMock()
-        on_page_unpublished(sender=Page, instance=fake_page)
+        with self.captureOnCommitCallbacks(execute=True):
+            on_page_unpublished(sender=Page, instance=fake_page)
         mock_purge.assert_called_once_with(fake_page)
 
     @patch("wtrx.signals.purge_page_with_related")
@@ -309,7 +346,8 @@ class TestPageSignalHandlers(TestCase):
         from wtrx.signals import on_page_slug_changed
 
         fake_page = MagicMock()
-        on_page_slug_changed(sender=Page, instance=fake_page, instance_before=None)
+        with self.captureOnCommitCallbacks(execute=True):
+            on_page_slug_changed(sender=Page, instance=fake_page, instance_before=None)
         mock_purge.assert_called_once_with(fake_page, extra_urls=None)
 
     @patch("wtrx.signals.purge_page_with_related")
@@ -321,9 +359,10 @@ class TestPageSignalHandlers(TestCase):
         fake_old_page = MagicMock()
         fake_old_page.get_full_url.return_value = "http://example.com/old-slug/"
 
-        on_page_slug_changed(
-            sender=Page, instance=fake_page, instance_before=fake_old_page
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            on_page_slug_changed(
+                sender=Page, instance=fake_page, instance_before=fake_old_page
+            )
         mock_purge.assert_called_once_with(
             fake_page, extra_urls=["http://example.com/old-slug/"]
         )

@@ -3,9 +3,9 @@ Django signal handlers for wtrx cache invalidation.
 
 Registered in WtrxConfig.ready() (wtrx/apps.py).
 
-- ``on_settings_saved`` — connected to ``post_save`` for all 5 site settings
-  models. Any settings save triggers a full-site purge because header/footer
-  content appears on every page.
+- ``on_settings_saved`` — connected to ``post_save`` for every
+  ``BaseSiteSetting`` model in wtrx. Any settings save triggers a full-site
+  purge because header/footer content appears on every page.
 - ``on_page_published`` — connected to Wagtail's ``page_published`` signal.
   Purges the published page and its parent IndexPage (if applicable) to keep
   listing pages fresh.
@@ -15,10 +15,15 @@ Registered in WtrxConfig.ready() (wtrx/apps.py).
 - ``on_page_slug_changed`` — connected to Wagtail's ``page_slug_changed``
   signal. Purges both the old URL (via the page's cached pre-save URL) and the
   new URL so redirects and listing pages reflect the updated slug immediately.
+
+Every purge is deferred with ``transaction.on_commit()``: these signals fire
+inside the save's transaction, and purging before the commit lets a request
+arriving in between re-cache the old content at the CDN.
 """
 
 import logging
 
+from django.db import transaction
 from wagtail.signals import page_published, page_slug_changed, page_unpublished
 
 from wtrx.cache import purge_all, purge_page_with_related
@@ -33,7 +38,7 @@ def on_settings_saved(sender, instance, **kwargs):
         sender.__name__,
         instance.pk,
     )
-    purge_all()
+    transaction.on_commit(purge_all)
 
 
 def on_page_published(sender, instance, **kwargs):
@@ -43,7 +48,7 @@ def on_page_published(sender, instance, **kwargs):
         sender.__name__,
         instance.pk,
     )
-    purge_page_with_related(instance)
+    transaction.on_commit(lambda: purge_page_with_related(instance))
 
 
 def on_page_unpublished(sender, instance, **kwargs):
@@ -53,7 +58,7 @@ def on_page_unpublished(sender, instance, **kwargs):
         sender.__name__,
         instance.pk,
     )
-    purge_page_with_related(instance)
+    transaction.on_commit(lambda: purge_page_with_related(instance))
 
 
 def on_page_slug_changed(sender, instance, instance_before=None, **kwargs):
@@ -69,32 +74,24 @@ def on_page_slug_changed(sender, instance, instance_before=None, **kwargs):
         instance.pk,
     )
     old_url = instance_before.get_full_url() if instance_before is not None else None
-    purge_page_with_related(instance, extra_urls=[old_url] if old_url else None)
+    extra_urls = [old_url] if old_url else None
+    transaction.on_commit(lambda: purge_page_with_related(instance, extra_urls=extra_urls))
 
 
 def connect_signals():
     """Connect all wtrx signal handlers.
 
-    Called from WtrxConfig.ready(). Importing settings models here (inside the
-    function) defers the import until after the app registry is fully populated,
-    avoiding AppRegistryNotReady errors.
+    Called from WtrxConfig.ready(), once the app registry is populated.
+    Settings models are discovered from the registry rather than listed by
+    hand, so a newly added ``BaseSiteSetting`` purges the cache without anyone
+    remembering to register it here.
     """
+    from django.apps import apps
     from django.db.models.signals import post_save
-
-    from wtrx.site_settings import (
-        BrandingSEOSettings,
-        FooterSettings,
-        IntegrationSettings,
-        NavigationSettings,
-        SocialSettings,
-    )
+    from wagtail.contrib.settings.models import BaseSiteSetting
 
     settings_models = [
-        BrandingSEOSettings,
-        NavigationSettings,
-        FooterSettings,
-        SocialSettings,
-        IntegrationSettings,
+        model for model in apps.get_app_config("wtrx").get_models() if issubclass(model, BaseSiteSetting)
     ]
     for model in settings_models:
         post_save.connect(
