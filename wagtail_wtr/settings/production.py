@@ -53,7 +53,9 @@ for _loopback in ("127.0.0.1", "localhost"):
     if _loopback not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_loopback)
 
-WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
+# Wagtail joins this with paths that already start with "/" (e.g. the edit
+# links in moderation emails), so a trailing slash here yields "//admin/...".
+WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"].rstrip("/")  # noqa: F405
 
 # ssl_require=True: some managed Postgres instances (e.g. certain RDS parameter
 # groups) enforce SSL and refuse plaintext connections outright. Connecting
