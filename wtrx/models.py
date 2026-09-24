@@ -7,7 +7,7 @@ from django.db import models
 from django.http import JsonResponse
 from django.utils import timezone, translation
 from django.utils.html import strip_tags
-from django.utils.text import slugify
+from django.utils.text import format_lazy, slugify
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from wagtail.admin.forms import WagtailAdminPageForm
@@ -593,6 +593,9 @@ class BlogCategory(models.Model):
         super().save(*args, **kwargs)
 
 
+MAX_POST_CATEGORIES = 2
+
+
 class PostForm(WagtailAdminPageForm):
     """
     Pre-fills the author field with the current user when creating a new
@@ -617,6 +620,17 @@ class PostForm(WagtailAdminPageForm):
             # by that pre-existing None and never actually render as the
             # field's pre-selected value.
             self.initial["author"] = self.for_user.pk
+
+    def clean_categories(self):
+        # Enforced here rather than in Post.clean(): a ParentalManyToManyField's
+        # submitted value only exists on the form until save, and the importers
+        # write categories directly without going through this form.
+        categories = self.cleaned_data.get("categories")
+        if categories is not None and len(categories) > MAX_POST_CATEGORIES:
+            raise forms.ValidationError(
+                _("Choose at most %(max)d categories.") % {"max": MAX_POST_CATEGORIES}
+            )
+        return categories
 
 
 # ---------------------------------------------------------------------------
@@ -1044,7 +1058,11 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             FieldPanel("author"),
             FieldPanel("author_name"),
             FieldPanel("author_title"),
-            FieldPanel("categories", widget=forms.CheckboxSelectMultiple),
+            FieldPanel(
+                "categories",
+                widget=forms.CheckboxSelectMultiple,
+                help_text=format_lazy(_("Choose up to {max}."), max=MAX_POST_CATEGORIES),
+            ),
             FieldPanel("hide_from_blogroll"),
             FieldPanel("body"),
         ]

@@ -15,6 +15,7 @@ from django.utils import timezone
 from wagtail.images.tests.utils import get_test_image_file
 from wagtail.models import Page, Site
 from wagtail.test.utils import WagtailPageTests
+from wagtail.test.utils.form_data import nested_form_data, streamfield
 
 from wtrx.images import CustomImage
 from wtrx.models import (
@@ -904,7 +905,33 @@ class TestPostForm(TestCase):
         self.assertEqual(form["author"].value(), other_user.pk)
 
 
-class TestPostMeta(TestCase):
+class TestPostCategoryLimit(TestCase):
+    """PostForm rejects more than MAX_POST_CATEGORIES categories."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.categories = [BlogCategory.objects.create(name=f"Cat {i}") for i in range(3)]
+
+    def _categories_errors(self, categories):
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(
+            # categories is set after flattening: nested_form_data() would
+            # otherwise split the list into categories-0, categories-1, ...
+            data={
+                **nested_form_data({"title": "Post", "slug": "post", "body": streamfield([])}),
+                "categories": [c.pk for c in categories],
+            },
+            instance=Post(),
+            for_user=User.objects.create_user(username=f"u{len(categories)}"),
+        )
+        form.is_valid()
+        return form.errors.get("categories")
+
+    def test_two_categories_allowed(self):
+        self.assertIsNone(self._categories_errors(self.categories[:2]))
+
+    def test_three_categories_rejected(self):
+        self.assertEqual(self._categories_errors(self.categories), ["Choose at most 2 categories."])
     def test_verbose_name(self):
         self.assertEqual(Post._meta.verbose_name, "post")
 
