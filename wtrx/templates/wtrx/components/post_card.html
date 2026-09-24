@@ -42,20 +42,29 @@ doesn't set one — see PageCardsBlock.get_context() and Blogs/Post.get_context(
             <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}" class="h-full w-full object-cover" loading="lazy">
         </div>
     {% endif %}
-    <div class="flex flex-1 items-start gap-4 px-4 pb-4">
-        <div class="flex flex-1 flex-col gap-[7px] pt-4">
-            {% if card.date %}
-                <span class="w-fit rounded-full bg-neutral-200 px-4 py-3 font-heading text-base font-bold text-dark">
-                    {{ card.date|date:"F j, Y" }}
-                </span>
-            {% endif %}
-            <h3 class="font-heading {{ heading_size|default:"text-2xl" }} font-bold text-dark">{{ card.heading }}</h3>
-            {% if card.description %}
-                <p class="text-base text-dark">{{ card.description }}</p>
-            {% endif %}
+    {% comment %}
+    Two-column grid so the arrow shares the heading's row (row-start-2 when
+    a date pill takes row 1), while the date and description stay in the
+    text column beside it. The arrow centres on the heading's *first line*,
+    not the whole heading, so it sits at the same height on every card in a
+    row however many lines each title wraps to. Its wrapper carries the
+    heading's own size class so h-[1lh] is exactly one heading line tall,
+    whatever heading_size a caller passes.
+    {% endcomment %}
+    <div class="grid flex-1 grid-cols-[1fr_auto] content-start gap-x-4 gap-y-[7px] px-4 pt-4 pb-4">
+        {% if card.date %}
+            <span class="col-start-1 w-fit rounded-full bg-neutral-200 px-4 py-3 font-heading text-base font-bold text-dark">
+                {{ card.date|date:"F j, Y" }}
+            </span>
+        {% endif %}
+        <h3 class="col-start-1 font-heading {{ heading_size|default:"text-2xl" }} font-bold text-dark">{{ card.heading }}</h3>
+        <div class="col-start-2 {% if card.date %}row-start-2{% else %}row-start-1{% endif %} flex h-[1lh] items-center font-heading {{ heading_size|default:"text-2xl" }}">
+            <svg class="h-10 w-10 text-dark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
         </div>
-        <svg class="h-10 w-10 shrink-0 text-dark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-            <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        {% if card.description %}
+            <p class="col-start-1 text-base text-dark">{{ card.description }}</p>
+        {% endif %}
     </div>
 </a>
