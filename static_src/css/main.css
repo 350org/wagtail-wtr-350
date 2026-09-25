@@ -1139,6 +1139,27 @@ html {
 }
 
 /* ============================================================
+ * Action Network embeds — radios and checkboxes
+ * ============================================================
+ * @tailwindcss/forms sets `appearance: none` on every radio/checkbox and
+ * redraws it with a border plus a background-image dot/tick. AN's
+ * style-embed-v3.css then resets `border: 0` and `background: none` on
+ * everything under #can_embed_form_inner with !important, so the redrawn
+ * control disappears entirely: no ring, no checked state, and a 0x0 box.
+ * On a form with a required email opt-in, AN still blocks submission until
+ * one is chosen, so a visitor is left stuck on an error with nothing they
+ * can see to click. Handing the controls back to the browser's native
+ * rendering (what AN's own hosted page shows) fixes it. Keyed on AN's
+ * own form id so it covers the standard embed pasted into a RawHTMLBlock
+ * as well as SignupActionNetworkBlock.
+ * ============================================================ */
+
+#can_embed_form input[type='radio'],
+#can_embed_form input[type='checkbox'] {
+    appearance: auto;
+}
+
+/* ============================================================
  * Heading weights — h1/h2 Klima Heavy, h3-h6 Klima Bold
  * ============================================================
  * The whole heading scale in two rules. font-bold and font-semibold both
