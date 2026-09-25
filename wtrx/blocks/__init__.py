@@ -3142,6 +3142,12 @@ class SignupActionKitFormMixin:
         elif hostname and short_form_id:
             form_html = actionkit.fetch_and_cache_embed_form_html(hostname, short_form_id)
 
+        # ActionKit's own intro copy (pretitle/title/description, and a
+        # petition's full text) is lifted out of the fragment rather than
+        # hidden in it, so the left-hand column can fall back to it when the
+        # editor leaves `content` blank — see _actionkit_intro.html.
+        ak_intro, form_html = actionkit.split_action_header(form_html)
+        ctx["ak_intro"] = ak_intro
         ctx["form_html"] = form_html
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
         # Needed client-side (not just server-side, where it already drove
@@ -3181,7 +3187,8 @@ class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, Struct
         label=_("Eyebrow"),
         help_text=_(
             "Optional short label shown as a pill above the heading "
-            "(e.g. 'Sign the Petition')."
+            "(e.g. 'Sign the Petition'). If Content is also left blank, the "
+            "ActionKit page's own pretitle is used."
         ),
     )
     content = RichTextBlock(
@@ -3190,7 +3197,8 @@ class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, Struct
         label=_("Content"),
         help_text=_(
             "Type your heading as an H2 at the top, then optional supporting "
-            "copy, shown above the ActionKit form."
+            "copy, shown beside the ActionKit form. Leave blank to use the "
+            "ActionKit page's own title and description instead."
         ),
     )
     background = ChoiceBlock(

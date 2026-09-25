@@ -1,0 +1,93 @@
+{% load i18n wagtailcore_tags %}
+{% comment %}
+    SignupActionKitBlock's copy column: eyebrow pill, heading/copy, and — on
+    a petition — a "view the full petition text" button that opens the text
+    in a <dialog>. Shared by both of signup_actionkit_block.html's layouts.
+
+    Expects `bg`/`on_light` (from the including template's {% with %}) and
+    `ak_intro` (SignupActionKitFormMixin.get_context(), via
+    actionkit.split_action_header()): the ActionKit page's own pretitle,
+    title, description and petition text, lifted out of the fetched form
+    fragment.
+
+    The editor's copy wins wherever they've written any. With `content`
+    blank, the column falls back to ActionKit's title and description (the
+    description carries whatever the campaigner embedded in ActionKit, such
+    as a partner logo) — the same left-hand column ActionKit and WordPress
+    show. The pretitle only stands in for the eyebrow under that same
+    condition, so a block that has its own copy and deliberately no eyebrow
+    doesn't sprout one. The petition text is ActionKit's regardless: it is
+    the text people are signing, which no Wagtail field holds.
+{% endcomment %}
+{% if value.content %}
+    {% firstof value.eyebrow as eyebrow %}
+{% else %}
+    {% firstof value.eyebrow ak_intro.pretitle as eyebrow %}
+{% endif %}
+{% if eyebrow %}
+    {% comment %}
+    Same dark pill as feature_panel_block.html's eyebrow, at Figma's 24px —
+    except on the dark grey panel, where that pill is the same --color-dark
+    as the panel behind it and would read as invisible text; there it flips
+    to light-on-dark, exactly as feature_panel_block.html's pill does on its
+    own dark background.
+    {% endcomment %}
+    <p class="wtr-signup-eyebrow font-heading inline-block self-start rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
+              {% if bg == 'dark-grey' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
+        {{ eyebrow }}
+    </p>
+{% endif %}
+{% comment %}
+Heading size pinned via .wtr-signup-actionkit-content in main.css, same
+technique .wtr-text-block uses. prose-invert's body color is pinned to pure
+white centrally, in main.css — see the .prose-invert rule there. Figma draws
+this copy at 24px, but it renders at the site's 20px body size instead — see
+AGENTS.md pitfall #32.
+{% endcomment %}
+{% if value.content or ak_intro.title or ak_intro.description_html %}
+    <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
+                {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
+        {% if value.content %}
+            {{ value.content|richtext }}
+        {% else %}
+            {% if ak_intro.title %}<h2>{{ ak_intro.title }}</h2>{% endif %}
+            {{ ak_intro.description_html|safe }}
+        {% endif %}
+    </div>
+{% endif %}
+{% if ak_intro.petition_html %}
+    <button type="button"
+            class="wtr-ak-petition-trigger inline-flex cursor-pointer items-center gap-2 text-base underline underline-offset-4 hover:no-underline
+                   {% if on_light %}text-dark{% else %}text-light{% endif %}"
+            aria-haspopup="dialog"
+            data-ak-petition-trigger>
+        <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        {{ ak_intro.petition_link_text|default:_("View the full petition text") }}
+    </button>
+    {% comment %}
+    Same native-<dialog> conventions as person_card.html's bio modal: p-0 +
+    m-auto keep the UA stylesheet's own centering, `relative` goes on the
+    inner wrapper (not the <dialog>, which would lose `position: fixed`) to
+    anchor the close button. The petition text can carry an embedded video
+    at a fixed 560px, hence the iframe cap.
+    {% endcomment %}
+    <dialog class="wtr-ak-petition-modal m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-lg border-0 p-0 text-left backdrop:bg-dark/70 backdrop:backdrop-blur-sm"
+            aria-label="{{ ak_intro.petition_link_text|default:_('Full petition text') }}"
+            data-ak-petition-dialog>
+        <div class="relative px-6 py-10 sm:px-10">
+            <button type="button"
+                    class="absolute right-4 top-4 z-10 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-dark text-light transition-colors hover:bg-navy"
+                    aria-label="{% trans 'Close' %}"
+                    data-ak-petition-close>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <div class="prose prose-neutral max-w-none text-dark [&_iframe]:aspect-video [&_iframe]:h-auto [&_iframe]:max-w-full">
+                {{ ak_intro.petition_html|safe }}
+            </div>
+        </div>
+    </dialog>
+{% endif %}

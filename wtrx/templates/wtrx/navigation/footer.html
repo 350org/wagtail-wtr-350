@@ -214,7 +214,7 @@
                     <h3 class="font-heading font-semibold text-light text-28 mb-4">
                         {% trans "Sign up to stay connected." %}
                     </h3>
-                    {% with form_html=newsletter.form_html actionkit_base_url=newsletter.actionkit_base_url success_text=newsletter.success_message panel_tone="on-dark" stacked=True %}
+                    {% with form_html=newsletter.form_html actionkit_base_url=newsletter.actionkit_base_url short_form_id=newsletter.short_form_id success_text=newsletter.success_message panel_tone="on-dark" stacked=True %}
                         {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" %}
                     {% endwith %}
                 </div>

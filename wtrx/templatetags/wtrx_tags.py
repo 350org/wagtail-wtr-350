@@ -147,8 +147,8 @@ def resolved_footer_newsletter_signup(context):
     SignupActionKitBlock uses for its own panel (see
     actionkit.fetch_and_cache_embed_form_html).
 
-    Returns a dict with `form_html`, `actionkit_base_url`, and
-    `success_message` — suitable for including directly into
+    Returns a dict with `form_html`, `actionkit_base_url`, `short_form_id`
+    and `success_message` — suitable for including directly into
     wtrx/components/streamfield/blocks/_actionkit_form.html — or None when
     no shortname is configured for this page's footer, meaning no signup box
     should render at all.
@@ -196,6 +196,9 @@ def resolved_footer_newsletter_signup(context):
     return {
         "form_html": form_html,
         "actionkit_base_url": actionkit.base_url(hostname) if hostname else "",
+        # For _actionkit_form.html's /context/ request (the opt-in's
+        # country list), same as SignupActionKitFormMixin passes it.
+        "short_form_id": short_form_id,
         "success_message": success_message,
     }
 

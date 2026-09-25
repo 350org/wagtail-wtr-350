@@ -25,8 +25,10 @@ visitors of the hosted page, just without the surrounding site chrome.
 
 import logging
 import re
+from html.parser import HTMLParser
 
 import requests
+from bs4 import BeautifulSoup
 from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from wagtail.blocks import BooleanBlock, CharBlock, StructBlock
@@ -237,6 +239,130 @@ _COUNTRY_LABEL_FOR_RE = re.compile(r'<label for="id_country">')
 
 def _fix_country_label_for_attribute(html):
     return _COUNTRY_LABEL_FOR_RE.sub('<label for="country">', html)
+
+
+# 350's ActionKit template puts a page's intro copy in <div id="action-header">,
+# a sibling of <form id="action-form"> inside the outer #action-lead section:
+# the pretitle, the title, the description (which is where an editor's
+# embedded logo lives), and on a petition, a "View the full petition text"
+# link whose target (#petition-text) sits in a no-JS box beside it. On
+# ActionKit and WordPress this is the page's left-hand column. Our blocks
+# render their own left-hand column, so the header is lifted out of the
+# fragment and handed to the template as data instead of being hidden.
+_ACTION_HEADER_START_RE = re.compile(r'<div\b[^>]*\bid="action-header"[^>]*>')
+_ACTION_FORM_START_RE = re.compile(r'<form\b[^>]*\bid="action-form"')
+
+
+class _ElementEndFinder(HTMLParser):
+    """
+    Records where the element opened at the very start of the fed HTML closes.
+
+    A real parser rather than counting ``<div`` substrings, because the
+    description is editor-authored HTML from ActionKit's page editor and can
+    carry comments or embeds that a substring count would miscount.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.tag = None
+        self.depth = 0
+        self.end_pos = None  # (line, column) of the matching closing tag
+
+    def handle_starttag(self, tag, attrs):
+        if self.end_pos is not None:
+            return
+        if self.tag is None:
+            self.tag = tag
+        if tag == self.tag:
+            self.depth += 1
+
+    def handle_endtag(self, tag):
+        if self.end_pos is not None or tag != self.tag:
+            return
+        self.depth -= 1
+        if self.depth == 0:
+            self.end_pos = self.getpos()
+
+
+def _element_end_offset(html):
+    """Offset just past the closing tag of the element ``html`` starts with, or None."""
+    finder = _ElementEndFinder()
+    finder.feed(html)
+    if finder.end_pos is None:
+        return None
+    line, column = finder.end_pos
+    line_start = 0
+    for _ in range(line - 1):
+        line_start = html.index("\n", line_start) + 1
+    close_tag_end = html.find(">", line_start + column)
+    return None if close_tag_end == -1 else close_tag_end + 1
+
+
+def split_action_header(html):
+    """
+    Lift ActionKit's ``#action-header`` intro out of a fetched form fragment.
+
+    Returns ``(intro, remaining_html)``. ``intro`` is a dict of the header's
+    parts — ``pretitle`` and ``title`` (plain text), ``description_html``,
+    and, on a petition, ``petition_html`` plus ``petition_link_text`` for the
+    "view the full petition text" modal — or None when the fragment has no
+    header (a different ActionKit template, or a fetch that failed). The
+    header is removed from ``remaining_html`` so its ids aren't duplicated
+    on the page; the form itself is untouched byte-for-byte, since its
+    inline scripts are sensitive to being re-serialised.
+    """
+    if not html:
+        return None, html
+    header_start = _ACTION_HEADER_START_RE.search(html)
+    if not header_start:
+        return None, html
+    form_start = _ACTION_FORM_START_RE.search(html, header_start.start())
+    region_end = form_start.start() if form_start else len(html)
+    header_length = _element_end_offset(html[header_start.start():region_end])
+    if header_length is None:
+        return None, html
+    header_end = header_start.start() + header_length
+
+    header = BeautifulSoup(html[header_start.start():header_end], "html.parser")
+
+    # YouTube refuses to play an embed that arrives with no referrer ("Error
+    # 153"), and this site sends none cross-origin: Django's default
+    # SECURE_REFERRER_POLICY is "same-origin". Petition text often embeds a
+    # video, so each iframe gets the browser-default policy back for itself.
+    for iframe in header.find_all("iframe"):
+        iframe["referrerpolicy"] = "strict-origin-when-cross-origin"
+
+    def text_of(selector):
+        element = header.select_one(selector)
+        return element.get_text(" ", strip=True) if element else ""
+
+    petition_box = header.select_one("#petition-text")
+    petition_link = header.select_one("a.js-modal")
+    petition_html = petition_box.decode_contents().strip() if petition_box else ""
+
+    description = header.select_one("#action-description-text") or header.select_one(
+        "#action-description"
+    )
+    description_html = ""
+    if description:
+        # The petition link and its no-JS box sit inside #action-description
+        # on templates without an #action-description-text wrapper; either
+        # way they're rendered separately, as a button and a <dialog>.
+        for element in description.select(".petition-text-link, .js-hidden, meta"):
+            element.decompose()
+        description_html = description.decode_contents().strip()
+
+    intro = {
+        "pretitle": text_of("#action-pretitle"),
+        "title": text_of("#action-title"),
+        "description_html": description_html,
+        "petition_html": petition_html,
+        "petition_link_text": (
+            petition_link.get_text(" ", strip=True) if petition_link and petition_html else ""
+        ),
+    }
+    remaining_html = html[: header_start.start()] + html[header_end:]
+    return (intro if any(intro.values()) else None), remaining_html
 
 
 # Shared by every caller that auto-renders a fetched ActionKit form

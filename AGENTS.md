@@ -1560,3 +1560,20 @@ gate.
     descendants, rather than descending from `site.root_page` alone. Both cases
     have regression tests in `test_i18n.py` that fail against the stock
     behaviour.
+78. **ActionKit's intro and its country-driven fields are ours to render.**
+    350's AK template puts the page's left-hand column in `#action-header`
+    (pretitle, title, description with any embedded logo, and on a petition
+    the "View the full petition text" link plus its `#petition-text` box).
+    `actionkit.split_action_header()` lifts it out of the fetched fragment
+    (the form is left byte-for-byte — its inline scripts are fragile), and
+    `_actionkit_intro.html` renders it as `SignupActionKitBlock`'s copy
+    column **only when `content` is blank**; the pretitle stands in for
+    `eyebrow` under the same condition. The petition modal always renders
+    when AK has petition text. Separately, the Zip/Postal (and State/Region)
+    swap and the GDPR opt-in (`.ak-privacy`, shown only for AK's
+    `privacy_record_countries` from `/context/`) are normally done by
+    `actionkit.forms.reflectCountryChange()`, which never runs here because
+    `initForm()` is never called (see `_actionkit_form.html`). That template
+    ports it per-instance: hidden fields are *disabled* so they aren't
+    posted, the opt-in is required client-side while shown, and it is shown
+    rather than hidden if `/context/` can't be reached.

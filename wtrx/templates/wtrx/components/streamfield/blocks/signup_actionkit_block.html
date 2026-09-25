@@ -60,22 +60,7 @@ choice, and is correct in both layouts.
             {% endif %}
             <div class="flex flex-col gap-8 p-6 sm:p-10
                         {% if on_light %}text-dark{% else %}text-light{% endif %}">
-                {% if value.eyebrow %}
-                    <p class="wtr-signup-eyebrow font-heading inline-block self-start rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
-                              {% if bg == 'dark-grey' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
-                        {{ value.eyebrow }}
-                    </p>
-                {% endif %}
-                {% comment %}
-                Heading size pinned via .wtr-signup-actionkit-content in
-                main.css, same technique .wtr-text-block uses.
-                {% endcomment %}
-                {% if value.content %}
-                    <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
-                                {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
-                        {{ value.content|richtext }}
-                    </div>
-                {% endif %}
+                {% include "wtrx/components/streamfield/blocks/_actionkit_intro.html" %}
                 <div class="w-full">
                     {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with stacked=True %}
                 </div>
@@ -109,35 +94,7 @@ choice, and is correct in both layouts.
             <div class="flex flex-col gap-10 p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-center lg:gap-32 lg:p-16">
                 <div class="flex flex-col items-start gap-8 lg:max-w-[800px] lg:flex-1
                             {% if on_light %}text-dark{% else %}text-light{% endif %}">
-                    {% if value.eyebrow %}
-                        {% comment %}
-                        Same dark pill as feature_panel_block.html's eyebrow, at Figma's
-                        24px — except on the dark grey panel, where that pill is the same
-                        --color-dark as the panel behind it and would read as invisible
-                        text; there it flips to light-on-dark, exactly as
-                        feature_panel_block.html's pill does on its own dark background.
-                        {% endcomment %}
-                        <p class="wtr-signup-eyebrow font-heading inline-block rounded-full px-6 py-4 text-base font-bold leading-[18px] tracking-[0.3px] sm:text-lg lg:text-2xl
-                                  {% if bg == 'dark-grey' %}bg-light text-dark{% else %}bg-dark text-light{% endif %}">
-                            {{ value.eyebrow }}
-                        </p>
-                    {% endif %}
-                    {% comment %}
-                    prose-invert's body color is pinned to pure white
-                    centrally, in main.css — see the .prose-invert rule
-                    there. Figma draws this copy at 24px, but it renders at
-                    the site's 20px body size instead — see AGENTS.md
-                    pitfall #34, which took the whole non-hero ramp down a
-                    notch against a 20px paragraph. Heading size pinned via
-                    .wtr-signup-actionkit-content in main.css, same
-                    technique .wtr-text-block uses.
-                    {% endcomment %}
-                    {% if value.content %}
-                        <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
-                                    {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
-                            {{ value.content|richtext }}
-                        </div>
-                    {% endif %}
+                    {% include "wtrx/components/streamfield/blocks/_actionkit_intro.html" %}
                 </div>
                 <div class="w-full lg:w-[370px] lg:shrink-0">
                     {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with stacked=True %}

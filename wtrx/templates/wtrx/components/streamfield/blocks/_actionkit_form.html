@@ -195,6 +195,81 @@
             populateUtmFields();
 
             {% comment %}
+            Country-dependent fields — a port of actionkit.js's own
+            forms.reflectCountryChange(), which this form never gets because
+            it only runs from forms.initForm() (see the multi-instance
+            comment above). Two things hang off the country select:
+
+              - ZIP Code vs Postal Code (and State vs Region, when a page
+                has them): ActionKit renders both of each pair and expects
+                its client to show the US one for the United States — or
+                for no country yet, same as actionkit.js's isUnitedStates()
+                — and the global one everywhere else. The hidden one is
+                disabled too, so FormData never posts it, and a value typed
+                into it carries over, exactly as actionkit.js does.
+              - The "Millions of people…" opt-in radios (.ak-privacy): shown
+                only for a country in ActionKit's privacy_record_countries
+                (the EU/GDPR list, configured in ActionKit and served on its
+                /context/ endpoint, fetched below). Hidden inputs are
+                disabled so a non-EU signup doesn't post `required=privacy`,
+                and the fine print's "350 will send you email updates"
+                sentence (.privacy-non_eu) takes their place, as ActionKit's
+                own fragment script would do if actionkit.form existed here.
+
+            Until the country list arrives, the opt-in stays hidden (most
+            visitors aren't in it); if /context/ can't be reached at all it
+            is shown instead, since asking for consent unnecessarily is the
+            safe way round to be wrong.
+            {% endcomment %}
+            var countrySelect = form.querySelector('select[name="country"]');
+            var privacyBox = form.querySelector(".ak-privacy");
+            var privacyCountries = null;
+            var privacyRequired = false;
+
+            function setFieldActive(name, active) {
+                var input = form.querySelector('[name="' + name + '"]');
+                if (!input) { return null; }
+                var row = input.closest('[id^="ak-fieldbox-"]');
+                input.disabled = !active;
+                if (row) { row.style.display = active ? "" : "none"; }
+                return input;
+            }
+
+            function showOneOf(showName, hideName) {
+                if (!form.querySelector('[name="' + showName + '"]') || !form.querySelector('[name="' + hideName + '"]')) { return; }
+                var hidden = setFieldActive(hideName, false);
+                var shown = setFieldActive(showName, true);
+                if (hidden.value && !shown.value) { shown.value = hidden.value; }
+            }
+
+            function setPrivacyRequired(required) {
+                privacyRequired = required;
+                if (!privacyBox) { return; }
+                privacyBox.style.display = required ? "" : "none";
+                Array.prototype.forEach.call(privacyBox.querySelectorAll("input, select, textarea"), function (el) {
+                    el.disabled = !required;
+                });
+                Array.prototype.forEach.call(form.querySelectorAll(".privacy-non_eu"), function (el) {
+                    el.style.display = required ? "none" : "";
+                });
+            }
+
+            function reflectCountry() {
+                var country = countrySelect ? countrySelect.value : "";
+                var isUs = !country || country === "United States" || country === "US";
+                showOneOf(isUs ? "zip" : "postal", isUs ? "postal" : "zip");
+                showOneOf(isUs ? "state" : "region", isUs ? "region" : "state");
+                if (privacyCountries && countrySelect) {
+                    setPrivacyRequired(privacyCountries.indexOf(country) !== -1);
+                }
+            }
+
+            if (countrySelect) {
+                countrySelect.addEventListener("change", reflectCountry);
+            }
+            reflectCountry();
+
+            {% comment %}
             Field-level errors reuse ActionKit's own convention exactly —
             .ak-error on the label/input, a <ul class="ak-err"><li> inside
             the fieldbox — so main.css's existing (already-styled, already
@@ -241,11 +316,26 @@
                 var firstInvalid = null;
                 Array.prototype.forEach.call(form.querySelectorAll(REQUIRED_FIELD_SELECTOR), function (fieldbox) {
                     clearFieldError(fieldbox);
+                    if (fieldbox.style.display === "none") { return; }
                     if (fieldIsEmpty(fieldbox)) {
                         showFieldError(fieldbox, msgRequired);
                         firstInvalid = firstInvalid || fieldbox;
                     }
                 });
+
+                {% comment %}
+                The opt-in carries no .required class of its own — ActionKit
+                enforces it server-side from the `required=privacy` hidden
+                input — so it's checked here whenever it's showing.
+                {% endcomment %}
+                var privacyGroup = privacyRequired && privacyBox && privacyBox.querySelector(".input-radio-group");
+                if (privacyGroup) {
+                    clearFieldError(privacyGroup);
+                    if (fieldIsEmpty(privacyGroup)) {
+                        showFieldError(privacyGroup, msgRequired);
+                        firstInvalid = firstInvalid || privacyGroup;
+                    }
+                }
 
                 {% comment %}
                 ActionKit renders email as type="text", not type="email" —
@@ -270,14 +360,14 @@
                 return true;
             }
 
-            form.addEventListener("input", function (event) {
+            function clearErrorFor(event) {
                 var fieldbox = event.target.closest(".input-text, .input-select, .input-checkbox, .input-radio");
                 if (fieldbox) { clearFieldError(fieldbox); }
-            });
-            form.addEventListener("change", function (event) {
-                var fieldbox = event.target.closest(".input-text, .input-select, .input-checkbox, .input-radio");
-                if (fieldbox) { clearFieldError(fieldbox); }
-            });
+                var group = event.target.closest(".input-radio-group");
+                if (group) { clearFieldError(group); }
+            }
+            form.addEventListener("input", clearErrorFor);
+            form.addEventListener("change", clearErrorFor);
 
             {% comment %}
             #ak-errors is ActionKit's own form-level error list, already in
@@ -359,6 +449,9 @@
                 });
             }
 
+            var shortFormId = "{{ short_form_id|escapejs }}";
+            var wantsProgress = false;
+
             {% if stacked %}
             {% comment %}
             Progress bar. AK's fetched fragment carries an empty #progress
@@ -389,10 +482,10 @@
             reuses AK's own per-campaign copy, number formatting, and
             goal/threshold logic exactly, rather than us re-deriving it,
             while writing the result only into this instance's own
-            #progress element. No request fires at all if this fragment
-            has no #progress (the block's ActionKit page has no progress
-            meter configured) — same as the honeypot-field guard above,
-            there's nothing to wire up.
+            #progress element. Nothing progress-related happens if this
+            fragment has no #progress (the block's ActionKit page has no
+            progress meter configured); the /context/ request itself is
+            shared with the opt-in, below.
 
             /context/'s own embedded `progress` field is itself flaky —
             confirmed by comparing it directly against a real ActionKit
@@ -407,57 +500,87 @@
             {% endcomment %}
             var progressEl = formContainer.querySelector("#progress");
             var progressTemplate = formContainer.querySelector("script[type='text/ak-template'][for='progress']");
-            var shortFormId = "{{ short_form_id|escapejs }}";
-            if (progressEl && progressTemplate && baseUrl && shortFormId) {
-                function renderProgress(progressData, pageData) {
-                    window.__wtrAkScriptPromise.then(function () {
-                        var context = pageData || {};
-                        {% comment %}
-                        Matches ak.context's own fallback in actionkit.js:
-                        older/simpler progress templates guard on
-                        `if (goal && total)`, but nothing stops a template
-                        from reading `progress.goal` unconditionally, which
-                        would throw on a plain missing key.
-                        {% endcomment %}
-                        context.progress = progressData || {goal: undefined, total: undefined};
-                        context.args = {};
-                        context.capitalize = actionkit.utils.capitalize;
-                        context.add_commas = actionkit.utils.add_commas;
-                        try {
-                            progressEl.innerHTML = actionkit.utils.template(progressTemplate.innerHTML, context);
-                        } catch (e) {}
-                    });
-                }
+            wantsProgress = !!(progressEl && progressTemplate);
 
-                window.__wtrAkProgressCbSeq = (window.__wtrAkProgressCbSeq || 0) + 1;
-                var progressCbName = "__wtrAkProgressCb" + window.__wtrAkProgressCbSeq;
-                window[progressCbName] = function (data) {
-                    delete window[progressCbName];
-                    data = data || {};
-                    if (data.progress) {
-                        renderProgress(data.progress, data);
-                        return;
-                    }
-                    var fallbackCbName = progressCbName + "_fallback";
-                    window[fallbackCbName] = function (progressData) {
-                        delete window[fallbackCbName];
-                        renderProgress(progressData, data);
-                    };
-                    var fallbackScript = document.createElement("script");
-                    fallbackScript.src = baseUrl + "/progress/" + shortFormId + "?form_name=act&callback=" + fallbackCbName;
-                    fallbackScript.onerror = function () {
-                        delete window[fallbackCbName];
-                        renderProgress(null, data);
-                    };
-                    document.body.appendChild(fallbackScript);
+            function renderProgress(progressData, pageData) {
+                window.__wtrAkScriptPromise.then(function () {
+                    var context = pageData || {};
+                    {% comment %}
+                    Matches ak.context's own fallback in actionkit.js:
+                    older/simpler progress templates guard on
+                    `if (goal && total)`, but nothing stops a template
+                    from reading `progress.goal` unconditionally, which
+                    would throw on a plain missing key.
+                    {% endcomment %}
+                    context.progress = progressData || {goal: undefined, total: undefined};
+                    context.args = {};
+                    context.capitalize = actionkit.utils.capitalize;
+                    context.add_commas = actionkit.utils.add_commas;
+                    try {
+                        progressEl.innerHTML = actionkit.utils.template(progressTemplate.innerHTML, context);
+                    } catch (e) {}
+                });
+            }
+
+            function loadProgress(data, callbackName) {
+                if (data.progress) {
+                    renderProgress(data.progress, data);
+                    return;
+                }
+                var fallbackCbName = callbackName + "_fallback";
+                window[fallbackCbName] = function (progressData) {
+                    delete window[fallbackCbName];
+                    renderProgress(progressData, data);
                 };
-                var progressScript = document.createElement("script");
-                progressScript.src = baseUrl + "/context/" + shortFormId + "?callback=" + progressCbName +
-                    "&form_name=act&want_progress=1&r=" + Math.random();
-                progressScript.onerror = function () { delete window[progressCbName]; };
-                document.body.appendChild(progressScript);
+                var fallbackScript = document.createElement("script");
+                fallbackScript.src = baseUrl + "/progress/" + shortFormId + "?form_name=act&callback=" + fallbackCbName;
+                fallbackScript.onerror = function () {
+                    delete window[fallbackCbName];
+                    renderProgress(null, data);
+                };
+                document.body.appendChild(fallbackScript);
             }
             {% endif %}
+
+            {% comment %}
+            One /context/ request per instance serves both the progress bar
+            (stacked only, above) and the opt-in's country list (every
+            variant — the hero and footer forms carry the same .ak-privacy
+            block). Nothing is requested when neither is present.
+            {% endcomment %}
+            var wantsPrivacy = !!privacyBox;
+            if (baseUrl && shortFormId && (wantsProgress || wantsPrivacy)) {
+                if (wantsPrivacy) { setPrivacyRequired(false); }
+                window.__wtrAkContextCbSeq = (window.__wtrAkContextCbSeq || 0) + 1;
+                var contextCbName = "__wtrAkContextCb" + window.__wtrAkContextCbSeq;
+                window[contextCbName] = function (data) {
+                    delete window[contextCbName];
+                    data = data || {};
+                    if (wantsPrivacy) {
+                        if (!Array.isArray(data.privacy_record_countries)) {
+                            setPrivacyRequired(true);
+                        } else if (countrySelect) {
+                            privacyCountries = data.privacy_record_countries;
+                            reflectCountry();
+                        } else {
+                            {% comment %}
+                            No country field to go on: actionkit.js falls
+                            back to ActionKit's own geo-IP verdict.
+                            {% endcomment %}
+                            setPrivacyRequired(!!data.privacy_needed);
+                        }
+                    }
+                    {% if stacked %}if (wantsProgress) { loadProgress(data, contextCbName); }{% endif %}
+                };
+                var contextScript = document.createElement("script");
+                contextScript.src = baseUrl + "/context/" + shortFormId + "?callback=" + contextCbName +
+                    "&form_name=act" + (wantsProgress ? "&want_progress=1" : "") + "&r=" + Math.random();
+                contextScript.onerror = function () {
+                    delete window[contextCbName];
+                    if (wantsPrivacy) { setPrivacyRequired(true); }
+                };
+                document.body.appendChild(contextScript);
+            }
         })();
     </script>
 {% else %}

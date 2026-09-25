@@ -333,6 +333,141 @@ class TestFetchEmbedFormHTML(SimpleTestCase):
         self.assertIn('<label for="id_email">Email Address</label>', html)
 
 
+# Trimmed from a real act.350.org petition fragment (/act/ppg): the header
+# sits beside the form inside #action-lead, and on a petition carries both
+# a description wrapper and the no-JS petition-text box.
+PETITION_FRAGMENT = """
+<section id="action-lead" class="section action-lead">
+<div class="section-inner">
+    <div id="action-header" class="c6">
+        <a id="jump-to-form" href="#action-form">Add Your Name</a>
+        <p id="action-pretitle"><span class="highlight">Tell PM Carney:</span></p>
+        <h2 id="action-title" class="title3"><span>Build a People's Power Grid</span></h2>
+        <div id="action-description" class="text-large">
+            <div id="action-description-text" data-read-more-after="6">
+                <meta charset="utf-8" />
+                <p>We demand a grid.</p>
+                <p><a href="https://example.org"><img src="https://cdn.example/logo.png" width="150"></a></p>
+            </div>
+            <p class="no-js-hidden petition-text-link">
+                <a href="https://act.350.org" class="js-modal" data-modal-source="#petition-text">
+                    View the full petition text.
+                </a>
+            </p>
+            <div class="js-hidden box">
+                <div id="petition-text">
+                    <p>Full text.</p>
+                    <div><iframe src="https://www.youtube.com/embed/x" width="560"></iframe></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <form id="action-form" name="act"><script>jQuery(function(){ if (1 < 2) {} });</script>
+        <input type="text" name="email"></form>
+    <div id="recent-actions"></div>
+</div>
+</section>
+"""
+
+
+class TestSplitActionHeader(SimpleTestCase):
+    def test_extracts_intro_parts(self):
+        intro, _html = actionkit.split_action_header(PETITION_FRAGMENT)
+        self.assertEqual(intro["pretitle"], "Tell PM Carney:")
+        self.assertEqual(intro["title"], "Build a People's Power Grid")
+        self.assertIn("<p>We demand a grid.</p>", intro["description_html"])
+        self.assertIn('src="https://cdn.example/logo.png"', intro["description_html"])
+        self.assertIn("<p>Full text.</p>", intro["petition_html"])
+        self.assertEqual(intro["petition_link_text"], "View the full petition text.")
+
+    def test_description_excludes_petition_chrome_and_meta(self):
+        intro, _html = actionkit.split_action_header(PETITION_FRAGMENT)
+        self.assertNotIn("js-modal", intro["description_html"])
+        self.assertNotIn("Full text.", intro["description_html"])
+        self.assertNotIn("<meta", intro["description_html"])
+
+    def test_header_removed_and_form_left_byte_for_byte(self):
+        _intro, html = actionkit.split_action_header(PETITION_FRAGMENT)
+        self.assertNotIn('id="action-header"', html)
+        self.assertNotIn("jump-to-form", html)
+        form_start = PETITION_FRAGMENT.index("<form")
+        self.assertEqual(html[html.index("<form"):], PETITION_FRAGMENT[form_start:])
+        self.assertTrue(html.startswith(PETITION_FRAGMENT[: PETITION_FRAGMENT.index('<div id="action-header"')]))
+
+    def test_embedded_iframes_get_a_referrer_policy(self):
+        # Without one, the site's same-origin Referrer-Policy makes YouTube
+        # refuse to play the embed.
+        intro, _html = actionkit.split_action_header(PETITION_FRAGMENT)
+        self.assertIn('referrerpolicy="strict-origin-when-cross-origin"', intro["petition_html"])
+
+    def test_letter_without_petition_text(self):
+        fragment = (
+            '<section id="action-lead"><div id="action-header">'
+            '<h2 id="action-title">No Pipelines</h2>'
+            '<div id="action-description"><p>Copy.</p></div>'
+            '</div><form id="action-form"></form></section>'
+        )
+        intro, html = actionkit.split_action_header(fragment)
+        self.assertEqual(intro["title"], "No Pipelines")
+        self.assertEqual(intro["description_html"], "<p>Copy.</p>")
+        self.assertEqual(intro["petition_html"], "")
+        self.assertEqual(intro["petition_link_text"], "")
+        self.assertEqual(html, '<section id="action-lead"><form id="action-form"></form></section>')
+
+    def test_fragment_without_header_is_returned_unchanged(self):
+        for fragment in ("<form id=\"action-form\"></form>", "", None):
+            intro, html = actionkit.split_action_header(fragment)
+            self.assertIsNone(intro)
+            self.assertEqual(html, fragment)
+
+
+class TestSignupActionKitIntroRendering(SimpleTestCase):
+    """The copy column falls back to ActionKit's own intro only when Content is blank."""
+
+    INTRO = {
+        "pretitle": "Tell PM Carney:",
+        "title": "Build a Grid",
+        "description_html": '<p>AK copy.</p><p><img src="https://cdn.example/logo.png"></p>',
+        "petition_html": "<p>Full petition.</p>",
+        "petition_link_text": "View the full petition text.",
+    }
+
+    def _render(self, **fields):
+        from django.template.loader import render_to_string
+
+        value = SignupActionKitBlock().to_python({"short_form_id": "ppg", **fields})
+        return render_to_string(
+            "wtrx/components/streamfield/blocks/_actionkit_intro.html",
+            {"value": value, "ak_intro": self.INTRO, "bg": "dark-grey", "on_light": False},
+        )
+
+    def test_blank_content_uses_actionkit_copy(self):
+        html = self._render()
+        self.assertIn("Tell PM Carney:", html)
+        self.assertIn("<h2>Build a Grid</h2>", html)
+        self.assertIn("<p>AK copy.</p>", html)
+        self.assertIn('src="https://cdn.example/logo.png"', html)
+
+    def test_editor_content_wins_and_suppresses_actionkit_pretitle(self):
+        html = self._render(content="<h2>Editor heading</h2>")
+        self.assertIn("Editor heading", html)
+        self.assertNotIn("Build a Grid", html)
+        self.assertNotIn("AK copy.", html)
+        self.assertNotIn("wtr-signup-eyebrow", html)
+
+    def test_editor_eyebrow_wins_over_pretitle(self):
+        html = self._render(eyebrow="Sign now")
+        self.assertIn("Sign now", html)
+        self.assertNotIn("Tell PM Carney:", html)
+
+    def test_petition_modal_renders_whether_or_not_content_is_set(self):
+        for fields in ({}, {"content": "<p>Editor copy.</p>"}):
+            html = self._render(**fields)
+            self.assertIn("data-ak-petition-trigger", html)
+            self.assertIn("View the full petition text.", html)
+            self.assertIn("<p>Full petition.</p>", html)
+
+
 class TestSignupActionKitBlockContext(TestCase):
     """SignupActionKitBlock.get_context() fetches, caches, and degrades gracefully."""
 
@@ -408,6 +543,16 @@ class TestSignupActionKitBlockContext(TestCase):
         ctx2 = block.get_context(self._value(), parent_context={"request": request})
         self.assertIsNone(ctx2["form_html"])
         mock_fetch.assert_called_once()
+
+    @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
+    def test_lifts_actionkit_intro_out_of_form_html(self, mock_fetch):
+        mock_fetch.return_value = PETITION_FRAGMENT
+        block = SignupActionKitBlock()
+        request = self.factory.get("/")
+        ctx = block.get_context(self._value(), parent_context={"request": request})
+        self.assertEqual(ctx["ak_intro"]["title"], "Build a People's Power Grid")
+        self.assertNotIn('id="action-header"', ctx["form_html"])
+        self.assertIn('id="action-form"', ctx["form_html"])
 
     def test_no_request_in_context_yields_no_form_html(self):
         block = SignupActionKitBlock()

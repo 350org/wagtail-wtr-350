@@ -5,6 +5,7 @@ import FormAjax from './components/form-ajax.js';
 import RegionalSiteModal from './components/regional-site-modal.js';
 import ActionKitCountryPrefill from './components/actionkit-country-prefill.js';
 import PersonBioModal from './components/person-bio-modal.js';
+import ActionKitPetitionModal from './components/actionkit-petition-modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     MobileMenu.init();
@@ -13,4 +14,5 @@ document.addEventListener('DOMContentLoaded', () => {
     RegionalSiteModal.init();
     ActionKitCountryPrefill.init();
     PersonBioModal.init();
+    ActionKitPetitionModal.init();
 });
