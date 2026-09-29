@@ -31,6 +31,7 @@ from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.utils import timezone
 from wagtail.blocks import RichTextBlock
+from wagtail.blocks.struct_block import StructBlockValidationError
 from wagtail.models import Page, Site
 
 from wtrx.blocks import (
@@ -827,6 +828,7 @@ class TestCardBlockFields(SimpleTestCase):
             "link_page",
             "link_url",
             "link_document",
+            "modal",
             "link_text",
         }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
@@ -875,6 +877,46 @@ class TestCardBlockFields(SimpleTestCase):
             extra_fields=("link_document",),
         )
         self.assertEqual(set(errors), {"link_page", "link_document"})
+
+    def test_modal_is_optional(self):
+        block = CardBlock()
+        self.assertFalse(block.declared_blocks["modal"].required)
+
+    def test_modal_alone_is_valid(self):
+        block = CardBlock()
+        value = block.to_python({
+            "content": "<h3>Stock</h3>",
+            "modal": [{"type": "text", "value": "<p>Transfer details.</p>"}],
+        })
+        block.clean(value)
+
+    def test_modal_conflicts_with_link_url(self):
+        block = CardBlock()
+        value = block.to_python({
+            "content": "<h3>Stock</h3>",
+            "link_url": "https://example.com",
+            "modal": [{"type": "text", "value": "<p>Transfer details.</p>"}],
+        })
+        with self.assertRaises(StructBlockValidationError) as ctx:
+            block.clean(value)
+        self.assertEqual(set(ctx.exception.block_errors), {"link_url", "modal"})
+
+    def test_modal_renders_trigger_and_dialog(self):
+        block = CardBlock()
+        value = block.to_python({
+            "content": "<h3>Stock</h3>",
+            "link_text": "Here's how",
+            "modal": [
+                {"type": "text", "value": "<p>Transfer details.</p>"},
+                {"type": "raw_html", "value": "<div id='widget'></div>"},
+            ],
+        })
+        html = block.render(value)
+        self.assertIn("data-card-modal-trigger", html)
+        self.assertIn("<dialog", html)
+        self.assertIn("Transfer details.", html)
+        self.assertIn("<div id='widget'></div>", html)
+        self.assertNotIn("<a href", html)
 
 
 class TestImageGridItemBlockFields(SimpleTestCase):

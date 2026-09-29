@@ -84,9 +84,51 @@ fill" — that distinction is gone now that every card uses it).
                 <p class="mt-2 flex-1 {{ description_size|default:"text-base" }} text-dark">{{ card.description }}</p>
             {% endif %}
         {% endif %}
-        {% if card.link_page or card.link_url or card.link_document %}
+        {% trans "Learn more" as default_link_text %}
+        {% if card.modal %}
+            {% comment %}
+            CardBlock.modal: the button opens the content in a <dialog>
+            instead of navigating. Same native-<dialog> conventions as
+            _actionkit_intro.html's petition modal (p-0 + m-auto keep the UA
+            centering, `relative` on the inner wrapper anchors the close
+            button). Paired to its trigger via .closest('.wtr-card') in
+            card-modal.js, since a card grid carries many of these.
+            Children are rendered here rather than via include_block — see
+            CardModalContentBlock's docstring.
+            {% endcomment %}
             <div class="mt-4">
-                {% trans "Learn more" as default_link_text %}
+                <button type="button"
+                        class="wtr-btn wtr-btn-outline cursor-pointer hover:bg-primary-50"
+                        aria-haspopup="dialog"
+                        data-card-modal-trigger>
+                    {{ card.link_text|default:default_link_text }}
+                </button>
+            </div>
+            <dialog class="wtr-card-modal m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-lg border-0 p-0 text-left backdrop:bg-dark/70 backdrop:backdrop-blur-sm"
+                    aria-label="{{ card.link_text|default:default_link_text }}"
+                    data-card-modal-dialog>
+                <div class="relative px-6 py-10 sm:px-10">
+                    <button type="button"
+                            class="absolute right-4 top-4 z-10 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-dark text-light transition-colors hover:bg-navy"
+                            aria-label="{% trans 'Close' %}"
+                            data-card-modal-close>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <div class="prose prose-neutral max-w-none text-lg text-dark">
+                        {% for child in card.modal %}
+                            {% if child.block_type == "raw_html" %}
+                                <div class="wtr-raw-html not-prose">{{ child.value }}</div>
+                            {% else %}
+                                {{ child.value|richtext }}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </dialog>
+        {% elif card.link_page or card.link_url or card.link_document %}
+            <div class="mt-4">
                 {% include "wtrx/components/button.html" with text=card.link_text|default:default_link_text link_page=card.link_page link_url=card.link_url link_document=card.link_document style="outline" %}
             </div>
         {% endif %}

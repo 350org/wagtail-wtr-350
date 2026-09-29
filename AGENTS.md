@@ -1596,3 +1596,16 @@ gate.
     point needed the fallback, since a country root's own children (like
     its `press-releases` Blogs page) are ordinary descendants of it, same
     as before.
+80. **`CardBlock.modal` is a fourth CTA target: the card's button opens a
+    native `<dialog>` instead of navigating.** It's mutually exclusive with
+    `link_page`/`link_url`/`link_document` (`_validate_at_most_one_link`).
+    The content is `CardModalContentBlock` (`text` + `raw_html`), not one
+    richtext field, so a modal can carry a third-party widget next to its
+    copy (How to Give's DAFdirect form). `card.html` renders the children
+    itself rather than through `include_block`, because `text_block.html`
+    inverts to light prose inside a dark `SectionBlock` and would be
+    unreadable on the dialog's white panel. `card-modal.js` pairs a trigger
+    with its dialog via `.closest('.wtr-card')`. The 350.org modals are
+    imported with `manage.py import_350_how_to_give_modals --page <id|path>`,
+    which matches each card whose `link_url` ends in `#<modal id>` and saves
+    a draft revision (`--publish` to publish it, `--dry-run` to report only).

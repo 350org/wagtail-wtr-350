@@ -318,7 +318,7 @@ def _validate_at_most_one_link(cleaned, errors, extra_fields=()):
     The base pair is link_page/link_url, which every caller has.
     ``extra_fields`` names further link fields a block also offers —
     FeaturePanelBlock/ImageCardListItemBlock pass ("anchor",), CardBlock
-    passes ("link_document",) — so a block that gained a third target does
+    passes ("link_document", "modal") — so a block that gained a third target does
     not need its own copy of this check. Blocks that pass nothing keep the
     original two-field message verbatim. Each extra-field combination gets
     its own full sentence rather than one built by joining field names, to
@@ -336,6 +336,10 @@ def _validate_at_most_one_link(cleaned, errors, extra_fields=()):
         elif extra_fields == ("link_document",):
             msg = ValidationError(
                 _("Provide only one of link page, link URL, or link document.")
+            )
+        elif extra_fields == ("link_document", "modal"):
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, link document, or modal content.")
             )
         else:
             msg = ValidationError(
@@ -1177,6 +1181,28 @@ class TableBlock(WagtailTableBlock):
 # ---------------------------------------------------------------------------
 
 
+class CardModalContentBlock(StreamBlock):
+    """
+    StreamBlock used inside CardBlock.modal: what the card's button opens in a
+    <dialog> instead of following a link.
+
+    A StreamBlock rather than one richtext field so a modal can carry a
+    third-party widget alongside its copy — the DAFdirect form on How to
+    Give's "Donor Advised Funds" modal is the case that needed it (see
+    import_350_how_to_give_modals). Same small, purpose-built list reasoning
+    as AccordionItemContentBlock: a modal is a compact overlay, not a layout
+    region. card.html renders the children itself rather than through each
+    child's own template — text_block.html inverts to light prose inside a
+    dark SectionBlock, which would be unreadable on the dialog's white panel.
+    """
+
+    text = TextBlock()
+    raw_html = RawHTMLBlock()
+
+    class Meta:
+        label = _("Modal content")
+
+
 class CardBlock(ContentPreviewMixin, StructBlock):
     """
     A content card with a heading, optional icon, optional image, description,
@@ -1184,8 +1210,13 @@ class CardBlock(ContentPreviewMixin, StructBlock):
 
     When an icon is set, it renders at 24x24 beside the content block. Used
     directly in the StreamField and as the child block of CardGridBlock. At
-    most one of link_page, link_url, or link_document may be set. clean()
-    enforces this. link_document was originally a "document-link" Draftail
+    most one of link_page, link_url, link_document, or modal may be set.
+    clean() enforces this.
+
+    `modal` is the fourth CTA target: when set, the card's button opens that
+    content in a native <dialog> (components/card.html, card-modal.js)
+    instead of navigating — 350.org's "Ways to give" cards each open their
+    details this way. link_document was originally a "document-link" Draftail
     feature inside `content` (letting an editor link arbitrary text to an
     uploaded Document), replaced by this structured field so a document
     behaves as a third CTA target alongside link_page/link_url instead of a
@@ -1240,6 +1271,14 @@ class CardBlock(ContentPreviewMixin, StructBlock):
             "link page, link URL, or link document."
         ),
     )
+    modal = CardModalContentBlock(
+        required=False,
+        label=_("Modal content"),
+        help_text=_(
+            "Opens in a pop-up when the card's button is clicked. Use instead "
+            "of link page, link URL, or link document."
+        ),
+    )
     link_text = CharBlock(
         required=False,
         default=_("Learn more"),
@@ -1248,7 +1287,7 @@ class CardBlock(ContentPreviewMixin, StructBlock):
     )
     def clean(self, value):
         cleaned = super().clean(value)
-        errors = _validate_at_most_one_link(cleaned, {}, extra_fields=("link_document",))
+        errors = _validate_at_most_one_link(cleaned, {}, extra_fields=("link_document", "modal"))
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
@@ -3254,13 +3293,7 @@ class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, Struct
         help_text=_(
             "Optional. When set, a successful signup shows this message in "
             "place of the form instead of redirecting to ActionKit's own "
-            "thank-you page. ActionKit's normal submission is a full-page "
-            "POST directly to ActionKit, so this works by forwarding the "
-            "signup through our own server (the same "
-            "integrations.actionkit.submit_action REST call FormPage signups "
-            "already use) instead — which does not go through ActionKit's own "
-            "recaptcha check, the same trade-off that forwarding already "
-            "accepts elsewhere."
+            "thank-you page."
         ),
     )
 
@@ -3347,13 +3380,7 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
         help_text=_(
             "Optional. When set, a successful signup shows this message in "
             "place of the form instead of redirecting to ActionKit's own "
-            "thank-you page. ActionKit's normal submission is a full-page "
-            "POST directly to ActionKit, so this works by forwarding the "
-            "signup through our own server (the same "
-            "integrations.actionkit.submit_action REST call FormPage signups "
-            "already use) instead — which does not go through ActionKit's own "
-            "recaptcha check, the same trade-off that forwarding already "
-            "accepts elsewhere."
+            "thank-you page."
         ),
     )
 

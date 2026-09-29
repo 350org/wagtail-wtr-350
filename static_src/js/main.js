@@ -6,6 +6,7 @@ import RegionalSiteModal from './components/regional-site-modal.js';
 import ActionKitCountryPrefill from './components/actionkit-country-prefill.js';
 import PersonBioModal from './components/person-bio-modal.js';
 import ActionKitPetitionModal from './components/actionkit-petition-modal.js';
+import CardModal from './components/card-modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     MobileMenu.init();
@@ -15,4 +16,5 @@ document.addEventListener('DOMContentLoaded', () => {
     ActionKitCountryPrefill.init();
     PersonBioModal.init();
     ActionKitPetitionModal.init();
+    CardModal.init();
 });
