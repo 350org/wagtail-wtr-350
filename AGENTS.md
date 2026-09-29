@@ -1577,3 +1577,22 @@ gate.
     ports it per-instance: hidden fields are *disabled* so they aren't
     posted, the opt-in is required client-side while shown, and it is shown
     rather than hidden if `/context/` can't be reached.
+79. **A third instance of pitfall #77's bug class: `--target`'s
+    slash-path resolution also only walked descendants of `site.root_page`.**
+    `_find_page_by_path()` (`_wp_content_utils.py`, shared by both content
+    importers via `resolve_blogs_target()`) existed for exactly the
+    "country site" case (`--target france/blog`), but was written before
+    the sibling-root refactor and still assumed the whole tree hung off
+    `site.root_page`. Confirmed live: `--target indonesia/press-releases`
+    failed with "No page found at path" even though
+    `/indonesia/press-releases/` loads fine — `indonesia`'s parent is the
+    tree's real root (sibling of Home), not a child of Home, so the walk's
+    very first segment never matched. Fixed by resolving only the *first*
+    path segment two ways, tried in order: as a child of `site.root_page`
+    (the original nested shape, e.g. a genuinely-nested `france/blog`) and,
+    if that finds nothing, as a child of `site.root_page.get_parent()`
+    instead (a sibling of Home). Every segment after the first still
+    resolves as an ordinary child either way — only the walk's starting
+    point needed the fallback, since a country root's own children (like
+    its `press-releases` Blogs page) are ordinary descendants of it, same
+    as before.

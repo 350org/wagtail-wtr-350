@@ -202,16 +202,31 @@ def yoast_seo_fields_from_page(soup):
 
 def _find_page_by_path(path):
     """
-    Walk the default site's page tree by slug, one path segment at a time,
-    and return the page found there (as its real subtype, via .specific),
-    or None if any segment doesn't match.
+    Walk the page tree by slug, one path segment at a time, and return the
+    page found there (as its real subtype, via .specific), or None if any
+    segment doesn't match.
 
-    E.g. "france/blog" -> site.root_page's child sliced by slug "france",
-    then that page's own child sliced by slug "blog". Exists because
-    Page.slug is only unique among siblings, not site-wide (see
-    resolve_blogs_target's docstring) -- a bare slug can't disambiguate a
-    page nested under a country/region sub-home from an identically-slugged
-    page elsewhere in the tree.
+    E.g. "france/blog" -> a page sliced by slug "france", then that page's
+    own child sliced by slug "blog". Exists because Page.slug is only
+    unique among siblings, not site-wide (see resolve_blogs_target's
+    docstring) -- a bare slug can't disambiguate a page nested under a
+    country/region sub-home from an identically-slugged page elsewhere in
+    the tree.
+
+    The *first* segment is resolved two ways, tried in order: as a child of
+    site.root_page (an ordinary nested section, the original/legacy
+    shape), then -- if that finds nothing -- as a sibling of site.root_page
+    (a child of the tree's real root instead). Country/language sections
+    were moved from nested-under-Home to top-level siblings of Home
+    (AGENTS.md pitfall #77: a language tree is a sibling of the site root,
+    not a descendant); this importer predates that move and walked only
+    site.root_page's descendants, so a --target path starting at one of
+    those sections (e.g. "indonesia/press-releases", where "indonesia" is
+    now a sibling of Home) silently failed to resolve even though the page
+    exists. Every segment *after* the first still resolves as an ordinary
+    child, same as before -- only the root of the walk needed the fallback.
+    Shared by both import_350_blog.py and import_350_press_releases.py via
+    resolve_blogs_target(), so this fixes --target resolution for both.
     """
     # Deferred import to avoid import-time DB access.
     from wagtail.models import Site
@@ -220,8 +235,16 @@ def _find_page_by_path(path):
     if site is None:
         return None
 
-    page = site.root_page
-    for segment in path.strip("/").split("/"):
+    segments = path.strip("/").split("/")
+    first_segment, remaining_segments = segments[0], segments[1:]
+
+    page = site.root_page.get_children().filter(slug=first_segment).first()
+    if page is None:
+        page = site.root_page.get_parent().get_children().filter(slug=first_segment).first()
+    if page is None:
+        return None
+
+    for segment in remaining_segments:
         page = page.get_children().filter(slug=segment).first()
         if page is None:
             return None
