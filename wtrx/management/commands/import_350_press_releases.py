@@ -80,6 +80,8 @@ from wtrx.management.commands._wp_content_utils import (
 USER_AGENT = "350-wagtail-press-release-import/1.0 (+https://github.com/)"
 
 _LOC_RE = re.compile(r"<loc>(.*?)</loc>")
+_URL_BLOCK_RE = re.compile(r"<url>(.*?)</url>", re.DOTALL)
+_LASTMOD_RE = re.compile(r"<lastmod>(.*?)</lastmod>")
 
 
 def _sitemap_shard_urls(session, sitemap_index_url):
@@ -90,9 +92,25 @@ def _sitemap_shard_urls(session, sitemap_index_url):
     ]
 
 
+def _parse_lastmod(text):
+    """Parse a sitemap <lastmod> value, or None if missing/unparseable."""
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
 def fetch_press_release_urls(session, sitemap_index_url):
     """
-    Return every press release URL, most recently published first.
+    Return every (url, lastmod) pair, most recently published first.
+
+    ``lastmod`` (a timezone-aware datetime, or None if the sitemap didn't
+    carry one) is Yoast's own ISO 8601 ``<lastmod>`` for that URL -- ISO 8601
+    is locale-independent, unlike the visible published date scraped from
+    each page later (see fetch_press_release()'s docstring), so it's kept
+    here as a fallback for when that scrape can't be parsed at all.
 
     The sitemap shards are each internally oldest-to-newest, and later
     shards contain newer posts than earlier ones (verified against the
@@ -103,10 +121,16 @@ def fetch_press_release_urls(session, sitemap_index_url):
     for shard_url in _sitemap_shard_urls(session, sitemap_index_url):
         resp = session.get(shard_url, timeout=30)
         resp.raise_for_status()
-        for url in _LOC_RE.findall(resp.text):
+        for block in _URL_BLOCK_RE.findall(resp.text):
+            loc_match = _LOC_RE.search(block)
+            if not loc_match:
+                continue
+            url = loc_match.group(1)
             if url.rstrip("/").endswith("/press-release"):
                 continue  # the archive index itself, not a single post
-            urls.append(url)
+            lastmod_match = _LASTMOD_RE.search(block)
+            lastmod = _parse_lastmod(lastmod_match.group(1) if lastmod_match else None)
+            urls.append((url, lastmod))
     urls.reverse()
     return urls
 
@@ -133,9 +157,12 @@ def _slug_from_url(url):
     return slugify(unquote(segment), allow_unicode=True)
 
 
-def fetch_press_release(session, url):
+def fetch_press_release(session, url, sitemap_lastmod=None):
     """
     Fetch and parse a single press release page.
+
+    ``sitemap_lastmod`` is that URL's <lastmod> from the sitemap (see
+    fetch_press_release_urls()), used as a fallback published_at.
 
     Returns (title, published_at, body_blocks, seo_title,
     search_description), or None if the page is missing the expected
@@ -151,7 +178,17 @@ def fetch_press_release(session, url):
         return None
     title = html.unescape(title_tag.get_text(strip=True))
 
-    published_at = dj_timezone.now()
+    # "#post-time"'s text is the theme's own rendering of the date, in
+    # whatever language the site is in ("26 septembre, 2026",
+    # "24. November 2021", "2026年8月26日", ...) -- "%B %d, %Y" only ever
+    # matches the English site's "Month DD, YYYY" shape. Rather than build
+    # out a per-language format table, fall back to the sitemap's own
+    # <lastmod> (locale-independent ISO 8601) when the scrape doesn't
+    # parse, and only as a last resort to "now" -- silently stamping every
+    # press release on a non-English site with today's date (the previous
+    # behavior) is worse than an approximate "last modified" date, since it
+    # also feeds first_published_at/listing order (pitfall #30).
+    published_at = sitemap_lastmod or dj_timezone.now()
     date_span = soup.find(id="post-time")
     if date_span:
         try:
@@ -247,7 +284,7 @@ class Command(BaseCommand):
         created, updated, skipped, errors = 0, 0, 0, 0
         processed = 0
 
-        for url in urls:
+        for url, lastmod in urls:
             if limit and processed >= limit:
                 break
 
@@ -259,7 +296,7 @@ class Command(BaseCommand):
                 processed += 1
                 continue
 
-            parsed = fetch_press_release(session, url)
+            parsed = fetch_press_release(session, url, sitemap_lastmod=lastmod)
             if parsed is None:
                 self.stdout.write(self.style.WARNING(f"  skip (unrecognized page structure): {url}"))
                 continue
