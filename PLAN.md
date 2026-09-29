@@ -386,13 +386,11 @@ more than one signup variant can be available to editors at once.
 
 ### HomePage
 - **Inherits**: BasePage + HeroMixin
-- **Fields**: body (BodyStreamBlock), use_transparent_header (BooleanField)
+- **Fields**: body (BodyStreamBlock)
 - **Template**: `pages/home_page.html`
 - **Parent**: Root (Site root page) or another HomePage (country/region
   sub-home, e.g. `/canada`). Not allowed under ContentPage or IndexPage.
 - **Notes**: Hero at top (from HeroMixin), StreamField body below.
-  `use_transparent_header=True` makes the header `position:absolute` so the hero
-  image extends behind it; automatically uses `BrandingSEOSettings.dark_logo` if set.
 
 ### ContentPage
 - **Inherits**: BasePage + HeroMixin
@@ -683,12 +681,11 @@ base.html
 ```
 
 ### Header (`navigation/header.html`)
-- Logo left (from BrandingSEOSettings.logo; uses dark_logo when transparent header active)
+- Logo left (from BrandingSEOSettings.logo)
 - Nav links right (from NavigationSettings.primary_navigation — InternalLink, ExternalLink, AnchorLink)
 - CTA button right (from NavigationSettings.cta_text/cta_page/cta_url/cta_anchor)
 - Social icons in menu panel (from SocialSettings when show_in_header=True)
 - Collapsed desktop menu option (NavigationSettings.collapse_desktop_menu) — hides desktop nav, shows hamburger at all breakpoints
-- Transparent header option (HomePage.use_transparent_header) — absolute position, transparent bg, light text colors
 - Mobile: logo left, hamburger right. Hamburger opens nav panel (same JS, breakpoint-agnostic).
 
 ### Footer (`navigation/footer.html`)
@@ -1028,9 +1025,7 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   breakpoints; uses existing mobile-menu.js (no JS changes needed)
 - [x] CTA anchor link: `NavigationSettings.cta_anchor` — CTA button can link to an
   anchor instead of a page or URL
-- [x] Transparent header on HomePage: `HomePage.use_transparent_header` (BooleanField,
-  default False) — makes header `position:absolute` over hero, transparent bg, light
-  text; automatically uses `BrandingSEOSettings.dark_logo` when enabled
+- [x] ~~Transparent header on HomePage~~ — removed; the header is always solid
 - [x] `wtr-*` CSS class hooks on all critical elements: `wtr-header`, `wtr-footer`,
   `wtr-hero`, `wtr-section`, `wtr-card`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`,
   `wtr-quote`, `wtr-donate`, `wtr-signup`, `wtr-social-links` — no default styles,

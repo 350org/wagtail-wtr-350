@@ -17,7 +17,9 @@ card_grid_block.html.
             in-data-[bg-tone=dark]: — see card_grid_block.html's comment;
             this heading has no fill of its own to fall back on.
             {% endcomment %}
-            <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+            <div class="mx-auto max-w-3xl text-center">
+                <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+            </div>
         {% endif %}
         <div class="wtr-person-card-grid flex flex-col gap-8">
             {% for row in rows %}

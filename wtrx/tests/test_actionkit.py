@@ -370,6 +370,35 @@ PETITION_FRAGMENT = """
 """
 
 
+class TestStripSubmitArrow(SimpleTestCase):
+    """A typed-in trailing arrow is removed; the CSS icon is the only arrow."""
+
+    def test_strips_trailing_arrow_from_submit_button(self):
+        html = '<button type="submit" class="submit button-primary">Junte-se a nós →</button>'
+        self.assertEqual(
+            actionkit._strip_submit_arrow(html),
+            '<button type="submit" class="submit button-primary">Junte-se a nós</button>',
+        )
+
+    def test_strips_arrow_entity(self):
+        html = '<button class="x" type="submit">Rejoignez-nous &rarr; </button>'
+        self.assertEqual(actionkit._strip_submit_arrow(html), '<button class="x" type="submit">Rejoignez-nous</button>')
+
+    def test_strips_arrow_from_submit_input_value(self):
+        self.assertEqual(
+            actionkit._strip_submit_arrow('<input type="submit" value="Join →">'),
+            '<input type="submit" value="Join">',
+        )
+
+    def test_leaves_labels_without_an_arrow_alone(self):
+        html = '<button type="submit">Join Us</button>'
+        self.assertEqual(actionkit._strip_submit_arrow(html), html)
+
+    def test_leaves_non_submit_buttons_alone(self):
+        html = '<button type="button">Next →</button>'
+        self.assertEqual(actionkit._strip_submit_arrow(html), html)
+
+
 class TestSplitActionHeader(SimpleTestCase):
     def test_extracts_intro_parts(self):
         intro, _html = actionkit.split_action_header(PETITION_FRAGMENT)

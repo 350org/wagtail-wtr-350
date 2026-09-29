@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from django.test import Client, RequestFactory, TestCase
 from django.utils import timezone
 from wagtail.images.tests.utils import get_test_image_file
-from wagtail.models import Page, Site
+from wagtail.models import Locale, Page, Site
 from wagtail.test.utils import WagtailPageTests
 from wagtail.test.utils.form_data import nested_form_data, streamfield
 
@@ -1298,7 +1298,21 @@ class TestBlogsGetContext(TestCase):
 
     def test_categories_in_context(self):
         ctx = self._get_context()
-        self.assertEqual(set(ctx["categories"]), {self.climate, self.justice})
+        self.assertEqual({item["category"] for item in ctx["categories"]}, {self.climate, self.justice})
+
+    def test_category_label_falls_back_to_name(self):
+        ctx = self._get_context()
+        self.assertEqual({item["label"] for item in ctx["categories"]}, {self.climate.name, self.justice.name})
+
+    def test_category_label_uses_the_pages_locale(self):
+        from wtrx.models import BlogCategoryLabel
+
+        other = Locale.objects.create(language_code="fr-fr")
+        BlogCategoryLabel.objects.create(category=self.climate, locale=self.blogs.locale, name="Local label")
+        BlogCategoryLabel.objects.create(category=self.justice, locale=other, name="Justice climatique")
+        labels = {item["category"]: item["label"] for item in self._get_context()["categories"]}
+        self.assertEqual(labels[self.climate], "Local label")
+        self.assertEqual(labels[self.justice], self.justice.name)
 
     def test_no_category_filter_selected_by_default(self):
         ctx = self._get_context()

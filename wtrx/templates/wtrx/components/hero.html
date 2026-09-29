@@ -77,10 +77,7 @@
   None there — HeroBlock has no video field, only a page's own hero does).
 
   Height (full variant only): viewport height minus the site nav's height
-  (h-16 = 4rem in header.html) when the nav is in normal flow; full viewport
-  when the nav is transparent/overlaid (see HomePage.use_transparent_header —
-  transparent_header is set on the page-level context and inherited here
-  since hero.html is {% include %}'d without `only`).
+  (h-16 = 4rem in header.html).
 {% endcomment %}
 {% if hero.variant == "banner" %}
 
@@ -233,15 +230,18 @@
                     trailing right arrow: a 4px border in the panel's own text color,
                     reusing feature_panel_block.html's arrow glyph and wtr-btn-lg
                     sizing so every arrow CTA on the site is one shape.
+                    max-w-full + whitespace-normal let a long label wrap on a phone
+                    instead of running past the panel's edge (wtr-btn is nowrap),
+                    same as feature_panel_block.html; shrink-0 keeps the arrow whole.
                     {% endcomment %}
                     {% for cta_block in hero.cta %}
                         {% if cta_block.block_type == "button" %}
                             <a href="{% if cta_block.value.link_page %}{{ cta_block.value.link_page.url }}{% elif cta_block.value.anchor %}#{{ cta_block.value.anchor }}{% else %}{{ cta_block.value.link_url }}{% endif %}"
                                {% if cta_block.value.link_url %}rel="noopener noreferrer"{% endif %}
-                               class="wtr-btn wtr-btn-lg mt-2 inline-flex w-fit items-center gap-2 border-4
+                               class="wtr-btn wtr-btn-lg mt-2 inline-flex w-fit max-w-full items-center gap-2 whitespace-normal border-4
                                       {% if on_light %}wtr-btn-outline hover:bg-dark/5{% else %}wtr-btn-outline-light hover:bg-white/10{% endif %}">
                                 {{ cta_block.value.text }}
-                                <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                                <svg class="h-7 w-7 shrink-0" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
                                     <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
                             </a>
@@ -324,7 +324,7 @@
     {% endcomment %}
     <div class="{% if not hero.in_body %}wtr-page-hero {% endif %}mx-auto max-w-[1500px] px-4">
         <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col rounded-lg justify-end
-                    {% if transparent_header %}min-h-screen{% else %}min-h-[calc(100vh-4rem)]{% endif %}"
+                    min-h-[calc(100vh-4rem)]"
              {% if hero.video %}data-hero{% endif %}>
 
             {% if hero.video %}

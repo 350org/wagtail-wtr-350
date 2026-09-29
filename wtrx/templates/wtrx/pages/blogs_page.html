@@ -33,11 +33,11 @@ too just doubled it.
                       {% if not selected_category %}bg-dark text-light{% else %}bg-neutral-200 text-dark hover:bg-neutral-300{% endif %}">
                 {% trans "All" %}
             </a>
-            {% for category in categories %}
-                <a href="{{ page.url }}?category={{ category.slug }}"
+            {% for item in categories %}
+                <a href="{{ page.url }}?category={{ item.category.slug }}"
                    class="rounded-full px-3 py-2 font-heading text-base font-bold transition-colors
-                          {% if selected_category == category %}bg-dark text-light{% else %}bg-neutral-200 text-dark hover:bg-neutral-300{% endif %}">
-                    {{ category.name }}
+                          {% if selected_category == item.category %}bg-dark text-light{% else %}bg-neutral-200 text-dark hover:bg-neutral-300{% endif %}">
+                    {{ item.label }}
                 </a>
             {% endfor %}
         </div>

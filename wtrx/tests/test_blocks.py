@@ -793,6 +793,7 @@ class TestSectionBlockStructure(SimpleTestCase):
         "signup_wagtail_forms",
         "signup_action_network",
         "signup_actionkit",
+        "spacer",
     }
 
     def test_content_block_names(self):
@@ -1573,6 +1574,48 @@ class TestImageCardListBlockFields(SimpleTestCase):
     def test_alignment_defaults_to_image_left(self):
         block = ImageCardListBlock()
         self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+
+class TestSpacerBlock(SimpleTestCase):
+    def test_sizes_render_their_height(self):
+        from wtrx.blocks import SpacerBlock
+
+        block = SpacerBlock()
+        for size, height in [("small", "h-8"), ("medium", "h-16"), ("large", "h-32")]:
+            html = block.render(block.to_python({"size": size}))
+            self.assertIn("wtr-spacer", html)
+            self.assertIn(height, html)
+            self.assertIn('aria-hidden="true"', html)
+
+    def test_gap_after_a_spacer_is_zeroed(self):
+        css = (pathlib.Path(settings.BASE_DIR) / "static_src" / "css" / "main.css").read_text()
+        self.assertRegex(css, r"\.wtr-body-stack > \[data-block-type='spacer'\],\s*\.wtr-spacer \{\s*margin-block-end: 0;")
+
+
+class TestHeadlineHtml(SimpleTestCase):
+    def test_paragraphs_and_breaks_become_br(self):
+        from wtrx.blocks import headline_html
+
+        self.assertEqual(
+            headline_html('<p data-block-key="a">First line<br/>second</p><p data-block-key="b">third</p>'),
+            "First line<br>second<br>third",
+        )
+
+    def test_other_markup_is_dropped_and_text_escaped(self):
+        from wtrx.blocks import headline_html
+
+        self.assertEqual(headline_html("<p><b>Bold</b> &amp; <i>more</i></p>"), "Bold &amp; more")
+
+    def test_plain_text_is_escaped(self):
+        from wtrx.blocks import headline_html
+
+        self.assertEqual(headline_html("Fish & chips"), "Fish &amp; chips")
+
+    def test_empty_values(self):
+        from wtrx.blocks import headline_html
+
+        for value in (None, "", "<p></p>", '<p data-block-key="x"> </p>'):
+            self.assertEqual(headline_html(value), "")
 
 
 class TestHeadingBlock(SimpleTestCase):
