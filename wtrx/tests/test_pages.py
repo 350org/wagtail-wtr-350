@@ -212,6 +212,25 @@ class TestHeroPanelSelection(TestCase):
 # ---------------------------------------------------------------------------
 
 
+class TestEditFormScriptOrder(TestCase):
+    """
+    wagtail-ai's draftail.js reads `window.React` once at load, so no
+    React-loading Wagtail entry (telepath/blocks.js) may sit between it and
+    Wagtail's draftail.js: that entry replaces the global with its own React
+    copy and every AI toolbar crashes with React error #321 (see
+    HeadlineRichTextArea).
+    """
+
+    def test_wagtail_ai_draftail_follows_wagtail_draftail(self):
+        for model in (HomePage, ContentPage, IndexPage, Blogs, Post, FormPage):
+            with self.subTest(model=model.__name__):
+                js = [path.split("?")[0] for path in model.get_edit_handler().get_form_class()().media._js]
+                start = js.index("/static/wagtailadmin/js/draftail.js")
+                end = js.index("/static/wagtail_ai/draftail.js")
+                self.assertLess(start, end)
+                self.assertNotIn("/static/wagtailadmin/js/telepath/blocks.js", js[start:end])
+
+
 class TestHomePageParentSubpageTypes(WagtailPageTests):
     """HomePage can only be created under the Wagtail root page."""
 
