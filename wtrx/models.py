@@ -39,6 +39,7 @@ from .blocks import (
 from .constants import RICHTEXT_FEATURES_HEADLINE, RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
+from .widgets import HeadlineRichTextArea
 from .site_settings import (  # noqa: F401 — register with Django ORM
     BrandingSEOSettings,
     FooterSettings,
@@ -328,7 +329,7 @@ class HeroMixin(models.Model):
         MultiFieldPanel(
             [
                 FieldPanel("hero_pre_header"),
-                FieldPanel("hero_headline"),
+                FieldPanel("hero_headline", widget=HeadlineRichTextArea(features=RICHTEXT_FEATURES_HEADLINE)),
                 FieldPanel("hero_copy"),
                 FieldPanel("hero_image"),
                 MediaChooserPanel("hero_video", media_type="video"),
@@ -359,7 +360,7 @@ class HeroMixin(models.Model):
     # across two MultiFieldPanels on two models is safe — bind_to_model()
     # clones before setting .model.
     banner_hero_fields = [
-        FieldPanel("hero_headline"),
+        FieldPanel("hero_headline", widget=HeadlineRichTextArea(features=RICHTEXT_FEATURES_HEADLINE)),
         FieldPanel("hero_copy"),
         FieldPanel("hero_image"),
         FieldPanel("hero_image_caption"),
@@ -498,7 +499,7 @@ class BannerHeroMixin(models.Model):
     banner_hero_panels = [
         MultiFieldPanel(
             [
-                FieldPanel("hero_headline"),
+                FieldPanel("hero_headline", widget=HeadlineRichTextArea(features=RICHTEXT_FEATURES_HEADLINE)),
                 FieldPanel("hero_image"),
                 FieldPanel("hero_banner_color"),
             ],

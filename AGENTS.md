@@ -1644,3 +1644,16 @@ gate.
     also counted before each zero-width item and leaves the form 16px too
     wide). `_strip_submit_arrow()` (`actionkit.py`) removes a trailing
     arrow typed into an AK submit label, since our CSS draws its own.
+82. **wagtail-ai's `draftail.js` must load before any other React-loading
+    Wagtail entry that follows Wagtail's own `draftail.js`.** Each Wagtail
+    webpack entry embeds its own runtime, so every entry that imports React
+    overwrites `window.React` with its own copy, and wagtail-ai captures
+    that global once, at load. If Django's media merge puts
+    `telepath/blocks.js` between the two, every AI-enabled Draftail on the
+    page crashes on load with React error #321 ("The editor just crashed").
+    A Draftail field without `"ai"` placed before the body StreamField is
+    what reorders it: the hero headline (`features=[]`) did, so its panels
+    use `HeadlineRichTextArea` (`wtrx/widgets.py`), which lists wagtail-ai's
+    script in its own media. Any new non-AI Draftail field ahead of a
+    StreamField needs the same widget. `TestEditFormScriptOrder` checks the
+    order for every page type.
