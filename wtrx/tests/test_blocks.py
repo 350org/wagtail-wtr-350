@@ -43,7 +43,9 @@ from wtrx.blocks import (
     AccordionItemBlock,
     AccordionItemContentBlock,
     BannerHeroCTABlock,
+    BodyImageBlock,
     BodyStreamBlock,
+    BodyVideoBlock,
     ButtonBlock,
     ButtonGroupBlock,
     CalloutBlock,
@@ -59,12 +61,14 @@ from wtrx.blocks import (
     HeroBlock,
     HeroCTABlock,
     HeroSignupActionKitBlock,
+    ImageBlock,
     ImageCardListBlock,
     ImageCardListItemBlock,
     ImageGridBlock,
     ImageGridItemBlock,
     HeadingBlock,
     ImageTextBlock,
+    LeadTextBlock,
     LogoGridBlock,
     LogoGridItemBlock,
     PageCardsBlock,
@@ -300,6 +304,64 @@ class TestRawHTMLBlockValidation(SimpleTestCase):
         block = RawHTMLBlock(required=False)
         cleaned = block.clean(block.to_python(""))
         self.assertEqual(cleaned, "")
+
+
+class TestMediaWidthAndCaption(TestCase):
+    """Body-level image/video width choice, and the image caption."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from wagtail.images.tests.utils import get_test_image_file
+
+        from wtrx.images import CustomImage
+
+        cls.image = CustomImage.objects.create(
+            title="Photo", description="A photo", file=get_test_image_file()
+        )
+
+    def _render_image(self, block, **raw):
+        value = block.to_python({"image": self.image.pk, "caption": "A caption", **raw})
+        return block.render(value)
+
+    def test_only_body_blocks_offer_a_width(self):
+        self.assertIn("width", BodyImageBlock().child_blocks)
+        self.assertIn("width", BodyVideoBlock().child_blocks)
+        self.assertNotIn("width", ImageBlock().child_blocks)
+        self.assertNotIn("width", VideoBlock().child_blocks)
+        self.assertNotIn("width", SectionContentBlock().child_blocks["image"].child_blocks)
+
+    def test_body_stream_uses_the_width_variants(self):
+        children = BodyStreamBlock().child_blocks
+        self.assertIsInstance(children["image"], BodyImageBlock)
+        self.assertIsInstance(children["video"], BodyVideoBlock)
+
+    def test_image_defaults_to_full_width(self):
+        html = self._render_image(BodyImageBlock())
+        self.assertIn("max-w-[1500px]", html)
+
+    def test_image_width_choice_sets_the_container(self):
+        html = self._render_image(BodyImageBlock(), width="narrow")
+        self.assertIn("max-w-[800px]", html)
+        self.assertNotIn("max-w-[1500px]", html)
+
+    def test_image_without_a_width_field_keeps_the_full_container(self):
+        self.assertIn("max-w-[1500px]", self._render_image(ImageBlock()))
+
+    def test_caption_renders_below_the_image(self):
+        html = self._render_image(ImageBlock())
+        self.assertIn("A caption", html)
+        self.assertNotIn("wtr-image-caption", html)
+        self.assertLess(html.index("<img"), html.index("A caption"))
+
+    def test_video_container_only_at_body_level(self):
+        raw = {"embed_url": "", "media_file": None, "caption": ""}
+        body = BodyVideoBlock()
+        self.assertEqual(
+            body.get_context(body.to_python(raw))["container_class"],
+            "mx-auto max-w-[800px] px-4 sm:px-6 lg:px-0",
+        )
+        plain = VideoBlock()
+        self.assertIsNone(plain.get_context(plain.to_python(raw))["container_class"])
 
 
 class TestVideoBlockValidation(SimpleTestCase):
@@ -1616,6 +1678,22 @@ class TestHeadlineHtml(SimpleTestCase):
 
         for value in (None, "", "<p></p>", '<p data-block-key="x"> </p>'):
             self.assertEqual(headline_html(value), "")
+
+
+class TestLeadTextBlock(SimpleTestCase):
+    """LeadTextBlock: inline marks plus lists, no headings."""
+
+    def test_allows_lists_but_not_headings(self):
+        features = LeadTextBlock().features
+        self.assertIn("ul", features)
+        self.assertIn("ol", features)
+        self.assertNotIn("h2", features)
+
+    def test_renders_a_list(self):
+        block = LeadTextBlock()
+        html = block.render(block.to_python("<ul><li>One</li><li>Two</li></ul>"))
+        self.assertIn("<ul>", html)
+        self.assertIn("wtr-lead-text", html)
 
 
 class TestHeadingBlock(SimpleTestCase):

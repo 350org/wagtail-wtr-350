@@ -151,6 +151,7 @@
                 <div class="relative z-10 flex flex-col justify-center gap-4 px-6 sm:px-10
                             {% if hero.minimal %}py-8 sm:py-10 lg:py-12{% else %}py-10 sm:py-12 lg:py-16{% endif %}
                             {% if hero.image or hero.video %}lg:pl-32 lg:pr-0{% else %}lg:px-32{% endif %}
+                            {% if hero.jumbo %}@container{% endif %}
                             {% if on_light %}text-dark{% else %}text-light{% endif %}">
                     {% if hero.tag %}
                         {# tag_url links back to the parent Blogs page — Post is the only current "banner" hero producer that sets tag (and tag_url). #}
@@ -190,13 +191,17 @@
                         </p>
                     {% endif %}
                     {% comment %}
-                    48px (lg:text-5xl) is the banner headline — the "full"
-                    variant's 96px belongs to the home page hero alone. Post's
-                    compact variant keeps its smaller 40px, per Figma's
-                    "Content Hero" instance on the Blog Post mockups.
+                    48px (lg:text-5xl) is the banner headline. hero.jumbo (the
+                    page's "Jumbo headline" toggle) scales it with this text
+                    column instead (16cqi, the column above being an
+                    @container), capped at the home hero's 96px: a fixed 96px
+                    only fits a two-line headline in the half-width column
+                    from ~1500px up, and wrapped a word per line at 1024px. Post's compact variant keeps its
+                    smaller 40px, per Figma's "Content Hero" instance on the
+                    Blog Post mockups.
                     {% endcomment %}
                     <h1 class="font-heading text-3xl tracking-tight sm:text-4xl
-                               {% if hero.published_at %}lg:text-40{% else %}lg:text-5xl{% endif %}">
+                               {% if hero.published_at %}lg:text-40{% elif hero.jumbo %}lg:text-[clamp(3.5rem,16cqi,6rem)] lg:leading-[1.135]{% else %}lg:text-5xl{% endif %}">
                         {{ hero.headline }}
                     </h1>
                     {% if hero.published_at and hero.author %}
