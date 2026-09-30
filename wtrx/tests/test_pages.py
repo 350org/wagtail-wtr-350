@@ -904,6 +904,27 @@ class TestPostForm(TestCase):
         form = form_class(for_user=self.user, parent_page=self.blogs, instance=post)
         self.assertEqual(form["author"].value(), other_user.pk)
 
+    def _category_choices(self, instance):
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(for_user=self.user, parent_page=self.blogs, instance=instance)
+        return list(form.fields["categories"].choices)
+
+    def test_category_choices_use_the_posts_locale_sorted_by_label(self):
+        from wtrx.models import BlogCategoryLabel
+
+        climate = BlogCategory.objects.create(name="Climate", slug="climate-bpf")
+        justice = BlogCategory.objects.create(name="Justice", slug="justice-bpf")
+        other = Locale.objects.create(language_code="fr-fr")
+        BlogCategoryLabel.objects.create(category=climate, locale=self.blogs.locale, name="Zeta")
+        BlogCategoryLabel.objects.create(category=justice, locale=other, name="Justice climatique")
+
+        # New page: no locale yet, so the parent's. Justice has no label here.
+        self.assertEqual(self._category_choices(Post()), [(justice.pk, "Justice"), (climate.pk, "Zeta")])
+
+        post = Post(title="Existing", slug="existing-labels-bpf")
+        self.blogs.add_child(instance=post)
+        self.assertEqual(self._category_choices(post), [(justice.pk, "Justice"), (climate.pk, "Zeta")])
+
 
 class TestPostCategoryLimit(TestCase):
     """PostForm rejects more than MAX_POST_CATEGORIES categories."""
