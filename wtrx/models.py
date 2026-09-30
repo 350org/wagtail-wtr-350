@@ -647,6 +647,17 @@ class PostForm(WagtailAdminPageForm):
             # field's pre-selected value.
             self.initial["author"] = self.for_user.pk
 
+        # Category checkboxes in the post's own language, sorted like the
+        # blog filter (Blogs.get_context()). A new page has no locale until
+        # saved, so it takes its parent's.
+        categories = self.fields.get("categories")
+        locale = self.instance.locale if self.instance.locale_id else getattr(self.parent_page, "locale", None)
+        if categories is not None and locale is not None:
+            categories.choices = sorted(
+                ((category.pk, category.label_for(locale)) for category in categories.queryset.prefetch_related("labels")),
+                key=lambda choice: choice[1].casefold(),
+            )
+
     def clean_categories(self):
         # Enforced here rather than in Post.clean(): a ParentalManyToManyField's
         # submitted value only exists on the form until save, and the importers

@@ -1629,8 +1629,10 @@ gate.
     `BlogCategoryLabel` (inline on the snippet: locale + name) holds each
     language's display name and `BlogCategory.label_for(locale)` falls back
     to `name`. `Blogs.get_context()` passes `categories` as
-    `{"category", "label"}` dicts sorted by label. The `?category=` slug
-    stays English in every language.
+    `{"category", "label"}` dicts sorted by label, and `PostForm` relabels
+    and sorts the Post edit form's category checkboxes the same way (a new
+    page uses its parent's locale). The `?category=` slug stays English in
+    every language.
 80. **`SpacerBlock` adds to the gap before it and zeroes the gap after
     it** (`.wtr-body-stack > [data-block-type='spacer']`/`.wtr-spacer` in
     main.css's "Body-stack spacing"), so a spacer between two blocks is one
