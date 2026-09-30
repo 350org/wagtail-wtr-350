@@ -434,7 +434,7 @@ class BrandingSEOSettings(BaseSiteSetting):
         related_name="+",
         verbose_name=_("dark logo"),
         help_text=_(
-            "Logo variant for dark or transparent backgrounds (e.g. transparent header)."
+            "Logo variant for dark backgrounds, used in the footer."
         ),
     )
     favicon = models.ForeignKey(

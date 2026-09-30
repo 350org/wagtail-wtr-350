@@ -61,6 +61,10 @@ RICHTEXT_FEATURES_FULL = [
 
 RICHTEXT_FEATURES_INLINE = ["bold", "italic", "link", "ai"]
 
+# RICHTEXT_FEATURES_HEADLINE: nothing but line breaks (Enter/Shift+Enter). For the
+# hero headline, which always renders inside one <h1> -- see headline_html().
+RICHTEXT_FEATURES_HEADLINE = []
+
 RICHTEXT_FEATURES_HERO = ["bold", "italic", "link", "ol", "ul", "ai"]
 
 RICHTEXT_FEATURES_HEADING_H2 = ["h2", "bold", "italic", "link", "ai"]

@@ -23,6 +23,7 @@ All blocks are assembled into BodyStreamBlock at the bottom of this file.
 import copy
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
+from html import unescape as html_unescape
 import json
 import math
 from pathlib import Path
@@ -34,7 +35,8 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.functional import cached_property
 from django.utils.text import format_lazy
-from django.utils.html import strip_tags
+from django.utils.html import escape, strip_tags
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.staticfiles import versioned_static
 from wagtail.admin.telepath import register
@@ -68,6 +70,7 @@ from wtrx.constants import (
     RICHTEXT_FEATURES_HEADING_H2,
     RICHTEXT_FEATURES_HEADING_H3,
     RICHTEXT_FEATURES_HEADINGS_H2_H3,
+    RICHTEXT_FEATURES_HEADLINE,
     RICHTEXT_FEATURES_INLINE,
 )
 from wtrx.integrations import actionkit
@@ -222,6 +225,30 @@ def resolve_background(value, default="white"):
 def background_is_light(value):
     """True when `value` names a fill that needs dark text rather than light."""
     return resolve_background(value) in LIGHT_BACKGROUND_COLORS
+
+
+_PARAGRAPH_RE = re.compile(r"<p\b[^>]*>(.*?)</p>", re.DOTALL | re.IGNORECASE)
+_LINE_BREAK_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+
+
+def headline_html(value) -> str:
+    """
+    A hero headline's rich text as inline HTML for its <h1>: every paragraph
+    and line break becomes a <br>, and any other markup is dropped, so the
+    editor can break lines but never change what the heading is. Also
+    accepts plain text (headlines saved before the field became rich text).
+    Returns "" for an empty headline so callers can fall back with `or`.
+    """
+    html = str(value or "")
+    blocks = _PARAGRAPH_RE.findall(html) or [html]
+    lines = []
+    for block in blocks:
+        for line in _LINE_BREAK_RE.split(block):
+            text = strip_tags(line).strip()
+            if text:
+                # strip_tags leaves entities encoded; escape() would double them.
+                lines.append(escape(html_unescape(text)))
+    return mark_safe("<br>".join(lines))
 
 
 def hero_is_minimal(*, copy, video, cta, tag="", published_at=None):
@@ -827,6 +854,37 @@ class HeadingBlock(StructBlock):
             "style used above card rows."
         )
         preview_value = {"heading": _("What we're working on")}
+
+
+SPACER_SIZE_CHOICES = [
+    ("small", _("Small (32px)")),
+    ("medium", _("Medium (64px)")),
+    ("large", _("Large (128px)")),
+]
+
+
+class SpacerBlock(StructBlock):
+    """
+    Extra vertical space between two blocks.
+
+    Adds its height on top of the normal gap before it: main.css's
+    "Body-stack spacing" zeroes the gap after a spacer, so a spacer between
+    two blocks gives one gap plus the spacer rather than two gaps plus it.
+    Preset sizes rather than a free value, so pages keep one rhythm.
+    """
+
+    size = ChoiceBlock(
+        choices=SPACER_SIZE_CHOICES,
+        default="medium",
+        label=_("Size"),
+    )
+
+    class Meta:
+        icon = "order"
+        label = _("Spacer")
+        template = "wtrx/components/streamfield/blocks/spacer_block.html"
+        description = _("Extra vertical space between two blocks.")
+        preview_value = {"size": "medium"}
 
 
 @ai_image_block()
@@ -3515,16 +3573,17 @@ class HeroBlock(StructBlock):
     right structure is fixed) and no cta field (banner never renders one,
     see components/hero.html).
 
-    headline is a plain text field (mirroring HeroMixin). content is richtext
+    headline is line-breaks-only rich text (mirroring HeroMixin). content is richtext
     for the supporting copy below the headline. Uses the same component
     template as the page-level hero (components/hero.html) via get_context(),
     which normalises field names so the template needs no block-type branch
     logic — only a variant branch.
     """
 
-    headline = CharBlock(
+    headline = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADLINE,
         label=_("Headline"),
-        help_text=_("The hero heading text."),
+        help_text=_("The hero heading text. Press Enter for a line break."),
     )
     content = RichTextBlock(
         features=RICHTEXT_FEATURES_INLINE,
@@ -3555,7 +3614,7 @@ class HeroBlock(StructBlock):
             # No pre-header on a mid-body hero: it is a page-opening device
             # (see HeroMixin.hero_panels), not a section-level one.
             "pre_header": None,
-            "headline": value.get("headline"),
+            "headline": headline_html(value.get("headline")),
             "copy": value.get("content"),
             "copy_is_block": False,
             "image": value.get("image"),
@@ -3750,6 +3809,7 @@ class SectionContentBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     text = TextBlock()
     lead_text = LeadTextBlock()
     heading = HeadingBlock()
+    spacer = SpacerBlock()
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()
@@ -3969,6 +4029,7 @@ class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     text = TextBlock()
     lead_text = LeadTextBlock()
     heading = HeadingBlock()
+    spacer = SpacerBlock()
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()

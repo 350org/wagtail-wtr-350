@@ -377,6 +377,38 @@ html {
     }
 }
 
+/* From sm: up the form shrinks to the width of its fields-and-button row,
+ * so everything on the full-width lines below it — above all the privacy
+ * notice — spans exactly that row. The row's width depends on the
+ * translated button label, so it can't be a fixed number.
+ *
+ * fit-content sizes the form from its items' max-content contributions,
+ * which is why the rest is needed:
+ *  - contain: inline-size on the full-width items makes them contribute
+ *    nothing, so the notice's single-line length doesn't set the width;
+ *  - width: 250px on the fields makes them contribute their real row width
+ *    (flex: 1 1 0 above still does the actual sizing);
+ *  - the 16px between row items moves from column-gap onto the fields'
+ *    own margin, because a column-gap is also counted before each
+ *    zero-width full-width item and would leave the form 16px too wide. */
+@media (width >= 40rem) {
+    .wtr-actionkit-embed-inline #action-form {
+        width: fit-content !important;
+        max-width: 100%;
+        column-gap: 0;
+    }
+
+    .wtr-actionkit-embed-inline #action-form > *:not(#unknown_user):not(.input-wrapper) {
+        contain: inline-size;
+    }
+
+    .wtr-actionkit-embed-inline .input-text,
+    .wtr-actionkit-embed-inline .input-select {
+        width: 250px;
+        margin-inline-end: 1rem;
+    }
+}
+
 /* :not() on the type for the same reason as the stacked variant below —
  * AK puts .ak-userfield-input on opt-in checkboxes and radios too, and a
  * 100%-wide borderless checkbox is not a checkbox. */
@@ -440,37 +472,15 @@ html {
 /* Disclaimer/fine-print text below the form (terms of service, privacy
  * policy, unsubscribe notice), at 14px/1.25 in --color-neutral-200
  * (#eaeaea, its own token, not white at 80%). It reaches this line via the
- * order:2 / flex-basis:100% rule above; the end padding is what pulls its
- * text back to 480px.
- *
- * Padding, not max-width: flex line-breaking measures an item at its
- * max-width-clamped size, so a 480px-max notice fits on the fields' row
- * whenever the row has 480px spare — which it now does, since the fields
- * stop at 250px and hero.html's wrapper is 1033px wide. The box has to stay
- * full width for flex-basis:100% to force the line break. max() floors
- * the padding at zero in a column narrower than 480px.
- *
- * 480px, not Figma's 435px, and the two numbers are measuring different
- * strings: Figma's mock carries its own placeholder wording, while what
- * actually renders is whatever copy the ActionKit form ships ("You'll
- * receive emails about our campaigns and ways you can take action. You can
- * unsubscribe at any time (...)"), which is longer. At 14px that real copy
- * misses a two-line fit inside 435px by about 4px, breaking as 399 + 425 +
- * a 40px orphan; 460px is the narrowest box that holds two lines, and 480
- * leaves slack for the copy to gain a word without dropping to three.
- *
- * text-wrap: balance is what makes those two lines even rather than a long
- * one over a short one — it settles at 443 + 424 and, usefully here, stays
- * there for any width past the 460px threshold, so the exact 480px
- * above is not load-bearing for evenness. Where balance is unsupported
- * this degrades to a plain greedy wrap: still two lines, just less even. */
+ * order:2 / flex-basis:100% rule above, and spans the fields-and-button
+ * row because the form is sized to that row (the fit-content rule above).
+ * Plain greedy wrapping, not text-wrap: balance, so the first line runs
+ * the full width of the row rather than being evened out short of it. */
 .wtr-actionkit-embed-inline .general-privacy-notice {
-    padding-inline-end: max(0px, 100% - 480px);
     font-family: var(--font-body);
     font-size: 0.875rem;
     line-height: 1.25;
     color: var(--color-neutral-200);
-    text-wrap: balance;
 }
 
 .wtr-actionkit-embed-inline .general-privacy-notice a {
@@ -659,6 +669,23 @@ html {
     color: var(--color-dark);
     font-family: var(--font-body);
     font-size: 0.875rem;
+}
+
+/* Focus shows on the field's box, not on the bare input inside it. The
+ * input is a borderless line within the box, so the global focus outline
+ * (base layer, above) and @tailwindcss/forms' ring drew a tight rectangle
+ * around the typed text instead of around the field. Both variants. */
+.wtr-actionkit-embed .input-text :is(input, select, textarea):focus,
+.wtr-actionkit-embed .input-select select:focus,
+.wtr-actionkit-embed .input-textarea textarea:focus,
+.wtr-actionkit-embed .letter-text:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.wtr-actionkit-embed :is(.input-text, .input-select, .input-textarea):focus-within {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 0;
 }
 
 /* AK ships this field with no rows/min-height of its own (native 2-row
@@ -1263,11 +1290,20 @@ h3, h4, h5, h6 {
     margin-block-end: 2.5rem;
 }
 
+/* A spacer adds its height to the gap before it: the gap after it is
+ * zeroed, so a spacer between two blocks is one gap plus the spacer, not
+ * two gaps plus it. .wtr-spacer covers a spacer inside a SectionBlock,
+ * whose children have no data-block-type wrapper. */
+.wtr-body-stack > [data-block-type='spacer'],
+.wtr-spacer {
+    margin-block-end: 0;
+}
+
 /* ============================================================
  * Hero -> first full-bleed block — .wtr-page-hero / .wtr-block-full-bleed
  * ============================================================
- * base.html gives <main> a flat my-32 (128px), so a full-bleed block
- * directly under a hero sat 128px below it. Both are 1500px rounded
+ * base.html gives <main> my-16 sm:my-32 (64px on phones, 128px from sm:
+ * up), so a full-bleed block directly under a hero sat that far below it. Both are 1500px rounded
  * panels with the same gutters; at that distance they read as unrelated
  * rather than as a stack, which is the whole point of the hero being a
  * panel in the first place.
@@ -1282,9 +1318,9 @@ h3, h4, h5, h6 {
  * Both conditions are required, hence two :has() tests:
  *
  *  - .wtr-page-hero  — set by components/hero.html only when in_body is
- *    false, so a mid-body HeroBlock never triggers this, and a page whose
- *    hero is switched off (ContentPage.hide_hero) correctly keeps the
- *    full 128px, since nothing renders the class at all.
+ *    false, so a mid-body HeroBlock never triggers this. A page whose hero
+ *    is switched off (ContentPage.hide_hero) renders no such class, and is
+ *    handled by the no-hero rule below instead.
  *  - the first block is one of the four panel-shaped types listed below:
  *    section, signup_actionkit, donate_fundraiseup, feature_panel. Each
  *    renders as a filled rounded panel at the same 1500px width and the
@@ -1309,6 +1345,27 @@ body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-t
 body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='donate_fundraiseup']),
 body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='feature_panel']) {
     margin-block-start: 1rem;
+}
+
+/* A vertical ActionKit signup is capped at 800px, so from lg: up it no
+ * longer spans the hero's width and the two stop reading as one stack —
+ * give it the full gap back there. Below lg: both fill the column, so it
+ * keeps the 16px above. */
+@media (width >= 64rem) {
+    body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='signup_actionkit'] .wtr-signup-vertical) {
+        margin-block-start: 8rem;
+    }
+}
+
+/* No hero (ContentPage.hide_hero): a panel-shaped first block takes the
+ * hero's place, starting flush under the header exactly where the hero's
+ * own panel would. Same four types as above; every other first block
+ * keeps <main>'s full gap. */
+body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='section']),
+body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='signup_actionkit']),
+body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='donate_fundraiseup']),
+body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='feature_panel']) {
+    margin-block-start: 0;
 }
 
 /* ============================================================

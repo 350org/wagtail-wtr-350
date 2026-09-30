@@ -200,7 +200,7 @@ def fetch_embed_form_html(hostname, short_form_id, timeout=5):
             f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
         )
 
-    return _fix_country_label_for_attribute(_make_recaptcha_async(response.text))
+    return _strip_submit_arrow(_fix_country_label_for_attribute(_make_recaptcha_async(response.text)))
 
 
 # ActionKit's fetched fragment includes its own <script
@@ -239,6 +239,27 @@ _COUNTRY_LABEL_FOR_RE = re.compile(r'<label for="id_country">')
 
 def _fix_country_label_for_attribute(html):
     return _COUNTRY_LABEL_FOR_RE.sub('<label for="country">', html)
+
+
+# Some ActionKit pages type a trailing arrow into the submit label ("Junte-se
+# a nós →"), while every embed variant already draws its own arrow icon on
+# the button (main.css/theme.css), so the label ends up with two. Strip a
+# trailing arrow character or entity from a submit <button>'s text or an
+# <input type="submit">'s value; the icon stays the only arrow.
+_ARROW = r"(?:\s|&nbsp;)*(?:[\u2192\u2794\u279c\u27a1\u00bb]|&rarr;|&#8594;|&#x2192;|&raquo;)(?:\s|&nbsp;)*"
+_SUBMIT_BUTTON_ARROW_RE = re.compile(
+    r"(<button\b[^>]*\btype=\"submit\"[^>]*>(?:(?!</button>).)*?)" + _ARROW + r"(</button>)",
+    re.DOTALL | re.IGNORECASE,
+)
+_SUBMIT_INPUT_ARROW_RE = re.compile(
+    r"(<input\b[^>]*\btype=\"submit\"[^>]*\bvalue=\"[^\"]*?)" + _ARROW + r"(\")",
+    re.IGNORECASE,
+)
+
+
+def _strip_submit_arrow(html):
+    html = _SUBMIT_BUTTON_ARROW_RE.sub(r"\1\2", html)
+    return _SUBMIT_INPUT_ARROW_RE.sub(r"\1\2", html)
 
 
 # 350's ActionKit template puts a page's intro copy in <div id="action-header">,

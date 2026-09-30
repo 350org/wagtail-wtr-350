@@ -412,9 +412,9 @@ check.
 16. **`collapse_desktop_menu` is CSS-only**: Tailwind responsive classes in
     `header.html` toggle whether the desktop nav vs. hamburger shows at all
     breakpoints; `mobile-menu.js` needs no changes.
-17. **Transparent header is `HomePage`-only** (`use_transparent_header`,
-    not on `HeroMixin`). When true, `header.html` auto-swaps to
-    `BrandingSEOSettings.dark_logo`.
+17. **There is no transparent header.** `HomePage.use_transparent_header`
+    was removed (migration `0091`); the header always sits in normal flow
+    on `bg-light`. `BrandingSEOSettings.dark_logo` survives for the footer.
 18. **Social display toggles live on `SocialSettings`**
     (`show_in_header`/`show_in_footer`), not Navigation/FooterSettings.
     Desktop icons show in the visible header bar; mobile icons show only in
@@ -454,10 +454,8 @@ check.
     resolved navigation (walks `path`/`depth` via `resolved_for_page()`),
     not a `HomePage` field — set per-section on a navigation override, or
     site-wide on `NavigationSettings`.
-26. **Nav hover/active states** (`header.html`, Figma node 1:965): light
-    headers hover `text-navy`, transparent headers hover `text-light`
-    (navy is unreadable on a dark hero) — same split for the regional
-    badge and logo. The logo hover uses a CSS `brightness()` filter, not a
+26. **Nav hover/active states** (`header.html`, Figma node 1:965): nav
+    links hover `text-navy`, as do the regional badge and logo. The logo hover uses a CSS `brightness()` filter, not a
     color swap — `<img>` is opaque to `fill`/`color`/`currentColor`
     regardless of SVG or PNG. `--color-secondary-600` is an alias for
     `--color-navy` (see #33) so nav/button/callout navy can't drift apart.
@@ -1193,22 +1191,27 @@ gate.
     meant to bleed off the right edge.
 
 61. **The gap between the hero and the first body block is conditional,
-    and lives entirely in CSS.** `base.html` gives `<main>` a flat
-    `my-32` (128px). An unlayered rule in `main.css` ("Hero -> first
-    full-bleed block") overrides `margin-block-start` to 16px, but only
-    when **both** hold: `body:has(.wtr-page-hero)`
-    (set by `hero.html` only when `in_body` is false, so a mid-body
-    `HeroBlock` never triggers it and a `hide_hero` page correctly keeps
-    128px) **and** the stack's `:first-child` is one of exactly four
+    and lives entirely in CSS.** `base.html` gives `<main>`
+    `my-16 sm:my-32` (64px on phones, 128px from `sm:`). An unlayered rule
+    in `main.css` ("Hero -> first full-bleed block") overrides
+    `margin-block-start` to 16px, but only when **both** hold:
+    `body:has(.wtr-page-hero)` (set by `hero.html` only when `in_body` is
+    false, so a mid-body `HeroBlock` never triggers it) **and** the
+    stack's `:first-child` is one of exactly four
     panel-shaped types: `section`, `signup_actionkit`,
     `donate_fundraiseup`, `feature_panel`. Those four render as filled
     rounded panels at the hero's own width, so hero-then-panel reads as
-    one stack. Every other type keeps 128px — **including full-bleed ones
+    one stack. Every other type keeps the full gap — **including full-bleed ones
     like `image`, `quote` or `card_grid`**, which sit directly on the page
     background and need the section break. "Is full-bleed" and "is a
     panel" are different questions that merely overlap; the four are
     listed by hand and a new panel block must be added to that selector
-    deliberately.
+    deliberately. Two refinements sit beside it: a *vertical*
+    `signup_actionkit` (`.wtr-signup-vertical`, capped at 800px) gets the
+    full 128px back from `lg:`, where it no longer spans the hero's width;
+    and with no hero at all (`hide_hero`), the same four panel types start
+    flush under the header (`margin-block-start: 0`), exactly where the
+    hero's panel would have started.
     **That margin is the only source of the gap below a hero.** The hero
     wrapper in `components/hero.html` used to carry a `pb-4` of its own as
     well, which summed with this rule to a visible 32px wherever it fired
@@ -1609,3 +1612,35 @@ gate.
     imported with `manage.py import_350_how_to_give_modals --page <id|path>`,
     which matches each card whose `link_url` ends in `#<modal id>` and saves
     a draft revision (`--publish` to publish it, `--dry-run` to report only).
+
+78. **The hero headline is line-breaks-only rich text, rendered through
+    `headline_html()`** (`wtrx/blocks/__init__.py`). `HeroMixin`/
+    `BannerHeroMixin.hero_headline` and `HeroBlock.headline` use
+    `RICHTEXT_FEATURES_HEADLINE = []` — no toolbar, Enter/Shift+Enter only.
+    `headline_html()` flattens paragraphs and `<br>`s to `<br>`-joined,
+    escaped text for the `<h1>` and drops any other markup, so nothing an
+    editor pastes can change the heading level. It also accepts plain text
+    (old revisions) and returns `""` when empty so callers can write
+    `headline_html(x) or self.title`. Never render the field's raw value
+    with `|richtext` inside the `<h1>` — that would emit `<p>`s inside it.
+79. **Blog category translations are labels on the one shared category,
+    not translated snippets.** Every language tree's posts point at the
+    same `BlogCategory` rows (`name`/`slug` are unique), so
+    `BlogCategoryLabel` (inline on the snippet: locale + name) holds each
+    language's display name and `BlogCategory.label_for(locale)` falls back
+    to `name`. `Blogs.get_context()` passes `categories` as
+    `{"category", "label"}` dicts sorted by label. The `?category=` slug
+    stays English in every language.
+80. **`SpacerBlock` adds to the gap before it and zeroes the gap after
+    it** (`.wtr-body-stack > [data-block-type='spacer']`/`.wtr-spacer` in
+    main.css's "Body-stack spacing"), so a spacer between two blocks is one
+    gap plus its preset height (32/64/128px), not two gaps plus it.
+81. **The ActionKit inline form shrinks to its fields-and-button row
+    from `sm:` up** (`width: fit-content`), so the privacy notice spans
+    exactly that row whatever the translated button label. It depends on
+    three things together: `contain: inline-size` on the full-width items,
+    a `width: 250px` hint on the fields, and the 16px row gap living on the
+    fields' `margin-inline-end` rather than `column-gap` (a column-gap is
+    also counted before each zero-width item and leaves the form 16px too
+    wide). `_strip_submit_arrow()` (`actionkit.py`) removes a trailing
+    arrow typed into an AK submit label, since our CSS draws its own.

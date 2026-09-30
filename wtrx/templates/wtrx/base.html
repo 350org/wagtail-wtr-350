@@ -116,7 +116,7 @@
     {% if not request.is_preview %}{{ settings.wtrx.IntegrationSettings.body_html }}{% endif %}
     {% block header %}{% endblock %}
     {% block hero %}{% endblock %}
-    <main id="main-content" class="my-32">
+    <main id="main-content" class="my-16 sm:my-32">
         {% block content %}{% endblock %}
     </main>
     {% block footer %}{% endblock %}

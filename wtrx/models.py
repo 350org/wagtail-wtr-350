@@ -10,6 +10,7 @@ from django.utils.html import strip_tags
 from django.utils.text import format_lazy, slugify
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
+from modelcluster.models import ClusterableModel
 from wagtail.admin.forms import WagtailAdminPageForm
 from wagtail.admin.panels import (
     FieldPanel,
@@ -22,7 +23,7 @@ from wagtail.blocks import StreamValue, StructValue
 from wagtail.blocks.list_block import ListValue
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.fields import RichTextField, StreamField
-from wagtail.models import Page
+from wagtail.models import Locale, Orderable, Page
 from wagtail.snippets.models import register_snippet
 from wagtail_ai.panels import AIDescriptionFieldPanel, AITitleFieldPanel
 from wagtailmedia.edit_handlers import MediaChooserPanel
@@ -32,9 +33,10 @@ from .blocks import (
     BannerHeroCTABlock,
     BodyStreamBlock,
     HeroCTABlock,
+    headline_html,
     hero_is_minimal,
 )
-from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
+from .constants import RICHTEXT_FEATURES_HEADLINE, RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
 from .integrations import actionkit
 from .site_settings import (  # noqa: F401 — register with Django ORM
@@ -136,16 +138,6 @@ class BasePage(Page):
     # disappears with no error.
     settings_panels = Page.settings_panels
 
-    def get_context(self, request, *args, **kwargs):
-        ctx = super().get_context(request, *args, **kwargs)
-        # Ensure transparent_header is always present in context so header.html
-        # never relies on implicit falsy-absent behaviour. setdefault is used
-        # intentionally: HomePage.get_context() calls super() first and then
-        # sets ctx["transparent_header"] = self.use_transparent_header, so this
-        # default is only applied for non-home pages where the key is absent.
-        ctx.setdefault("transparent_header", False)
-        return ctx
-
     def get_sitemap_urls(self, request=None):
         if self.hide_from_search:
             return []
@@ -240,13 +232,13 @@ class HeroMixin(models.Model):
 
     hero_variant = "banner"
 
-    hero_headline = models.CharField(
-        max_length=255,
+    hero_headline = RichTextField(
         blank=True,
+        features=RICHTEXT_FEATURES_HEADLINE,
         verbose_name=_("hero headline"),
         help_text=_(
             "Optional. Overrides the page title as the displayed heading. "
-            "Leave blank to use the page title."
+            "Leave blank to use the page title. Press Enter for a line break."
         ),
     )
     hero_copy = RichTextField(
@@ -415,7 +407,7 @@ class HeroMixin(models.Model):
         return {
             "variant": self.hero_variant,
             "pre_header": self.hero_pre_header,
-            "headline": self.hero_headline or self.title,
+            "headline": headline_html(self.hero_headline) or self.title,
             "copy": self.hero_copy,
             "copy_is_block": False,
             "image": self.hero_image,
@@ -479,13 +471,13 @@ class BannerHeroMixin(models.Model):
     header too busy alongside the tag, author and date, so it was removed.
     """
 
-    hero_headline = models.CharField(
-        max_length=255,
+    hero_headline = RichTextField(
         blank=True,
+        features=RICHTEXT_FEATURES_HEADLINE,
         verbose_name=_("headline"),
         help_text=_(
             "Optional. Overrides the page title as the displayed heading. "
-            "Leave blank to use the page title."
+            "Leave blank to use the page title. Press Enter for a line break."
         ),
     )
     hero_image = models.ForeignKey(
@@ -533,7 +525,7 @@ class BannerHeroMixin(models.Model):
             # field and Post uses BannerHeroMixin); pinned None to keep the
             # hero.html contract complete.
             "pre_header": None,
-            "headline": self.hero_headline or self.title,
+            "headline": headline_html(self.hero_headline) or self.title,
             "copy": None,
             "copy_is_block": False,
             "image": self.hero_image,
@@ -556,7 +548,7 @@ class BannerHeroMixin(models.Model):
 
 
 @register_snippet
-class BlogCategory(models.Model):
+class BlogCategory(ClusterableModel):
     """
     Editor-managed taxonomy for Post.categories — a Snippet (rather
     than freeform tagging via the already-installed-but-unused `taggit`
@@ -577,6 +569,7 @@ class BlogCategory(models.Model):
     panels = [
         FieldPanel("name"),
         FieldPanel("slug"),
+        InlinePanel("labels", label=_("Translated labels")),
     ]
 
     class Meta:
@@ -587,10 +580,42 @@ class BlogCategory(models.Model):
     def __str__(self):
         return self.name
 
+    def label_for(self, locale):
+        """The category's name in `locale`, falling back to `name`.
+
+        One category is shared by every language tree (posts in all locales
+        point at the same row), so a translation is a label on it rather than
+        a separate translated snippet.
+        """
+        for label in self.labels.all():
+            if label.locale_id == locale.pk:
+                return label.name
+        return self.name
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+
+
+class BlogCategoryLabel(Orderable):
+    """A BlogCategory's display name in one locale."""
+
+    category = ParentalKey(BlogCategory, on_delete=models.CASCADE, related_name="labels")
+    locale = models.ForeignKey(Locale, on_delete=models.PROTECT, related_name="+", verbose_name=_("locale"))
+    name = models.CharField(max_length=100, verbose_name=_("name"))
+
+    panels = [
+        FieldPanel("locale"),
+        FieldPanel("name"),
+    ]
+
+    class Meta(Orderable.Meta):
+        verbose_name = _("translated label")
+        verbose_name_plural = _("translated labels")
+        constraints = [
+            models.UniqueConstraint(fields=["category", "locale"], name="unique_blog_category_label_per_locale"),
+        ]
 
 
 MAX_POST_CATEGORIES = 2
@@ -670,25 +695,11 @@ class HomePage(BasePage, HeroMixin):
         help_text=_("Page body content."),
         use_json_field=True,
     )
-    use_transparent_header = models.BooleanField(
-        default=False,
-        verbose_name=_("transparent header"),
-        help_text=_(
-            "Make the header transparent so the hero image extends behind it. "
-            "Automatically uses the dark logo variant when enabled."
-        ),
-    )
 
     content_panels = (
         BasePage.title_panels
         + HeroMixin.hero_panels
-        + [
-            FieldPanel("body"),
-            MultiFieldPanel(
-                [FieldPanel("use_transparent_header")],
-                heading=_("Header options"),
-            ),
-        ]
+        + [FieldPanel("body")]
     )
 
     promote_panels = BasePage.promote_panels
@@ -718,7 +729,6 @@ class HomePage(BasePage, HeroMixin):
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
         ctx["hero"] = self.get_hero_context()
-        ctx["transparent_header"] = self.use_transparent_header
         return ctx
 
 
@@ -1401,7 +1411,9 @@ class Blogs(BasePage, HeroMixin):
         # own wherever it doesn't apply — e.g. a press-release-only Blogs
         # page, where posts never carry categories — with no separate
         # toggle for editors to manage.
-        available_categories = BlogCategory.objects.filter(posts__in=posts_qs).distinct()
+        available_categories = (
+            BlogCategory.objects.filter(posts__in=posts_qs).distinct().prefetch_related("labels")
+        )
 
         selected_category = None
         category_slug = request.GET.get("category")
@@ -1431,7 +1443,10 @@ class Blogs(BasePage, HeroMixin):
         ctx["posts"] = posts
         ctx["cards"] = cards
         ctx["paginator"] = paginator
-        ctx["categories"] = available_categories
+        ctx["categories"] = sorted(
+            ({"category": category, "label": category.label_for(self.locale)} for category in available_categories),
+            key=lambda item: item["label"].casefold(),
+        )
         ctx["selected_category"] = selected_category
         return ctx
 
