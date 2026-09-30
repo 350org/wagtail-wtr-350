@@ -293,6 +293,14 @@ class HeroMixin(models.Model):
             "video, e.g. a photo credit."
         ),
     )
+    hero_jumbo_headline = models.BooleanField(
+        default=False,
+        verbose_name=_("jumbo headline"),
+        help_text=_(
+            "Show the headline at the home page's display size on desktop. "
+            "Best with a short headline."
+        ),
+    )
     hero_banner_color = models.CharField(
         max_length=20,
         choices=BACKGROUND_COLOR_CHOICES,
@@ -363,6 +371,7 @@ class HeroMixin(models.Model):
         FieldPanel("hero_headline", widget=HeadlineRichTextArea(features=RICHTEXT_FEATURES_HEADLINE)),
         FieldPanel("hero_copy"),
         FieldPanel("hero_image"),
+        FieldPanel("hero_jumbo_headline"),
         FieldPanel("hero_image_caption"),
         FieldPanel("hero_banner_color"),
         FieldPanel("hero_cta"),
@@ -409,6 +418,7 @@ class HeroMixin(models.Model):
             "variant": self.hero_variant,
             "pre_header": self.hero_pre_header,
             "headline": headline_html(self.hero_headline) or self.title,
+            "jumbo": self.hero_jumbo_headline,
             "copy": self.hero_copy,
             "copy_is_block": False,
             "image": self.hero_image,
@@ -533,6 +543,7 @@ class BannerHeroMixin(models.Model):
             "video": None,
             "banner_color": self.hero_banner_color,
             "cta": [],
+            "jumbo": False,
             "minimal": hero_is_minimal(
                 copy=None,
                 video=None,
@@ -916,6 +927,10 @@ class IndexPage(BasePage, HeroMixin):
         "wtrx.FormPage",
         "wtrx.Blogs",
     ]
+
+    # Hidden from the "Create a page" menu until a site needs it; the model
+    # and template stay so it can be switched back on.
+    is_creatable = False
 
     class Meta:
         verbose_name = _("index page")
@@ -1348,8 +1363,8 @@ class Blogs(BasePage, HeroMixin):
     subpage_types = ["wtrx.Post"]
 
     class Meta:
-        verbose_name = _("Blogs")
-        verbose_name_plural = _("Blogs")
+        verbose_name = _("Media index")
+        verbose_name_plural = _("Media indexes")
 
     @property
     def post_label(self):
@@ -1562,6 +1577,10 @@ class FormPage(BasePage, AbstractEmailForm):
         "wtrx.IndexPage",
     ]
     subpage_types = []
+
+    # Hidden from the "Create a page" menu: signups go through the ActionKit/
+    # Action Network blocks instead. Switch back on if a site needs it.
+    is_creatable = False
 
     class Meta:
         verbose_name = _("form page")

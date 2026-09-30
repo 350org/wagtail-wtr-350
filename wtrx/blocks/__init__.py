@@ -72,6 +72,7 @@ from wtrx.constants import (
     RICHTEXT_FEATURES_HEADINGS_H2_H3,
     RICHTEXT_FEATURES_HEADLINE,
     RICHTEXT_FEATURES_INLINE,
+    RICHTEXT_FEATURES_HERO,
 )
 from wtrx.integrations import actionkit
 from wtrx.site_settings import IntegrationSettings
@@ -196,6 +197,20 @@ SECTION_WIDTH_CHOICES = [
     ("default", _("Default (1152px)")),
     ("wide", _("Wide (1266px)")),
 ]
+
+# How wide a body-level image or video sits. The first three are
+# SECTION_WIDTH_CHOICES' measures, with section_block.html's own container
+# classes, so a video set to "wide" lines up with a "wide" section; "full" is
+# the shared full-width container (AGENTS.md pitfall #60).
+MEDIA_WIDTH_CHOICES = SECTION_WIDTH_CHOICES + [
+    ("full", _("Full (1500px)")),
+]
+MEDIA_WIDTH_CONTAINER_CLASSES = {
+    "narrow": "mx-auto max-w-[800px] px-4 sm:px-6 lg:px-0",
+    "default": "mx-auto max-w-6xl px-4 sm:px-6 lg:px-8",
+    "wide": "mx-auto max-w-[1330px] px-4 sm:px-6 lg:px-8",
+    "full": "mx-auto max-w-[1500px] px-4",
+}
 
 # Mapping of Action Network URL path segments (plural) to embed types (singular).
 # Only 'forms' is supported initially; others will be added as needed.
@@ -779,9 +794,9 @@ class LeadTextBlock(RichTextBlock):
     """
     A short lead-in paragraph, rendered larger than ordinary body copy.
 
-    Restricted to RICHTEXT_FEATURES_INLINE (no headings/lists/blockquote) —
-    a lead paragraph is a single opening statement; TextBlock already covers
-    longer structured copy.
+    Restricted to RICHTEXT_FEATURES_HERO (inline marks and lists, no
+    headings/blockquote) — a lead is an opening statement, which may be a
+    short list; TextBlock already covers longer structured copy.
 
     Deliberately NOT ContentPreviewMixin (AGENTS.md pitfall #45): no real
     page uses this block yet, so there is nothing in
@@ -793,7 +808,7 @@ class LeadTextBlock(RichTextBlock):
     """
 
     def __init__(self, **kwargs):
-        kwargs.setdefault("features", RICHTEXT_FEATURES_INLINE)
+        kwargs.setdefault("features", RICHTEXT_FEATURES_HERO)
         super().__init__(**kwargs)
 
     class Meta:
@@ -802,8 +817,8 @@ class LeadTextBlock(RichTextBlock):
         template = "wtrx/components/streamfield/blocks/lead_text_block.html"
         description = _(
             "A larger introductory paragraph for opening a page or section. "
-            "Bold/italic/links only — use a regular Text block for headings "
-            "or lists."
+            "Bold/italic/links and lists only — use a regular Text block for "
+            "headings."
         )
         # preview_value must live on Meta, not the block class itself --
         # Wagtail's default get_preview_value()/is_previewable() only ever
@@ -914,6 +929,14 @@ class ImageBlock(ContentPreviewMixin, StructBlock):
         label=_("Caption"),
         help_text=_("Optional caption displayed below the image."),
     )
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        width = value.get("width") or "full"
+        if width not in MEDIA_WIDTH_CONTAINER_CLASSES:
+            width = "full"
+        ctx["container_class"] = MEDIA_WIDTH_CONTAINER_CLASSES[width]
+        ctx["is_full_width"] = width == "full"
+        return ctx
 
     class Meta:
         icon = "image"
@@ -967,6 +990,47 @@ class VideoBlock(ContentPreviewMixin, StructBlock):
         icon = "media"
         label = _("Video")
         template = "wtrx/components/streamfield/blocks/video_block.html"
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        # Only a body-level video (BodyVideoBlock) has a width and owns its
+        # container; elsewhere the parent's column sizes it.
+        ctx["container_class"] = MEDIA_WIDTH_CONTAINER_CLASSES.get(
+            value.get("width")
+        )
+        ctx["is_full_width"] = value.get("width") == "full"
+        return ctx
+
+
+class BodyImageBlock(ImageBlock):
+    """
+    ImageBlock as placed directly in a page body, with a width choice.
+
+    Only the body gets one: inside a SectionBlock the section's own width
+    sets the column, and accordion/timeline content has a fixed measure.
+    Stored as the same "image" type, so adding the field is additive.
+    """
+
+    width = ChoiceBlock(
+        choices=MEDIA_WIDTH_CHOICES,
+        default="full",
+        label=_("Width"),
+    )
+
+
+class BodyVideoBlock(VideoBlock):
+    """
+    VideoBlock as placed directly in a page body, with a width choice.
+
+    See BodyImageBlock for why only the body gets one. Defaults to "narrow",
+    the closest match to the body text column a video used to sit in.
+    """
+
+    width = ChoiceBlock(
+        choices=MEDIA_WIDTH_CHOICES,
+        default="narrow",
+        label=_("Width"),
+    )
 
 
 class ButtonBlock(StructBlock):
@@ -3623,6 +3687,7 @@ class HeroBlock(StructBlock):
             "banner_color": value.get("banner_color"),
             "cta": [],  # banner variant never renders a cta; key kept for template contract
             "minimal": hero_is_minimal(copy=value.get("content"), video=None, cta=[]),
+            "jumbo": False,
             # Mid-page HeroBlock, not a page-level HeroMixin hero. Only the
             # gutter differs: in the body this block sits in a stack with
             # image/image_text/callout and has to line its edges up with
@@ -4030,8 +4095,8 @@ class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     lead_text = LeadTextBlock()
     heading = HeadingBlock()
     spacer = SpacerBlock()
-    image = ImageBlock()
-    video = VideoBlock()
+    image = BodyImageBlock()
+    video = BodyVideoBlock()
     button = ButtonBlock()
     button_group = ButtonGroupBlock()
     quote = QuoteBlock()

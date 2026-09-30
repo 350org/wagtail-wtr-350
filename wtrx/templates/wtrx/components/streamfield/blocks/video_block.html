@@ -1,5 +1,12 @@
 {% load i18n wagtailcore_tags wagtailembeds_tags %}
-<figure>
+{% comment %}
+container_class is set only for a body-level video (BodyVideoBlock's width
+choice); elsewhere the parent column sizes it and there is no wrapper.
+wtr-media-full marks the full width, for main.css's hero -> first block
+spacing rule.
+{% endcomment %}
+{% if container_class %}<div class="{{ container_class }}{% if is_full_width %} wtr-media-full{% endif %}">{% endif %}
+<figure class="wtr-video">
     {% if value.embed_url %}
         <div class="relative aspect-video w-full overflow-hidden rounded-lg [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full">
             {% embed value.embed_url %}
@@ -22,3 +29,4 @@
         </figcaption>
     {% endif %}
 </figure>
+{% if container_class %}</div>{% endif %}

@@ -1,2 +1,10 @@
 {% load i18n %}
-{% include "wtrx/components/card.html" with card=value %}
+{% comment %}
+A lone card is as wide as two cards side by side in card_grid_block.html:
+2 x md:max-w-[390px] + gap-6 = 804px. The page templates give it the grid's
+own gutters (px-4 sm:px-6 lg:px-8) in place of the body column, so the two
+line up at every width.
+{% endcomment %}
+<div class="wtr-card-single mx-auto max-w-[804px]">
+    {% include "wtrx/components/card.html" with card=value %}
+</div>

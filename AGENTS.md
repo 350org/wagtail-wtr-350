@@ -218,7 +218,11 @@ ES modules, 4-space indent, semicolons required.
    `hero` context dict with exactly these keys: `variant`, `pre_header`,
    `headline`, `copy`, `copy_is_block`, `image`, `video`, `image_caption`,
    `banner_color`, `cta`, `tag`, `tag_url`, `author`, `published_at`,
-   `minimal`, `in_body`. `in_body=True` only for `HeroBlock`, and it no
+   `minimal`, `jumbo`, `in_body`. `jumbo` is the banner pages' "Jumbo
+   headline" toggle (`hero_jumbo_headline`, in `banner_hero_fields`),
+   scaling the banner `h1` from `lg:` with its text column (`16cqi` on an
+   `@container` column, 56–96px) instead of the fixed 48px;
+   `BannerHeroMixin`/`HeroBlock` pin it `False`. `in_body=True` only for `HeroBlock`, and it no
    longer changes the gutter — every hero and every full-width block now
    shares one container, `mx-auto max-w-[1500px] px-4` (flat 16px at every
    breakpoint). The nav (`header.html`) deliberately still steps
@@ -1201,9 +1205,12 @@ gate.
     panel-shaped types: `section`, `signup_actionkit`,
     `donate_fundraiseup`, `feature_panel`. Those four render as filled
     rounded panels at the hero's own width, so hero-then-panel reads as
-    one stack. Every other type keeps the full gap — **including full-bleed ones
-    like `image`, `quote` or `card_grid`**, which sit directly on the page
-    background and need the section break. "Is full-bleed" and "is a
+    one stack. An `image`/`video` joins them only at "Full" width
+    (`.wtr-media-full` on its container, pitfall #83), since at any
+    narrower width its edges no longer match the hero's. Every other type
+    keeps the full gap — **including full-bleed ones like `quote` or
+    `card_grid`**, which sit directly on the page background and need the
+    section break. "Is full-bleed" and "is a
     panel" are different questions that merely overlap; the four are
     listed by hand and a new panel block must be added to that selector
     deliberately. Two refinements sit beside it: a *vertical*
@@ -1659,3 +1666,26 @@ gate.
     script in its own media. Any new non-AI Draftail field ahead of a
     StreamField needs the same widget. `TestEditFormScriptOrder` checks the
     order for every page type.
+
+83. **Body-level images and videos carry a width; nested ones don't.**
+    `BodyStreamBlock` registers `BodyImageBlock`/`BodyVideoBlock`
+    (`ImageBlock`/`VideoBlock` plus `width`, stored under the same
+    `image`/`video` types), while `SectionContentBlock`, accordion and
+    timeline content keep the plain blocks — a section's own width sets its
+    column. `MEDIA_WIDTH_CHOICES` is `SECTION_WIDTH_CHOICES` plus "full", and
+    `MEDIA_WIDTH_CONTAINER_CLASSES` reuses `section_block.html`'s container
+    classes so a "wide" video lines up with a "wide" section. `get_context()`
+    hands the template `container_class`: an image with no width gets the
+    full 1500px container (its old behaviour); a video with no width gets no
+    wrapper at all. `video` is in each page template's full-bleed list for
+    this reason. `ImageBlock`'s caption always renders below the photo (no
+    overlay option); `.wtr-image-caption` is still used by other blocks.
+84. **A lone `card` is two grid cards wide** (804px = 2 x 390 + a 24px gap).
+    The page templates give `card` the card grid's own gutters instead of the
+    body column, and `card_block.html` caps it, so its edges match a
+    two-card `CardGridBlock` row at every width. Change one with the other.
+85. **Form and Index pages are `is_creatable = False`** — hidden from "Create
+    a page", models and templates kept. Wagtail's `assertCanCreateAt` checks
+    `subpage_types` only and still passes for them; test
+    `creatable_subpage_models()` instead. `Blogs` is labelled "Media index"
+    in the admin; the class name is unchanged.

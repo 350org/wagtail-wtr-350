@@ -21,8 +21,9 @@ CHARFIELD_MAX_LENGTH = 255
 #                           Used for short rich text (descriptions, intro fields).
 #
 # RICHTEXT_FEATURES_HERO:   inline formatting + lists (no headings, no blockquote).
-#                           Used for HeroMixin.hero_copy where lists are useful
-#                           but headings would conflict with the hero headline.
+#                           Used for HeroMixin.hero_copy and LeadTextBlock, where
+#                           lists are useful but headings would conflict with the
+#                           surrounding heading.
 #
 # RICHTEXT_FEATURES_HEADING_H2: inline formatting + h2 only. Used by blocks whose
 #                           separate heading + text fields were condensed into one

@@ -1325,10 +1325,13 @@ h3, h4, h5, h6 {
  *    section, signup_actionkit, donate_fundraiseup, feature_panel. Each
  *    renders as a filled rounded panel at the same 1500px width and the
  *    same gutters as the hero itself, so the two stack as one object and
- *    the large gap is what looks wrong. Every other block type keeps the
- *    full 128px — including full-bleed ones like image, quote or
- *    card_grid, which sit directly on the page background rather than in
- *    a panel and need the section break to read as separate.
+ *    the large gap is what looks wrong. An image or video set to "Full"
+ *    width (.wtr-media-full) is the same rounded 1500px shape and joins
+ *    them; at any narrower width it doesn't line up with the hero and
+ *    keeps the full gap. Every other block type keeps the full 128px —
+ *    including full-bleed ones like quote or card_grid, which sit
+ *    directly on the page background rather than in a panel and need the
+ *    section break to read as separate.
  *
  * Listed explicitly rather than derived from the full-bleed set, because
  * "is full-bleed" and "is a panel" are different questions that happen to
@@ -1343,7 +1346,8 @@ h3, h4, h5, h6 {
 body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='section']),
 body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='signup_actionkit']),
 body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='donate_fundraiseup']),
-body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='feature_panel']) {
+body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-type='feature_panel']),
+body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child:is([data-block-type='image'], [data-block-type='video']) > .wtr-media-full) {
     margin-block-start: 1rem;
 }
 
@@ -1359,12 +1363,13 @@ body:has(.wtr-page-hero) main:has(> .wtr-body-stack > *:first-child[data-block-t
 
 /* No hero (ContentPage.hide_hero): a panel-shaped first block takes the
  * hero's place, starting flush under the header exactly where the hero's
- * own panel would. Same four types as above; every other first block
+ * own panel would. Same types as above; every other first block
  * keeps <main>'s full gap. */
 body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='section']),
 body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='signup_actionkit']),
 body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='donate_fundraiseup']),
-body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='feature_panel']) {
+body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child[data-block-type='feature_panel']),
+body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child:is([data-block-type='image'], [data-block-type='video']) > .wtr-media-full) {
     margin-block-start: 0;
 }
 

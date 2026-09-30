@@ -120,11 +120,28 @@ class TestHeroPanelSelection(TestCase):
             "hero_copy",
             "hero_image",
             "hero_image_caption",
+            "hero_jumbo_headline",
             "hero_banner_color",
             "hero_cta",
         ):
             self.assertIn(field, names)
         self.assertNotIn("hero_video", names)
+
+    def test_jumbo_headline_reaches_the_hero_context(self):
+        page = ContentPage(title="Big Oil profits.", hero_jumbo_headline=True)
+        self.assertTrue(page.get_hero_context()["jumbo"])
+        self.assertFalse(ContentPage(title="t").get_hero_context()["jumbo"])
+
+    def test_jumbo_headline_steps_the_banner_h1_up_on_desktop(self):
+        from django.template.loader import render_to_string
+
+        hero = ContentPage(title="Big Oil profits.", hero_jumbo_headline=True).get_hero_context()
+        html = render_to_string("wtrx/components/hero.html", {"hero": hero})
+        self.assertIn("lg:text-[clamp(3.5rem,16cqi,6rem)]", html)
+        hero["jumbo"] = False
+        html = render_to_string("wtrx/components/hero.html", {"hero": hero})
+        self.assertNotIn("16cqi", html)
+        self.assertIn("lg:text-5xl", html)
 
     def _content_page_hero_panel(self):
         """ContentPage's Hero panel, found by heading rather than index so
@@ -325,6 +342,7 @@ class TestHomePageGetContext(TestCase):
             "banner_color",
             "cta",
             "minimal",
+            "jumbo",
         }
         self.assertEqual(set(ctx["hero"].keys()), required_keys)
 
@@ -468,6 +486,7 @@ class TestContentPageGetContext(TestCase):
             "banner_color",
             "cta",
             "minimal",
+            "jumbo",
         }
         self.assertEqual(set(ctx["hero"].keys()), expected)
 
@@ -1389,9 +1408,24 @@ class TestBlogsPostLabel(TestCase):
         self.assertEqual(Blogs(title="News").post_label, "news")
 
 
+class TestCreatablePageTypes(TestCase):
+    """Form and Index pages are hidden from the "Create a page" menu."""
+
+    def test_hidden_page_types(self):
+        from wtrx.models import FormPage
+
+        for model in (FormPage, IndexPage):
+            self.assertFalse(model.is_creatable, model.__name__)
+            self.assertNotIn(model, HomePage.creatable_subpage_models())
+
+    def test_offered_page_types(self):
+        for model in (ContentPage, Blogs):
+            self.assertIn(model, HomePage.creatable_subpage_models())
+
+
 class TestBlogsMeta(TestCase):
     def test_verbose_name(self):
-        self.assertEqual(Blogs._meta.verbose_name, "Blogs")
+        self.assertEqual(Blogs._meta.verbose_name, "Media index")
 
     def test_verbose_name_plural(self):
-        self.assertEqual(Blogs._meta.verbose_name_plural, "Blogs")
+        self.assertEqual(Blogs._meta.verbose_name_plural, "Media indexes")
