@@ -1689,3 +1689,20 @@ gate.
     `subpage_types` only and still passes for them; test
     `creatable_subpage_models()` instead. `Blogs` is labelled "Media index"
     in the admin; the class name is unchanged.
+86. **A signup can open a Fundraise Up checkout in place of its thank-you
+    box.** Both ActionKit signup blocks carry a collapsed
+    `post_signup_donation` (`PostSignupDonationBlock`): a Fundraise Up
+    **campaign code** (opens the checkout modal, e.g. `FUNXXXXXXXX`), not
+    one of the **element IDs** `DonateFundraiseUpBlock` embeds inline, plus
+    an optional designation. On success `_actionkit_form.html` hides the
+    form and calls `FundraiseUp.openCheckout()`, prefilling name and email
+    from the signup. `get_context()` passes the code only while the
+    Fundraise Up integration is enabled, and the JS falls back to the
+    thank-you box whenever `window.FundraiseUp.openCheckout` is missing
+    (defined by the installation snippet's stub, which live preview
+    suppresses — pitfall #53), or when Fundraise Up's `checkoutOpen` event
+    hasn't fired within 5s — `openCheckout()` fails silently on a form ID,
+    the easy mistake since the two look alike. When testing it in a browser
+    by stubbing `fetch` to fake the signup, stub **only** the ActionKit
+    URL: Fundraise Up resolves the campaign over its own POST `fetch`, and
+    a blanket stub makes a valid code fail exactly like an invalid one.

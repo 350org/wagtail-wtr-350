@@ -3186,6 +3186,49 @@ class SignupActionNetworkBlock(StructBlock):
         }
 
 
+class PostSignupDonationBlock(StructBlock):
+    """
+    Optional Fundraise Up checkout opened after a successful ActionKit signup,
+    shared by SignupActionKitBlock and HeroSignupActionKitBlock.
+
+    When `campaign_code` is set (and the Fundraise Up integration is enabled),
+    a successful signup hides the form and calls Fundraise Up's own
+    `FundraiseUp.openCheckout()` JS API in place of showing the block's
+    success message, prefilling the donor's name and email from the signup
+    form. A campaign code (a Fundraise Up campaign, e.g. FUNXXXXXXXX) is a
+    different thing from the element IDs DonateFundraiseUpBlock embeds — an
+    element renders inline, a campaign opens the checkout modal. If Fundraise
+    Up's script isn't on the page (integration disabled, live preview), the
+    success message shows as before.
+
+    Meta.collapsed=True for the same reason as
+    FundraiseUpAdvancedSettingsBlock: most signup blocks never use it.
+    """
+
+    campaign_code = IdentifierBlock(
+        required=False,
+        label=_("Fundraise Up campaign code"),
+        help_text=_(
+            "Optional. When set, a successful signup opens this Fundraise Up "
+            "campaign's donation checkout instead of showing the success "
+            "message. Use the campaign's code from Fundraise Up > Campaigns "
+            "(starts with FUN, e.g. FUNABCDEFGH) — not a Form ID like the "
+            "ones in Settings > Integrations, which won't open anything. "
+            "Requires the Fundraise Up integration to be enabled."
+        ),
+    )
+    designation_id = IdentifierBlock(
+        required=False,
+        label=_("Designation ID"),
+        help_text=_("Optional Fundraise Up designation ID to route the donation to a specific fund."),
+    )
+
+    class Meta:
+        icon = "pick"
+        label = _("Donation after signup")
+        collapsed = True
+
+
 class SignupActionKitFormMixin:
     """
     Shared logic (no fields) for both SignupActionKitBlock (body/section
@@ -3282,14 +3325,23 @@ class SignupActionKitFormMixin:
 
         request = (parent_context or {}).get("request")
         hostname = ""
+        fundraiseup_config = None
         if request is not None:
             try:
-                config = IntegrationSettings.for_request(request).get_integration_config(
-                    "actionkit"
-                )
+                integration_settings = IntegrationSettings.for_request(request)
+                config = integration_settings.get_integration_config("actionkit")
                 hostname = config.get("hostname", "") if config else ""
+                fundraiseup_config = integration_settings.get_integration_config("fundraiseup")
             except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
                 hostname = ""
+
+        # Only hand the campaign to the template when Fundraise Up's script
+        # will actually be in <head> — otherwise the form would vanish on
+        # success with nothing opening in its place.
+        donation = value.get("post_signup_donation") or {}
+        campaign_code = (donation.get("campaign_code") or "") if fundraiseup_config else ""
+        ctx["fundraiseup_campaign_code"] = campaign_code
+        ctx["fundraiseup_designation_id"] = (donation.get("designation_id") or "") if campaign_code else ""
 
         form_html = None
         if (parent_context or {}).get("is_block_preview"):
@@ -3418,6 +3470,10 @@ class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, Struct
             "thank-you page."
         ),
     )
+    post_signup_donation = PostSignupDonationBlock(
+        required=False,
+        label=_("Donation after signup"),
+    )
 
     class Meta:
         icon = "form"
@@ -3504,6 +3560,10 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
             "place of the form instead of redirecting to ActionKit's own "
             "thank-you page."
         ),
+    )
+    post_signup_donation = PostSignupDonationBlock(
+        required=False,
+        label=_("Donation after signup"),
     )
 
     class Meta:

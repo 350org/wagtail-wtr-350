@@ -388,6 +388,64 @@
                 }
             }
 
+            {% comment %}
+            PostSignupDonationBlock: opens a Fundraise Up campaign checkout
+            in place of the thank-you box, prefilled from this signup. Returns
+            false (so the thank-you box shows as usual) when no campaign is
+            set, or when Fundraise Up's installation snippet isn't on the
+            page — its stub defines window.FundraiseUp and queues calls until
+            the full script loads, so its absence means it never will (e.g.
+            live preview, where base.html suppresses integration head HTML).
+            {% endcomment %}
+            var fundraiseupCampaign = "{{ fundraiseup_campaign_code|escapejs }}";
+            var fundraiseupDesignation = "{{ fundraiseup_designation_id|escapejs }}";
+            var CHECKOUT_OPEN_TIMEOUT_MS = 5000;
+
+            function openDonationCheckout() {
+                if (!fundraiseupCampaign || !window.FundraiseUp || typeof window.FundraiseUp.openCheckout !== "function") {
+                    return false;
+                }
+                var data = new FormData(form);
+                var firstName = String(data.get("first_name") || "").trim();
+                var lastName = String(data.get("last_name") || "").trim();
+                if (!firstName && !lastName && data.get("name")) {
+                    var parts = String(data.get("name")).trim().split(/\s+/);
+                    firstName = parts.shift() || "";
+                    lastName = parts.join(" ");
+                }
+                var supporter = {};
+                if (firstName) { supporter.firstName = firstName; }
+                if (lastName) { supporter.lastName = lastName; }
+                if (data.get("email")) { supporter.email = String(data.get("email")).trim(); }
+                var options = { supporter: supporter };
+                if (fundraiseupDesignation) { options.designations = [{ id: fundraiseupDesignation }]; }
+                formContainer.classList.add("hidden");
+
+                {% comment %}
+                openCheckout() fails silently on a code that isn't a campaign
+                code (an editor pasting a form/element ID is the likely one),
+                leaving an empty space where the form was. So wait for
+                Fundraise Up's own checkoutOpen event, and if it hasn't fired
+                in time, fall back to what a signup without this option does:
+                the thank-you box, or the form itself when there is none.
+                {% endcomment %}
+                var opened = false;
+                window.FundraiseUp.on("checkoutOpen", function () { opened = true; });
+                window.FundraiseUp.openCheckout(fundraiseupCampaign, options);
+                setTimeout(function () {
+                    if (opened) { return; }
+                    if (window.console) {
+                        console.warn("Fundraise Up checkout did not open for campaign code \"" + fundraiseupCampaign + "\". Is it a campaign code (FUN...) rather than a form ID?");
+                    }
+                    if (thankYou) {
+                        thankYou.classList.remove("hidden");
+                    } else {
+                        formContainer.classList.remove("hidden");
+                    }
+                }, CHECKOUT_OPEN_TIMEOUT_MS);
+                return true;
+            }
+
             form.onsubmit = null;
             form.addEventListener("submit", function (event) {
                 event.preventDefault();
@@ -409,6 +467,7 @@
                     return response.json();
                 }).then(function (data) {
                     if (data.success) {
+                        if (openDonationCheckout()) { return; }
                         {% if success_message or success_text %}
                         if (formContainer) { formContainer.classList.add("hidden"); }
                         if (thankYou) { thankYou.classList.remove("hidden"); }

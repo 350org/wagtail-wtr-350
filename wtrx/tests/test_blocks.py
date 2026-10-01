@@ -3402,3 +3402,63 @@ class TestGatedStreamBlockAdapter(TestCase):
         self.assertIsInstance(
             registry.find_adapter(SectionContentBlock), GatedStreamBlockAdapter
         )
+
+
+class TestSignupActionKitPostSignupDonation(TestCase):
+    """
+    PostSignupDonationBlock: both ActionKit signup blocks hand a Fundraise Up
+    campaign code to _actionkit_form.html, which opens its checkout in place
+    of the thank-you box — but only while the Fundraise Up integration is
+    enabled, since its script is what makes openCheckout() exist.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+
+    def _set_fundraiseup(self, enabled=True):
+        self.integration.integrations = [
+            ("fundraiseup", {"enabled": enabled, "installation_code": "<script>fru</script>"})
+        ]
+        self.integration.save()
+
+    def _get_context(self, block_class, donation):
+        block = block_class()
+        request = RequestFactory().get("/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        value = block.to_python({"short_form_id": "join", "post_signup_donation": donation})
+        return block.get_context(value, parent_context={"request": request})
+
+    def test_both_signup_blocks_offer_the_field(self):
+        for block_class in (SignupActionKitBlock, HeroSignupActionKitBlock):
+            self.assertIn("post_signup_donation", block_class().child_blocks)
+            self.assertFalse(block_class().child_blocks["post_signup_donation"].required)
+
+    def test_campaign_and_designation_reach_the_template_when_enabled(self):
+        self._set_fundraiseup()
+        for block_class in (SignupActionKitBlock, HeroSignupActionKitBlock):
+            ctx = self._get_context(block_class, {"campaign_code": "FUNABC", "designation_id": "EDEF"})
+            self.assertEqual(ctx["fundraiseup_campaign_code"], "FUNABC")
+            self.assertEqual(ctx["fundraiseup_designation_id"], "EDEF")
+
+    def test_campaign_is_dropped_when_fundraiseup_is_disabled(self):
+        self._set_fundraiseup(enabled=False)
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code": "FUNABC", "designation_id": "EDEF"})
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "")
+        self.assertEqual(ctx["fundraiseup_designation_id"], "")
+
+    def test_blank_section_leaves_the_thank_you_flow_alone(self):
+        self._set_fundraiseup()
+        ctx = self._get_context(SignupActionKitBlock, {})
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "")
+
+    def test_campaign_code_is_not_translatable(self):
+        """Pitfall #66: an identifier handed to a translator comes back broken."""
+        from wtrx.blocks import IdentifierBlock, PostSignupDonationBlock
+
+        for name, child in PostSignupDonationBlock().child_blocks.items():
+            self.assertIsInstance(child, IdentifierBlock, name)
