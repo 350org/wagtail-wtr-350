@@ -41,6 +41,11 @@ logger = logging.getLogger(__name__)
 class ActionKitError(Exception):
     """Raised when ActionKit is misconfigured or returns a non-success response."""
 
+    def __init__(self, message="", status_code=None):
+        super().__init__(message)
+        #: The HTTP status ActionKit returned, when the error is a response.
+        self.status_code = status_code
+
 
 # Field names ActionKit's own hosted forms already post under the
 # ``action_<name>`` convention — passed through verbatim (not re-prefixed
@@ -197,7 +202,8 @@ def fetch_embed_form_html(hostname, short_form_id, timeout=5):
 
     if not 200 <= response.status_code < 300:
         raise ActionKitError(
-            f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
+            f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}",
+            status_code=response.status_code,
         )
 
     return _strip_submit_arrow(_fix_country_label_for_attribute(_make_recaptcha_async(response.text)))
@@ -477,6 +483,15 @@ def uniquify_form_ids(html, request):
 # still only hit ActionKit's live server at this one shared rate.
 EMBED_FORM_SUCCESS_CACHE_TIMEOUT = 60 * 15  # 15 minutes
 EMBED_FORM_FAILURE_CACHE_TIMEOUT = 60  # retry a broken/misconfigured page once a minute
+# How long the last successfully fetched copy is kept to fall back on. A
+# refetch fails now and then (in production, mostly a read timeout from
+# act.350.org), and without this every one of those turned into a minute of
+# "temporarily unavailable" on whichever worker hit it.
+EMBED_FORM_LAST_GOOD_CACHE_TIMEOUT = 60 * 60 * 24 * 7  # 7 days
+# Statuses meaning the ActionKit page itself is gone, not that the fetch
+# failed: an old copy of its form would only collect signups that ActionKit
+# then rejects, so these drop the fallback instead of serving it.
+_EMBED_FORM_GONE_STATUSES = {404, 410}
 _EMBED_FORM_FETCH_FAILED = "__actionkit_embed_fetch_failed__"
 
 
@@ -484,29 +499,42 @@ def fetch_and_cache_embed_form_html(hostname, short_form_id):
     """
     Cached wrapper around fetch_embed_form_html().
 
-    Returns the cached (or freshly fetched) form fragment, or None if the
-    fetch failed (also cached, briefly, so a broken/misconfigured page
-    doesn't get hit on every render). The failure itself is logged — a
-    silent None here previously left no way to tell a timeout apart from a
-    bad short_form_id or a genuine ActionKit outage from production logs.
+    Returns the cached (or freshly fetched) form fragment. When a refetch
+    fails, it falls back to the last copy fetched successfully (up to
+    EMBED_FORM_LAST_GOOD_CACHE_TIMEOUT old), and returns None only when
+    there is none, or when ActionKit says the page no longer exists. The
+    failure is cached briefly either way, so a broken/misconfigured page
+    doesn't get hit on every render, and logged — a silent None here
+    previously left no way to tell a timeout apart from a bad short_form_id
+    or a genuine ActionKit outage from production logs.
     """
     cache_key = f"wtrx:actionkit_embed:{hostname}:{short_form_id}"
+    last_good_key = f"{cache_key}:last_good"
     cached = cache.get(cache_key)
     if cached == _EMBED_FORM_FETCH_FAILED:
-        return None
+        return cache.get(last_good_key)
     if cached is not None:
         return cached
 
     try:
         html = fetch_embed_form_html(hostname, short_form_id)
     except (ActionKitError, requests.RequestException) as exc:
+        page_gone = getattr(exc, "status_code", None) in _EMBED_FORM_GONE_STATUSES
+        if page_gone:
+            cache.delete(last_good_key)
+        fallback = cache.get(last_good_key)
         logger.warning(
-            "ActionKit embed form fetch failed for %s/%s: %s", hostname, short_form_id, exc
+            "ActionKit embed form fetch failed for %s/%s: %s%s",
+            hostname,
+            short_form_id,
+            exc,
+            " (serving the last good copy)" if fallback else "",
         )
         cache.set(cache_key, _EMBED_FORM_FETCH_FAILED, EMBED_FORM_FAILURE_CACHE_TIMEOUT)
-        return None
+        return fallback
 
     cache.set(cache_key, html, EMBED_FORM_SUCCESS_CACHE_TIMEOUT)
+    cache.set(last_good_key, html, EMBED_FORM_LAST_GOOD_CACHE_TIMEOUT)
     return html
 
 

@@ -634,6 +634,39 @@ class TestSignupActionKitBlockContext(TestCase):
         self.assertIsNone(ctx2["form_html"])
         mock_fetch.assert_called_once()
 
+    def _expire_fresh_copy(self):
+        cache.delete("wtrx:actionkit_embed:myorg.actionkit.com:join")
+
+    @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
+    def test_failed_refetch_serves_the_last_good_copy(self, mock_fetch):
+        block = SignupActionKitBlock()
+        mock_fetch.return_value = "<form>hello</form>"
+        block.get_context(self._value(), parent_context={"request": self.factory.get("/")})
+
+        self._expire_fresh_copy()
+        mock_fetch.side_effect = requests.ReadTimeout("Read timed out.")
+        with self.assertLogs("wtrx.integrations.actionkit", "WARNING") as logs:
+            ctx = block.get_context(self._value(), parent_context={"request": self.factory.get("/")})
+        self.assertEqual(ctx["form_html"], "<form>hello</form>")
+        self.assertIn("serving the last good copy", logs.output[0])
+
+        # Within the failure window it keeps serving that copy without retrying.
+        ctx = block.get_context(self._value(), parent_context={"request": self.factory.get("/")})
+        self.assertEqual(ctx["form_html"], "<form>hello</form>")
+        self.assertEqual(mock_fetch.call_count, 2)
+
+    @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
+    def test_a_deleted_actionkit_page_drops_the_last_good_copy(self, mock_fetch):
+        block = SignupActionKitBlock()
+        mock_fetch.return_value = "<form>hello</form>"
+        block.get_context(self._value(), parent_context={"request": self.factory.get("/")})
+
+        self._expire_fresh_copy()
+        mock_fetch.side_effect = ActionKitError("ActionKit returned HTTP 404", status_code=404)
+        with self.assertLogs("wtrx.integrations.actionkit", "WARNING"):
+            ctx = block.get_context(self._value(), parent_context={"request": self.factory.get("/")})
+        self.assertIsNone(ctx["form_html"])
+
     @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
     def test_lifts_actionkit_intro_out_of_form_html(self, mock_fetch):
         mock_fetch.return_value = PETITION_FRAGMENT
