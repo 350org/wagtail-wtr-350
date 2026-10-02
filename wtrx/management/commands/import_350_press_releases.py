@@ -236,8 +236,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--target",
             help="Slug of the Blogs page to import under, or a slash-separated path "
-            "from the site root (e.g. 'france/press-releases') if a bare slug would "
-            "be ambiguous. Required if more than one Blogs page exists; optional "
+            "from the site root (e.g. 'france/press-releases', or '/press-releases' "
+            "for one directly under it) if a bare slug would be ambiguous. Required if more than one Blogs page exists; optional "
             "(and inferred) if there's only one.",
         )
         parser.add_argument(

@@ -159,7 +159,8 @@ class TestResolveBlogsTargetByPath(TestCase):
     Page.slug is only unique among siblings, not site-wide: a France
     sub-home's "press-releases" Blogs child can share a slug with the
     top-level English "press-releases" Blogs page. A bare-slug --target
-    can't disambiguate that; a path can.
+    refuses to guess between them; a path ("/press-releases" for the
+    top-level one) picks one.
     """
 
     @classmethod
@@ -202,14 +203,24 @@ class TestResolveBlogsTargetByPath(TestCase):
         result = resolve_blogs_target(self.stderr, self.style, "france/press-releases")
         self.assertEqual(result.pk, self.france_blogs.pk)
 
-    def test_bare_slug_lookup_is_unchanged_and_can_still_be_ambiguous(self):
-        # Existing behavior, deliberately preserved: a bare slug goes
-        # through the old Blogs.objects.filter(slug=...).first() lookup,
-        # which doesn't know or care that two Blogs pages share this slug
-        # -- it just returns whichever one comes back first. This is
-        # exactly the ambiguity --target <path> exists to let you avoid.
+    def test_ambiguous_bare_slug_is_an_error(self):
         result = resolve_blogs_target(self.stderr, self.style, "press-releases")
-        self.assertIn(result.pk, {self.top_blogs.pk, self.france_blogs.pk})
+        self.assertIsNone(result)
+        message = self.stderr.write.call_args[0][0]
+        self.assertIn("More than one Blogs page has slug 'press-releases'", message)
+        self.assertIn("'/press-releases'", message)
+
+    def test_leading_slash_picks_the_page_directly_under_the_site_root(self):
+        result = resolve_blogs_target(self.stderr, self.style, "/press-releases")
+        self.assertEqual(result.pk, self.top_blogs.pk)
+
+    def test_unique_bare_slug_still_resolves(self):
+        from wtrx.models import Blogs
+
+        unique = Blogs(title="Blog", slug="unique-blog")
+        self.home.add_child(instance=unique)
+        result = resolve_blogs_target(self.stderr, self.style, "unique-blog")
+        self.assertEqual(result.pk, unique.pk)
 
     def test_nonexistent_path_reports_a_clear_error(self):
         result = resolve_blogs_target(self.stderr, self.style, "france/nonexistent")

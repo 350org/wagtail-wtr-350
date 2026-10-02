@@ -265,7 +265,10 @@ def resolve_blogs_target(stderr, style, target):
     -- needed because Page.slug is only unique among siblings, not
     site-wide, so a country/region sub-home's own Blogs child (e.g.
     350.org/france/blog) can't always be picked out by slug alone once more
-    than one page in the tree shares that slug.
+    than one page in the tree shares that slug. A leading slash forces the
+    path lookup for a single segment too ("/blog" is the Blogs page directly
+    under Home), and a bare slug matching more than one Blogs page is an
+    error rather than an arbitrary pick.
 
     Returns the Blogs instance, or None (having already written an error
     to stderr) if it can't be resolved.
@@ -274,7 +277,7 @@ def resolve_blogs_target(stderr, style, target):
     from wtrx.models import Blogs
 
     if target:
-        if "/" in target.strip("/"):
+        if "/" in target.strip("/") or target.startswith("/"):
             page = _find_page_by_path(target)
             if page is None:
                 stderr.write(style.ERROR(f"No page found at path '{target}'."))
@@ -285,10 +288,20 @@ def resolve_blogs_target(stderr, style, target):
                 )
                 return None
             return page
-        blogs = Blogs.objects.filter(slug=target).first()
-        if blogs is None:
+        matches = list(Blogs.objects.filter(slug=target))
+        if not matches:
             stderr.write(style.ERROR(f"No Blogs page found with slug '{target}'."))
-        return blogs
+            return None
+        if len(matches) > 1:
+            paths = ", ".join(sorted(f"'{b.url_path}'" for b in matches))
+            stderr.write(
+                style.ERROR(
+                    f"More than one Blogs page has slug '{target}' ({paths}). Pass a path "
+                    f"instead, e.g. '/{target}' for the one directly under the site root."
+                )
+            )
+            return None
+        return matches[0]
 
     all_blogs = list(Blogs.objects.all())
     if not all_blogs:
