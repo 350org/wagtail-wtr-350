@@ -450,6 +450,67 @@ class TestSplitActionHeader(SimpleTestCase):
             self.assertEqual(html, fragment)
 
 
+class TestUniquifyFormIds(SimpleTestCase):
+    """A page with several ActionKit embeds must not repeat the fragment's ids."""
+
+    FRAGMENT = (
+        '<section id="action-lead"><form id="action-form" name="act">'
+        '<div id="ak-fieldbox-email"><label for="id_email">Email</label>'
+        '<input type="text" name="email" id="id_email" aria-describedby="ak-errors other"></div>'
+        '<a href="#action-form">Jump</a><a href="#elsewhere">Away</a>'
+        "<script>document.getElementById(\"id_email\"); var s = '<p id=\"x\">';</script>"
+        '<ul id="ak-errors"><li></li></ul></form></section>'
+    )
+
+    def setUp(self):
+        self.request = RequestFactory().get("/")
+
+    def test_first_embed_is_unchanged(self):
+        self.assertEqual(actionkit.uniquify_form_ids(self.FRAGMENT, self.request), self.FRAGMENT)
+
+    def test_later_embeds_get_suffixed_ids_and_references(self):
+        actionkit.uniquify_form_ids(self.FRAGMENT, self.request)
+        html = actionkit.uniquify_form_ids(self.FRAGMENT, self.request)
+        self.assertIn('<form id="action-form--2" data-ak-id="action-form" name="act">', html)
+        self.assertIn('<label for="id_email--2">', html)
+        self.assertIn('id="id_email--2" data-ak-id="id_email"', html)
+        self.assertIn('aria-describedby="ak-errors--2 other"', html)
+        self.assertIn('href="#action-form--2"', html)
+        # A fragment link to an id the fragment doesn't own is left alone.
+        self.assertIn('href="#elsewhere"', html)
+        self.assertNotIn(' id="ak-errors"', html)
+
+        third = actionkit.uniquify_form_ids(self.FRAGMENT, self.request)
+        self.assertIn('id="action-form--3"', third)
+
+    def test_scripts_are_left_byte_for_byte(self):
+        actionkit.uniquify_form_ids(self.FRAGMENT, self.request)
+        html = actionkit.uniquify_form_ids(self.FRAGMENT, self.request)
+        self.assertIn("<script>document.getElementById(\"id_email\"); var s = '<p id=\"x\">';</script>", html)
+
+    def test_repeats_within_one_embed_are_renamed(self):
+        fragment = '<p>Hi <span id="known_user_name"></span></p><p>Not <span id="known_user_name"></span>?</p>'
+        first = actionkit.uniquify_form_ids(fragment, self.request)
+        self.assertEqual(
+            first,
+            '<p>Hi <span id="known_user_name"></span></p>'
+            '<p>Not <span id="known_user_name-2" data-ak-id="known_user_name"></span>?</p>',
+        )
+        second = actionkit.uniquify_form_ids(fragment, self.request)
+        self.assertIn('id="known_user_name--2" data-ak-id', second)
+        self.assertIn('id="known_user_name--2-2" data-ak-id', second)
+
+    def test_counts_per_request(self):
+        actionkit.uniquify_form_ids(self.FRAGMENT, self.request)
+        other_request = RequestFactory().get("/")
+        self.assertEqual(actionkit.uniquify_form_ids(self.FRAGMENT, other_request), self.FRAGMENT)
+
+    def test_no_request_or_html_is_a_no_op(self):
+        self.assertEqual(actionkit.uniquify_form_ids(self.FRAGMENT, None), self.FRAGMENT)
+        self.assertIsNone(actionkit.uniquify_form_ids(None, self.request))
+        self.assertEqual(getattr(self.request, "_wtrx_actionkit_form_count", 0), 0)
+
+
 class TestSignupActionKitIntroRendering(SimpleTestCase):
     """The copy column falls back to ActionKit's own intro only when Content is blank."""
 

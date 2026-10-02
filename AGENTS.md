@@ -1706,3 +1706,18 @@ gate.
     by stubbing `fetch` to fake the signup, stub **only** the ActionKit
     URL: Fundraise Up resolves the campaign over its own POST `fetch`, and
     a blanket stub makes a valid code fail exactly like an invalid one.
+
+87. **Every ActionKit embed after the first on a page has its ids
+    suffixed** (`--2`, `--3`, ...) by `actionkit.uniquify_form_ids()`,
+    counted per request, since all of them render the same fetched
+    fragment and its hardcoded ids (`action-form`, `id_email`, ...). The
+    first keeps AK's ids, so the fragment's inline scripts (which use
+    `getElementById`/`jQuery('#...')` page-globally) behave as before; a
+    repeat *within* one fragment (AK's two `known_user_name` spans) gets
+    `-2`. Renamed elements carry `data-ak-id="<original>"`, so **never
+    select an AK element by bare id**: main.css uses
+    `:is(#action-form, [data-ak-id="action-form"])` (the `:is()` keeps the
+    id's specificity) and `_actionkit_form.html`'s script uses
+    `'#ak-errors, [data-ak-id="ak-errors"]'`. Only markup outside
+    `<script>`/`<style>` is rewritten, along with `<label for>`,
+    `href="#..."` and `aria-*` references to the fragment's own ids.

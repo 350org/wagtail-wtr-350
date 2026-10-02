@@ -146,8 +146,11 @@
             A page can carry more than one SignupActionKitBlock (the home
             page always does: the hero CTA plus this standalone panel).
             Every instance fetches and renders the *same* ActionKit
-            fragment, which hardcodes id="action-form"/name="act" — so the
-            page ends up with duplicate ids. document.getElementById and
+            fragment, which hardcodes id="action-form"/name="act". Every
+            instance after the first has its ids suffixed server-side
+            (actionkit.uniquify_form_ids(), keeping the original in
+            data-ak-id), so the ids are unique, but the fragment's own
+            scripts still only see the first instance. document.getElementById and
             ActionKit's own actionkit.js (forms.setForm walks
             document.getElementsByTagName('form') and stops at the first
             name match) can therefore only ever resolve the first instance
@@ -174,7 +177,7 @@
             var wrapper = document.currentScript.closest(".wtr-signup-actionkit");
             if (!wrapper) { return; }
             var formContainer = wrapper.querySelector("[data-form-container]");
-            var form = formContainer && formContainer.querySelector("#action-form");
+            var form = formContainer && formContainer.querySelector('#action-form, [data-ak-id="action-form"]');
             if (!form) { return; }
             var thankYou = wrapper.querySelector("[data-thank-you]");
             var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
@@ -378,7 +381,7 @@
             owns it instead.
             {% endcomment %}
             function showFormError(message) {
-                var errs = form.querySelector("#ak-errors");
+                var errs = form.querySelector('#ak-errors, [data-ak-id="ak-errors"]');
                 if (!errs) { return; }
                 if (message) {
                     errs.querySelector("li").textContent = message;
@@ -557,7 +560,7 @@
             that fallback — only firing the extra request on that same
             condition, not on every load.
             {% endcomment %}
-            var progressEl = formContainer.querySelector("#progress");
+            var progressEl = formContainer.querySelector('#progress, [data-ak-id="progress"]');
             var progressTemplate = formContainer.querySelector("script[type='text/ak-template'][for='progress']");
             wantsProgress = !!(progressEl && progressTemplate);
 

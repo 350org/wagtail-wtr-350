@@ -199,9 +199,9 @@ html {
  *
  * Only `color` is reset. AK's layout classes on these elements are already
  * handled deliberately by each variant's own rules. */
-.wtr-actionkit-embed #action-form,
-.wtr-actionkit-embed #action-form .user-form,
-.wtr-actionkit-embed #action-form #unknown_user {
+.wtr-actionkit-embed :is(#action-form, [data-ak-id="action-form"]),
+.wtr-actionkit-embed :is(#action-form, [data-ak-id="action-form"]) .user-form,
+.wtr-actionkit-embed :is(#action-form, [data-ak-id="action-form"]) :is(#unknown_user, [data-ak-id="unknown_user"]) {
     color: inherit;
 }
 
@@ -219,7 +219,7 @@ html {
  * block's chosen background (e.g. the blue-gradient fill) should show
  * through. Reset instead of removed, same as the color guard above, so a
  * future AK class collision on this element can't do it again either. */
-.wtr-actionkit-embed #action-lead {
+.wtr-actionkit-embed :is(#action-lead, [data-ak-id="action-lead"]) {
     background-color: transparent;
 }
 
@@ -269,9 +269,9 @@ html {
  * to layout), and inline styles beat any stylesheet rule regardless of
  * specificity.
  * ============================================================ */
-.wtr-actionkit-embed-inline #action-header,
-.wtr-actionkit-embed-inline #recent-actions,
-.wtr-actionkit-embed-inline #known_user,
+.wtr-actionkit-embed-inline :is(#action-header, [data-ak-id="action-header"]),
+.wtr-actionkit-embed-inline :is(#recent-actions, [data-ak-id="recent-actions"]),
+.wtr-actionkit-embed-inline :is(#known_user, [data-ak-id="known_user"]),
 /* AK emits a bare <div id="t" class="p ..."> &nbsp; </div> spacer between
  * the submit button and the privacy notice — vertical rhythm for its own
  * stylesheet, which we don't load. Left visible it is caught by the
@@ -279,14 +279,14 @@ html {
  * inside the hero, pushing the fine print ~50px further down than Figma
  * puts it. (Scoped to the inline variant deliberately: the stacked panel
  * hasn't been re-checked against its own design yet.) */
-.wtr-actionkit-embed-inline #action-form > #t {
+.wtr-actionkit-embed-inline :is(#action-form, [data-ak-id="action-form"]) > :is(#t, [data-ak-id="t"]) {
     display: none;
 }
 
 /* Figma's Signup Horizontal (node I1:560;2031:5529) puts 16px between the
  * fields and the submit button, and 13px between that row and the privacy
  * fine print below it — one wrapping flex row, two different gaps. */
-.wtr-actionkit-embed-inline #action-form {
+.wtr-actionkit-embed-inline :is(#action-form, [data-ak-id="action-form"]) {
     display: flex !important;
     flex-wrap: wrap;
     align-items: flex-start;
@@ -294,12 +294,12 @@ html {
     row-gap: 0.8125rem;
 }
 
-.wtr-actionkit-embed-inline #unknown_user,
+.wtr-actionkit-embed-inline :is(#unknown_user, [data-ak-id="unknown_user"]),
 .wtr-actionkit-embed-inline .user-form {
     display: contents;
 }
 
-.wtr-actionkit-embed-inline #action-form > .input-wrapper.input-submit {
+.wtr-actionkit-embed-inline :is(#action-form, [data-ak-id="action-form"]) > .input-wrapper.input-submit {
     order: 1;
     flex: 0 0 auto;
     /* AK ships .margin-bottom-normal on this wrapper; the row-gap above is
@@ -311,7 +311,7 @@ html {
  * error list) is pushed onto its own full-width line below, in whatever
  * relative order it already had. Fields themselves default to order:0, so
  * they still lead the row ahead of the order:1 submit button. */
-.wtr-actionkit-embed-inline #action-form > *:not(#unknown_user):not(.input-wrapper) {
+.wtr-actionkit-embed-inline :is(#action-form, [data-ak-id="action-form"]) > *:not(:is(#unknown_user, [data-ak-id="unknown_user"])):not(.input-wrapper) {
     order: 2;
     flex-basis: 100%;
 }
@@ -392,13 +392,13 @@ html {
  *    own margin, because a column-gap is also counted before each
  *    zero-width full-width item and would leave the form 16px too wide. */
 @media (width >= 40rem) {
-    .wtr-actionkit-embed-inline #action-form {
+    .wtr-actionkit-embed-inline :is(#action-form, [data-ak-id="action-form"]) {
         width: fit-content !important;
         max-width: 100%;
         column-gap: 0;
     }
 
-    .wtr-actionkit-embed-inline #action-form > *:not(#unknown_user):not(.input-wrapper) {
+    .wtr-actionkit-embed-inline :is(#action-form, [data-ak-id="action-form"]) > *:not(:is(#unknown_user, [data-ak-id="unknown_user"])):not(.input-wrapper) {
         contain: inline-size;
     }
 
@@ -565,7 +565,7 @@ html {
  * surface, matching this variant's own ul.ak-err treatment above. #action-
  * form is a flex-wrap row here, so this needs an explicit full-width
  * flex-basis to break onto its own line instead of sizing to its content. */
-.wtr-actionkit-embed-inline #ak-errors {
+.wtr-actionkit-embed-inline :is(#ak-errors, [data-ak-id="ak-errors"]) {
     flex: 0 0 100%;
     margin: 0;
     padding: 0;
@@ -599,9 +599,9 @@ html {
  * #action-form's !important is required for the same reason as inline: the
  * fetched fragment hard-codes style="display: block" on the element.
  * ============================================================ */
-.wtr-actionkit-embed-stacked #action-header,
-.wtr-actionkit-embed-stacked #recent-actions,
-.wtr-actionkit-embed-stacked #known_user {
+.wtr-actionkit-embed-stacked :is(#action-header, [data-ak-id="action-header"]),
+.wtr-actionkit-embed-stacked :is(#recent-actions, [data-ak-id="recent-actions"]),
+.wtr-actionkit-embed-stacked :is(#known_user, [data-ak-id="known_user"]) {
     display: none;
 }
 
@@ -619,13 +619,13 @@ html {
     color: var(--color-light);
 }
 
-.wtr-actionkit-embed-stacked #action-form {
+.wtr-actionkit-embed-stacked :is(#action-form, [data-ak-id="action-form"]) {
     display: flex !important;
     flex-direction: column;
     gap: 1rem;
 }
 
-.wtr-actionkit-embed-stacked #unknown_user,
+.wtr-actionkit-embed-stacked :is(#unknown_user, [data-ak-id="unknown_user"]),
 .wtr-actionkit-embed-stacked .user-form {
     display: contents;
 }
@@ -735,7 +735,7 @@ html {
  * rest of the form's loose text does, with a red hairline and inherited text
  * rather than red type that would be unreadable on the red fill. AK ships it
  * hidden and unhides it inline, so this only ever shows when it has content. */
-.wtr-actionkit-embed-stacked #ak-errors {
+.wtr-actionkit-embed-stacked :is(#ak-errors, [data-ak-id="ak-errors"]) {
     margin: 0;
     padding: 0.75rem;
     list-style: none;
@@ -751,7 +751,7 @@ html {
  * this column it is an empty line plus a 1rem flex gap between the fields and
  * the submit button. Same reasoning, same fix — the comment on the inline
  * rule noted this variant had not been re-checked yet. */
-.wtr-actionkit-embed-stacked #action-form > #t {
+.wtr-actionkit-embed-stacked :is(#action-form, [data-ak-id="action-form"]) > :is(#t, [data-ak-id="t"]) {
     display: none;
 }
 
@@ -883,7 +883,7 @@ html {
  * The fill's inline width is the only thing AK sets, so the track just
  * needs a height, a fill colour and a radius to clip it to.
  * ------------------------------------------------------------ */
-.wtr-actionkit-embed-stacked #progress {
+.wtr-actionkit-embed-stacked :is(#progress, [data-ak-id="progress"]) {
     display: flex;
     flex-direction: column;
     gap: 0.375rem;
@@ -896,7 +896,7 @@ html {
  * bare divs). Visually hidden but still announced is what AK intends
  * here. Scoped to #progress so it cannot touch the .hidden our own
  * template toggles on the form container and thank-you box. */
-.wtr-actionkit-embed-stacked #progress p.hidden {
+.wtr-actionkit-embed-stacked :is(#progress, [data-ak-id="progress"]) p.hidden {
     display: block;
     position: absolute;
     width: 1px;

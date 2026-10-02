@@ -185,6 +185,7 @@ def resolved_footer_newsletter_signup(context):
     form_html = None
     if hostname:
         form_html = actionkit.fetch_and_cache_embed_form_html(hostname, short_form_id)
+        form_html = actionkit.uniquify_form_ids(form_html, request)
 
     success_message = _resolved_attr(footer, "newsletter_success_message", "")
     if not success_message:

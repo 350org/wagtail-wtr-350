@@ -3360,6 +3360,8 @@ class SignupActionKitFormMixin:
         # hidden in it, so the left-hand column can fall back to it when the
         # editor leaves `content` blank — see _actionkit_intro.html.
         ak_intro, form_html = actionkit.split_action_header(form_html)
+        if not (parent_context or {}).get("is_block_preview"):
+            form_html = actionkit.uniquify_form_ids(form_html, request)
         ctx["ak_intro"] = ak_intro
         ctx["form_html"] = form_html
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""

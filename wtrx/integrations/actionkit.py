@@ -386,6 +386,90 @@ def split_action_header(html):
     return (intro if any(intro.values()) else None), remaining_html
 
 
+# Every ActionKit embed fetches the same fragment, which hardcodes its ids
+# (action-form, unknown_user, id_email, ak-errors, ...), so a page with more
+# than one embed — the home page has three: hero, panel and footer — repeats
+# each of them. uniquify_form_ids() gives every embed after the first its own
+# copies. The first keeps AK's ids, so the fragment's own inline scripts,
+# which look elements up page-globally (getElementById("id_email"),
+# jQuery("#unknown_user ...")), keep resolving exactly what they always did:
+# duplicate ids only ever resolved to the first embed anyway. The fragment
+# also repeats one id inside itself (two <span id="known_user_name">s in its
+# "Hi ___ / Not ___?" box), so a repeat within one embed is renamed too, the
+# first embed included.
+#
+# Renamed elements also get data-ak-id="<original>", which is what our own
+# CSS and _actionkit_form.html's script select on alongside the bare id.
+#
+# Regex rather than BeautifulSoup, and only outside <script>/<style>, for the
+# same reason split_action_header() leaves the form alone: the inline scripts
+# are sensitive to being re-serialised.
+_RAW_TEXT_ELEMENT_RE = re.compile(r"<(script|style)\b.*?</\1\s*>", re.IGNORECASE | re.DOTALL)
+_TAG_RE = re.compile(r"<[a-zA-Z][^>]*>")
+_ID_ATTR_RE = re.compile(r'(\sid=")([^"]+)(")')
+_ID_REF_RES = (
+    re.compile(r'(<label\b[^>]*\sfor=")([^"]+)(")', re.IGNORECASE),
+    re.compile(r'(\s(?:aria-labelledby|aria-describedby|aria-controls)=")([^"]+)(")'),
+    re.compile(r'(\shref="#)([^"]+)(")'),
+)
+
+#: Request attribute counting the ActionKit embeds rendered so far.
+_FORM_COUNT_ATTR = "_wtrx_actionkit_form_count"
+
+
+def uniquify_form_ids(html, request):
+    """
+    Return ``html`` with its ids made unique for this request (see above).
+
+    Later embeds get ``--2``, ``--3``, ... appended to every id, with
+    ``<label for>``, ``href="#..."`` and ``aria-*`` id references inside the
+    fragment renamed to match; a repeat of an id within one embed also gets
+    ``-2``, ``-3``, ... (references keep pointing at its first occurrence).
+    Without a request there is nothing to count against, so the html is
+    returned as-is.
+    """
+    if not html or request is None:
+        return html
+    count = getattr(request, _FORM_COUNT_ATTR, 0) + 1
+    setattr(request, _FORM_COUNT_ATTR, count)
+    suffix = f"--{count}" if count > 1 else ""
+    seen = {}
+
+    def rename_tag(match):
+        tag = match.group(0)
+        id_match = _ID_ATTR_RE.search(tag)
+        if not id_match:
+            return tag
+        original = id_match.group(2)
+        seen[original] = seen.get(original, 0) + 1
+        repeat = f"-{seen[original]}" if seen[original] > 1 else ""
+        if not suffix and not repeat:
+            return tag
+        renamed = f'{id_match.group(1)}{original}{suffix}{repeat}" data-ak-id="{original}"'
+        return tag[: id_match.start()] + renamed + tag[id_match.end() :]
+
+    def rename_refs(match):
+        refs = " ".join(ref + suffix if ref in seen else ref for ref in match.group(2).split())
+        return f"{match.group(1)}{refs}{match.group(3)}"
+
+    # Markup between <script>/<style> elements, which are kept verbatim.
+    raw_elements, markup, last = [], [], 0
+    for element in _RAW_TEXT_ELEMENT_RE.finditer(html):
+        markup.append(html[last : element.start()])
+        raw_elements.append(element.group(0))
+        last = element.end()
+    markup.append(html[last:])
+
+    markup = [_TAG_RE.sub(rename_tag, piece) for piece in markup]
+    if suffix:
+        for pattern in _ID_REF_RES:
+            markup = [pattern.sub(rename_refs, piece) for piece in markup]
+    out = [markup[0]]
+    for element, piece in zip(raw_elements, markup[1:]):
+        out += [element, piece]
+    return "".join(out)
+
+
 # Shared by every caller that auto-renders a fetched ActionKit form
 # (SignupActionKitBlock, the footer newsletter signup) so they hit the same
 # cache key format and retry window instead of each keeping its own copy of
