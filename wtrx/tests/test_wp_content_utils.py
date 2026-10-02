@@ -16,6 +16,10 @@ Tests for wtrx.management.commands._wp_content_utils:
   _find_page_by_path), needed because Page.slug is only unique among
   siblings, not site-wide -- a country/region sub-home's own Blogs child
   can share a slug with an unrelated page elsewhere in the tree.
+- Video embeds (video_embed_url / convert_body): YouTube and Vimeo player
+  iframes become "video" blocks rather than being dropped with the other
+  disallowed tags -- including the classic-editor shape where the iframe
+  sits inside a <p>.
 """
 
 from unittest.mock import Mock
@@ -26,11 +30,13 @@ from wagtail.models import Page, Site
 
 from wtrx.management.commands._wp_content_utils import (
     _decode_cf_email,
+    convert_body,
     _find_page_by_path,
     _unmask_cf_emails,
     resolve_blogs_target,
     resolve_site_base_url,
     verify_site_reachable,
+    video_embed_url,
 )
 
 
@@ -225,3 +231,75 @@ class TestResolveBlogsTargetByPath(TestCase):
     def test_find_page_by_path_strips_slashes(self):
         page = _find_page_by_path("/france/press-releases/")
         self.assertEqual(page.pk, self.france_blogs.pk)
+
+
+class TestVideoEmbedUrl(SimpleTestCase):
+    def test_youtube_embed_becomes_watch_url(self):
+        self.assertEqual(
+            video_embed_url("https://www.youtube.com/embed/s5kg1oOq9tY?si=6CdZwRrleJpVWfiO"),
+            "https://www.youtube.com/watch?v=s5kg1oOq9tY",
+        )
+
+    def test_youtube_nocookie_protocol_relative_and_start_time(self):
+        self.assertEqual(
+            video_embed_url("//www.youtube-nocookie.com/embed/abc123DEF_-?rel=0&amp;start=42"),
+            "https://www.youtube.com/watch?v=abc123DEF_-&t=42",
+        )
+
+    def test_vimeo_player_becomes_page_url(self):
+        self.assertEqual(
+            video_embed_url("https://player.vimeo.com/video/405768387?dnt=1&amp;app_id=122963"),
+            "https://vimeo.com/405768387",
+        )
+
+    def test_vimeo_private_hash_is_kept(self):
+        self.assertEqual(
+            video_embed_url("https://player.vimeo.com/video/405768387?h=ab12cd"),
+            "https://vimeo.com/405768387/ab12cd",
+        )
+
+    def test_other_iframes_are_unsupported(self):
+        self.assertIsNone(video_embed_url("https://www.facebook.com/plugins/post.php?href=x"))
+        self.assertIsNone(video_embed_url(""))
+
+
+class TestConvertBodyVideos(SimpleTestCase):
+    def _convert(self, content_html):
+        blocks = convert_body(content_html, session=None, stdout=Mock())
+        return [(b["type"], b["value"]) for b in blocks]
+
+    def test_iframe_inside_paragraph_becomes_video_block(self):
+        # The shape of https://350.org/350-name/.
+        blocks = self._convert(
+            "<p><strong>Here's a video:</strong></p>"
+            '<p style="text-align: center;"><iframe src="https://www.youtube.com/embed/s5kg1oOq9tY?si=x">'
+            "</iframe></p><p>After.</p>"
+        )
+        self.assertEqual(
+            blocks,
+            [
+                ("text", "<p><strong>Here's a video:</strong></p>"),
+                ("video", {"embed_url": "https://www.youtube.com/watch?v=s5kg1oOq9tY", "caption": ""}),
+                ("text", "<p>After.</p>"),
+            ],
+        )
+
+    def test_block_editor_embed_figure(self):
+        blocks = self._convert(
+            '<figure class="wp-block-embed is-provider-vimeo"><div class="wp-block-embed__wrapper">'
+            '<iframe src="https://player.vimeo.com/video/405768387?dnt=1"></iframe></div></figure>'
+        )
+        self.assertEqual(blocks, [("video", {"embed_url": "https://vimeo.com/405768387", "caption": ""})])
+
+    def test_paragraph_text_beside_iframe_is_kept(self):
+        blocks = self._convert('<p>Watch: <iframe src="https://www.youtube.com/embed/s5kg1oOq9tY"></iframe></p>')
+        self.assertEqual([t for t, _ in blocks], ["text", "video"])
+        self.assertIn("Watch:", blocks[0][1])
+
+    def test_unsupported_iframe_is_still_dropped(self):
+        stdout = Mock()
+        blocks = convert_body(
+            '<p>Hi</p><iframe src="https://www.facebook.com/plugins/post.php"></iframe>', session=None, stdout=stdout
+        )
+        self.assertEqual([b["type"] for b in blocks], ["text"])
+        self.assertIn("unsupported embed", stdout.write.call_args[0][0])

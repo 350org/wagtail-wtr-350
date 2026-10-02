@@ -13,6 +13,7 @@ Usage:
     python manage.py import_350_blog --site fr --target blog-index-fr
                                                              # a 350.org country/language site
     python manage.py import_350_blog --skip-authors        # leave author_name blank
+    python manage.py import_350_blog --skip-categories     # leave categories untouched
 
 Country/language sites: 350.org's other-language sites (e.g.
 https://350.org/fr) are separate WordPress multisite subdirectory installs
@@ -39,7 +40,8 @@ Field mapping:
     WP title/slug/date_gmt   -> Post title/slug/published_at
                                 (also first_published_at, which Wagtail
                                 only sets on an admin publish)
-    WP content.rendered      -> Post.body (StreamField: text + image blocks;
+    WP content.rendered      -> Post.body (StreamField: text + image + video
+                                 blocks; YouTube/Vimeo iframes -> video blocks;
                                  each <img>'s alt attribute -> that image
                                  block's own alt_text, and (see
                                  download_image() in _wp_content_utils.py)
@@ -69,7 +71,7 @@ WordPress category slugs directly onto wtrx.BlogCategory names -- these are
 exact/known equivalents (e.g. WP's "kiitg" category *is* our "Fossil Fuels"
 category), not a guess. A post carrying none of these WP categories falls
 back to TITLE_CATEGORY_KEYWORDS: a simple case-insensitive substring match
-of the post title against each of the 5 target categories' keyword list. A
+of the post title against each of the 4 target categories' keyword list. A
 post can end up in more than one category, from either source, and a title
 that matches nothing keeps zero categories rather than a forced guess.
 """
@@ -96,10 +98,9 @@ USER_AGENT = "350-wagtail-blog-import/1.0 (+https://github.com/)"
 
 # WordPress category slug -> wtrx.BlogCategory name. Only known direct
 # equivalents belong here -- "justice" is WP's own literal "Climate Justice"
-# category, not a guess. "impacts" (WP's "Climate Impacts") is deliberately
-# excluded: it's broader than Extreme Weather (sea-level rise, biodiversity,
-# etc. all live under it too), so posts carrying it fall through to the
-# title-keyword match instead of being assumed to be about extreme weather.
+# category, not a guess. "impacts" (WP's "Climate Impacts") has no
+# equivalent: there is deliberately no "Extreme Weather" category any more,
+# so posts carrying it fall through to the title-keyword match.
 CATEGORY_SLUG_MAP = {
     "kiitg": "Fossil Fuels",
     "finance": "Climate Finance",
@@ -133,11 +134,6 @@ TITLE_CATEGORY_KEYWORDS = {
     "Climate Justice": [
         "justice", "equity", "indigenous", "frontline communities",
         "human rights", "reparations", "just transition", "colonial",
-    ],
-    "Extreme Weather": [
-        "flood", "wildfire", "hurricane", "typhoon", "cyclone", "drought",
-        "heatwave", "heat wave", "extreme heat", "extreme weather", "climate disaster",
-        "monsoon", "landslide", "tornado", "storm",
     ],
 }
 
@@ -310,6 +306,12 @@ class Command(BaseCommand):
             "blank author_name; --update never overwrites an already-imported post's "
             "existing author_name.",
         )
+        parser.add_argument(
+            "--skip-categories",
+            action="store_true",
+            help="Don't assign categories. New posts get none; --update never "
+            "overwrites an already-imported post's existing categories.",
+        )
 
     def handle(self, *args, **options):
         # Deferred imports to avoid import-time DB access (architecture rule #4).
@@ -320,6 +322,7 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         update = options["update"]
         skip_authors = options["skip_authors"]
+        skip_categories = options["skip_categories"]
 
         try:
             base_url = resolve_site_base_url(options["site"])
@@ -377,7 +380,7 @@ class Command(BaseCommand):
             self.stdout.write(f"{'updating' if existing else 'importing'}: {title}")
 
             published_at = _parse_published_at(post)
-            categories = get_categories(_category_names(post, title))
+            categories = [] if skip_categories else get_categories(_category_names(post, title))
             hide_from_blogroll = _is_hidden_from_blogroll(post)
             body = convert_body(post["content"]["rendered"], session, self.stdout, dry_run=dry_run)
             author_name = "" if skip_authors else _author_name(post, session)
@@ -425,7 +428,8 @@ class Command(BaseCommand):
                     # .set() only caches the change in memory -- it's flushed to the
                     # DB by the *next* .save() call (ClusterableModel.commit()), so
                     # it must be called before save(), not after.
-                    existing.categories.set(categories)
+                    if not skip_categories:
+                        existing.categories.set(categories)
                     existing.save()
                     updated += 1
                 else:

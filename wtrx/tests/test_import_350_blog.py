@@ -1,5 +1,6 @@
 """
-Tests for import_350_blog.py's --site wiring: confirm a country/language
+Tests for import_350_blog.py: --site wiring, --skip-authors and
+--skip-categories. --site: confirm a country/language
 site (e.g. --site fr) actually changes the WP REST API URL that gets
 queried, following the same @patch convention as
 test_import_350_our_impact.py.
@@ -14,7 +15,7 @@ from django.test import SimpleTestCase, TestCase
 from wagtail.models import Page
 
 from wtrx.management.commands.import_350_blog import fetch_posts
-from wtrx.models import Blogs, HomePage, Post
+from wtrx.models import BlogCategory, Blogs, HomePage, Post
 
 
 class TestFetchPostsSiteUrl(SimpleTestCase):
@@ -130,3 +131,55 @@ class SkipAuthorsTest(TestCase):
         # Confirm the rest of the update still ran, so this isn't passing
         # because the whole update was skipped.
         self.assertEqual(existing.title, "A Post")
+
+
+class SkipCategoriesTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-skip-categories")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-skip-categories")
+        home.add_child(instance=cls.blogs)
+
+    def _run(self, *args, title="New coal pipeline"):
+        with (
+            patch("wtrx.management.commands.import_350_blog.verify_site_reachable", return_value=True),
+            patch("wtrx.management.commands.import_350_blog.convert_body", return_value=[]),
+            patch(
+                "wtrx.management.commands.import_350_blog.yoast_seo_fields_from_api_post",
+                return_value=("", ""),
+            ),
+            patch(
+                "wtrx.management.commands.import_350_blog.fetch_posts",
+                return_value=[_fake_wp_post("skip-categories-post", title=title)],
+            ),
+        ):
+            call_command("import_350_blog", "--skip-authors", *args, stdout=StringIO(), stderr=StringIO())
+        return Post.objects.child_of(self.blogs).get(slug="skip-categories-post")
+
+    def test_assigns_categories_by_default(self):
+        post = self._run()
+        self.assertEqual([c.name for c in post.categories.all()], ["Fossil Fuels"])
+
+    def test_leaves_categories_empty_on_a_new_post(self):
+        post = self._run("--skip-categories")
+        self.assertEqual(post.categories.count(), 0)
+        self.assertFalse(BlogCategory.objects.filter(name="Fossil Fuels").exists())
+
+    def test_update_does_not_overwrite_existing_categories(self):
+        justice = BlogCategory.objects.create(name="Climate Justice")
+        existing = Post(title="Old title", slug="skip-categories-post")
+        self.blogs.add_child(instance=existing)
+        existing.categories.set([justice])
+        existing.save()
+
+        post = self._run("--skip-categories", "--update")
+
+        self.assertEqual([c.name for c in post.categories.all()], ["Climate Justice"])
+        self.assertEqual(post.title, "New coal pipeline")
+
+    def test_extreme_weather_is_no_longer_assigned(self):
+        post = self._run(title="Floods and wildfire season")
+        self.assertEqual(post.categories.count(), 0)
+        self.assertFalse(BlogCategory.objects.filter(name="Extreme Weather").exists())

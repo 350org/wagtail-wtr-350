@@ -1,6 +1,6 @@
 """
 Shared helpers for importing 350.org WordPress content into StreamField
-bodies (wtrx.blocks.BodyStreamBlock's "text"/"image" blocks).
+bodies (wtrx.blocks.BodyStreamBlock's "text"/"image"/"video" blocks).
 
 Leading underscore keeps this out of manage.py's command autodiscovery
 (Django's find_commands() skips filenames starting with "_") — it's a
@@ -12,7 +12,7 @@ import html
 import os
 import re
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
@@ -535,6 +535,48 @@ def _make_image_block(img_tag, caption, session, stdout, dry_run=False):
     }
 
 
+_YOUTUBE_EMBED_RE = re.compile(
+    r"^(?:https?:)?//(?:www\.)?youtube(?:-nocookie)?\.com/embed/([\w-]{6,})", re.IGNORECASE
+)
+_VIMEO_PLAYER_RE = re.compile(r"^(?:https?:)?//player\.vimeo\.com/video/(\d+)", re.IGNORECASE)
+
+
+def video_embed_url(iframe_src: str) -> str | None:
+    """
+    Map an <iframe> player URL to the public page URL VideoBlock's oEmbed
+    lookup understands, or None for any other iframe.
+
+    Only YouTube and Vimeo are converted -- together ~90% of 350.org's post
+    iframes. Wagtail's YouTube oEmbed patterns don't match /embed/ URLs at
+    all, hence the rewrite to /watch?v=. Facebook (the next most common)
+    needs an app access token for oEmbed, and the long tail is mostly dead
+    services (Storify, Vine, Ooyala).
+    """
+    src = html.unescape(iframe_src or "").strip()
+    match = _YOUTUBE_EMBED_RE.match(src)
+    if match:
+        url = f"https://www.youtube.com/watch?v={match.group(1)}"
+        start = parse_qs(urlparse(src).query).get("start")
+        if start and start[0].isdigit():
+            url += f"&t={start[0]}"
+        return url
+    match = _VIMEO_PLAYER_RE.match(src)
+    if match:
+        # An unlisted video's player URL carries its privacy hash as ?h=.
+        private_hash = parse_qs(urlparse(src).query).get("h")
+        return f"https://vimeo.com/{match.group(1)}" + (f"/{private_hash[0]}" if private_hash else "")
+    return None
+
+
+def _make_video_block(iframe_tag, stdout):
+    src = iframe_tag.get("src", "")
+    url = video_embed_url(src)
+    if url is None:
+        stdout.write(f"    WARNING: dropped unsupported embed: {src}")
+        return None
+    return {"type": "video", "value": {"embed_url": url, "caption": ""}}
+
+
 def _process_nodes(nodes, blocks, pending, session, stdout, dry_run=False):
     """
     Walk a list of top-level bs4 nodes, appending finished blocks to
@@ -564,6 +606,12 @@ def _process_nodes(nodes, blocks, pending, session, stdout, dry_run=False):
             continue
 
         name = node.name.lower()
+        if name == "iframe":
+            block = _make_video_block(node, stdout)
+            if block:
+                flush()
+                blocks.append(block)
+            continue
         if name in _DROP_ENTIRELY:
             continue
 
@@ -612,6 +660,22 @@ def _process_nodes(nodes, blocks, pending, session, stdout, dry_run=False):
                 continue
 
         if name in _BLOCK_TAG_MAP:
+            iframes = node.find_all("iframe")
+            if iframes:
+                # Classic-editor posts paste the player into a paragraph
+                # (<p style="text-align: center;"><iframe ...></p>), where
+                # _build_clean would drop it. Keep any text first, then the
+                # videos as blocks of their own.
+                for cleaned in _build_clean(node):
+                    text = cleaned.get_text(strip=True) if isinstance(cleaned, Tag) else str(cleaned).strip()
+                    if text:
+                        pending.append(str(cleaned))
+                for iframe in iframes:
+                    block = _make_video_block(iframe, stdout)
+                    if block:
+                        flush()
+                        blocks.append(block)
+                continue
             imgs = node.find_all("img")
             if imgs and not node.get_text(strip=True):
                 # A block whose only content is one or more bare images
