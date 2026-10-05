@@ -5,8 +5,9 @@ wtrx/management/commands/backfill_image_descriptions.py).
 BasicPromptAgent.execute is mocked throughout -- these tests must never make
 a real LLM call. They pin: generation is cached to disk without touching the
 database unless --apply is passed, a cached entry is never regenerated, a
-failure on one image doesn't stop the rest, and only images with a blank
-description are ever considered.
+failure on one image doesn't stop the rest, only images with a blank
+description are ever considered, and --apply saves each description as it
+goes so an interrupted run keeps its progress.
 """
 
 import json
@@ -139,6 +140,57 @@ class BackfillImageDescriptionsTest(TestCase):
         self._run(execute_return="Generated.", image_id=wanted.pk)
 
         self.assertEqual(list(self._cache().keys()), [str(wanted.pk)])
+
+    def test_apply_saves_each_description_before_generating_the_next(self):
+        first = self._image(title="first")
+        self._image(title="second")
+
+        with self.assertRaises(RuntimeError):
+            self._run(execute_side_effect=["Saved before the crash.", RuntimeError("killed")], apply=True)
+
+        first.refresh_from_db()
+        self.assertEqual(first.description, "Saved before the crash.")
+
+    def test_aborts_after_consecutive_failures(self):
+        for title in ("a", "b", "c"):
+            self._image(title=title)
+
+        with self.assertRaises(CommandError):
+            self._run(
+                execute_side_effect=[ValidationError("boom")] * 2 + ["Never reached."],
+                max_consecutive_failures=2,
+                stderr=StringIO(),
+            )
+
+        self.assertEqual(self._cache(), {})
+
+    def test_exits_without_generating_when_another_run_holds_the_lock(self):
+        self._image()
+
+        with patch(
+            "wtrx.management.commands.backfill_image_descriptions.Command._try_lock",
+            return_value=False,
+        ):
+            out, mock_execute = self._run(apply=True)
+
+        mock_execute.assert_not_called()
+        self.assertIn("in progress", out)
+
+    def test_does_not_overwrite_a_description_filled_in_during_the_run(self):
+        first = self._image(title="first")
+        second = self._image(title="second")
+
+        def editor_fills_in_second(**kwargs):
+            CustomImage.objects.filter(pk=second.pk).update(description="Written by an editor.")
+            return "Generated."
+
+        _, mock_execute = self._run(execute_side_effect=editor_fills_in_second, apply=True)
+
+        self.assertEqual(mock_execute.call_count, 1)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.description, "Generated.")
+        self.assertEqual(second.description, "Written by an editor.")
 
     def test_raises_when_no_prompt_is_configured(self):
         # Patch the name as imported into the command module (AGENTS.md #24)
