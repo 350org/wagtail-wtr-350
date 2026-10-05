@@ -3,7 +3,7 @@ import json
 from django import template
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
-from django.utils.html import _json_script_escapes, format_html
+from django.utils.html import _json_script_escapes, format_html, strip_tags
 from django.utils.safestring import mark_safe
 from wagtail.models import Locale, Site
 
@@ -74,6 +74,27 @@ def background_is_light(value):
         {% if value.background|background_is_light %}text-dark{% else %}text-light{% endif %}
     """
     return _background_is_light(value)
+
+
+_RICHTEXT_NON_TEXT_CONTENT = ("<img", "<iframe", "<embed", "<hr")
+
+
+@register.filter
+def richtext_has_content(value):
+    """
+    True when a rich text value has something to show: text, or an image,
+    embed or rule.
+
+    Bare truthiness isn't enough. Draftail leaves an empty paragraph behind
+    when an editor clears a field, so a field that looks blank in the admin
+    still stores `<p data-block-key="..."></p>` and is truthy — which, on a
+    block that falls back to other copy when its field is blank, switches
+    the fallback off and renders nothing in its place.
+    """
+    source = str(getattr(value, "source", value) or "")
+    if strip_tags(source).replace("&nbsp;", " ").strip():
+        return True
+    return any(tag in source for tag in _RICHTEXT_NON_TEXT_CONTENT)
 
 
 # ---------------------------------------------------------------------------

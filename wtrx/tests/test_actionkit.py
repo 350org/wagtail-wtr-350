@@ -617,6 +617,16 @@ class TestSignupActionKitIntroRendering(SimpleTestCase):
         self.assertIn("<p>AK copy.</p>", html)
         self.assertIn('src="https://cdn.example/logo.png"', html)
 
+    def test_cleared_content_still_counts_as_blank(self):
+        # What Draftail stores once an editor deletes the field's text.
+        for emptied in ('<p data-block-key="x"></p>', "<h2></h2><p>&nbsp;</p>"):
+            html = self._render(content=emptied)
+            self.assertIn("Tell PM Carney:", html)
+            self.assertIn("<h2>Build a Grid</h2>", html)
+            self.assertIn("<p>AK copy.</p>", html)
+        html = self._render({"ak_intro": None, "is_page_preview": True}, content="<p></p>")
+        self.assertIn("wtr-actionkit-preview-notice", html)
+
     def test_editor_content_wins_and_suppresses_actionkit_pretitle(self):
         html = self._render(content="<h2>Editor heading</h2>")
         self.assertIn("Editor heading", html)

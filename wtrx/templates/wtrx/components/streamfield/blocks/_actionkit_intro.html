@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags %}
+{% load i18n wagtailcore_tags wtrx_tags %}
 {% comment %}
     SignupActionKitBlock's copy column: eyebrow pill, heading/copy, and — on
     a petition — a "view the full petition text" button that opens the text
@@ -18,8 +18,13 @@
     condition, so a block that has its own copy and deliberately no eyebrow
     doesn't sprout one. The petition text is ActionKit's regardless: it is
     the text people are signing, which no Wagtail field holds.
+
+    "Blank" is `richtext_has_content`, not bare truthiness: a Content field
+    an editor has cleared still stores an empty paragraph, which would
+    otherwise count as copy and leave this whole column empty.
 {% endcomment %}
-{% if value.content %}
+{% with has_content=value.content|richtext_has_content %}
+{% if has_content %}
     {% firstof value.eyebrow as eyebrow %}
 {% else %}
     {% firstof value.eyebrow ak_intro.pretitle as eyebrow %}
@@ -44,10 +49,10 @@ white centrally, in main.css — see the .prose-invert rule there. Figma draws
 this copy at 24px, but it renders at the site's 20px body size instead — see
 AGENTS.md pitfall #32.
 {% endcomment %}
-{% if value.content or ak_intro.title or ak_intro.description_html %}
+{% if has_content or ak_intro.title or ak_intro.description_html %}
     <div class="wtr-signup-actionkit-content prose max-w-none text-lg leading-[1.2] sm:text-xl
                 {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
-        {% if value.content %}
+        {% if has_content %}
             {{ value.content|richtext }}
         {% else %}
             {% if ak_intro.title %}<h2>{{ ak_intro.title }}</h2>{% endif %}
@@ -66,6 +71,7 @@ AGENTS.md pitfall #32.
         {% trans "The ActionKit page's title and description will be rendered here on the live site. Add Content to this block to show your own text instead." %}
     </div>
 {% endif %}
+{% endwith %}
 {% if ak_intro.petition_html %}
     <button type="button"
             class="wtr-ak-petition-trigger inline-flex cursor-pointer items-center gap-2 text-base underline underline-offset-4 hover:no-underline
