@@ -18,6 +18,7 @@ anything.
     python manage.py backfill_image_descriptions --limit 5 --apply   # generate/reuse cache, then save
     python manage.py backfill_image_descriptions --apply             # apply everything already cached
     python manage.py backfill_image_descriptions --image-id 42 --apply
+    python manage.py backfill_image_descriptions --limit 20 --newest-first --apply
 
 Idempotent: only ever targets images whose description is still blank, so
 partial runs (--limit, Ctrl-C, an API failure) are always safe to re-run.
@@ -60,6 +61,11 @@ class Command(BaseCommand):
             help="Only process this single image ID.",
         )
         parser.add_argument(
+            "--newest-first",
+            action="store_true",
+            help="Process the most recently uploaded images first (default: oldest first).",
+        )
+        parser.add_argument(
             "--apply",
             action="store_true",
             help="Write cached descriptions to the database. Without this, only the cache file is populated.",
@@ -69,7 +75,9 @@ class Command(BaseCommand):
         cache_path = Path(options["cache_file"])
         cache = self._load_cache(cache_path)
 
-        images = CustomImage.objects.filter(description="").order_by("pk")
+        images = CustomImage.objects.filter(description="").order_by(
+            "-created_at" if options["newest_first"] else "pk"
+        )
         if options["image_id"] is not None:
             images = images.filter(pk=options["image_id"])
 

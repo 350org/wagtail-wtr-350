@@ -11,6 +11,7 @@ description are ever considered.
 
 import json
 import tempfile
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -101,6 +102,15 @@ class BackfillImageDescriptionsTest(TestCase):
         self._run(execute_return="Generated.", limit=1)
 
         self.assertEqual(len(self._cache()), 1)
+
+    def test_newest_first_generates_the_latest_upload_first(self):
+        older = self._image(title="older")
+        newer = self._image(title="newer")
+        CustomImage.objects.filter(pk=older.pk).update(created_at=newer.created_at - timedelta(days=1))
+
+        self._run(execute_return="Generated.", limit=1, newest_first=True)
+
+        self.assertEqual(list(self._cache().keys()), [str(newer.pk)])
 
     def test_a_failure_on_one_image_does_not_stop_the_batch(self):
         first = self._image(title="broken")
