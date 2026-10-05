@@ -19,11 +19,12 @@ from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.core.management import CommandError, call_command
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from wagtail.images.tests.utils import get_test_image_file
 
 from wtrx.images import CustomImage
+from wtrx.management.commands.backfill_image_descriptions import fit_description
 
 
 class BackfillImageDescriptionsTest(TestCase):
@@ -192,6 +193,27 @@ class BackfillImageDescriptionsTest(TestCase):
         self.assertEqual(first.description, "Generated.")
         self.assertEqual(second.description, "Written by an editor.")
 
+    def test_an_over_long_description_is_trimmed_to_fit_before_saving(self):
+        image = self._image()
+        max_length = CustomImage._meta.get_field("description").max_length
+
+        self._run(execute_return="A sentence that runs on. " * 20, apply=True)
+
+        image.refresh_from_db()
+        self.assertLessEqual(len(image.description), max_length)
+        self.assertTrue(image.description.endswith("runs on."))
+
+    def test_an_over_long_cached_entry_is_trimmed_when_applied(self):
+        image = self._image()
+        self.cache_path.write_text(json.dumps({str(image.pk): {"title": "t", "description": "word " * 100}}))
+
+        _, mock_execute = self._run(apply=True)
+
+        mock_execute.assert_not_called()
+        image.refresh_from_db()
+        self.assertLessEqual(len(image.description), CustomImage._meta.get_field("description").max_length)
+
+
     def test_raises_when_no_prompt_is_configured(self):
         # Patch the name as imported into the command module (AGENTS.md #24)
         # -- not wagtail_ai.agents.base, whose reference the command doesn't use.
@@ -203,3 +225,17 @@ class BackfillImageDescriptionsTest(TestCase):
                 call_command(
                     "backfill_image_descriptions", cache_file=str(self.cache_path)
                 )
+
+
+class FitDescriptionTest(SimpleTestCase):
+    def test_short_descriptions_are_unchanged(self):
+        self.assertEqual(fit_description("  A short one.  ", 255), "A short one.")
+
+    def test_ends_on_the_last_full_sentence_when_it_keeps_enough(self):
+        text = "First sentence here. Second sentence here. Third one runs past the limit."
+        self.assertEqual(fit_description(text, 50), "First sentence here. Second sentence here.")
+
+    def test_cuts_at_a_word_boundary_with_an_ellipsis_otherwise(self):
+        result = fit_description("one two three four five six seven", 20)
+        self.assertLessEqual(len(result), 20)
+        self.assertEqual(result, "one two three four\u2026")

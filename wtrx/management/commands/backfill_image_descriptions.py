@@ -47,6 +47,25 @@ DEFAULT_MAX_CONSECUTIVE_FAILURES = 5
 ADVISORY_LOCK_ID = 7_350_001
 
 
+def fit_description(description: str, max_length: int) -> str:
+    """Shorten an over-long generated description to fit the field.
+
+    The prompt asks for at most max_length characters but the model can run
+    over, which would fail the save. Prefer ending on the last full sentence
+    when that keeps at least half the limit; otherwise cut at a word boundary
+    and mark the cut with an ellipsis.
+    """
+    description = description.strip()
+    if len(description) <= max_length:
+        return description
+    head = description[:max_length]
+    sentence_end = max(head.rfind(". "), head.rfind("! "), head.rfind("? "))
+    if sentence_end >= max_length // 2:
+        return head[:sentence_end + 1]
+    words = description[:max_length - 1].rsplit(" ", 1)[0]
+    return words.rstrip(" ,;:-") + "\u2026"
+
+
 class Command(BaseCommand):
     help = "Generate (and optionally apply) AI descriptions for images missing one."
 
@@ -135,12 +154,16 @@ class Command(BaseCommand):
                         )
                     continue
                 failures_in_a_row = 0
+                if len(description) > max_length:
+                    self.stdout.write("TRIMMED %5s from %d characters" % (pk, len(description)))
+                    description = fit_description(description, max_length)
                 entry = {"title": image.title, "description": description}
                 cache[key] = entry
                 self._save_cache(cache_path, cache)
                 self.stdout.write("CACHED  %5s %-40s -> %s" % (pk, image.title[:40], description))
             if options["apply"]:
-                image.description = entry["description"]
+                # Cached entries may predate fit_description().
+                image.description = fit_description(entry["description"], max_length)
                 image.save(update_fields=["description"])
                 applied += 1
                 self.stdout.write("APPLIED %5s %-40s -> %s" % (pk, image.title[:40], entry["description"]))
