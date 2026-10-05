@@ -99,7 +99,11 @@ def actionkit_inline_signup(request):
         actionkit_config.get("hostname"), short_form_id, action
     )
     if redirect:
-        payload["redirect_url"], payload["redirect_is_actionkit"] = redirect
+        (
+            payload["redirect_url"],
+            payload["redirect_is_actionkit"],
+            payload["redirect_is_default"],
+        ) = redirect
     return JsonResponse(payload)
 
 

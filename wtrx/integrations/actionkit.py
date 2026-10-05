@@ -189,12 +189,14 @@ def signup_redirect(hostname, page, action):
 
     ``action`` is :func:`submit_action`'s return value, whose ``redirect_url``
     is that setting with ``action_id``/``akid`` already appended. Returns
-    ``(url, is_actionkit)``, or ``None`` when there is nothing to follow:
+    ``(url, is_actionkit, is_default)``, or ``None`` when there is nothing to
+    follow:
 
     - ActionKit gives every page a redirect, defaulting to its own
       ``/cms/thanks/<page>``. That default is what a page has when nobody set
-      one, so it counts as "no redirect" and the block's own thank-you
-      handling runs instead.
+      one, so it is flagged ``is_default`` and is only a last resort: the
+      block's own thank-you handling (donation checkout, success message)
+      runs first, and the caller follows it only when the block has neither.
     - ``is_actionkit`` is True when the destination is on the ActionKit host.
       The caller uses it to decide who records the conversion: ActionKit's
       thank-you page does, from ``action_id``, so our own tracking event must
@@ -211,9 +213,8 @@ def signup_redirect(hostname, page, action):
         return None
 
     is_actionkit = parts.netloc.lower() == urlsplit(ak_base).netloc.lower()
-    if is_actionkit and parts.path.rstrip("/") == f"/cms/thanks/{page}":
-        return None
-    return url, is_actionkit
+    is_default = is_actionkit and parts.path.rstrip("/") == f"/cms/thanks/{page}"
+    return url, is_actionkit, is_default
 
 
 def fetch_embed_form_html(hostname, short_form_id, timeout=5):

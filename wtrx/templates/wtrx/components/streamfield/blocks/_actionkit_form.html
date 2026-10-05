@@ -404,10 +404,12 @@
             var fundraiseupDesignation = "{{ fundraiseup_designation_id|escapejs }}";
             var CHECKOUT_OPEN_TIMEOUT_MS = 5000;
 
+            function canOpenDonationCheckout() {
+                return !!fundraiseupCampaign && !!window.FundraiseUp && typeof window.FundraiseUp.openCheckout === "function";
+            }
+
             function openDonationCheckout() {
-                if (!fundraiseupCampaign || !window.FundraiseUp || typeof window.FundraiseUp.openCheckout !== "function") {
-                    return false;
-                }
+                if (!canOpenDonationCheckout()) { return false; }
                 var data = new FormData(form);
                 var firstName = String(data.get("first_name") || "").trim();
                 var lastName = String(data.get("last_name") || "").trim();
@@ -510,8 +512,13 @@
                         ActionKit-hosted destination counts the signup itself
                         (from action_id, already on the URL), so only any
                         other destination gets our event first.
+                        ActionKit's default /cms/thanks/<page> (what a page
+                        has when nobody set a redirect) is the last resort
+                        instead: followed only when this block has neither a
+                        checkout to open nor a thank-you box to show.
                         {% endcomment %}
-                        if (data.redirect_url) {
+                        var hasOwnNextStep = !!thankYou || canOpenDonationCheckout();
+                        if (data.redirect_url && !(data.redirect_is_default && hasOwnNextStep)) {
                             var followRedirect = function () { window.location.assign(data.redirect_url); };
                             if (data.redirect_is_actionkit) {
                                 followRedirect();

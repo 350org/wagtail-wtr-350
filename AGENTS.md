@@ -1743,13 +1743,16 @@ gate.
     form's `page` value) runs once, inside `if (data.success)`, before the
     next step; GTM's Google Ads, Meta and GA4 conversions all hang off it.
     The next step is, in order: the ActionKit page's own "redirect to"
-    setting, then the Fundraise Up checkout, then the thank-you box. The
-    redirect comes from `redirect_url` in ActionKit's REST response
+    setting, then the Fundraise Up checkout, then the thank-you box, then
+    ActionKit's default thank-you page. The redirect comes from
+    `redirect_url` in ActionKit's REST response
     (`actionkit.signup_redirect()`), returned by `/actionkit-signup/` as
-    `redirect_url` + `redirect_is_actionkit`:
+    `redirect_url` + `redirect_is_actionkit` + `redirect_is_default`:
     - ActionKit gives every page a redirect, defaulting to its own
-      `/cms/thanks/<page>`. That default is treated as "none set" —
-      following it would replace every block's thank-you message.
+      `/cms/thanks/<page>`. That default is flagged `redirect_is_default`
+      and is the last resort: followed only when the block has neither a
+      post-signup donation that can open nor a success message, since
+      following it otherwise would replace every block's thank-you message.
     - A redirect off the ActionKit host pushes the event and navigates only
       from GTM's `eventCallback` (with a 2.5s fallback for a blocked or
       consent-delayed GTM).
