@@ -20,7 +20,7 @@
 
                 {% comment %}Social icons (if enabled and present){% endcomment %}
                 {% if social.show_in_footer and social.social_links %}
-                    <div class="wtr-social-links -m-1.5 flex items-center">
+                    <div class="wtr-social-links -mx-1.5 flex items-center">
                         {% for item in social.social_links %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
@@ -253,7 +253,7 @@
 
                 {% comment %}Social links{% endcomment %}
                 {% if social.show_in_footer and social.social_links %}
-                    <div class="wtr-social-links -m-2 flex items-center">
+                    <div class="wtr-social-links -mx-2 flex items-center">
                         {% for item in social.social_links %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
