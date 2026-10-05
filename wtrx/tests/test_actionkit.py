@@ -589,13 +589,25 @@ class TestSignupActionKitIntroRendering(SimpleTestCase):
         "petition_link_text": "View the full petition text.",
     }
 
-    def _render(self, **fields):
+    def _render(self, context=None, **fields):
         from django.template.loader import render_to_string
 
         value = SignupActionKitBlock().to_python({"short_form_id": "ppg", **fields})
         return render_to_string(
             "wtrx/components/streamfield/blocks/_actionkit_intro.html",
-            {"value": value, "ak_intro": self.INTRO, "bg": "dark-grey", "on_light": False},
+            {"value": value, "ak_intro": self.INTRO, "bg": "dark-grey", "on_light": False, **(context or {})},
+        )
+
+    def test_preview_marks_an_empty_copy_column(self):
+        empty = {"ak_intro": None}
+        for flag in ("is_page_preview", "is_block_preview"):
+            self.assertIn("wtr-actionkit-preview-notice", self._render({**empty, flag: True}))
+        # Never on the live site, and never once there is copy to show.
+        self.assertNotIn("wtr-actionkit-preview-notice", self._render(empty))
+        self.assertNotIn("wtr-actionkit-preview-notice", self._render({"is_page_preview": True}))
+        self.assertNotIn(
+            "wtr-actionkit-preview-notice",
+            self._render({**empty, "is_page_preview": True}, content="<h2>Editor heading</h2>"),
         )
 
     def test_blank_content_uses_actionkit_copy(self):
@@ -686,6 +698,17 @@ class TestSignupActionKitBlockContext(TestCase):
         # Second render within the cache window does not hit ActionKit again.
         block.get_context(self._value(), parent_context={"request": request})
         mock_fetch.assert_called_once()
+
+    @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
+    def test_missing_form_shows_a_placeholder_in_page_preview_only(self, mock_fetch):
+        mock_fetch.side_effect = ActionKitError("boom")
+        block = SignupActionKitBlock()
+        for is_preview in (True, False):
+            request = self.factory.get("/")
+            request.is_preview = is_preview
+            html = block.render(self._value(), context={"request": request})
+            self.assertEqual("wtr-actionkit-preview-notice" in html, is_preview)
+            self.assertEqual("temporarily unavailable" in html, not is_preview)
 
     @patch("wtrx.blocks.actionkit.fetch_embed_form_html")
     def test_fetch_failure_degrades_to_none_and_is_cached(self, mock_fetch):

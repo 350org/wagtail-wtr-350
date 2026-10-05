@@ -54,6 +54,17 @@ AGENTS.md pitfall #32.
             {{ ak_intro.description_html|safe }}
         {% endif %}
     </div>
+{% elif is_page_preview or is_block_preview %}
+    {% comment %}
+    Content is blank and ActionKit supplied no title or description to stand
+    in for it (the form couldn't be fetched, or the ActionKit page has none),
+    so this column would be empty. Editor-facing only: the live site renders
+    nothing here.
+    {% endcomment %}
+    <div class="wtr-actionkit-preview-notice w-full rounded-lg border border-dashed px-4 py-6 text-center text-base
+                {% if on_light %}border-dark/30 text-dark/70{% else %}border-light/30 text-light/70{% endif %}">
+        {% trans "The ActionKit page's title and description will be rendered here on the live site. Add Content to this block to show your own text instead." %}
+    </div>
 {% endif %}
 {% if ak_intro.petition_html %}
     <button type="button"

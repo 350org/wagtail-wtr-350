@@ -3364,6 +3364,10 @@ class SignupActionKitFormMixin:
             form_html = actionkit.uniquify_form_ids(form_html, request)
         ctx["ak_intro"] = ak_intro
         ctx["form_html"] = form_html
+        # Wagtail's live-preview iframe, as on DonateFundraiseUpBlock: where
+        # ActionKit's copy or form has nothing to show, the templates mark the
+        # spot for the editor instead of leaving it empty.
+        ctx["is_page_preview"] = bool(request is not None and getattr(request, "is_preview", False))
         ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
         # Needed client-side (not just server-side, where it already drove
         # the form_html fetch above) so _actionkit_form.html's progress-bar

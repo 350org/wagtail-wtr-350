@@ -703,6 +703,21 @@
             }
         })();
     </script>
+{% elif is_page_preview %}
+    {% comment %}
+    Editor-facing stand-in for the visitor message below: in Wagtail's live
+    preview a missing form is something the editor can fix (no short form ID
+    yet, a mistyped one, or ActionKit not set up in Settings > Integrations).
+
+    The colour is set here rather than inherited: the panel's form column
+    carries no text colour of its own. `on_light` comes from
+    signup_actionkit_block.html; the hero strip doesn't set it and sits on
+    the hero's dark scrim, which the light default suits.
+    {% endcomment %}
+    <div class="wtr-actionkit-preview-notice rounded-lg border border-dashed px-4 py-6 text-center text-base
+                {% if on_light %}border-dark/30 text-dark/70{% else %}border-light/30 text-light/70{% endif %}">
+        {% trans "The ActionKit form will be rendered here on the live site. It could not be loaded for this preview: check the short form ID and the ActionKit integration settings." %}
+    </div>
 {% else %}
     <div class="mt-8 rounded-lg bg-white p-6 text-sm text-neutral-500">
         {% trans "This signup form is temporarily unavailable. Please try again shortly." %}
