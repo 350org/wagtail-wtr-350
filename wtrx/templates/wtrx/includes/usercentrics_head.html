@@ -15,6 +15,7 @@ Cloudflare Worker or Django involvement required.
 {% comment %}1. Consent Mode v2 defaults — must be first.{% endcomment %}
 <script>
   window.dataLayer = window.dataLayer || [];
+  window.dataLayer.__usercentrics_watched = true;
   function gtag(){dataLayer.push(arguments);}
   gtag('consent', 'default', {
     ad_storage: 'denied',
