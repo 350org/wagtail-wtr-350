@@ -1016,8 +1016,11 @@ check.
     WebP; JPEG was added to the same setting after the PNG-only version
     shipped and the same report kept flagging JPEG-sourced images for an
     identical reason.
-    `WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp"}`
-    (`settings/base.py`) fixes this project-wide with no template changes —
+    `WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp",
+    "webp": "webp"}` (`settings/base.py`) fixes this project-wide with no
+    template changes. The `webp` entry matters as much as the other two:
+    Wagtail's default turns a WebP *source* into PNG, which left every
+    rendition of a WebP upload a large PNG until it was added —
     WebP (not JPEG) as PNG's target so a PNG with real transparency still
     renders correctly instead of being flattened onto a white background
     (Wagtail's own JPEG-output path does exactly that via

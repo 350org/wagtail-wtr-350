@@ -24,7 +24,7 @@ by coincidence isn't the same guarantee as one that's actually format-proof.
 
 from django.conf import settings
 from django.test import Client, TestCase
-from wagtail.images.tests.utils import get_test_image_file, get_test_image_file_jpeg
+from wagtail.images.tests.utils import get_test_image_file, get_test_image_file_jpeg, get_test_image_file_webp
 from wagtail.models import Page, Site
 
 from wtrx.images import CustomImage
@@ -39,6 +39,10 @@ class TestFormatConversionSetting(TestCase):
     def test_jpeg_sources_default_to_webp(self):
         self.assertEqual(settings.WAGTAILIMAGES_FORMAT_CONVERSIONS.get("jpeg"), "webp")
 
+    def test_webp_sources_stay_webp(self):
+        # Wagtail's own default converts a WebP source to PNG.
+        self.assertEqual(settings.WAGTAILIMAGES_FORMAT_CONVERSIONS.get("webp"), "webp")
+
 
 class TestGenericRenditionsAreWebp(TestCase):
     def test_fill_rendition_of_a_png_source_is_webp(self):
@@ -46,6 +50,15 @@ class TestGenericRenditionsAreWebp(TestCase):
             title="Screenshot",
             file=get_test_image_file(filename="Screenshot-test.png"),
             description="A screenshot",
+        )
+        rendition = image.get_rendition("fill-640x360")
+        self.assertTrue(rendition.file.name.endswith(".webp"))
+
+    def test_fill_rendition_of_a_webp_source_is_webp(self):
+        image = CustomImage.objects.create(
+            title="Graphic",
+            file=get_test_image_file_webp(filename="graphic-test.webp"),
+            description="A graphic",
         )
         rendition = image.get_rendition("fill-640x360")
         self.assertTrue(rendition.file.name.endswith(".webp"))

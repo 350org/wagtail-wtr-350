@@ -68,9 +68,18 @@ choice, and is correct in both layouts.
         {% else %}
             {% if value.image %}
                 <div class="relative">
+                    {% comment %}
+                    The 3.2:1 desktop crop fills a far squarer box on a phone
+                    (h-64 at full width), so below sm: a 4:3 crop is served
+                    instead of the 1600px file cropped down by object-cover.
+                    {% endcomment %}
                     {% image value.image fill-1600x500 as img %}
-                    <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
-                         class="h-64 w-full object-cover sm:h-80" loading="lazy">
+                    {% image value.image fill-800x600 as img_phone %}
+                    <picture>
+                        <source media="(max-width: 639px)" srcset="{{ img_phone.url }}" width="{{ img_phone.width }}" height="{{ img_phone.height }}">
+                        <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
+                             class="h-64 w-full object-cover sm:h-80" loading="lazy">
+                    </picture>
                     {% if value.image_caption %}
                         <div class="absolute inset-x-0 bottom-4 flex justify-center px-4 sm:bottom-6">
                             <p class="wtr-image-caption rounded-lg px-4 py-2 text-center text-xl leading-[1.2] text-light">{{ value.image_caption }}</p>

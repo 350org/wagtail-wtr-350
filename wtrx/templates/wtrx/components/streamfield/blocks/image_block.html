@@ -15,8 +15,12 @@ px-4 stacks on the section's gutter.
 <div class="{{ container_class }}{% if is_full_width %} wtr-media-full{% endif %}">
     <figure class="wtr-image">
         {% image value.image width-1600 as img %}
+        {% image value.image width-800 as img_small %}
+        {% image value.image width-1200 as img_medium %}
         <img
             src="{{ img.url }}"
+            srcset="{{ img_small.url }} {{ img_small.width }}w, {{ img_medium.url }} {{ img_medium.width }}w, {{ img.url }} {{ img.width }}w"
+            sizes="(min-width: 1500px) 1468px, 100vw"
             width="{{ img.width }}"
             height="{{ img.height }}"
             alt="{{ value.alt_text|default:img.alt }}"
