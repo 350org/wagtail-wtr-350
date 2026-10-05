@@ -53,6 +53,25 @@ silently hiding it.
       script.onload = function () {
         UsercentricsConsent.initConsent({
           settingsId: '{{ uc.settings_id|escapejs }}',
+          onReady: function (info) {
+            if (info && info.isGdpr === false) {
+              gtag('consent', 'update', {
+                ad_storage: 'granted',
+                analytics_storage: 'granted',
+                ad_user_data: 'granted',
+                ad_personalization: 'granted'
+              });
+              window.dataLayer.push({
+                event: 'consent_status',
+                type: 'IMPLICIT',
+                action: 'consentNotRequired',
+                ucCategory: { marketing: true, functional: true, essential: true },
+                'Google Analytics': true,
+                'Google Ads': true,
+                'Facebook Pixel': true
+              });
+            }
+          },
           serviceIds: {
             reloadOnOptIn: '{{ uc.reload_on_opt_in_service_ids|escapejs }}'.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
             deactivateBlocking: '{{ uc.deactivate_blocking_service_ids|escapejs }}'.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
