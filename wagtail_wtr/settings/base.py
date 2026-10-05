@@ -87,7 +87,9 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+    # Wagtail's RedirectMiddleware, but the query string survives the redirect
+    # (gclid, UTMs, akid/source, Fundraise Up ?form=) -- see wtrx/redirects.py.
+    "wtrx.redirects.QueryPreservingRedirectMiddleware",
 ]
 
 ROOT_URLCONF = "wagtail_wtr.urls"

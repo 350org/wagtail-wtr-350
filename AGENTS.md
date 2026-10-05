@@ -1721,3 +1721,18 @@ gate.
     `'#ak-errors, [data-ak-id="ak-errors"]'`. Only markup outside
     `<script>`/`<style>` is rewritten, along with `<label for>`,
     `href="#..."` and `aria-*` references to the fragment's own ids.
+
+88. **Redirects carry the visitor's query string, which stock Wagtail
+    drops.** `wagtail.contrib.redirects`' middleware matches
+    `/about/?gclid=x` against a redirect stored for `/about` and then
+    answers with the bare destination, losing ad click IDs, UTMs,
+    ActionKit's `akid`/`source` and Fundraise Up's `?form=`. `MIDDLEWARE`
+    therefore lists `wtrx.redirects.QueryPreservingRedirectMiddleware`, a
+    subclass that appends the request's parameters to the `Location`
+    Wagtail produced. Two rules: a parameter the destination already sets
+    wins over the incoming one, and a redirect whose stored "from" path
+    itself includes the query string is served exactly as stored. It
+    covers every row in the `Redirect` table (auto-created on move/slug
+    change and Settings > Redirects alike) — but not redirects issued
+    anywhere else, e.g. Cloudflare rules, which need "preserve query
+    string" set on their own.
