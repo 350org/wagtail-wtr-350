@@ -235,15 +235,14 @@
                     trailing right arrow: a 4px border in the panel's own text color,
                     reusing feature_panel_block.html's arrow glyph and wtr-btn-lg
                     sizing so every arrow CTA on the site is one shape.
-                    max-w-full + whitespace-normal let a long label wrap on a phone
-                    instead of running past the panel's edge (wtr-btn is nowrap),
-                    same as feature_panel_block.html; shrink-0 keeps the arrow whole.
+                    A long label wraps on a phone (wtr-btn caps itself at its
+                    container), and shrink-0 keeps the arrow whole.
                     {% endcomment %}
                     {% for cta_block in hero.cta %}
                         {% if cta_block.block_type == "button" %}
                             <a href="{% if cta_block.value.link_page %}{{ cta_block.value.link_page.url }}{% elif cta_block.value.anchor %}#{{ cta_block.value.anchor }}{% else %}{{ cta_block.value.link_url }}{% endif %}"
                                {% if cta_block.value.link_url %}rel="noopener noreferrer"{% endif %}
-                               class="wtr-btn wtr-btn-lg mt-2 inline-flex w-fit max-w-full items-center gap-2 whitespace-normal border-4
+                               class="wtr-btn wtr-btn-lg mt-2 inline-flex w-fit items-center gap-2 border-4
                                       {% if on_light %}wtr-btn-outline hover:bg-dark/5{% else %}wtr-btn-outline-light hover:bg-white/10{% endif %}">
                                 {{ cta_block.value.text }}
                                 <svg class="h-7 w-7 shrink-0" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">

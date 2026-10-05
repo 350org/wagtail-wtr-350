@@ -72,7 +72,13 @@
     text-decoration: none;
     cursor: pointer;
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, opacity 0.15s ease-in-out;
-    white-space: nowrap;
+    /* A label longer than its container wraps, balanced and centred, rather
+     * than overflowing it: translated and editor-written labels can be far
+     * longer than the design's (pitfall #62). */
+    max-width: 100%;
+    white-space: normal;
+    text-wrap: balance;
+    text-align: center;
 }
 
 /* Smooth scroll — respects prefers-reduced-motion.
@@ -452,6 +458,34 @@ html {
 .wtr-actionkit-embed-inline button[type='submit']:hover,
 .wtr-actionkit-embed-inline input[type='submit']:hover {
     background-color: var(--color-primary-700);
+}
+
+/* Below sm: the button can't share the fields' row (it drops below them
+ * under a ~465px column), so it fills its own line instead of sitting at
+ * content width beside empty space. Equal side padding keeps the label
+ * centred; the arrow stays pinned at the right edge. */
+@media (width < 40rem) {
+    .wtr-actionkit-embed-inline :is(#action-form, [data-ak-id="action-form"]) > .input-wrapper.input-submit {
+        flex-basis: 100%;
+    }
+
+    .wtr-actionkit-embed-inline button[type='submit'],
+    .wtr-actionkit-embed-inline input[type='submit'] {
+        width: 100%;
+        justify-content: center;
+        padding-inline: 3rem;
+    }
+}
+
+/* The visible field is the 58px box, but only its label and its 20px-tall
+ * control respond to a tap. Stretching the control over the box's side and
+ * bottom padding makes the whole lower part of the box the tap target with
+ * no visual change (the label above it covers the rest). */
+.wtr-actionkit-embed-inline .input-text > .ak-userfield-input:not([type='checkbox']):not([type='radio']),
+.wtr-actionkit-embed-inline .input-select > select {
+    width: calc(100% + 2rem);
+    margin: 0 -1rem -0.625rem;
+    padding: 0 1rem 0.625rem;
 }
 
 /* 13px bold uppercase, sitting inside the field box on the box's own light
@@ -1374,31 +1408,6 @@ body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child:is([da
 }
 
 /* ============================================================
- * Vertical button stacks — .wtr-button-group-vertical
- * ============================================================
- * ButtonGroupBlock's "vertical" layout caps its column and stretches its
- * buttons to fill it (see button_group_block.html), so every button in a
- * stack is the same width. That only works if a label longer than the
- * column can wrap, and wtr-btn sets white-space: nowrap -- without this
- * override a long label just widens past the cap and the stack goes
- * ragged again, which is the thing the cap exists to prevent.
- *
- * text-align matters for the same reason: wtr-btn sets none, and an
- * inline-block stretched by a flex parent would otherwise left-align its
- * label while its shorter siblings look centred.
- *
- * Unlayered, so it beats wtr-btn's own @utility declarations regardless
- * of source order -- the same mechanism the heading-weight and
- * body-stack rules above rely on. Scoped to the vertical layout only:
- * horizontal rows deliberately keep content-width, nowrap buttons.
- * ============================================================ */
-.wtr-button-group-vertical .wtr-btn {
-    max-width: 100%;
-    white-space: normal;
-    text-align: center;
-}
-
-/* ============================================================
  * Mobile / collapsed-desktop nav menu — .wtr-scroll-locked
  * ============================================================
  * mobile-menu.js adds this to <body> while the mobile nav panel (now a
@@ -1557,6 +1566,13 @@ body.wtr-scroll-locked {
  * Typography's 0,1,0 `:where(h2):not(...)` rule, which the equivalent
  * prose-h2:* utilities tie with and then lose to on source order.
  * ============================================================ */
+/* A pasted URL or other long unbroken string (privacy policies quote whole
+ * opt-out links) breaks onto the next line instead of widening the page. */
+.wtr-text-block,
+.prose {
+    overflow-wrap: break-word;
+}
+
 .wtr-text-block h2 {
     font-family: var(--font-heading);
     font-size: var(--text-2xl);

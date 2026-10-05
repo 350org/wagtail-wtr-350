@@ -37,9 +37,9 @@ doesn't set one — see PageCardsBlock.get_context() and Blogs/Post.get_context(
 <a href="{{ card.link_page.url }}"
    class="wtr-post-card flex flex-col overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50 text-left">
     {% if card.image %}
-        {% image card.image fill-640x360 as img %}
+        {% comment %}Cards are at most 390px wide (a 1218px row of three), half the row on a tablet, full width on a phone.{% endcomment %}
         <div class="aspect-video overflow-hidden bg-neutral-200">
-            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}" class="h-full w-full object-cover" loading="lazy">
+            {% srcset_image card.image fill-{640x360,360x203,960x540} sizes="(min-width: 1024px) 390px, (min-width: 640px) 50vw, 100vw" class="h-full w-full object-cover" loading="lazy" %}
         </div>
     {% endif %}
     {% comment %}

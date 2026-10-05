@@ -80,12 +80,9 @@ own shape and needs none.
                 </div>
                 {% if value.link_text and value.link_page or value.link_text and value.link_url or value.link_text and value.anchor %}
                     {% comment %}
-                    max-w-full + whitespace-normal on the button: wtr-btn is
-                    nowrap by default, and a long label ("Join the Great Power
-                    Shift") at wtr-btn-lg's 24px text / 36px padding is wider
-                    than the panel's content box on a phone — it would run past
-                    the edge and be clipped by the panel's overflow-hidden.
-                    Wrapping is what keeps one button size across breakpoints.
+                    A long label ("Join the Great Power Shift") at wtr-btn-lg's
+                    24px text is wider than the panel's content box on a phone;
+                    wtr-btn wraps it, and shrink-0 keeps the arrow whole.
                     {% endcomment %}
                     <div class="mt-8">
                         {% comment %}
@@ -103,10 +100,10 @@ own shape and needs none.
                         {% endcomment %}
                         <a href="{% if value.link_page %}{{ value.link_page.url }}{% elif value.link_url %}{{ value.link_url }}{% else %}#{{ value.anchor }}{% endif %}"
                            {% if value.link_url and not value.link_page %}rel="noopener noreferrer"{% endif %}
-                           class="wtr-btn wtr-btn-lg inline-flex max-w-full items-center gap-2 whitespace-normal
+                           class="wtr-btn wtr-btn-lg inline-flex items-center gap-2
                                   {% if on_light %}hover:bg-primary-500{% else %}wtr-btn-outline-light hover:bg-white/10{% endif %}">
                             {{ value.link_text }}
-                            <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                            <svg class="h-7 w-7 shrink-0" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
                                 <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </a>

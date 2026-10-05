@@ -52,9 +52,9 @@ Post.get_context() and Blogs.post_label / Blogs.get_related_intro().
                 {% endfor %}
             </div>
             {% if parent_page %}
-                <a href="{{ parent_page.url }}" class="wtr-btn wtr-btn-outline-light wtr-btn-lg inline-flex items-center gap-2 hover:bg-white/10">
+                <a href="{{ parent_page.url }}" class="wtr-btn wtr-btn-outline-light wtr-btn-lg inline-flex items-center justify-center gap-2 hover:bg-white/10">
                     {{ related_link_text }}
-                    <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                    <svg class="h-7 w-7 shrink-0" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
                         <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </a>
