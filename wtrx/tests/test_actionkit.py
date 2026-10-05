@@ -177,6 +177,66 @@ class TestSubmitAction(SimpleTestCase):
         with self.assertRaises(ActionKitError):
             actionkit.submit_action("", "u", "p", "join", {"email": "a@b.com"})
 
+    @patch("wtrx.integrations.actionkit.requests.post")
+    def test_returns_the_response_body(self, mock_post):
+        resp = self._mock_response(201)
+        resp.json.return_value = {"id": 7, "redirect_url": "/cms/thanks/join?action_id=7"}
+        mock_post.return_value = resp
+        result = actionkit.submit_action(
+            "myorg.actionkit.com", "u", "p", "join", {"email": "a@b.com"}
+        )
+        self.assertEqual(result["redirect_url"], "/cms/thanks/join?action_id=7")
+
+    @patch("wtrx.integrations.actionkit.requests.post")
+    def test_returns_empty_dict_when_body_is_not_json(self, mock_post):
+        resp = self._mock_response(201)
+        resp.json.side_effect = ValueError
+        mock_post.return_value = resp
+        result = actionkit.submit_action(
+            "myorg.actionkit.com", "u", "p", "join", {"email": "a@b.com"}
+        )
+        self.assertEqual(result, {})
+
+
+class TestSignupRedirect(SimpleTestCase):
+    """signup_redirect: which ActionKit after-action redirects get followed."""
+
+    HOST = "myorg.actionkit.com"
+
+    def _redirect(self, redirect_url, page="join"):
+        return actionkit.signup_redirect(self.HOST, page, {"redirect_url": redirect_url})
+
+    def test_default_thanks_page_is_not_a_redirect(self):
+        # Every ActionKit page has this when nobody set a redirect, so
+        # following it would replace every block's own thank-you message.
+        self.assertIsNone(self._redirect("/cms/thanks/join?action_id=7&akid=.1.abc"))
+        self.assertIsNone(
+            self._redirect("https://myorg.actionkit.com/cms/thanks/join/?action_id=7")
+        )
+
+    def test_another_actionkit_page_keeps_action_id_and_is_flagged(self):
+        url, is_actionkit = self._redirect("/donate/give?action_id=7&akid=.1.abc")
+        self.assertEqual(
+            url, "https://myorg.actionkit.com/donate/give?action_id=7&akid=.1.abc"
+        )
+        self.assertTrue(is_actionkit)
+
+    def test_another_pages_thanks_page_is_followed(self):
+        url, is_actionkit = self._redirect("/cms/thanks/other?action_id=7")
+        self.assertEqual(url, "https://myorg.actionkit.com/cms/thanks/other?action_id=7")
+        self.assertTrue(is_actionkit)
+
+    def test_external_page_is_not_flagged_as_actionkit(self):
+        url, is_actionkit = self._redirect("https://example.org/welcome/?action_id=7")
+        self.assertEqual(url, "https://example.org/welcome/?action_id=7")
+        self.assertFalse(is_actionkit)
+
+    def test_non_http_and_missing_redirects_are_ignored(self):
+        self.assertIsNone(self._redirect("javascript:alert(1)"))
+        self.assertIsNone(self._redirect(""))
+        self.assertIsNone(actionkit.signup_redirect(self.HOST, "join", {}))
+        self.assertIsNone(actionkit.signup_redirect(self.HOST, "join", None))
+
 
 class TestFormPageActionKitForwarding(TestCase):
     @classmethod
@@ -762,6 +822,38 @@ class TestActionKitInlineSignupView(TestCase):
         self.assertEqual(fields["first_name"], "Alice")
         for bookkeeping_field in ("page", "utf8", "form_name", "url", "js", "auto_country"):
             self.assertNotIn(f"user_{bookkeeping_field}", fields)
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_default_thanks_redirect_is_not_returned(self, mock_submit):
+        mock_submit.return_value = {"redirect_url": "/cms/thanks/web_join?action_id=7"}
+        self._configure_actionkit()
+        response = self._post({"page": "web_join", "email": "a@b.com"})
+        self.assertEqual(response.json(), {"success": True})
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_custom_redirect_is_returned(self, mock_submit):
+        mock_submit.return_value = {"redirect_url": "https://example.org/welcome/?action_id=7"}
+        self._configure_actionkit()
+        response = self._post({"page": "web_join", "email": "a@b.com"})
+        self.assertEqual(
+            response.json(),
+            {
+                "success": True,
+                "redirect_url": "https://example.org/welcome/?action_id=7",
+                "redirect_is_actionkit": False,
+            },
+        )
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_actionkit_hosted_redirect_is_flagged(self, mock_submit):
+        mock_submit.return_value = {"redirect_url": "/donate/give?action_id=7"}
+        self._configure_actionkit()
+        response = self._post({"page": "web_join", "email": "a@b.com"})
+        self.assertEqual(
+            response.json()["redirect_url"],
+            "https://myorg.actionkit.com/donate/give?action_id=7",
+        )
+        self.assertTrue(response.json()["redirect_is_actionkit"])
 
     def test_missing_page_returns_400_without_calling_submit_action(self):
         self._configure_actionkit()

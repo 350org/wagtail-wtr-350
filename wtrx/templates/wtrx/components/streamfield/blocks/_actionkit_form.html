@@ -449,6 +449,40 @@
                 return true;
             }
 
+            {% comment %}
+            Tells GTM about a successful signup (Google Ads, Meta, GA4 all
+            hang off this one event). Call it once per success, before the
+            next step. Pass `done` only when that next step navigates away:
+            it runs once GTM has finished with the event, or after
+            SIGNUP_EVENT_FALLBACK_MS if GTM is blocked or slow (Usercentrics
+            can hold it back), whichever comes first.
+            Never call it ahead of a redirect to an ActionKit-hosted page —
+            ActionKit's own thank-you page counts the signup from action_id,
+            so pushing here as well would count it twice.
+            {% endcomment %}
+            var SIGNUP_EVENT_FALLBACK_MS = 2500;
+
+            function pushSignupEvent(done) {
+                var pageInput = form.querySelector('[name="page"]');
+                var payload = {
+                    event: "actionkit_signup",
+                    ak_page: (pageInput && pageInput.value) || ""
+                };
+                if (typeof done === "function") {
+                    var finished = false;
+                    var finish = function () {
+                        if (finished) { return; }
+                        finished = true;
+                        done();
+                    };
+                    payload.eventCallback = finish;
+                    payload.eventTimeout = 2000;
+                    setTimeout(finish, SIGNUP_EVENT_FALLBACK_MS);
+                }
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push(payload);
+            }
+
             form.onsubmit = null;
             form.addEventListener("submit", function (event) {
                 event.preventDefault();
@@ -470,6 +504,23 @@
                     return response.json();
                 }).then(function (data) {
                     if (data.success) {
+                        {% comment %}
+                        The ActionKit page's own "redirect to" setting wins
+                        over the thank-you box and the checkout. An
+                        ActionKit-hosted destination counts the signup itself
+                        (from action_id, already on the URL), so only any
+                        other destination gets our event first.
+                        {% endcomment %}
+                        if (data.redirect_url) {
+                            var followRedirect = function () { window.location.assign(data.redirect_url); };
+                            if (data.redirect_is_actionkit) {
+                                followRedirect();
+                            } else {
+                                pushSignupEvent(followRedirect);
+                            }
+                            return;
+                        }
+                        pushSignupEvent();
                         if (openDonationCheckout()) { return; }
                         {% if success_message or success_text %}
                         if (formContainer) { formContainer.classList.add("hidden"); }

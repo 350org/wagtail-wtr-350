@@ -1736,3 +1736,23 @@ gate.
     change and Settings > Redirects alike) — but not redirects issued
     anywhere else, e.g. Cloudflare rules, which need "preserve query
     string" set on their own.
+
+89. **A successful ActionKit signup pushes `actionkit_signup` to the
+    `dataLayer`, unless ActionKit's own thank-you page will count it.**
+    `pushSignupEvent()` in `_actionkit_form.html` (with `ak_page` = the
+    form's `page` value) runs once, inside `if (data.success)`, before the
+    next step; GTM's Google Ads, Meta and GA4 conversions all hang off it.
+    The next step is, in order: the ActionKit page's own "redirect to"
+    setting, then the Fundraise Up checkout, then the thank-you box. The
+    redirect comes from `redirect_url` in ActionKit's REST response
+    (`actionkit.signup_redirect()`), returned by `/actionkit-signup/` as
+    `redirect_url` + `redirect_is_actionkit`:
+    - ActionKit gives every page a redirect, defaulting to its own
+      `/cms/thanks/<page>`. That default is treated as "none set" —
+      following it would replace every block's thank-you message.
+    - A redirect off the ActionKit host pushes the event and navigates only
+      from GTM's `eventCallback` (with a 2.5s fallback for a blocked or
+      consent-delayed GTM).
+    - A redirect to an ActionKit-hosted page does **not** push: AK's
+      thank-you page counts the signup from the `action_id` already on the
+      URL, so pushing as well double-counts.

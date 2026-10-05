@@ -26,6 +26,7 @@ visitors of the hosted page, just without the surrounding site chrome.
 import logging
 import re
 from html.parser import HTMLParser
+from urllib.parse import urljoin, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -147,9 +148,11 @@ def submit_action(hostname, username, password, page, fields, timeout=5):
     POST an action to ActionKit's REST API.
 
     ``fields`` is the mapped dict from :func:`map_form_fields` (must contain
-    ``email``). Returns None on success (HTTP 2xx); raises :class:`ActionKitError`
-    on missing configuration or any non-2xx response. Network errors from
-    ``requests`` propagate to the caller, which is expected to catch and log them.
+    ``email``). Returns ActionKit's JSON response body as a dict on success
+    (HTTP 2xx; empty when the body isn't a JSON object); raises
+    :class:`ActionKitError` on missing configuration or any non-2xx response.
+    Network errors from ``requests`` propagate to the caller, which is expected
+    to catch and log them.
     """
     if not (hostname and username and page):
         raise ActionKitError(
@@ -171,6 +174,46 @@ def submit_action(hostname, username, password, page, fields, timeout=5):
         raise ActionKitError(
             f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
         )
+
+    try:
+        data = response.json()
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def signup_redirect(hostname, page, action):
+    """
+    Where a signup should send the visitor next, per the ActionKit page's own
+    "redirect to" (after-action) setting.
+
+    ``action`` is :func:`submit_action`'s return value, whose ``redirect_url``
+    is that setting with ``action_id``/``akid`` already appended. Returns
+    ``(url, is_actionkit)``, or ``None`` when there is nothing to follow:
+
+    - ActionKit gives every page a redirect, defaulting to its own
+      ``/cms/thanks/<page>``. That default is what a page has when nobody set
+      one, so it counts as "no redirect" and the block's own thank-you
+      handling runs instead.
+    - ``is_actionkit`` is True when the destination is on the ActionKit host.
+      The caller uses it to decide who records the conversion: ActionKit's
+      thank-you page does, from ``action_id``, so our own tracking event must
+      not also fire.
+    """
+    raw = action.get("redirect_url") if isinstance(action, dict) else None
+    if not raw or not isinstance(raw, str):
+        return None
+
+    ak_base = base_url(hostname)
+    url = urljoin(f"{ak_base}/", raw.strip())
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return None
+
+    is_actionkit = parts.netloc.lower() == urlsplit(ak_base).netloc.lower()
+    if is_actionkit and parts.path.rstrip("/") == f"/cms/thanks/{page}":
+        return None
+    return url, is_actionkit
 
 
 def fetch_embed_form_html(hostname, short_form_id, timeout=5):

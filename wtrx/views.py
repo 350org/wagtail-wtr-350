@@ -75,7 +75,7 @@ def actionkit_inline_signup(request):
         )
 
     try:
-        actionkit.submit_action(
+        action = actionkit.submit_action(
             actionkit_config.get("hostname"),
             actionkit_config.get("api_username"),
             integration.get_actionkit_api_password(),
@@ -94,7 +94,13 @@ def actionkit_inline_signup(request):
             status=502,
         )
 
-    return JsonResponse({"success": True})
+    payload = {"success": True}
+    redirect = actionkit.signup_redirect(
+        actionkit_config.get("hostname"), short_form_id, action
+    )
+    if redirect:
+        payload["redirect_url"], payload["redirect_is_actionkit"] = redirect
+    return JsonResponse(payload)
 
 
 def no_cms_access(request):
