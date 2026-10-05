@@ -20,12 +20,12 @@
 
                 {% comment %}Social icons (if enabled and present){% endcomment %}
                 {% if social.show_in_footer and social.social_links %}
-                    <div class="wtr-social-links flex items-center gap-3">
+                    <div class="wtr-social-links -mx-1.5 flex items-center">
                         {% for item in social.social_links %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
                                aria-label="{{ item.value.platform|social_platform_label }}"
-                               class="text-light hover:text-primary-400 transition-colors">
+                               class="inline-flex size-8 items-center justify-center text-light hover:text-primary-400 transition-colors">
                                 {% social_icon item.value.platform %}
                             </a>
                         {% endfor %}
@@ -140,9 +140,9 @@
                 {% endcomment %}
                 {% if footer.footer_navigation %}
                     <nav aria-label="{% trans 'Footer navigation' %}">
-                    <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">
                         {% for column in footer.footer_navigation %}
-                            <div>
+                            <div class="min-w-0 break-words">
                                 {% if column.value.heading %}
                                     <h3 class="font-heading font-semibold text-light text-sm uppercase tracking-wider mb-4">
                                         {{ column.value.heading }}
@@ -253,12 +253,12 @@
 
                 {% comment %}Social links{% endcomment %}
                 {% if social.show_in_footer and social.social_links %}
-                    <div class="wtr-social-links flex items-center gap-4">
+                    <div class="wtr-social-links -mx-2 flex items-center">
                         {% for item in social.social_links %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
                                aria-label="{{ item.value.platform|social_platform_label }}"
-                               class="text-light hover:text-primary-400 transition-colors">
+                               class="inline-flex size-9 items-center justify-center text-light hover:text-primary-400 transition-colors">
                                 {% social_icon item.value.platform %}
                             </a>
                         {% endfor %}

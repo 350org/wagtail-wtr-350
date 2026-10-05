@@ -415,7 +415,11 @@ check.
     Django settings var, not exposed to templates.
 16. **`collapse_desktop_menu` is CSS-only**: Tailwind responsive classes in
     `header.html` toggle whether the desktop nav vs. hamburger shows at all
-    breakpoints; `mobile-menu.js` needs no changes.
+    breakpoints; `mobile-menu.js` needs no changes. The desktop nav starts at
+    `lg:` (1024px), not `md:`: its links are `whitespace-nowrap`, and at 768px
+    the French and Indonesian labels pushed the Donate button 41–105px off
+    screen. The CTA group is `shrink-0`, so an overflow can never take the
+    Donate button with it.
 17. **There is no transparent header.** `HomePage.use_transparent_header`
     was removed (migration `0091`); the header always sits in normal flow
     on `bg-light`. `BrandingSEOSettings.dark_logo` survives for the footer.
@@ -1012,8 +1016,11 @@ check.
     WebP; JPEG was added to the same setting after the PNG-only version
     shipped and the same report kept flagging JPEG-sourced images for an
     identical reason.
-    `WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp"}`
-    (`settings/base.py`) fixes this project-wide with no template changes —
+    `WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp",
+    "webp": "webp"}` (`settings/base.py`) fixes this project-wide with no
+    template changes. The `webp` entry matters as much as the other two:
+    Wagtail's default turns a WebP *source* into PNG, which left every
+    rendition of a WebP upload a large PNG until it was added —
     WebP (not JPEG) as PNG's target so a PNG with real transparency still
     renders correctly instead of being flattened onto a white background
     (Wagtail's own JPEG-output path does exactly that via
@@ -1132,6 +1139,19 @@ check.
     `test_previews_never_call_a_third_party_platform`, which asserts on the
     literal string, not on whether the JS actually runs.
 
+    **`actionkit.js` is the opposite case: it stays async, and the page
+    defines an empty `window.actionkit` placeholder before the fragment.**
+    The fragment's GDPR block (in `.ak-privacy`) has a DOM-ready handler
+    that reads `actionkit.form`; without the placeholder it threw
+    `actionkit is not defined` on nearly every ActionKit page, and jQuery
+    1.9 then skipped every later ready handler (the opt-in wiring and the
+    radio/checkbox styling). With the placeholder the handler is a no-op,
+    exactly as when actionkit.js arrives first, since `actionkit.form` is
+    only set by `initForm()`, which we never call. actionkit.js replaces the
+    whole global when it loads. Loading actionkit.js synchronously would
+    also fix it, at the cost of a second render-blocking third-party
+    script.
+
 ## Git Conventions
 
 - Branch from `main`. Descriptive names: `feature/signup-block`,
@@ -1227,19 +1247,20 @@ gate.
     panel edge — don't reintroduce vertical padding there to "fix" a gap;
     change this margin instead.
 
-62. **`wtr-btn` sets `white-space: nowrap`**, so a button cannot wrap
-    however wide its container is. `ButtonGroupBlock`'s "vertical" layout
-    caps its column (`mx-auto max-w-sm`) and stretches its buttons
-    (`items-stretch` at every breakpoint, not just below `sm:` as before),
-    which only reads correctly because `.wtr-button-group-vertical
-    .wtr-btn` in `main.css` overrides `white-space` to `normal` and adds
-    `text-align: center` — `wtr-btn` sets no text-align, so a stretched
-    `inline-block` would left-align its label beside centred shorter
-    siblings. Unlayered, so it beats `wtr-btn`'s own `@utility`
-    declarations. `feature_panel_block.html` solves the same problem
-    inline on a single button. Horizontal rows deliberately keep
-    content-width, `nowrap` buttons — a row of stretched buttons reads as
-    a segmented control rather than as separate CTAs.
+62. **`wtr-btn` wraps: it is capped at its container's width (`max-width:
+    100%`) with a balanced, centred label.** It used to be `nowrap`, and
+    long or translated labels ran off phones ("Ver mais posts do blog",
+    callout CTAs) or were clipped by `overflow-hidden` panels. Arrow buttons
+    (`inline-flex` with a trailing `<svg>`) also need `justify-center` and
+    `shrink-0` on the svg, or the arrow is squashed when the label wraps.
+    `ButtonGroupBlock`'s "vertical" layout caps its column (`mx-auto
+    max-w-sm`) and stretches its buttons; horizontal rows keep content-width
+    buttons (a row of stretched buttons reads as a segmented control) and
+    `sm:flex-wrap`, so a button moves to a new line before its label wraps.
+    A card's flex item also needs `min-w-0`: its automatic minimum width is
+    its content's, which a long button label used to push past the row
+    (`card_grid_block.html`; `image_grid_block.html` had the same problem
+    with an image's intrinsic size).
 
 63. **`ContentPage.hide_hero` is gated by `FieldPanel(permission=
     "wtrx.disable_hero")`**, a custom permission declared in

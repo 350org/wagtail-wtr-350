@@ -291,7 +291,11 @@ WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
 # regardless of this setting) -- run `python manage.py
 # wagtail_update_image_renditions` after deploying this to regenerate
 # existing ones.
-WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp"}
+#
+# "webp": "webp" is needed too: Wagtail's default_conversions turns a WebP
+# *source* into PNG output, so every rendition of a WebP upload came out as a
+# PNG several times the size.
+WAGTAILIMAGES_FORMAT_CONVERSIONS = {"png": "webp", "jpeg": "webp", "webp": "webp"}
 
 WAGTAILSEARCH_BACKENDS = {
     "default": {

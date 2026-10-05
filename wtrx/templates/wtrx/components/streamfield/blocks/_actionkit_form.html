@@ -76,6 +76,18 @@
             if (typeof jQuery === "undefined") {
                 document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
             }
+            {% comment %}
+            ActionKit's fragment has a DOM-ready handler (the GDPR block in
+            .ak-privacy) that reads the global `actionkit`, but actionkit.js
+            is appended asynchronously below and usually arrives after
+            DOM-ready. The ReferenceError then makes jQuery 1.9 skip every
+            later ready handler (the opt-in wiring and radio/checkbox
+            styling). An empty placeholder lets that handler run as a no-op,
+            as it does when actionkit.js wins the race: actionkit.form is
+            only set by initForm(), which we never call. actionkit.js
+            replaces the whole global when it loads.
+            {% endcomment %}
+            window.actionkit = window.actionkit || { forms: {}, utils: {} };
         </script>
     {% endif %}
     {% comment %}

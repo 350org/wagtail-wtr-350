@@ -6,25 +6,25 @@ layout's bottom bar. Expects `links` (a minimal_links StreamValue).
 forloop.first skips the separator before the first link.
 {% endcomment %}
 {% if links %}
-    <nav class="flex items-center flex-wrap gap-x-3 gap-y-2" aria-label="{% trans 'Footer links' %}">
+    <nav class="flex items-center flex-wrap gap-x-3" aria-label="{% trans 'Footer links' %}">
         {% for item in links %}
             {% if not forloop.first %}
                 <span class="text-light" aria-hidden="true">|</span>
             {% endif %}
             {% if item.block_type == "internal" and item.value.page %}
                 <a href="{% pageurl item.value.page|localized %}"
-                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                   class="py-1 text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                     {{ item.value.text }}
                 </a>
             {% elif item.block_type == "external" %}
                 <a href="{{ item.value.url }}"
                    rel="noopener noreferrer"
-                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                   class="py-1 text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                     {{ item.value.text }}
                 </a>
             {% elif item.block_type == "anchor" %}
                 <a href="#{{ item.value.anchor }}"
-                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                   class="py-1 text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                     {{ item.value.text }}
                 </a>
             {% elif item.block_type == "cookie_settings" %}
@@ -39,7 +39,7 @@ forloop.first skips the separator before the first link.
                 {% endcomment %}
                 <a href="{{ item.value.policy_url }}"
                    rel="noopener noreferrer"
-                   class="uc-cookie-link text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                   class="uc-cookie-link py-1 text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
                     {{ item.value.text }}
                 </a>
             {% endif %}
