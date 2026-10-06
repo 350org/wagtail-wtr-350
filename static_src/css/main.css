@@ -1399,6 +1399,29 @@ body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child:is([da
 }
 
 /* ============================================================
+ * Outline buttons on a dark section
+ * ============================================================
+ * wtr-btn-outline is dark text on a transparent fill, which is unreadable
+ * once a ButtonBlock/ButtonGroupBlock sits on a dark SectionBlock (red,
+ * navy, ...). Flip it to wtr-btn-outline-light's colours off the section's
+ * own data-bg-tone, so an editor doesn't have to pick a different style
+ * per background. The hover fill is replaced too: button.html's
+ * hover:bg-primary-50 would put the now-white label on a near-white fill.
+ *
+ * Scoped to the two button blocks rather than every .wtr-btn-outline
+ * under the section: a card's own outline button sits on the card's
+ * light surface, not on the section fill, and must stay dark.
+ * ============================================================ */
+[data-bg-tone="dark"] :is(.wtr-button, .wtr-button-group) .wtr-btn-outline {
+    color: var(--color-light);
+    border-color: var(--color-light);
+}
+
+[data-bg-tone="dark"] :is(.wtr-button, .wtr-button-group) .wtr-btn-outline:hover {
+    background-color: color-mix(in srgb, var(--color-light) 10%, transparent);
+}
+
+/* ============================================================
  * Mobile / collapsed-desktop nav menu — .wtr-scroll-locked
  * ============================================================
  * mobile-menu.js adds this to <body> while the mobile nav panel (now a
