@@ -395,21 +395,53 @@
             PostSignupDonationBlock: opens a Fundraise Up campaign checkout
             in place of the thank-you box, prefilled from this signup. Returns
             false (so the thank-you box shows as usual) when no campaign is
-            set, or when Fundraise Up's installation snippet isn't on the
+            set for this visitor, or when Fundraise Up's installation snippet isn't on the
             page — its stub defines window.FundraiseUp and queues calls until
             the full script loads, so its absence means it never will (e.g.
             live preview, where base.html suppresses integration head HTML).
             {% endcomment %}
-            var fundraiseupCampaign = "{{ fundraiseup_campaign_code|escapejs }}";
+            var fundraiseupCampaigns = {
+                US: "{{ fundraiseup_campaign_code_us|escapejs }}",
+                CA: "{{ fundraiseup_campaign_code_ca|escapejs }}",
+                _default: "{{ fundraiseup_campaign_code|escapejs }}"
+            };
             var fundraiseupDesignation = "{{ fundraiseup_designation_id|escapejs }}";
             var CHECKOUT_OPEN_TIMEOUT_MS = 5000;
 
+            {% comment %}
+            The campaign can differ for US and Canadian visitors. The country
+            comes from Cloudflare's /cdn-cgi/trace edge endpoint, as in
+            donate_fundraiseup_block.html: it never reaches Django, so the
+            cached page stays the same for everyone. Asked for at load, and
+            only when a country has its own campaign, so the answer is ready
+            long before the form is submitted. Until it arrives, or if it
+            never does, every visitor gets the rest of world campaign.
+            {% endcomment %}
+            var visitorCountry = "";
+            if (fundraiseupCampaigns.US !== fundraiseupCampaigns._default || fundraiseupCampaigns.CA !== fundraiseupCampaigns._default) {
+                fetch("/cdn-cgi/trace")
+                    .then(function (response) { return response.ok ? response.text() : ""; })
+                    .then(function (text) {
+                        var match = text.match(/^loc=([A-Z]{2})$/m);
+                        if (match) { visitorCountry = match[1]; }
+                    })
+                    .catch(function () {});
+            }
+
+            function donationCampaign() {
+                if (visitorCountry === "US" || visitorCountry === "CA") {
+                    return fundraiseupCampaigns[visitorCountry];
+                }
+                return fundraiseupCampaigns._default;
+            }
+
             function canOpenDonationCheckout() {
-                return !!fundraiseupCampaign && !!window.FundraiseUp && typeof window.FundraiseUp.openCheckout === "function";
+                return !!donationCampaign() && !!window.FundraiseUp && typeof window.FundraiseUp.openCheckout === "function";
             }
 
             function openDonationCheckout() {
                 if (!canOpenDonationCheckout()) { return false; }
+                var fundraiseupCampaign = donationCampaign();
                 var data = new FormData(form);
                 var firstName = String(data.get("first_name") || "").trim();
                 var lastName = String(data.get("last_name") || "").trim();

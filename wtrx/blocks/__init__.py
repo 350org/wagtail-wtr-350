@@ -3191,7 +3191,7 @@ class PostSignupDonationBlock(StructBlock):
     Optional Fundraise Up checkout opened after a successful ActionKit signup,
     shared by SignupActionKitBlock and HeroSignupActionKitBlock.
 
-    When `campaign_code` is set (and the Fundraise Up integration is enabled),
+    When a campaign code is set (and the Fundraise Up integration is enabled),
     a successful signup hides the form and calls Fundraise Up's own
     `FundraiseUp.openCheckout()` JS API in place of showing the block's
     success message, prefilling the donor's name and email from the signup
@@ -3201,17 +3201,45 @@ class PostSignupDonationBlock(StructBlock):
     Up's script isn't on the page (integration disabled, live preview), the
     success message shows as before.
 
+    The campaign can differ by the visitor's country: `campaign_code_us` and
+    `campaign_code_ca` each fall back to `campaign_code` (rest of world) when
+    blank. The country is resolved client-side, the same way
+    DonateFundraiseUpBlock does it (Cloudflare's /cdn-cgi/trace), so the
+    cached page stays identical for every visitor. `campaign_code` keeps its
+    original name, so blocks saved before the regional fields existed behave
+    exactly as before. Unlike DonateFundraiseUpBlock's overrides there is no
+    site-wide value underneath these — Settings > Integrations holds form IDs,
+    not campaign codes.
+
     Meta.collapsed=True for the same reason as
     FundraiseUpAdvancedSettingsBlock: most signup blocks never use it.
     """
 
+    campaign_code_us = IdentifierBlock(
+        required=False,
+        label=_("Campaign code — United States visitors"),
+        help_text=_(
+            "Optional. Fundraise Up campaign opened for visitors in the "
+            "United States. Leave blank to use the rest of world campaign."
+        ),
+    )
+    campaign_code_ca = IdentifierBlock(
+        required=False,
+        label=_("Campaign code — Canada visitors"),
+        help_text=_(
+            "Optional. Fundraise Up campaign opened for visitors in Canada. "
+            "Leave blank to use the rest of world campaign."
+        ),
+    )
     campaign_code = IdentifierBlock(
         required=False,
-        label=_("Fundraise Up campaign code"),
+        label=_("Campaign code — rest of world"),
         help_text=_(
             "Optional. When set, a successful signup opens this Fundraise Up "
             "campaign's donation checkout instead of showing the success "
-            "message. Use the campaign's code from Fundraise Up > Campaigns "
+            "message. Used for every visitor without a country-specific "
+            "campaign above, and whenever the visitor's country can't be "
+            "determined. Use the campaign's code from Fundraise Up > Campaigns "
             "(starts with FUN, e.g. FUNABCDEFGH) — not a Form ID like the "
             "ones in Settings > Integrations, which won't open anything. "
             "Requires the Fundraise Up integration to be enabled."
@@ -3339,9 +3367,19 @@ class SignupActionKitFormMixin:
         # will actually be in <head> — otherwise the form would vanish on
         # success with nothing opening in its place.
         donation = value.get("post_signup_donation") or {}
-        campaign_code = (donation.get("campaign_code") or "") if fundraiseup_config else ""
+
+        def campaign(field_name):
+            return (donation.get(field_name) or "") if fundraiseup_config else ""
+
+        # Rest of world, and the fallback for either country left blank.
+        campaign_code = campaign("campaign_code")
         ctx["fundraiseup_campaign_code"] = campaign_code
-        ctx["fundraiseup_designation_id"] = (donation.get("designation_id") or "") if campaign_code else ""
+        ctx["fundraiseup_campaign_code_us"] = campaign("campaign_code_us") or campaign_code
+        ctx["fundraiseup_campaign_code_ca"] = campaign("campaign_code_ca") or campaign_code
+        has_campaign = bool(
+            campaign_code or ctx["fundraiseup_campaign_code_us"] or ctx["fundraiseup_campaign_code_ca"]
+        )
+        ctx["fundraiseup_designation_id"] = (donation.get("designation_id") or "") if has_campaign else ""
 
         form_html = None
         if (parent_context or {}).get("is_block_preview"):

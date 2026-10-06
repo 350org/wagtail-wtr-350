@@ -1707,7 +1707,13 @@ gate.
     `post_signup_donation` (`PostSignupDonationBlock`): a Fundraise Up
     **campaign code** (opens the checkout modal, e.g. `FUNXXXXXXXX`), not
     one of the **element IDs** `DonateFundraiseUpBlock` embeds inline, plus
-    an optional designation. On success `_actionkit_form.html` hides the
+    an optional designation. The campaign can differ by country:
+    `campaign_code_us`/`campaign_code_ca` each fall back to `campaign_code`
+    (rest of world, and the original field name, so older blocks are
+    unchanged). The country is read client-side from `/cdn-cgi/trace` at
+    page load, only when a country has its own campaign; until it answers,
+    or if it can't, the visitor gets the rest of world campaign. There is
+    no site-wide value beneath these, unlike the donate block's overrides. On success `_actionkit_form.html` hides the
     form and calls `FundraiseUp.openCheckout()`, prefilling name and email
     from the signup. `get_context()` passes the code only while the
     Fundraise Up integration is enabled, and the JS falls back to the

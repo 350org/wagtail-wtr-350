@@ -3456,6 +3456,38 @@ class TestSignupActionKitPostSignupDonation(TestCase):
         ctx = self._get_context(SignupActionKitBlock, {})
         self.assertEqual(ctx["fundraiseup_campaign_code"], "")
 
+    def test_country_campaigns_reach_the_template(self):
+        self._set_fundraiseup()
+        ctx = self._get_context(
+            SignupActionKitBlock,
+            {"campaign_code": "FUNROW", "campaign_code_us": "FUNUS", "campaign_code_ca": "FUNCA"},
+        )
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "FUNROW")
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "FUNUS")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "FUNCA")
+
+    def test_blank_country_campaign_falls_back_to_rest_of_world(self):
+        """Also what a block saved before the country fields existed looks like."""
+        self._set_fundraiseup()
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code": "FUNROW", "campaign_code_ca": "FUNCA"})
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "FUNROW")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "FUNCA")
+
+    def test_country_only_campaign_keeps_its_designation(self):
+        """No rest of world campaign: only that country gets a checkout."""
+        self._set_fundraiseup()
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code_us": "FUNUS", "designation_id": "EDEF"})
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "")
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "FUNUS")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "")
+        self.assertEqual(ctx["fundraiseup_designation_id"], "EDEF")
+
+    def test_country_campaigns_are_dropped_when_fundraiseup_is_disabled(self):
+        self._set_fundraiseup(enabled=False)
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code_us": "FUNUS", "campaign_code_ca": "FUNCA"})
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "")
+
     def test_campaign_code_is_not_translatable(self):
         """Pitfall #66: an identifier handed to a translator comes back broken."""
         from wtrx.blocks import IdentifierBlock, PostSignupDonationBlock
