@@ -109,6 +109,12 @@ def map_form_fields(cleaned_data):
             result["city"] = value
         elif key == "state" or "province" in key:
             result["state"] = value
+        # ActionKit core user fields, posted under their own names by its
+        # embedded form. Sent as user_country/user_region they would land as
+        # custom fields and a page that requires country would reject the
+        # signup for any user without one on file.
+        elif key in ("country", "region"):
+            result[key] = value
         elif "address" in key or "street" in key:
             result["address1"] = value
         else:

@@ -62,6 +62,15 @@ class TestMapFormFields(SimpleTestCase):
         )
         self.assertEqual(result["first_name"], "Given")
 
+    def test_country_and_region_are_core_fields_not_custom_ones(self):
+        result = actionkit.map_form_fields(
+            {"email": "a@example.com", "country": "Canada", "region": "Ontario"}
+        )
+        self.assertEqual(result["country"], "Canada")
+        self.assertEqual(result["region"], "Ontario")
+        self.assertNotIn("user_country", result)
+        self.assertNotIn("user_region", result)
+
     def test_unrecognised_field_becomes_custom_user_field(self):
         result = actionkit.map_form_fields(
             {"email": "a@b.com", "favorite_color": "blue"}
