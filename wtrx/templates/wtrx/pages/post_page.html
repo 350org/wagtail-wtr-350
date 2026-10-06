@@ -28,9 +28,11 @@ uses) per Figma's Post body text frame width.
 "Related <posts>" — fixed (non-block) section on every post, per Figma's
 Frame 5922. Not a StreamField block since it always appears and its posts
 aren't editor-authored. The heading/button copy adapts to the Blogs page
-this post lives under ("Related blogs" vs "Related press releases") and
-the subheading comes from that page's related_intro / header copy — see
-Post.get_context() and Blogs.post_label / Blogs.get_related_intro().
+this post lives under ("Related blogs" vs "Related press releases"), or is
+replaced whole by that page's related_heading / related_link_text when set
+(the automated form only reads correctly in English). The subheading comes
+from that page's related_intro / header copy — see Post.get_context() and
+Blogs.post_label / Blogs.get_related_intro().
 {% endcomment %}
 {% if related_posts %}
     <div class="mt-32 w-full px-4 sm:px-6 lg:px-8">

@@ -1244,9 +1244,18 @@ class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
             related_posts.append(card)
         ctx["related_posts"] = related_posts
         ctx["parent_page"] = parent
+        #
+        # The two automated strings only read correctly in English (the noun
+        # is a lowercased title with a naive "s", and can't agree in gender or
+        # number with the words around it), so a Blogs page can replace either
+        # one outright — see Blogs.related_heading / related_link_text.
         label = getattr(parent, "post_label", None) or _("posts")
-        ctx["related_heading"] = _("Related %(label)s") % {"label": label}
-        ctx["related_link_text"] = _("Read more %(label)s") % {"label": label}
+        ctx["related_heading"] = getattr(parent, "related_heading", "") or (
+            _("Related %(label)s") % {"label": label}
+        )
+        ctx["related_link_text"] = getattr(parent, "related_link_text", "") or (
+            _("Read more %(label)s") % {"label": label}
+        )
         ctx["related_intro"] = (
             parent.get_related_intro() if hasattr(parent, "get_related_intro") else ""
         )
@@ -1290,6 +1299,28 @@ class Blogs(BasePage, HeroMixin):
         use_json_field=True,
     )
 
+    related_heading = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("related posts heading"),
+        help_text=_(
+            "Heading of the \"Related …\" section at the bottom of each post "
+            "under this page. Leave blank to build it from this page's title "
+            "(\"Related press releases\"), which only reads correctly in "
+            "English — fill it in on a page in any other language."
+        ),
+    )
+    related_link_text = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("related posts button text"),
+        help_text=_(
+            "Text of the button under that section, which links back to this "
+            "page. Leave blank to build it from this page's title (\"Read more "
+            "press releases\"), which only reads correctly in English — fill "
+            "it in on a page in any other language."
+        ),
+    )
     related_intro = models.TextField(
         blank=True,
         verbose_name=_("related posts intro"),
@@ -1337,7 +1368,14 @@ class Blogs(BasePage, HeroMixin):
         BasePage.title_panels
         + HeroMixin.banner_hero_panels
         + [
-            FieldPanel("related_intro"),
+            MultiFieldPanel(
+                [
+                    FieldPanel("related_heading"),
+                    FieldPanel("related_intro"),
+                    FieldPanel("related_link_text"),
+                ],
+                heading=_("Related posts section"),
+            ),
             FieldPanel("default_card_image"),
             FieldPanel("default_hero_image"),
         ]
@@ -1369,7 +1407,8 @@ class Blogs(BasePage, HeroMixin):
     def post_label(self):
         """
         Lowercase plural noun for this page's posts, used to build the
-        "Related …" / "Read more …" headings on each child Post (see
+        default "Related …" / "Read more …" headings on each child Post when
+        related_heading / related_link_text are blank (see
         Post.get_context()). Derived from the page title so a "Press
         Releases" page reads "press releases" and a "Blog" page reads
         "blogs" with nothing for an editor to configure — pluralisation is

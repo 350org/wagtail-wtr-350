@@ -859,6 +859,22 @@ class TestPostGetContext(TestCase):
         self.assertEqual(ctx["related_heading"], "Related press releases")
         self.assertEqual(ctx["related_link_text"], "Read more press releases")
 
+    def test_related_headings_use_parent_overrides(self):
+        """An editor-set heading/button text replaces the automated string whole."""
+        self.blogs.related_heading = "Articles liés"
+        self.blogs.related_link_text = "Lire plus d'articles"
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_heading"], "Articles liés")
+        self.assertEqual(ctx["related_link_text"], "Lire plus d'articles")
+
+    def test_related_heading_overrides_are_independent(self):
+        self.blogs.related_heading = "Articles liés"
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_heading"], "Articles liés")
+        self.assertEqual(ctx["related_link_text"], "Read more blogs")
+
     def test_related_intro_uses_parent_related_intro(self):
         self.blogs.related_intro = "Stories from the movement."
         self.blogs.save()
