@@ -21,8 +21,8 @@ column alone, same as hero.html does with no image/video.
     <div class="wtr-404-hero wtr-bg-navy relative flex flex-col overflow-hidden rounded-lg md:min-h-[300px]">
         <div class="grid flex-1 grid-cols-1 {% if settings.wtrx.NotFoundPageSettings.hero_image %}md:grid-cols-2 md:items-stretch{% endif %}">
             <div class="relative z-10 flex flex-col justify-center gap-4 px-6 py-10 text-light sm:px-10 sm:py-12 lg:py-16 {% if settings.wtrx.NotFoundPageSettings.hero_image %}lg:pl-32 lg:pr-0{% else %}lg:px-32{% endif %}">
-                <h1 class="font-heading text-3xl tracking-tight sm:text-4xl lg:text-5xl">{% trans "Page not found!" %}</h1>
-                <p class="text-lg sm:text-xl">{% trans "Error 404" %}</p>
+                <h1 class="font-heading text-3xl tracking-tight sm:text-4xl lg:text-5xl">{% trans "Error 404 - Page not found" %}</h1>
+                <p class="text-lg sm:text-xl">{% trans "Uh-oh, looks like the page you are looking for doesn't exist!" %}</p>
             </div>
             {% with hero_image=settings.wtrx.NotFoundPageSettings.hero_image %}
                 {% if hero_image %}
@@ -44,12 +44,30 @@ column alone, same as hero.html does with no image/video.
 {% block content %}
 <div class="wtr-404-content max-w-3xl mx-auto px-4 py-12 sm:py-16">
     <div class="space-y-4 text-lg text-neutral-700 sm:text-xl">
-        <p>{% trans "Uh-oh, looks like the page you are looking for doesn't exist!" %}</p>
-        <p>{% trans "Let's get you back on track toward a fossil-free future." %}</p>
+        <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl">{% trans "Let's get you back on track toward a fossil-free future:" %}</h2>
+        {% with quick_links=settings.wtrx.NotFoundPageSettings.quick_links %}
+            {% if quick_links %}
+                <div class="wtr-404-quick-links mt-10">
+                    <div class="flex flex-wrap gap-3">
+                        {% for item in quick_links %}
+                            {% if item.block_type == "internal" and item.value.page %}
+                                <a href="{% pageurl item.value.page %}" class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">
+                                    {{ item.value.text }}
+                                </a>
+                            {% elif item.block_type == "external" %}
+                                <a href="{{ item.value.url }}" rel="noopener noreferrer" class="wtr-btn wtr-btn-secondary hover:bg-secondary-700">
+                                    {{ item.value.text }}
+                                </a>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
     </div>
 
     <div class="wtr-404-search mt-10">
-        <p class="mb-3 font-heading text-lg font-semibold">{% trans "Try searching for what you need:" %}</p>
+        <h3 class="mb-3 font-heading text-lg font-semibold">{% trans "Or try searching for what you need:" %}</h3>
         <form action="{% url 'search' %}" method="get" role="search" class="flex gap-2">
             <input
                 type="search"
@@ -63,26 +81,5 @@ column alone, same as hero.html does with no image/video.
             </button>
         </form>
     </div>
-
-    {% with quick_links=settings.wtrx.NotFoundPageSettings.quick_links %}
-        {% if quick_links %}
-            <div class="wtr-404-quick-links mt-10">
-                <p class="mb-3 text-neutral-700">{% trans "Or you can:" %}</p>
-                <div class="flex flex-wrap gap-3">
-                    {% for item in quick_links %}
-                        {% if item.block_type == "internal" and item.value.page %}
-                            <a href="{% pageurl item.value.page %}" class="wtr-btn wtr-btn-outline hover:bg-primary-50">
-                                {{ item.value.text }}
-                            </a>
-                        {% elif item.block_type == "external" %}
-                            <a href="{{ item.value.url }}" rel="noopener noreferrer" class="wtr-btn wtr-btn-outline hover:bg-primary-50">
-                                {{ item.value.text }}
-                            </a>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-    {% endwith %}
 </div>
 {% endblock %}
