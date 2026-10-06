@@ -265,16 +265,6 @@ class TestOnSettingsSaved(TestCase):
         mock_purge_all.assert_called_once()
 
     @patch("wtrx.signals.purge_all")
-    def test_social_settings_save_triggers_purge_all(self, mock_purge_all):
-        from wtrx.site_settings import SocialSettings
-
-        obj, _ = SocialSettings.objects.get_or_create(site=self.site)
-        mock_purge_all.reset_mock()
-        with self.captureOnCommitCallbacks(execute=True):
-            obj.save()
-        mock_purge_all.assert_called_once()
-
-    @patch("wtrx.signals.purge_all")
     def test_integration_settings_save_triggers_purge_all(self, mock_purge_all):
         from wtrx.site_settings import IntegrationSettings
 

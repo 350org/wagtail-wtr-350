@@ -2,7 +2,7 @@
 Tests for wtrx.templatetags.wtrx_tags.organization_structured_data.
 
 Builds a site-wide Organization JSON-LD <script> tag from existing
-Branding & SEO / Social settings data (see AGENTS.md's wagtail-seo
+Branding & SEO / Footer settings data (see AGENTS.md's wagtail-seo
 comparison note) — no dedicated structured-data fields.
 """
 
@@ -14,7 +14,7 @@ from wagtail.models import Page, Site
 
 from wtrx.images import CustomImage
 from wtrx.models import ContentPage, HomePage
-from wtrx.site_settings import BrandingSEOSettings, SocialSettings
+from wtrx.site_settings import BrandingSEOSettings, FooterSettings
 from wtrx.templatetags.wtrx_tags import organization_structured_data
 
 
@@ -25,7 +25,7 @@ class TestOrganizationStructuredData(TestCase):
         cls.site.site_name = "Test Org"
         cls.site.save()
         cls.branding, _ = BrandingSEOSettings.objects.get_or_create(site=cls.site)
-        cls.social, _ = SocialSettings.objects.get_or_create(site=cls.site)
+        cls.social, _ = FooterSettings.objects.get_or_create(site=cls.site)
 
     def setUp(self):
         self.factory = RequestFactory()
@@ -143,7 +143,7 @@ class TestBaseTemplateSeoTagsRender(TestCase):
         cls.home.add_child(instance=cls.page)
 
         cls.branding, _ = BrandingSEOSettings.objects.get_or_create(site=cls.site)
-        cls.social, _ = SocialSettings.objects.get_or_create(site=cls.site)
+        cls.social, _ = FooterSettings.objects.get_or_create(site=cls.site)
         cls.social.social_links = [
             ("link", {"platform": "twitter", "url": "https://twitter.com/testorg"})
         ]
@@ -171,8 +171,8 @@ class TestBaseTemplateSeoTagsRender(TestCase):
 
     def test_twitter_site_meta_tag_derived_from_social_links(self):
         """
-        twitter:site is derived from SocialSettings.social_links's "twitter"
-        entry (see SocialSettings.twitter_handle) — no separate
+        twitter:site is derived from FooterSettings.social_links's "twitter"
+        entry (see twitter_handle_from_links()) — no separate
         BrandingSEOSettings.twitter_site field any more.
         """
         response = self.client.get(self.page.url)

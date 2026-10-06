@@ -262,10 +262,60 @@ FOOTER_LAYOUT_CHOICES = [
 ]
 
 
+# Module-level so it can be reused in templates/filters if needed.
+SOCIAL_PLATFORM_CHOICES = [
+    ("facebook", "Facebook"),
+    ("twitter", "Twitter / X"),
+    ("instagram", "Instagram"),
+    ("tiktok", "TikTok"),
+    ("linkedin", "LinkedIn"),
+    ("youtube", "YouTube"),
+    ("threads", "Threads"),
+    ("bluesky", "Bluesky"),
+    ("mastodon", "Mastodon"),
+    ("whatsapp", "WhatsApp"),
+]
+
+
+class SocialLinkBlock(StructBlock):
+    """
+    A single social media link.
+
+    Explicitly named StructBlock subclass (not anonymous) so Django's migration
+    serialization can reference it by dotted path.
+    """
+
+    platform = ChoiceBlock(choices=SOCIAL_PLATFORM_CHOICES, label=_("Platform"))
+    url = URLBlock(label=_("URL"))
+
+    class Meta:
+        icon = "site"
+        label = _("Social link")
+
+
+def twitter_handle_from_links(social_links):
+    """
+    Derive an "@handle" for the twitter:site meta tag (base.html) from the
+    "twitter" entry in a social links stream, if any — e.g.
+    "https://twitter.com/350" or "https://x.com/350" both yield "@350".
+    Returns "" when there is no usable entry.
+    """
+    from urllib.parse import urlparse
+
+    for block in social_links or []:
+        if block.value.get("platform") != "twitter":
+            continue
+        path = urlparse(block.value.get("url", "")).path.strip("/")
+        handle = path.split("/")[0] if path else ""
+        if handle:
+            return f"@{handle}"
+    return ""
+
+
 class FooterOverrideBlock(StructBlock):
     """
-    An alternate footer (layout, columns/links, copyright) scoped to a root
-    page and everything beneath it. See FooterSettings.resolved_for_page().
+    An alternate footer (layout, columns/links, copyright, social links)
+    scoped to a root page and everything beneath it. See FooterSettings.resolved_for_page().
     """
 
     root_page = PageChooserBlock(
@@ -324,6 +374,18 @@ class FooterOverrideBlock(StructBlock):
             "copyright line for this section."
         ),
     )
+    social_links = StreamBlock(
+        [("link", SocialLinkBlock())],
+        required=False,
+        label=_("Social links"),
+        help_text=_(
+            "Social media links for this section, shown in its footer (and "
+            "its header, when social icons are switched on there). Leave "
+            "empty to use the site default's social links (unlike the "
+            "other fields on this override, which show nothing rather "
+            "than fall back)."
+        ),
+    )
     newsletter_actionkit_shortname = CharBlock(
         required=False,
         label=_("Newsletter signup — ActionKit page shortname"),
@@ -348,37 +410,6 @@ class FooterOverrideBlock(StructBlock):
     class Meta:
         icon = "bars"
         label = _("Footer override")
-
-
-# Module-level so it can be reused in templates/filters if needed.
-SOCIAL_PLATFORM_CHOICES = [
-    ("facebook", "Facebook"),
-    ("twitter", "Twitter / X"),
-    ("instagram", "Instagram"),
-    ("tiktok", "TikTok"),
-    ("linkedin", "LinkedIn"),
-    ("youtube", "YouTube"),
-    ("threads", "Threads"),
-    ("bluesky", "Bluesky"),
-    ("mastodon", "Mastodon"),
-    ("whatsapp", "WhatsApp"),
-]
-
-
-class SocialLinkBlock(StructBlock):
-    """
-    A single social media link.
-
-    Explicitly named StructBlock subclass (not anonymous) so Django's migration
-    serialization can reference it by dotted path.
-    """
-
-    platform = ChoiceBlock(choices=SOCIAL_PLATFORM_CHOICES, label=_("Platform"))
-    url = URLBlock(label=_("URL"))
-
-    class Meta:
-        icon = "site"
-        label = _("Social link")
 
 
 class RegionalSiteLinkBlock(StructBlock):
@@ -669,7 +700,7 @@ class NavigationSettings(BaseSiteSetting):
 
 @register_setting(icon="bars", order=30)
 class FooterSettings(BaseSiteSetting):
-    """Settings > Footer — layout mode, footer nav columns, minimal links, copyright text."""
+    """Settings > Footer — layout mode, footer nav columns, minimal links, copyright text, social links."""
 
     layout = models.CharField(
         max_length=20,
@@ -721,6 +752,27 @@ class FooterSettings(BaseSiteSetting):
             "site, e.g. \"Canada\". Leave blank for no badge. Sections with "
             "their own footer override set this on the override instead."
         ),
+    )
+    social_links = StreamField(
+        [("link", SocialLinkBlock())],
+        blank=True,
+        verbose_name=_("social links"),
+        help_text=_(
+            "Sections with their own footer override can set their own "
+            "social links on the override; an override with none uses "
+            "these."
+        ),
+        use_json_field=True,
+    )
+    show_social_in_header = models.BooleanField(
+        default=False,
+        verbose_name=_("show in header"),
+        help_text=_("Display social media icons in the site header."),
+    )
+    show_social_in_footer = models.BooleanField(
+        default=True,
+        verbose_name=_("show in footer"),
+        help_text=_("Display social media icons in the site footer."),
     )
     footer_overrides = StreamField(
         [("override", FooterOverrideBlock())],
@@ -784,6 +836,14 @@ class FooterSettings(BaseSiteSetting):
         FieldPanel("regional_label"),
         FieldPanel("newsletter_actionkit_shortname"),
         FieldPanel("newsletter_success_message"),
+        MultiFieldPanel(
+            [
+                FieldPanel("social_links"),
+                FieldPanel("show_social_in_header"),
+                FieldPanel("show_social_in_footer"),
+            ],
+            heading=_("Social"),
+        ),
     ]
     advanced_panels = [
         FieldPanel("footer_overrides"),
@@ -835,66 +895,37 @@ class FooterSettings(BaseSiteSetting):
                 best_depth = root_page.depth
         return best_override if best_override is not None else self
 
-    class Meta:
-        verbose_name = _("Footer")
-
-
-@register_setting(icon="globe", order=40)
-class SocialSettings(BaseSiteSetting):
-    """Settings > Social — social media links and display options."""
-
-    social_links = StreamField(
-        [("link", SocialLinkBlock())],
-        blank=True,
-        verbose_name=_("social links"),
-        use_json_field=True,
-    )
-    show_in_header = models.BooleanField(
-        default=False,
-        verbose_name=_("show in header"),
-        help_text=_("Display social media icons in the site header."),
-    )
-    show_in_footer = models.BooleanField(
-        default=True,
-        verbose_name=_("show in footer"),
-        help_text=_("Display social media icons in the site footer."),
-    )
-
-    panels = [
-        FieldPanel("social_links"),
-        MultiFieldPanel(
-            [FieldPanel("show_in_header"), FieldPanel("show_in_footer")],
-            heading=_("Display options"),
-        ),
-    ]
-
     @property
     def twitter_handle(self):
-        """
-        Derive an "@handle" for the twitter:site meta tag (base.html) from
-        this site's "twitter" entry in social_links, if any — e.g.
-        "https://twitter.com/350" or "https://x.com/350" both yield "@350".
+        """The site default's "@handle" — see twitter_handle_from_links()."""
+        return twitter_handle_from_links(self.social_links)
 
-        Replaces the old separate BrandingSEOSettings.twitter_site field
-        (see the data migration that removed it): that field and a
-        "twitter" entry here both claimed to be the site's Twitter/X
-        presence, with nothing keeping them in sync. One source of truth
-        now — an editor sets the profile URL here once, for both the
-        header/footer icon and this meta tag.
+    def social_for_page(self, page):
         """
-        from urllib.parse import urlparse
+        Return the social links to render for ``page``, as a dict with
+        ``social_links``, ``show_in_header``, ``show_in_footer`` and
+        ``twitter_handle``.
 
-        for block in self.social_links:
-            if block.value.get("platform") != "twitter":
-                continue
-            path = urlparse(block.value.get("url", "")).path.strip("/")
-            handle = path.split("/")[0] if path else ""
-            if handle:
-                return f"@{handle}"
-        return ""
+        The links come from the footer override covering ``page`` when it
+        has any, and from the site default otherwise — an override with no
+        links falls back rather than showing nothing, so a section only
+        has to fill them in when its accounts differ. The two display
+        toggles are site-wide and never overridden. The header reads this
+        too, so a section's header icons match its footer's.
+        """
+        social_links = self.social_links
+        footer = self.resolved_for_page(page)
+        if footer is not self:
+            social_links = footer.get("social_links") or social_links
+        return {
+            "social_links": social_links,
+            "show_in_header": self.show_social_in_header,
+            "show_in_footer": self.show_social_in_footer,
+            "twitter_handle": twitter_handle_from_links(social_links),
+        }
 
     class Meta:
-        verbose_name = _("Social")
+        verbose_name = _("Footer")
 
 
 class IntegrationsStreamBlock(StreamBlock):

@@ -419,10 +419,23 @@ check.
 17. **There is no transparent header.** `HomePage.use_transparent_header`
     was removed (migration `0091`); the header always sits in normal flow
     on `bg-light`. `BrandingSEOSettings.dark_logo` survives for the footer.
-18. **Social display toggles live on `SocialSettings`**
-    (`show_in_header`/`show_in_footer`), not Navigation/FooterSettings.
-    Desktop icons show in the visible header bar; mobile icons show only in
-    the menu panel.
+18. **Social links live on `FooterSettings`, and a footer override can
+    replace them.** There is no `SocialSettings` any more (migrations
+    `0096`–`0098` copied its row onto the footer's and deleted it). The
+    site default is `FooterSettings.social_links` plus two site-wide
+    toggles, `show_social_in_header`/`show_social_in_footer`;
+    `FooterOverrideBlock.social_links` replaces the links for a country
+    site. Templates never read either directly: `{% resolved_social as
+    social %}` (`FooterSettings.social_for_page()`) returns
+    `social_links`/`show_in_header`/`show_in_footer`/`twitter_handle` for
+    the current page, and `footer.html`, `header.html` and `base.html`'s
+    `twitter:site` tag all use it — so a country's header icons and
+    Twitter handle follow its footer override. An override with no social
+    links **falls back to the site default** (like
+    `newsletter_success_message`, unlike the override's other fields).
+    The Organization JSON-LD's `sameAs` deliberately stays on the site
+    default. Desktop icons show in the visible header bar; mobile icons
+    show only in the menu panel.
 19. **Action Network embed is URL-based**: `SignupActionNetworkBlock` takes
     a full AN URL, parsed by `parse_action_network_url()`
     (`blocks/__init__.py`, only `/forms/` supported, slug validated against

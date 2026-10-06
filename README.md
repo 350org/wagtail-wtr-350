@@ -200,7 +200,7 @@ fork-specific configuration stay on your fork.
 | `wagtail_wtr/settings/base.py` | `WAGTAIL_SITE_NAME`, `WTRX_DONATION_PLATFORM`, `WTRX_SIGNUP_PLATFORM`, `LANGUAGES` |
 | `templates/` | Override or extend any template (shadow `templates/wtrx/<path>`) |
 | `static_src/javascript/` | Add site-specific JS components |
-| Wagtail admin | Settings > Branding, Navigation, Footer, Social, Integrations |
+| Wagtail admin | Settings > Branding, Navigation, Footer, Integrations |
 
 ### Don't edit — pull upstream cleanly
 
@@ -317,8 +317,7 @@ class HomePage(BasePage, HeroMixin):
 
 - **Branding & SEO** — logo, favicon, default meta image, site description
 - **Navigation** — primary nav links, CTA button
-- **Footer** — footer nav sections, copyright text
-- **Social** — social platform links
+- **Footer** — footer nav sections, copyright text, social platform links (overridable per country site)
 - **Integrations** — donation platform (ActBlue), signup platform (wagtail_forms / Action Network)
 
 ### Core features

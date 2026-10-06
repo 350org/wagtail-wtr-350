@@ -8,8 +8,8 @@ Hooks registered here:
   wtrx/static/wtrx/admin/branding.css)
 - construct_main_menu: adds the configurable admin sidebar shortcuts from
   AdminMenuSettings.sidebar_shortcuts (Settings > Admin menu)
-- construct_settings_menu: groups Branding & SEO / Navigation / Footer /
-  Social under one "Site design" flyout in the Settings menu, so the
+- construct_settings_menu: groups Branding & SEO / Navigation / Footer
+  under one "Site design" flyout in the Settings menu, so the
   Settings sidebar doesn't grow one flat entry per settings model forever
 
 Block-type visibility (hiding irrelevant SignupBlock/DonateBlock variants
@@ -36,7 +36,6 @@ from wtrx.site_settings import (
     BrandingSEOSettings,
     FooterSettings,
     NavigationSettings,
-    SocialSettings,
 )
 
 
@@ -168,7 +167,6 @@ _SITE_DESIGN_SETTINGS_MODELS = {
     BrandingSEOSettings,
     NavigationSettings,
     FooterSettings,
-    SocialSettings,
 }
 
 

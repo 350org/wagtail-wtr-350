@@ -25,7 +25,8 @@ Held in one variable so all three nav renderings (desktop bar, collapsed
 desktop dropdown, mobile panel) can't drift apart. Tailwind's scanner reads
 class names as plain text, so the literal here is enough for JIT.
 {% endcomment %}
-{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings nav_link_weight="font-medium" nav_active_link="font-semibold underline decoration-primary-600 decoration-[0.3em] underline-offset-4" %}
+{% resolved_social as social %}
+{% with branding=settings.wtrx.BrandingSEOSettings nav_link_weight="font-medium" nav_active_link="font-semibold underline decoration-primary-600 decoration-[0.3em] underline-offset-4" %}
 {% comment %}
 border-b-0 by default; the has-[...] variant below adds a light-gray
 border-bottom only while the mobile/collapsed-desktop toggle is expanded

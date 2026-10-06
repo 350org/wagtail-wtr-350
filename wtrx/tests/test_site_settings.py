@@ -39,7 +39,6 @@ from wtrx.site_settings import (
     FooterSettings,
     IntegrationSettings,
     NavigationSettings,
-    SocialSettings,
 )
 
 # Minimal fixtures for TestHeaderLogoRendering — one of each format, to pin
@@ -1152,9 +1151,9 @@ class TestFooterNewsletterSignupRendersInFooter(TestCase):
         self.assertIn("Thanks for signing up!", content)
 
 
-class TestSocialSettingsTwitterHandle(TestCase):
+class TestFooterSettingsTwitterHandle(TestCase):
     """
-    SocialSettings.twitter_handle derives the twitter:site meta tag's
+    FooterSettings.twitter_handle derives the twitter:site meta tag's
     "@handle" from social_links's own "twitter" entry -- replaces the old
     separate BrandingSEOSettings.twitter_site field (see the migration
     that removed it, 0068/0069), which could disagree with social_links.
@@ -1163,7 +1162,7 @@ class TestSocialSettingsTwitterHandle(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.site = Site.objects.get(is_default_site=True)
-        cls.social, _ = SocialSettings.objects.get_or_create(site=cls.site)
+        cls.social, _ = FooterSettings.objects.get_or_create(site=cls.site)
 
     def _set_links(self, links):
         self.social.social_links = links
@@ -1390,3 +1389,103 @@ class TestIntegrationSettingsCustomHtmlValidation(SimpleTestCase):
     def test_blank_is_allowed(self):
         self._clean("custom_head_html", "")
         self._clean("custom_body_html", "")
+
+
+class TestSocialLinksFollowFooterOverride(TestCase):
+    """
+    A footer override can carry its own social links for a country site
+    (FooterSettings.social_for_page(), read by {% resolved_social %} in
+    footer.html, header.html and base.html). An override with none falls
+    back to the site default's rather than showing nothing.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="social-override-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="social-override-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Social Override Test",
+        )
+        cls.canada = ContentPage(title="Canada", slug="canada")
+        cls.home.add_child(instance=cls.canada)
+        cls.brasil = ContentPage(title="Brasil", slug="brasil")
+        cls.home.add_child(instance=cls.brasil)
+        cls.other = ContentPage(title="Other", slug="other")
+        cls.home.add_child(instance=cls.other)
+
+        cls.footer, _ = FooterSettings.objects.get_or_create(site=cls.site)
+        cls.footer.social_links = [
+            ("link", {"platform": "twitter", "url": "https://twitter.com/global350"}),
+        ]
+        cls.footer.footer_overrides = [
+            (
+                "override",
+                {
+                    "root_page": cls.canada,
+                    "social_links": [
+                        ("link", {"platform": "twitter", "url": "https://twitter.com/350canada"}),
+                    ],
+                },
+            ),
+            # No social links of its own: falls back to the site default.
+            ("override", {"root_page": cls.brasil}),
+        ]
+        cls.footer.save()
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="social-override-test.localhost")
+
+    def _urls(self, page):
+        social = self.footer.social_for_page(page)
+        return [item.value["url"] for item in social["social_links"]]
+
+    def test_page_outside_any_override_gets_default_links(self):
+        self.assertEqual(self._urls(self.other), ["https://twitter.com/global350"])
+
+    def test_override_with_links_replaces_default(self):
+        self.assertEqual(self._urls(self.canada), ["https://twitter.com/350canada"])
+
+    def test_override_without_links_falls_back_to_default(self):
+        self.assertEqual(self._urls(self.brasil), ["https://twitter.com/global350"])
+
+    def test_no_page_gets_default_links(self):
+        self.assertEqual(self._urls(None), ["https://twitter.com/global350"])
+
+    def test_footer_renders_override_links_only_under_its_root(self):
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertIn('href="https://twitter.com/350canada"', content)
+        self.assertNotIn('href="https://twitter.com/global350"', content)
+        self.assertIn('<meta name="twitter:site" content="@350canada" />', content)
+
+        content = self.client.get(self.other.url).content.decode()
+        self.assertIn('href="https://twitter.com/global350"', content)
+        self.assertNotIn("350canada", content)
+        self.assertIn('<meta name="twitter:site" content="@global350" />', content)
+
+    def test_header_icons_follow_the_override_when_switched_on(self):
+        content = self.client.get(self.canada.url).content.decode()
+        self.assertEqual(content.count('href="https://twitter.com/350canada"'), 1)
+
+        self.footer.show_social_in_header = True
+        self.footer.save()
+        try:
+            content = self.client.get(self.canada.url).content.decode()
+            self.assertGreater(content.count('href="https://twitter.com/350canada"'), 1)
+            self.assertNotIn('href="https://twitter.com/global350"', content)
+        finally:
+            self.footer.show_social_in_header = False
+            self.footer.save()
+
+    def test_footer_toggle_hides_icons(self):
+        self.footer.show_social_in_footer = False
+        self.footer.save()
+        try:
+            content = self.client.get(self.canada.url).content.decode()
+            self.assertNotIn('href="https://twitter.com/350canada"', content)
+        finally:
+            self.footer.show_social_in_footer = True
+            self.footer.save()

@@ -168,7 +168,7 @@ class TestSettingsMenuGrouping(TestCase):
     """
     group_site_design_settings_menu_items() (wagtail_hooks.py,
     construct_settings_menu hook) folds BrandingSEOSettings/
-    NavigationSettings/FooterSettings/SocialSettings into one "Site
+    NavigationSettings/FooterSettings into one "Site
     design" SubmenuMenuItem, leaving IntegrationSettings/AdminMenuSettings
     (and anything else) at the top level of the Settings menu.
     """
@@ -192,7 +192,6 @@ class TestSettingsMenuGrouping(TestCase):
             FooterSettings,
             IntegrationSettings,
             NavigationSettings,
-            SocialSettings,
         )
         from wtrx.wagtail_hooks import group_site_design_settings_menu_items
 
@@ -200,7 +199,6 @@ class TestSettingsMenuGrouping(TestCase):
             self._setting_menu_item(BrandingSEOSettings),
             self._setting_menu_item(NavigationSettings),
             self._setting_menu_item(FooterSettings),
-            self._setting_menu_item(SocialSettings),
             self._setting_menu_item(IntegrationSettings),
         ]
         group_site_design_settings_menu_items(self._request(), items)
@@ -209,7 +207,7 @@ class TestSettingsMenuGrouping(TestCase):
         self.assertEqual(len(submenus), 1)
         self.assertEqual(submenus[0].name, "site-design")
 
-        # The 4 site-design models are gone from the top-level list, and
+        # The 3 site-design models are gone from the top-level list, and
         # IntegrationSettings is the only thing left there (not grouped).
         non_submenu_items = [
             item for item in items if not isinstance(item, SubmenuMenuItem)
@@ -221,7 +219,7 @@ class TestSettingsMenuGrouping(TestCase):
         }
         self.assertEqual(
             submenu_labels,
-            {"Branding & SEO", "Navigation", "Footer", "Social"},
+            {"Branding & SEO", "Navigation", "Footer"},
         )
 
     def test_integration_settings_not_grouped(self):

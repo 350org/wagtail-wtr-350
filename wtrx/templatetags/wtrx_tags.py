@@ -15,7 +15,6 @@ from wtrx.site_settings import (
     FooterSettings,
     IntegrationSettings,
     NavigationSettings,
-    SocialSettings,
 )
 
 
@@ -156,6 +155,23 @@ def resolved_footer(context):
         return None
     footer_settings = FooterSettings.for_request(request)
     return footer_settings.resolved_for_page(context.get("page"))
+
+
+@register.simple_tag(takes_context=True)
+def resolved_social(context):
+    """
+    Return the social links and display toggles for the current page: the
+    covering footer override's links when it has any, the site default's
+    otherwise. See FooterSettings.social_for_page().
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% resolved_social as social %}
+        {% if social.show_in_footer and social.social_links %}...{% endif %}
+    """
+    request = context.get("request")
+    footer_settings = FooterSettings.for_request(request)
+    return footer_settings.social_for_page(context.get("page"))
 
 
 @register.simple_tag(takes_context=True)
@@ -470,7 +486,7 @@ def organization_structured_data(context):
     """
     Render a <script type="application/ld+json"> Organization entry for
     search engines (Google Knowledge Panel, sitelinks, etc.), built entirely
-    from existing Branding & SEO / Social settings data — no dedicated
+    from existing Branding & SEO / Footer settings data — no dedicated
     structured-data fields to keep in sync.
 
     Usage in templates:
@@ -488,7 +504,7 @@ def organization_structured_data(context):
         return ""
 
     branding = BrandingSEOSettings.for_request(request)
-    social = SocialSettings.for_request(request)
+    footer = FooterSettings.for_request(request)
 
     data = {
         "@context": "https://schema.org",
@@ -502,7 +518,7 @@ def organization_structured_data(context):
         rendition = branding.logo.get_rendition("max-600x600")
         data["logo"] = request.build_absolute_uri(rendition.url)
 
-    same_as = [item.value["url"] for item in social.social_links if item.value["url"]]
+    same_as = [item.value["url"] for item in footer.social_links if item.value["url"]]
     if same_as:
         data["sameAs"] = same_as
 

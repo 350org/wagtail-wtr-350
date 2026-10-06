@@ -29,8 +29,9 @@
     <meta property="og:description" content="{{ og_desc }}" />
     <meta name="twitter:title" content="{{ og_title }}" />
     <meta name="twitter:description" content="{{ og_desc }}" />
-    {% if settings.wtrx.SocialSettings.twitter_handle %}
-        <meta name="twitter:site" content="{{ settings.wtrx.SocialSettings.twitter_handle }}" />
+    {% resolved_social as social %}
+    {% if social.twitter_handle %}
+        <meta name="twitter:site" content="{{ social.twitter_handle }}" />
     {% endif %}
     {% if meta_img %}
         {% comment %}

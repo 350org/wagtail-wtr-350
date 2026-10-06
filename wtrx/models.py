@@ -45,7 +45,6 @@ from .site_settings import (  # noqa: F401 — register with Django ORM
     FooterSettings,
     IntegrationSettings,
     NavigationSettings,
-    SocialSettings,
 )
 
 logger = logging.getLogger(__name__)

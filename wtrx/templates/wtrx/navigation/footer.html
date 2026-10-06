@@ -1,7 +1,8 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
 {% resolved_footer as footer %}
 {% resolved_footer_newsletter_signup as newsletter %}
-{% with social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings regional_sites=settings.wtrx.FooterSettings.regional_sites %}
+{% resolved_social as social %}
+{% with branding=settings.wtrx.BrandingSEOSettings regional_sites=settings.wtrx.FooterSettings.regional_sites %}
 
 {% if footer.layout == "minimal" %}
 
@@ -225,7 +226,7 @@
             then disclaimer/copyright (left) + inline links (minimal_links,
             e.g. "Privacy Policy | Terms of Service", right) sharing one
             row. order-3 on mobile (last, below the newsletter box).
-            Social icons only rendered when SocialSettings.show_in_footer is
+            Social icons only rendered when FooterSettings.show_social_in_footer is
             True. minimal_links renders here regardless of `footer.layout`
             — it isn't gated to the minimal layout, since the columns layout
             wants the same links in its own bottom bar.

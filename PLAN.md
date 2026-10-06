@@ -39,7 +39,7 @@ wagtail-wtr/
 │   │                                   #   IndexPage, FormField, FormPage
 │   ├── views.py                        # search() view
 │   ├── site_settings.py                # BrandingSEOSettings, NavigationSettings,
-│   │                                   #   FooterSettings, SocialSettings, IntegrationSettings
+│   │                                   #   FooterSettings, IntegrationSettings
 │   ├── images.py                       # CustomImage, Rendition
 │   ├── templatetags/
 │   │   ├── __init__.py
@@ -533,13 +533,17 @@ class BasePage(Page):
 **Columns layout**: multi-column navigation grid, logo at top, social links + copyright in bottom bar.
 **Minimal layout**: single row — `[logo + copyright] [social icons] [inline links]`, stacking on mobile.
 
-### Settings > Social (`SocialSettings`)
+### Social links (on Settings > Footer, `FooterSettings`)
 
 | Field | Type | Required |
 |---|---|---|
 | social_links | StreamField of SocialLinkBlock (platform: ChoiceBlock, url: URLBlock) | No |
-| show_in_header | BooleanField | No, default False — show social icons in header menu panel |
-| show_in_footer | BooleanField | No, default True — show social icons in footer |
+| show_social_in_header | BooleanField | No, default False — show social icons in header menu panel |
+| show_social_in_footer | BooleanField | No, default True — show social icons in footer |
+
+Each footer override (`FooterOverrideBlock.social_links`) can replace the
+links for a country site; an override with none uses the site default.
+Resolved per page by `{% resolved_social %}`.
 
 `SocialLinkBlock` is an explicitly named `StructBlock` subclass. Use a `StreamField`,
 not a `ListBlock`, so each item is independently typed and editable in the admin.
@@ -656,7 +660,7 @@ base.html
 
   base_page.html (extends base.html)
     -- Includes navigation/header.html (reads NavigationSettings)
-    -- Includes navigation/footer.html (reads FooterSettings, SocialSettings)
+    -- Includes navigation/footer.html (reads FooterSettings, incl. its social links)
     -- Blocks: hero, above_content, content, below_content
 
     pages/home_page.html (extends base_page.html)
@@ -684,14 +688,14 @@ base.html
 - Logo left (from BrandingSEOSettings.logo)
 - Nav links right (from NavigationSettings.primary_navigation — InternalLink, ExternalLink, AnchorLink)
 - CTA button right (from NavigationSettings.cta_text/cta_page/cta_url/cta_anchor)
-- Social icons in menu panel (from SocialSettings when show_in_header=True)
+- Social icons in menu panel (from FooterSettings when show_social_in_header=True)
 - Collapsed desktop menu option (NavigationSettings.collapse_desktop_menu) — hides desktop nav, shows hamburger at all breakpoints
 - Mobile: logo left, hamburger right. Hamburger opens nav panel (same JS, breakpoint-agnostic).
 
 ### Footer (`navigation/footer.html`)
 - **Columns layout** (default): logo at top, multi-column navigation grid (FooterSettings.footer_navigation), social links + copyright in bottom bar
 - **Minimal layout**: single row — `[logo + copyright] [social icons] [inline links]`
-- Social icons guarded by SocialSettings.show_in_footer (default True)
+- Social icons guarded by FooterSettings.show_social_in_footer (default True)
 - Copyright line (from FooterSettings.copyright_text, fallback: "(c) {year} {site name}")
 
 ### Hero (`components/hero.html`)
@@ -1002,8 +1006,8 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
 - [x] `video_block.html` -- fixed YouTube iframe size: added Tailwind arbitrary
   variant `[&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full`
   to wrapper so the oEmbed-generated iframe fills the `aspect-video` container
-- [x] Social icon display toggles: `SocialSettings.show_in_header` (default False),
-  `SocialSettings.show_in_footer` (default True) — social icons rendered in header
+- [x] Social icon display toggles: `FooterSettings.show_social_in_header` (default False),
+  `FooterSettings.show_social_in_footer` (default True) — social icons rendered in header
   menu panel and/or footer based on these flags
 - [x] Footer layout modes: `FooterSettings.layout` choice (columns/minimal) +
   `FooterSettings.minimal_links` StreamField — minimal layout is a single-row bar
