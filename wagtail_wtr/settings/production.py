@@ -99,6 +99,13 @@ SECURE_REDIRECT_EXEMPT = [r"^_health/$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+# Files WhiteNoise serves from the site root rather than under /static/:
+# public_root/350_org.svg is https://<domain>/350_org.svg. For files whose URL
+# is fixed by a third party (BIMI's logo and certificate). Anything put in
+# that directory is public.
+WHITENOISE_ROOT = os.path.join(BASE_DIR, "public_root")  # noqa: F405
+WHITENOISE_MIMETYPES = {".pem": "application/x-pem-file"}
+
 # ---------------------------------------------------------------------------
 # AWS S3 storage for MEDIA ONLY (optional — omit AWS_STORAGE_BUCKET_NAME to disable)
 # When configured, user-uploaded media (images, documents) is stored in S3 under

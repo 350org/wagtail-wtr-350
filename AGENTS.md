@@ -36,6 +36,7 @@ wagtail-wtr/
 │   └── wsgi.py
 ├── templates/              # Fork override templates (empty in upstream; forks shadow wtrx/ templates here)
 ├── static_src/             # Frontend source (Tailwind, JS, fonts)
+├── public_root/            # Files served from the site root in production (WHITENOISE_ROOT), e.g. BIMI's /350_org.svg
 ├── static_compiled/        # Tailwind CLI output (gitignored; built at deploy time)
 ├── fixtures/
 ├── manage.py / pyproject.toml / Makefile / Dockerfile
