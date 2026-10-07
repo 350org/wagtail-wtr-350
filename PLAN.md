@@ -1176,6 +1176,8 @@ is configured.
     `AppRegistryNotReady` errors
 - [x] `wtrx/apps.py` — `WtrxConfig.ready()` calls `connect_signals()` from
   `wtrx.signals`
+- [x] `wtrx/edge_cache.py` — `EdgeCacheMiddleware` marks anonymous page views cacheable by the CDN
+  (`s-maxage` from `WTRX_EDGE_CACHE_SECONDS`); `/actionkit-signup/` is CSRF-exempt so pages set no cookie
 - [x] `wtrx/tests/test_cache.py` — 21 tests:
   - `purge_all()` no-ops silently when not configured
   - Cloudflare API called with correct payload + auth when configured

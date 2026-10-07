@@ -921,6 +921,28 @@ CLOUDFLARE_ZONE_ID=your-zone-id
    - Zone → Cache Purge → Purge
    - Zone Resources → Include → your specific zone (or all zones)
 
+### Cloudflare page caching (optional)
+
+Cloudflare caches no HTML on its own. The app marks every anonymous page view
+as cacheable (`Cache-Control: public, max-age=0, s-maxage=600`, from
+`wtrx/edge_cache.py`), and one Cache Rule tells Cloudflare to honour that:
+
+- **When:** hostname equals your domain, **and** the Cookie header does not
+  contain `sessionid`, **and** the path does not start with `/admin/`,
+  `/django-admin/`, `/accounts/`, `/documents/` or `/actionkit-signup/`.
+- **Then:** *Eligible for cache*; **Edge TTL** = "Use cache-control header if
+  present, bypass cache if not"; **Browser TTL** = "Respect origin TTL".
+
+With that Edge TTL setting the app decides what is cached: a response without
+the header (a logged-in editor, a page with a Django form, the admin) is never
+stored. Browser TTL must respect the origin, or Cloudflare replaces
+`max-age=0` with the zone default and visitors keep stale pages after a purge.
+
+`WTRX_EDGE_CACHE_SECONDS` sets the lifetime (default `600`; `0` turns the
+header off). Publishing a page purges it and its parent listing, so the
+lifetime only bounds how stale *other* pages showing its content can get. Set
+the two purge variables above as well, or an edit waits out the full lifetime.
+
 ---
 
 ## License
