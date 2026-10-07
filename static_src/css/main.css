@@ -1399,6 +1399,20 @@ body:not(:has(.wtr-page-hero)) main:has(> .wtr-body-stack > *:first-child:is([da
 }
 
 /* ============================================================
+ * Large buttons wrap — .wtr-btn-lg
+ * ============================================================
+ * At wtr-btn-lg's 24px text a label of a few words is wider than a phone
+ * column, and wtr-btn's nowrap pushed it out of its panel. Unlayered for
+ * the same reason as the vertical-stack rule above. Regular-size buttons
+ * keep nowrap.
+ * ============================================================ */
+.wtr-btn-lg {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+}
+
+/* ============================================================
  * Outline buttons on a dark section
  * ============================================================
  * wtr-btn-outline is dark text on a transparent fill, which is unreadable
