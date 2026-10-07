@@ -71,13 +71,14 @@ class TestSetupSiteCommand(TestCase):
 
         site = Site.objects.get(is_default_site=True)
         integration = IntegrationSettings.objects.get(site=site)
-        self.assertEqual(integration.donation_platform, "actblue")
+        actblue_config = integration.get_integration_config("actblue")
+        self.assertIsNotNone(actblue_config)
         self.assertEqual(
-            integration.donation_base_url,
+            actblue_config["base_url"],
             "https://secure.actblue.com/donate/myorg",
         )
-        self.assertEqual(integration.donation_suggested_amounts, "10,25,50,100")
-        self.assertEqual(integration.signup_platform, "action_network")
+        self.assertEqual(actblue_config["suggested_amounts"], "10,25,50,100")
+        self.assertTrue(integration.is_integration_enabled("action_network"))
 
     def test_reuses_existing_homepage(self):
         """If a HomePage already exists, the command reuses it."""
@@ -124,5 +125,4 @@ class TestSetupSiteCommand(TestCase):
         self.assertEqual(site.site_name, "My Site")
 
         integration = IntegrationSettings.objects.get(site=site)
-        self.assertEqual(integration.donation_platform, "none")
-        self.assertEqual(integration.signup_platform, "wagtail_forms")
+        self.assertEqual(list(integration.integrations), [])

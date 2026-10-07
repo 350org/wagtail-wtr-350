@@ -1,0 +1,119 @@
+{% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
+{% comment %}
+Filled, rounded panel: image in one column, a text stack (optional eyebrow
+pill, H2, optional richtext body, optional CTA button with trailing arrow)
+in the other. Columns are vertically centered against each other, same as
+image_text_block.html — contrast that block, which has no panel fill at
+all. Single column on mobile, image first in DOM order regardless of
+alignment.
+
+Per Figma's Take Action page (node 1:1021), this renders both the
+"Featured Campaign" panel above the card grid (light, with pill) and the
+"Looking for more?" panel below it (dark, no pill). One component, two
+configurations — see FeaturePanelBlock's docstring.
+
+Full-bleed-ish width: special-cased in content_page.html/home_page.html/
+post_page.html (alongside section/callout/image_text/etc.) to skip the
+shared max-w-5xl wrapper, same w-full-outer / max-w-inner two-tier pattern
+as callout_block.html — see that file's comment for why a bare
+`50% - 50vw` bleed isn't used instead. Capped at max-w-7xl (1280px), the
+width of Figma's light panel and the same cap image_text_block.html and
+image_card_list_block.html already use. Figma's dark panel is drawn wider
+(1448px) but is otherwise the identical component, so it is brought back
+to the shared cap rather than given a second width.
+
+No vertical padding on the w-full-outer wrapper — the 128px gap between
+body blocks comes from the page templates' space-y-32 on the block loop.
+This div's px-4/6/8 is horizontal gutters only; the panel's own p-6/10/16
+is its internal breathing room (64px at lg, per Figma).
+
+Heading size: lg:text-36 (36px) for both backgrounds — one step above
+image_text_block.html's section heading, mirroring the gap Figma draws
+between them (48px vs 64px there). Figma sizes the light panel's heading
+smaller than the dark one, but sizing type off the background choice would
+conflate two unrelated concerns — background controls color inversion
+only. See the type scale note in AGENTS.md. Heading and body text used to
+be two fields; now they're one richtext field (`content`, heading typed
+as an H2), with its size pinned via .wtr-feature-panel-content in main.css
+— see FeaturePanelBlock's docstring for the field history.
+
+Background comes from the shared palette (main.css's .wtr-bg-{color}),
+the same six fills the section, callout, hero banner and signup panel
+offer — this block used to have a two-entry Light/Dark list of its own.
+A dark fill inverts three things together: the pill (dark-on-light becomes
+light-on-dark), the prose color, and the button style (filled primary
+becomes outline-light). That is one `background_is_light` question held in
+`on_light` and read in four places, rather than a wrapper class, because
+there is no one element here whose class alone can flip all of them.
+
+The panel's border is tied to the fill rather than the tone: the neutral-50
+card only reads as a card against the white page because of its
+neutral-200 outline, whereas a filled panel (light grey included) is its
+own shape and needs none.
+{% endcomment %}
+<div class="mx-auto max-w-[1500px] px-4">
+    {% with bg=value.background|background_key on_light=value.background|background_is_light %}
+    <div class="wtr-feature-panel w-full overflow-hidden rounded-lg p-6 sm:p-10 lg:p-16
+                {% if bg == 'white' %}border-2 border-neutral-200 bg-neutral-50{% else %}wtr-bg-{{ bg }}{% endif %}">
+        <div class="grid grid-cols-1 items-center gap-8 md:grid-cols-2 lg:gap-16">
+            {% image value.image fill-900x675 as img %}
+            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ img.alt }}"
+                 class="aspect-[4/3] w-full rounded-lg object-cover {% if value.alignment == 'image-right' %}md:order-2{% endif %}"
+                 loading="lazy">
+            <div class="{% if on_light %}text-dark{% else %}text-light{% endif %}">
+                {% if value.eyebrow %}
+                    <p class="font-heading mb-4 inline-block rounded-full border px-6 py-3 text-lg font-bold tracking-[0.3px]
+                              {% if on_light %}border-light/20 bg-dark text-light{% else %}border-dark/20 bg-light text-dark{% endif %}">
+                        {{ value.eyebrow }}
+                    </p>
+                {% endif %}
+                {% comment %}
+                prose-invert's body color is pinned to pure white centrally,
+                in main.css — see the .prose-invert rule there. The h2
+                (heading typed at the top of `content`) gets its font-size/
+                tracking pinned via .wtr-feature-panel-content in main.css,
+                same technique .wtr-text-block uses.
+                {% endcomment %}
+                <div class="wtr-feature-panel-content prose max-w-none text-lg sm:text-xl
+                            {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
+                    {{ value.content|richtext }}
+                </div>
+                {% if value.link_text and value.link_page or value.link_text and value.link_url or value.link_text and value.anchor %}
+                    {% comment %}
+                    max-w-full + whitespace-normal on the button: wtr-btn is
+                    nowrap by default, and a long label ("Join the Great Power
+                    Shift") at wtr-btn-lg's 24px text / 36px padding is wider
+                    than the panel's content box on a phone — it would run past
+                    the edge and be clipped by the panel's overflow-hidden.
+                    Wrapping is what keeps one button size across breakpoints.
+                    {% endcomment %}
+                    <div class="mt-8">
+                        {% comment %}
+                        Three link targets, resolved in the same order
+                        components/button.html resolves them: page, then
+                        external URL, then a same-page anchor (see
+                        FeaturePanelBlock.anchor for why that third one is
+                        its own field). rel is only for the external case —
+                        an internal page link and a jump link both stay on
+                        the site. This button is not the shared
+                        components/button.html include, because its trailing
+                        arrow and wrapping behaviour are specific to the
+                        panel; the link resolution is deliberately kept
+                        identical to it all the same.
+                        {% endcomment %}
+                        <a href="{% if value.link_page %}{{ value.link_page.url }}{% elif value.link_url %}{{ value.link_url }}{% else %}#{{ value.anchor }}{% endif %}"
+                           {% if value.link_url and not value.link_page %}rel="noopener noreferrer"{% endif %}
+                           class="wtr-btn wtr-btn-lg inline-flex max-w-full items-center gap-2 whitespace-normal
+                                  {% if on_light %}hover:bg-primary-500{% else %}wtr-btn-outline-light hover:bg-white/10{% endif %}">
+                            {{ value.link_text }}
+                            <svg class="h-7 w-7" width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                                <path d="M8 20H32M32 20L22 10M32 20L22 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+</div>

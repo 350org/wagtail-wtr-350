@@ -1,9 +1,16 @@
 {% load i18n %}
+{% comment %}
+{% querystring page=... %} (Django 5.1+) preserves any other GET params already
+on the URL (e.g. blog_index_page.html's ?category=<slug>) instead of dropping
+them the way a bare `?page=N` href would — needed since this component is
+shared by every listing page, filtered or not, and shouldn't need to know
+which filter params any particular one uses.
+{% endcomment %}
 {% if page_obj.has_other_pages %}
 <nav class="mt-10 flex items-center justify-center gap-1" aria-label="{% trans 'Pagination' %}">
 
     {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}"
+        <a href="{% querystring page=page_obj.previous_page_number %}"
            class="inline-flex items-center rounded-md border border-neutral-300 bg-light px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
             &larr; {% trans "Previous" %}
         </a>
@@ -20,7 +27,7 @@
                 {{ num }}
             </span>
         {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-            <a href="?page={{ num }}"
+            <a href="{% querystring page=num %}"
                class="inline-flex items-center rounded-md border border-neutral-300 bg-light px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
                 {{ num }}
             </a>
@@ -28,7 +35,7 @@
     {% endfor %}
 
     {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}"
+        <a href="{% querystring page=page_obj.next_page_number %}"
            class="inline-flex items-center rounded-md border border-neutral-300 bg-light px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
             {% trans "Next" %} &rarr;
         </a>

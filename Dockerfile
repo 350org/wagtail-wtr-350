@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     libpq-dev \
     gcc \
+    gettext \
     && rm -rf /var/lib/apt/lists/* && \
     adduser --system --no-create-home --group app --home /tmp
 
@@ -44,6 +45,16 @@ COPY --chown=app:app --from=frontend /app/static_compiled/ ./static_compiled/
 
 # Ensure the entrypoint is executable (git does not reliably preserve +x bits).
 RUN chmod +x bin/start.sh
+
+# Compile the UI-translation catalogues. .po files are committed, .mo files are
+# build output (gitignored), so without this every {% trans %} string falls back
+# to English at runtime with no error to notice. Needs the gettext binary
+# installed above. Reads no database, so it is safe at build time.
+# Settings are pinned to base here so the build never depends on runtime
+# secrets: base.py carries a placeholder SECRET_KEY and a SQLite default, while
+# production.py raises on a missing SECRET_KEY/WAGTAILADMIN_BASE_URL at import.
+RUN DJANGO_SETTINGS_MODULE=wagtail_wtr.settings.base python manage.py compilemessages \
+        --ignore=.venv --ignore=node_modules
 
 # STATIC_ROOT is /app/static (see wagtail_wtr/settings/base.py). collectstatic in
 # bin/start.sh runs as user app — directory must exist and be writable.

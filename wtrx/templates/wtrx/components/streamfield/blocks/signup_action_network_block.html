@@ -1,22 +1,66 @@
 {% load i18n wagtailcore_tags %}
 <div class="wtr-signup wtr-signup-action-network rounded-lg bg-neutral-50 px-6 py-10"{% if value.anchor_id %} id="{{ value.anchor_id }}"{% endif %}>
     <div class="mx-auto max-w-2xl">
-        {% if value.heading %}<h2 class="font-heading text-2xl font-bold text-dark md:text-3xl">{{ value.heading }}</h2>{% endif %}
-        {% if value.description %}
-            <div class="prose prose-neutral mt-4 max-w-none">
-                {{ value.description|richtext }}
+        {% comment %}
+        This panel is always bg-neutral-50, so no dark-section inversion is
+        needed. Heading size is pinned via .wtr-signup-panel-content in
+        main.css (shared with signup_wagtail_forms_block.html, which
+        renders this identically), same technique .wtr-text-block uses.
+        {% endcomment %}
+        {% if value.content %}
+            <div class="wtr-signup-panel-content prose prose-neutral max-w-none text-lg sm:text-xl">
+                {{ value.content|richtext }}
             </div>
         {% endif %}
         {% if action_type and slug %}
             <div class="wtr-action-network-embed mt-8">
-                <link rel="stylesheet" href="https://actionnetwork.org/css/style-embed-v3.css">
-                <script src="https://actionnetwork.org/widgets/v6/{{ action_type }}/{{ slug }}?format=js&source=widget"></script>
-                <div id="can-{{ action_type }}-area-{{ slug }}" style="width: 100%">
-                    {# Action Network widget renders here #}
-                </div>
+                {% if is_block_preview %}
+                    {% comment %}
+                    The block picker preview must not load Action Network's
+                    stylesheet or widget script -- previews open constantly
+                    while editing, and neither the traffic nor the dependency
+                    on an external host belongs there. Action Network draws the
+                    real form entirely client-side, so unlike the ActionKit
+                    block there is no markup to capture up front; these
+                    stand-in fields show the form's shape instead. Exact
+                    fields come from the form's own Action Network settings.
+                    {% endcomment %}
+                    <form class="an-form" role="presentation" onsubmit="return false">
+                        <label class="mt-4 block text-sm font-semibold text-dark">{% trans "Email" %}
+                            <input type="email" value="you@example.org" readonly
+                                   class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                        </label>
+                        <div class="mt-4 grid grid-cols-2 gap-4">
+                            <label class="block text-sm font-semibold text-dark">{% trans "First name" %}
+                                <input type="text" value="Jane" readonly
+                                       class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                            </label>
+                            <label class="block text-sm font-semibold text-dark">{% trans "Last name" %}
+                                <input type="text" value="Doe" readonly
+                                       class="mt-1 w-full rounded-lg border border-neutral-300 px-4 py-3">
+                            </label>
+                        </div>
+                        <span class="wtr-btn mt-6 inline-block">{% trans "Sign Up" %}</span>
+                    </form>
+                {% else %}
+                    <link rel="stylesheet" href="https://actionnetwork.org/css/style-embed-v3.css">
+                    <script src="https://actionnetwork.org/widgets/v6/{{ action_type }}/{{ slug }}?format=js&source=widget"></script>
+                    <div id="can-{{ action_type }}-area-{{ slug }}" style="width: 100%">
+                        {# Action Network widget renders here #}
+                    </div>
+                {% endif %}
                 {% if success_message %}
+                    {% comment %}
+                    data-bg-tone="dark": same fix as _actionkit_form.html's
+                    thank-you box — success_message's "text" field renders
+                    through text_block.html, whose prose-neutral defaults to
+                    grey and only inverts to white when an ancestor carries
+                    this attribute. Without it the message was grey text on
+                    this box's own bg-dark fill, regardless of the page
+                    around it.
+                    {% endcomment %}
                     <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50"
-                         data-thank-you>
+                         data-thank-you data-bg-tone="dark">
                         {% include_block success_message %}
                     </div>
                 {% endif %}
@@ -37,7 +81,7 @@
         {% endif %}
     </div>
 </div>
-{% if action_type and slug and success_message %}
+{% if action_type and slug and success_message and not is_block_preview %}
 <script type="module">
     (function() {
         var target = document.getElementById('can-{{ action_type }}-area-{{ slug }}');

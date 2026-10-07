@@ -1,0 +1,88 @@
+/*
+ * 350.org admin theme colours.
+ *
+ * Overrides Wagtail's documented CSS custom properties for admin theming
+ * (https://docs.wagtail.org/en/stable/advanced_topics/customization/admin_templates.html#custom-colours).
+ * Setting the hue/saturation/lightness components (not the derived flat
+ * colours) lets every shade Wagtail computes from them -- e.g.
+ * --w-color-primary-200, sidebar surface colours, focus rings -- follow
+ * along correctly.
+ *
+ * Primary: 350 blue (--color-primary-600 in static_src/css/theme.css, #0f81e8).
+ * Secondary: 350 navy (--color-navy in static_src/css/theme.css, #024582).
+ */
+:root {
+    --w-color-primary-hue: 208.5;
+    --w-color-primary-saturation: 87.9%;
+    --w-color-primary-lightness: 48.4%;
+
+    --w-color-secondary-hue: 208.6;
+    --w-color-secondary-saturation: 97%;
+    --w-color-secondary-lightness: 25.9%;
+
+    /*
+     * --w-color-text-label (form field labels, panel headings, the login
+     * heading -- anywhere Wagtail's own CSS uses this token) defaults to
+     * var(--w-color-primary) in Wagtail's light theme. Point it at navy
+     * instead, per Wagtail's own documented semantic-variable override
+     * pattern. Dark theme redefines this token to var(--w-color-grey-150)
+     * for contrast against its dark surfaces -- restored below so this
+     * only affects the light theme, not the label colour in dark mode.
+     */
+    --w-color-text-label: var(--w-color-secondary);
+
+    /*
+     * --w-color-icon-primary drives most icons across the admin (field
+     * icons, panel toggles, dialog icons, tab underlines, etc.) and
+     * defaults to var(--w-color-primary) in light theme, same pattern as
+     * --w-color-text-label above -- restored for dark theme below too.
+     */
+    --w-color-icon-primary: var(--w-color-secondary);
+}
+
+.w-theme-dark {
+    --w-color-text-label: var(--w-color-grey-150);
+    --w-color-icon-primary: var(--w-color-grey-150);
+}
+
+@media (prefers-color-scheme: dark) {
+    .w-theme-system {
+        --w-color-text-label: var(--w-color-grey-150);
+        --w-color-icon-primary: var(--w-color-grey-150);
+    }
+}
+
+/*
+ * Sidebar logo sizing.
+ *
+ * A custom branding_logo override is rendered by Wagtail's sidebar JS inside
+ * <a class="sidebar-custom-branding">, which -- unlike the default bird icon
+ * -- applies no width constraint of its own, so an unstyled <img> renders at
+ * its native size in the collapsed ("slim") sidebar too and overflows it.
+ * Mirrors Wagtail's own .sidebar-wagtail-branding / .sidebar--slim sizing
+ * pattern for the default logo.
+ */
+.sidebar-custom-branding img {
+    width: 80px;
+    height: auto;
+}
+
+.sidebar--slim .sidebar-custom-branding img {
+    width: 32px;
+}
+
+/*
+ * Sidebar item text-shadow removal.
+ *
+ * Wagtail's own core.css applies text-shadow:-1px -1px 0 var(--w-color-black-35)
+ * on hover/focus, the active item, and an open submenu toggle -- present in
+ * stock Wagtail regardless of theme colour, just barely visible against the
+ * default indigo sidebar. It's much more noticeable against our brighter,
+ * more saturated blue, so switch it off here.
+ */
+.sidebar-menu-item__link:focus,
+.sidebar-menu-item__link:hover,
+.sidebar-menu-item--active,
+.sidebar-sub-menu-item--open > a {
+    text-shadow: none;
+}

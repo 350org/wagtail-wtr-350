@@ -1,110 +1,75 @@
 """
-Tests for wagtail_hooks.py — block visibility hooks.
+Tests for wagtail_hooks.py.
+
+Block-type visibility is no longer a hook in this file — see
+wtrx/tests/test_blocks.py's TestIntegrationGatedStreamBlockVisibility for
+that behavior, which now lives in IntegrationGatedStreamBlockMixin
+(wtrx/blocks/__init__.py). The registry-metadata tests below still belong
+here since they're about the IntegrationType contract, not the hook file.
 """
 
-from django.test import RequestFactory, TestCase
-from wagtail.models import Site
+from django.test import TestCase
 
-from wtrx.site_settings import IntegrationSettings
-from wtrx.wagtail_hooks import (
-    BLOCK_PLATFORM_REQUIREMENTS,
-    _block_visibility_js,
-)
+from wtrx.integrations.registry import get_integration
 
 
-class TestBlockPlatformRequirements(TestCase):
-    """Verify the BLOCK_PLATFORM_REQUIREMENTS mapping."""
+class TestIntegrationRegistryMetadata(TestCase):
+    """
+    Verify the block-visibility metadata each integration declares.
 
-    def test_donate_requires_donation_platform(self):
-        self.assertIn("donate", BLOCK_PLATFORM_REQUIREMENTS)
-        category, value = BLOCK_PLATFORM_REQUIREMENTS["donate"]
-        self.assertEqual(category, "donation")
-        self.assertIsNone(value)
+    wagtail_hooks.py has no hardcoded per-integration mapping anymore — it
+    reads this metadata straight off the registry, so these tests guard the
+    contract each integration module must uphold.
+    """
 
-    def test_signup_wagtail_forms_requires_matching_platform(self):
-        self.assertIn("signup_wagtail_forms", BLOCK_PLATFORM_REQUIREMENTS)
-        category, value = BLOCK_PLATFORM_REQUIREMENTS["signup_wagtail_forms"]
-        self.assertEqual(category, "signup")
-        self.assertEqual(value, "wagtail_forms")
+    def test_actionkit_gates_signup_actionkit_block(self):
+        integration_type = get_integration("actionkit")
+        self.assertEqual(integration_type.category, "signup")
+        self.assertEqual(integration_type.content_block_names, ("signup_actionkit",))
 
-    def test_signup_action_network_requires_matching_platform(self):
-        self.assertIn("signup_action_network", BLOCK_PLATFORM_REQUIREMENTS)
-        category, value = BLOCK_PLATFORM_REQUIREMENTS["signup_action_network"]
-        self.assertEqual(category, "signup")
-        self.assertEqual(value, "action_network")
+    def test_fundraiseup_gates_donate_fundraiseup_block(self):
+        integration_type = get_integration("fundraiseup")
+        self.assertEqual(integration_type.category, "donation")
+        self.assertEqual(integration_type.content_block_names, ("donate_fundraiseup",))
 
-    def test_signup_link_not_in_requirements(self):
-        """signup_link is platform-agnostic and should not be in the mapping."""
-        self.assertNotIn("signup_link", BLOCK_PLATFORM_REQUIREMENTS)
+    def test_actblue_gates_donate_block(self):
+        integration_type = get_integration("actblue")
+        self.assertEqual(integration_type.category, "donation")
+        self.assertEqual(integration_type.content_block_names, ("donate",))
 
-
-class TestBlockVisibilityJS(TestCase):
-    """Test the _block_visibility_js view function."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.site = Site.objects.get(is_default_site=True)
-        cls.integration, _ = IntegrationSettings.objects.get_or_create(
-            site=cls.site,
+    def test_action_network_gates_signup_action_network_block(self):
+        integration_type = get_integration("action_network")
+        self.assertEqual(integration_type.category, "signup")
+        self.assertEqual(
+            integration_type.content_block_names, ("signup_action_network",)
         )
 
-    def _make_request(self):
-        request = RequestFactory().get("/admin/wtrx/block-visibility.js")
-        request.META["HTTP_HOST"] = self.site.hostname
-        request.META["SERVER_PORT"] = str(self.site.port)
-        return request
+    def test_wagtail_forms_gates_signup_wagtail_forms_block(self):
+        """
+        Wagtail Forms is a built-in feature, not a third-party integration —
+        it's registered with default_enabled=True so its block stays visible
+        out of the box, hideable only by an explicit disabled entry (or by
+        enabling a real signup integration — see
+        IntegrationSettings.is_integration_enabled()'s category-yielding
+        rule).
+        """
+        integration_type = get_integration("wagtail_forms")
+        self.assertEqual(integration_type.category, "signup")
+        self.assertEqual(
+            integration_type.content_block_names, ("signup_wagtail_forms",)
+        )
+        self.assertTrue(integration_type.default_enabled)
 
-    def test_returns_javascript_content_type(self):
-        response = _block_visibility_js(self._make_request())
-        self.assertEqual(response["Content-Type"], "application/javascript")
-
-    def test_no_donation_hides_donate_block(self):
-        """When donation_platform is 'none', the donate block should be hidden."""
-        self.integration.donation_platform = "none"
-        self.integration.signup_platform = "wagtail_forms"
-        self.integration.save()
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        self.assertIn("donate", content)
-        self.assertIn("display: none", content)
-
-    def test_actblue_does_not_hide_donate_block(self):
-        """When donation_platform is 'actblue', the donate block should NOT be hidden."""
-        self.integration.donation_platform = "actblue"
-        self.integration.signup_platform = "wagtail_forms"
-        self.integration.save()
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        # donate should not appear in CSS selectors
-        self.assertNotIn('[data-contentpath="donate"]', content)
-
-    def test_wagtail_forms_hides_action_network(self):
-        """When signup_platform is 'wagtail_forms', action_network block should be hidden."""
-        self.integration.donation_platform = "actblue"
-        self.integration.signup_platform = "wagtail_forms"
-        self.integration.save()
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        self.assertIn("signup_action_network", content)
-        self.assertNotIn("signup_wagtail_forms", content)
-
-    def test_action_network_hides_wagtail_forms(self):
-        """When signup_platform is 'action_network', wagtail_forms block should be hidden."""
-        self.integration.donation_platform = "actblue"
-        self.integration.signup_platform = "action_network"
-        self.integration.save()
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        self.assertIn("signup_wagtail_forms", content)
-        self.assertNotIn("signup_action_network", content)
-
-    def test_active_platforms_not_hidden(self):
-        """Active platform blocks should not be hidden in the CSS."""
-        self.integration.donation_platform = "actblue"
-        self.integration.signup_platform = "wagtail_forms"
-        self.integration.save()
-        response = _block_visibility_js(self._make_request())
-        content = response.content.decode()
-        # donate and wagtail_forms are active — should not be hidden
-        self.assertNotIn('[data-contentpath="donate"]', content)
-        self.assertNotIn('[data-contentpath="signup_wagtail_forms"]', content)
+    def test_only_built_in_pseudo_integrations_default_to_enabled(self):
+        """
+        Every genuine third-party integration must stay hidden until a site
+        explicitly configures and enables it — default_enabled=True should
+        never spread to one of them by accident. Only a built-in,
+        zero-configuration option (currently just Wagtail Forms) may set it.
+        """
+        for slug in ("actionkit", "fundraiseup", "actblue", "action_network"):
+            integration_type = get_integration(slug)
+            self.assertFalse(
+                integration_type.default_enabled,
+                f"{slug} should not default to enabled",
+            )

@@ -1,35 +1,67 @@
 {% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
-{% with nav=settings.wtrx.NavigationSettings social=settings.wtrx.SocialSettings branding=settings.wtrx.BrandingSEOSettings %}
+{% resolved_navigation as nav %}
 {% comment %}
-transparent_header is set in context by HomePage.get_context() when use_transparent_header is True.
-When transparent: header is position:absolute over the hero, bg is transparent, text switches to light,
-and the dark_logo variant is used if available.
+nav_active_link — the active-page indicator from Figma's nav (node 1:965):
+Klima Bold plus a text-decoration underline in brand blue, 4px below the
+baseline. Thickness is 0.3em — deliberately double Figma's 15%, which read too
+fine in the browser.
+
+The weight is half the indicator, not decoration. nav_link_weight is the resting
+state and nav_active_link the active one, and they are mutually exclusive — each
+link takes one or the other, never both, so there is no same-family utility
+collision to resolve by source order.
+
+Resting is font-medium (Klima Medium, 600). Plain Regular read too thin at
+text-base uppercase with 1px tracking; Medium holds the line without making the
+nav bold. Active steps to font-semibold (Klima Bold, 700) rather than Heavy —
+off a Medium baseline Bold is already unmistakable, and Heavy beside a 0.3em
+underline shouts twice. The submenu <button> carries font-medium directly, since
+its active state lives on the inner <span> around the label.
+
+font-semibold is Klima Bold (700) here, not 600 — theme.css remaps the token so
+the two bold utilities address the two bold faces. font-bold would be Heavy.
+
+Held in one variable so all three nav renderings (desktop bar, collapsed
+desktop dropdown, mobile panel) can't drift apart. Tailwind's scanner reads
+class names as plain text, so the literal here is enough for JIT.
 {% endcomment %}
-<header class="wtr-header {% if transparent_header %}absolute inset-x-0 top-0 z-30 bg-transparent border-b-0{% else %}relative bg-light border-b border-neutral-200{% endif %}">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
+{% resolved_social as social %}
+{% with branding=settings.wtrx.BrandingSEOSettings nav_link_weight="font-medium" nav_active_link="font-semibold underline decoration-primary-600 decoration-[0.3em] underline-offset-4" %}
+{% comment %}
+border-b-0 by default; the has-[...] variant below adds a light-gray
+border-bottom only while the mobile/collapsed-desktop toggle is expanded
+(aria-expanded="true" on [data-mobile-menu-toggle]), so the header only
+shows a divider under logo/CTA/hamburger while its menu is actually open.
+This is pure CSS (:has() reacting to the aria-expanded attribute
+mobile-menu.js already toggles) — no separate JS hook needed.
+{% endcomment %}
+<header class="wtr-header relative bg-light border-b-0 has-[[data-mobile-menu-toggle][aria-expanded=true]]:border-b has-[[data-mobile-menu-toggle][aria-expanded=true]]:border-neutral-200">
+    <div class="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex items-center justify-between" data-mobile-menu-header-row>
 
             {% comment %}
-            Logo — uses dark_logo when transparent header is active (dark hero bg),
-            falls back to primary logo, then site name text.
+            Logo lockup. The whole lockup is one link: to the override's root
+            page when there is one, otherwise the site root.
+
+            Falls back to the site name text when no logo is set.
+
+            "group" on the anchor drives the logo's own hover. A CSS filter is
+            the only recolour that works on every logo: an <img> is opaque to
+            colour properties whether it holds an SVG or a PNG.
+            brightness(0.55) takes 350's #0F81E9 to #084780 — 6/255 off
+            --color-navy, imperceptible — while a differently coloured logo
+            simply darkens proportionally instead of breaking.
             {% endcomment %}
-            <a href="/" class="flex items-center shrink-0">
-                {% if transparent_header and branding.dark_logo %}
-                    {% image branding.dark_logo max-160x60 as logo_img %}
-                    <img src="{{ logo_img.url }}"
-                         width="{{ logo_img.width }}"
-                         height="{{ logo_img.height }}"
-                         alt="{{ current_site.site_name }}"
-                         class="h-10 w-auto object-contain">
-                {% elif branding.logo %}
+            <a href="{% if nav.root_page %}{% pageurl nav.root_page|localized %}{% else %}/{% endif %}" class="group flex items-center gap-4 shrink-0">
+                {% if branding.logo %}
                     {% image branding.logo max-160x60 as logo_img %}
                     <img src="{{ logo_img.url }}"
                          width="{{ logo_img.width }}"
                          height="{{ logo_img.height }}"
-                         alt="{{ current_site.site_name }}"
-                         class="h-10 w-auto object-contain">
+                         alt="{{ logo_img.image.description|default:current_site.site_name }}"
+                         class="wtr-logo h-10 w-auto object-contain transition group-hover:brightness-[0.55]">
                 {% else %}
-                    <span class="font-heading font-bold text-xl {% if transparent_header %}text-light{% else %}text-dark{% endif %}">{{ current_site.site_name }}</span>
+                    <span class="font-heading font-bold text-xl text-dark">{{ current_site.site_name }}</span>
                 {% endif %}
             </a>
 
@@ -38,24 +70,77 @@ and the dark_logo variant is used if available.
             Each item is an InternalLinkBlock, ExternalLinkBlock, or AnchorLinkBlock.
             {% endcomment %}
             {% if not nav.collapse_desktop_menu %}
-                <nav class="hidden md:flex items-center space-x-6 ml-auto" aria-label="{% trans 'Primary navigation' %}">
+                <nav class="hidden md:flex items-center space-x-1 ml-auto" aria-label="{% trans 'Primary navigation' %}">
+                    {% comment %}
+                    Hover — text color only (primary-600, #0f81e8). No background
+                    pill, no shadow, no underline, no font-weight change — the
+                    underline + font-semibold combo (nav_active_link) is reserved
+                    for the active-page indicator, so hovering a non-active item
+                    never reads as "this is now the current page."
+                    {% endcomment %}
                     {% for item in nav.primary_navigation %}
-                        {% if item.block_type == "internal" %}
-                            <a href="{% pageurl item.value.page %}"
-                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                        {% nav_item_is_active item as is_active %}
+                        {% if item.block_type == "internal" and item.value.page %}
+                            <a href="{% pageurl item.value.page|localized %}"
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 text-dark {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "external" %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
-                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 text-dark {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
                         {% elif item.block_type == "anchor" %}
                             <a href="#{{ item.value.anchor }}"
-                               class="text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                               class="px-2 text-base uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 text-dark {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                 {{ item.value.text }}
                             </a>
+                        {% elif item.block_type == "submenu" %}
+                            {% comment %}
+                            Dropdown menu. Opens on hover (group-hover) and on keyboard focus
+                            (group-focus-within) so it is reachable without JavaScript.
+                            Single column only for now.
+                            {% endcomment %}
+                            <div class="relative group">
+                                <button type="button"
+                                        class="inline-flex items-center gap-1 px-2 py-2 text-base font-medium uppercase tracking-[1px] whitespace-nowrap cursor-pointer hover:text-primary-600 text-dark transition-colors"
+                                        aria-haspopup="true">
+                                    <span class="{% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">{{ item.value.text }}</span>
+                                    {% comment %}
+                                    Solid triangle, not an outline chevron — fill plus a
+                                    matching stroke with stroke-linejoin="round" is what
+                                    softens the triangle's corners; fill alone would give
+                                    sharp points.
+                                    {% endcomment %}
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M5 9L19 9L12 16Z" />
+                                    </svg>
+                                </button>
+                                <div class="hidden group-hover:block group-focus-within:block absolute left-0 top-full pt-2 z-40 min-w-48">
+                                    <div class="rounded-lg border-2 border-neutral-200 shadow-lg bg-light p-4 flex flex-col gap-1">
+                                        {% for child in item.value.links %}
+                                            {% if child.block_type == "internal" and child.value.page %}
+                                                <a href="{% pageurl child.value.page|localized %}"
+                                                   class="block rounded-lg p-3 text-base font-medium text-neutral-700 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                                                    {{ child.value.text }}
+                                                </a>
+                                            {% elif child.block_type == "external" %}
+                                                <a href="{{ child.value.url }}"
+                                                   rel="noopener noreferrer"
+                                                   class="block rounded-lg p-3 text-base font-medium text-neutral-700 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                                                    {{ child.value.text }}
+                                                </a>
+                                            {% elif child.block_type == "anchor" %}
+                                                <a href="#{{ child.value.anchor }}"
+                                                   class="block rounded-lg p-3 text-base font-medium text-neutral-700 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                                                    {{ child.value.text }}
+                                                </a>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
                         {% endif %}
                     {% endfor %}
                 </nav>
@@ -68,7 +153,7 @@ and the dark_logo variant is used if available.
             relative here is the containing block for the collapsed desktop dropdown (md:absolute md:right-0 md:top-full).
             Without it the dropdown would be positioned relative to the full-width <header> and overhang the right viewport edge.
             {% endcomment %}
-            <div class="relative flex items-center gap-4 {% if not nav.collapse_desktop_menu %}ml-6{% else %}ml-auto{% endif %}">
+            <div class="relative flex items-center gap-4 {% if not nav.collapse_desktop_menu %}ml-4{% else %}ml-auto{% endif %}">
 
                 {% comment %}
                 Social icons — always shown on desktop when show_in_header is enabled,
@@ -80,29 +165,34 @@ and the dark_logo variant is used if available.
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
                                aria-label="{{ item.value.platform|social_platform_label }}"
-                               class="{% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
+                               class="text-neutral-500 hover:text-dark transition-colors">
                                 {% social_icon item.value.platform %}
                             </a>
                         {% endfor %}
                     </div>
                 {% endif %}
 
-                {% comment %}CTA button — always shown at all breakpoints regardless of collapse_desktop_menu.{% endcomment %}
+                {% comment %}
+                CTA button — always shown at all breakpoints regardless of collapse_desktop_menu.
+                Bespoke red pill per Figma's nav spec (bg-callout-red, rounded 4px, px-4 py-3) —
+                deliberately not wtr-btn, whose blue fill and 8px radius belong to the general
+                button system, not this specific nav component.
+                {% endcomment %}
                 {% if nav.cta_text %}
                     {% if nav.cta_page %}
-                        <a href="{% pageurl nav.cta_page %}"
-                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                        <a href="{% pageurl nav.cta_page|localized %}"
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_url %}
                         <a href="{{ nav.cta_url }}"
                            rel="noopener noreferrer"
-                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_anchor %}
                         <a href="#{{ nav.cta_anchor }}"
-                           class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% endif %}
@@ -112,44 +202,37 @@ and the dark_logo variant is used if available.
                 Hamburger toggle.
                 When collapse_desktop_menu is False: shown on mobile only (md:hidden).
                 When collapse_desktop_menu is True: shown at all breakpoints.
-                Four fully-spelled-out branches (collapse × transparent) so Tailwind's JIT scanner
-                can detect every class statically — never construct class names dynamically.
+                Two fully-spelled-out branches so Tailwind's JIT scanner can detect every
+                class statically — never construct class names dynamically.
                 {% endcomment %}
                 {% if nav.collapse_desktop_menu %}
-                    {% if transparent_header %}
-                        <button type="button"
-                                class="p-2 text-neutral-200 hover:text-light"
-                                aria-label="{% trans 'Open menu' %}"
-                                aria-expanded="false"
-                                aria-controls="mobile-menu"
-                                data-mobile-menu-toggle>
-                    {% else %}
-                        <button type="button"
-                                class="p-2 text-neutral-600 hover:text-dark"
-                                aria-label="{% trans 'Open menu' %}"
-                                aria-expanded="false"
-                                aria-controls="mobile-menu"
-                                data-mobile-menu-toggle>
-                    {% endif %}
+                    <button type="button"
+                            class="p-2 cursor-pointer text-neutral-600 hover:text-dark"
+                            aria-label="{% trans 'Open menu' %}"
+                            aria-expanded="false"
+                            aria-controls="mobile-menu"
+                            data-mobile-menu-toggle>
                 {% else %}
-                    {% if transparent_header %}
-                        <button type="button"
-                                class="md:hidden p-2 text-neutral-200 hover:text-light"
-                                aria-label="{% trans 'Open menu' %}"
-                                aria-expanded="false"
-                                aria-controls="mobile-menu"
-                                data-mobile-menu-toggle>
-                    {% else %}
-                        <button type="button"
-                                class="md:hidden p-2 text-neutral-600 hover:text-dark"
-                                aria-label="{% trans 'Open menu' %}"
-                                aria-expanded="false"
-                                aria-controls="mobile-menu"
-                                data-mobile-menu-toggle>
-                    {% endif %}
+                    <button type="button"
+                            class="md:hidden p-2 cursor-pointer text-neutral-600 hover:text-dark"
+                            aria-label="{% trans 'Open menu' %}"
+                            aria-expanded="false"
+                            aria-controls="mobile-menu"
+                            data-mobile-menu-toggle>
                 {% endif %}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    {% comment %}
+                    Two icons, swapped by mobile-menu.js on open/close via
+                    [data-mobile-menu-icon-open]/[data-mobile-menu-icon-close] —
+                    hamburger while closed, X while open. Toggled with the same
+                    instant class-toggle idiom accordion.js already uses for
+                    its content panel, so this needs no new animation
+                    mechanism.
+                    {% endcomment %}
+                    <svg data-mobile-menu-icon-open xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <svg data-mobile-menu-icon-close class="hidden h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
 
@@ -158,52 +241,76 @@ and the dark_logo variant is used if available.
                 Lives inside the "relative" flex container so "absolute right-0 top-full" is
                 positioned relative to this group (not the full-width <header>), keeping the
                 right edge flush with the hamburger/CTA/social group.
-                Four fully-spelled-out class branches (collapse × transparent) for Tailwind JIT.
-                {% endcomment %}
+                                {% endcomment %}
                 {% if nav.collapse_desktop_menu %}
-                    {% if transparent_header %}
-                        <div id="mobile-menu"
-                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-700 bg-dark rounded-lg shadow-lg"
-                             aria-label="{% trans 'Mobile navigation' %}">
-                    {% else %}
-                        <div id="mobile-menu"
-                             class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-200 bg-light rounded-lg shadow-lg"
-                             aria-label="{% trans 'Mobile navigation' %}">
-                    {% endif %}
+                    <div id="mobile-menu"
+                         class="hidden absolute right-0 top-full mt-2 z-40 min-w-64 w-auto border border-neutral-200 bg-light rounded-lg shadow-lg opacity-0 -translate-y-2 transition duration-200 ease-out"
+                         aria-label="{% trans 'Mobile navigation' %}">
                         <div class="px-4 py-4 space-y-2 text-right">
                             {% for item in nav.primary_navigation %}
-                                {% if item.block_type == "internal" %}
-                                    <a href="{% pageurl item.value.page %}"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                {% nav_item_is_active item as is_active %}
+                                {% if item.block_type == "internal" and item.value.page %}
+                                    <a href="{% pageurl item.value.page|localized %}"
+                                       class="block py-2 text-lg text-neutral-700 hover:text-navy {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "external" %}
                                     <a href="{{ item.value.url }}"
                                        rel="noopener noreferrer"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-2 text-lg text-neutral-700 hover:text-navy {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
                                 {% elif item.block_type == "anchor" %}
                                     <a href="#{{ item.value.anchor }}"
-                                       class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
+                                       class="block py-2 text-lg text-neutral-700 hover:text-navy {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %} transition-colors">
                                         {{ item.value.text }}
                                     </a>
+                                {% elif item.block_type == "submenu" %}
+                                    {% comment %}In the collapsed vertical menu a dropdown becomes a labelled, indented sub-group.{% endcomment %}
+                                    <p class="pt-2 pb-1 text-base uppercase tracking-wide text-neutral-500 {% if is_active %}{{ nav_active_link }}{% else %}{{ nav_link_weight }}{% endif %}">
+                                        {{ item.value.text }}
+                                    </p>
+                                    <div class="space-y-1">
+                                        {% for child in item.value.links %}
+                                            {% if child.block_type == "internal" and child.value.page %}
+                                                <a href="{% pageurl child.value.page|localized %}"
+                                                   class="block py-1.5 text-lg font-medium text-neutral-700 hover:text-navy transition-colors">
+                                                    {{ child.value.text }}
+                                                </a>
+                                            {% elif child.block_type == "external" %}
+                                                <a href="{{ child.value.url }}"
+                                                   rel="noopener noreferrer"
+                                                   class="block py-1.5 text-lg font-medium text-neutral-700 hover:text-navy transition-colors">
+                                                    {{ child.value.text }}
+                                                </a>
+                                            {% elif child.block_type == "anchor" %}
+                                                <a href="#{{ child.value.anchor }}"
+                                                   class="block py-1.5 text-lg font-medium text-neutral-700 hover:text-navy transition-colors">
+                                                    {{ child.value.text }}
+                                                </a>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
                                 {% endif %}
                             {% endfor %}
                             {% if social.show_in_header and social.social_links %}
-                                 <div class="wtr-social-links md:hidden pt-2 border-t {% if transparent_header %}border-neutral-700{% else %}border-neutral-200{% endif %} flex items-center justify-end gap-4">
+                                 <div class="wtr-social-links md:hidden pt-2 border-t border-neutral-200 flex items-center justify-end gap-4">
                                     {% for item in social.social_links %}
                                         <a href="{{ item.value.url }}"
                                            rel="noopener noreferrer"
                                            aria-label="{{ item.value.platform|social_platform_label }}"
-                                           class="{% if transparent_header %}text-neutral-400 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
+                                           class="text-neutral-500 hover:text-dark transition-colors">
                                             {% social_icon item.value.platform %}
                                         </a>
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            {% include "wtrx/components/language_switcher.html" %}
-                            {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+                            {% comment %}
+                            Language switcher deliberately not rendered. The
+                            template and its `language_links` tag are kept and
+                            tested; re-add the include here (and in the other
+                            menu panel below) to turn it back on.
+                            {% endcomment %}
                         </div>
                     </div>
                 {% endif %}
@@ -212,54 +319,154 @@ and the dark_logo variant is used if available.
     </div>
 
     {% comment %}
-    Standard mobile-only panel — only rendered when collapse_desktop_menu is False.
-    Lives outside max-w-7xl as a direct child of <header> so it spans the full header
-    width at mobile breakpoints. md:hidden keeps it off desktop.
+    Standard mobile-only panel — a full-screen overlay takeover, not the
+    old in-flow strip. Fixed below the header's visible row content,
+    filling the rest of the viewport with its own internal scroll
+    (overflow-y-auto). top-[65px] below (the header's own pt-6 (24px)
+    plus the ~41px logo/CTA row — NOT the header's full ~89px box, which
+    also includes its own pb-6 (24px) bottom padding) is a no-JS
+    fallback only: mobile-menu.js measures
+    [data-mobile-menu-header-row]'s actual rendered bottom edge every
+    time the overlay opens and overrides this with an inline style.top,
+    because the header's true height drifts with content (a long
+    regional label, font-load timing, text wrapping) — a hardcoded
+    pixel guess alone has already caused a visible overlap with the CTA
+    button once. The toggle button (showing the close/X icon while open)
+    and the CTA both live in the header above this overlay, not inside
+    it — so there's no separate close button or duplicate CTA here; both
+    stay reachable the whole time the overlay is open.
+
+    The outer #mobile-menu is the per-variant bg-light/bg-dark fill with a
+    p-4 inset gap; the inner div (no background, no border, no rounded
+    corners — flat, on purpose) is only a flex/padding wrapper around
+    every element — nav list, submenu sub-items, and the trailing
+    social/language group.
+
+    top-[65px] (not 89px) is what keeps that p-4 gap actually equal on
+    all four sides: the overlay's own bg-light/bg-dark matches the
+    header's, so the overlay overlapping the header's last 24px of
+    bottom padding is invisible (same color, seamless) — and it means
+    the overlay's own p-4 top padding is the ONLY gap between the visible
+    row and the content below it, same 16px the sides get. Starting the
+    overlay at the full 89px instead would stack the header's own 24px
+    bottom padding underneath the overlay's 16px top padding, giving a
+    40px top gap against 16px on the sides — the mismatch this was
+    written to fix.
+
+    The inner div's own padding is px-6 pt-3 pb-6, not a uniform p-6 —
+    every nav item is `block` with its own py-3 (for touch-target height
+    and inter-item spacing) but no horizontal padding, so a top-level
+    item's py-3 stacks with this div's own top padding while nothing
+    stacks with its side padding. pt-3 (12px) plus the first item's own
+    top py-3
+    (12px) equals 24px, matching the 24px px-6 gives the sides; a uniform
+    p-6 here left 36px above the first item against 24px on the sides.
+
+    Left-aligned, large (text-2xl) touch targets. Submenus are
+    tap-to-expand accordion sections via data-accordion /
+    data-accordion-toggle / data-accordion-content — the same
+    instant-hidden-toggle + rotate-180-chevron idiom AccordionBlock
+    already uses (accordion_block.html), not a new mechanism. Children
+    stay flush-left with no indent, matching the flat hierarchy used
+    elsewhere in this panel.
+
+    No card chrome here — no background fill, no border, no rounded
+    corners. The only visual separation between the header and this
+    content is the header's own has-[...]:border-b (see the <header>
+    tag's class list), which shows a light-gray border only while a
+    toggle in it is aria-expanded="true".
+
+    Only rendered when collapse_desktop_menu is False; md:hidden keeps
+    it off desktop. mobile-menu.js drives the open/close fade+slide via
+    the opacity-0/-translate-y-2 base classes below.
     {% endcomment %}
     {% if not nav.collapse_desktop_menu %}
-        {% if transparent_header %}
-            <div id="mobile-menu"
-                 class="hidden md:hidden border-t border-neutral-700 bg-dark"
-                 aria-label="{% trans 'Mobile navigation' %}">
-        {% else %}
-            <div id="mobile-menu"
-                 class="hidden md:hidden border-t border-neutral-200 bg-light"
-                 aria-label="{% trans 'Mobile navigation' %}">
-        {% endif %}
-            <div class="px-4 py-4 space-y-2 text-right">
-                {% for item in nav.primary_navigation %}
-                    {% if item.block_type == "internal" %}
-                        <a href="{% pageurl item.value.page %}"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
-                            {{ item.value.text }}
-                        </a>
-                    {% elif item.block_type == "external" %}
-                        <a href="{{ item.value.url }}"
-                           rel="noopener noreferrer"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
-                            {{ item.value.text }}
-                        </a>
-                    {% elif item.block_type == "anchor" %}
-                        <a href="#{{ item.value.anchor }}"
-                           class="block py-2 text-sm font-semibold {% if transparent_header %}text-neutral-200 hover:text-light{% else %}text-neutral-700 hover:text-dark{% endif %} transition-colors">
-                            {{ item.value.text }}
-                        </a>
-                    {% endif %}
-                {% endfor %}
-                {% if social.show_in_header and social.social_links %}
-                    <div class="wtr-social-links md:hidden pt-2 border-t {% if transparent_header %}border-neutral-700{% else %}border-neutral-200{% endif %} flex items-center justify-end gap-4">
-                        {% for item in social.social_links %}
+        <div id="mobile-menu"
+             class="hidden md:hidden fixed inset-x-0 top-[65px] bottom-0 z-40 overflow-y-auto p-4 bg-light opacity-0 -translate-y-2 transition duration-200 ease-out"
+             aria-label="{% trans 'Mobile navigation' %}">
+            <div class="flex min-h-full flex-col px-6 pt-3 pb-6" data-accordion>
+                <nav class="flex flex-col gap-1" aria-label="{% trans 'Primary navigation' %}">
+                    {% for item in nav.primary_navigation %}
+                        {% nav_item_is_active item as is_active %}
+                        {% if item.block_type == "internal" and item.value.page %}
+                            <a href="{% pageurl item.value.page|localized %}"
+                               class="block py-3 text-2xl font-heavy text-neutral-700 hover:text-navy {% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "external" %}
                             <a href="{{ item.value.url }}"
                                rel="noopener noreferrer"
-                               aria-label="{{ item.value.platform|social_platform_label }}"
-                               class="{% if transparent_header %}text-neutral-400 hover:text-light{% else %}text-neutral-500 hover:text-dark{% endif %} transition-colors">
-                                {% social_icon item.value.platform %}
+                               class="block py-3 text-2xl font-heavy text-neutral-700 hover:text-navy {% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %} transition-colors">
+                                {{ item.value.text }}
                             </a>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-                {% include "wtrx/components/language_switcher.html" %}
-                {# Language switcher is intentionally mobile-only for MVP. Desktop variant deferred to Phase 5/6. #}
+                        {% elif item.block_type == "anchor" %}
+                            <a href="#{{ item.value.anchor }}"
+                               class="block py-3 text-2xl font-heavy text-neutral-700 hover:text-navy {% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %} transition-colors">
+                                {{ item.value.text }}
+                            </a>
+                        {% elif item.block_type == "submenu" %}
+                            {% comment %}
+                            Tap-to-expand accordion, reusing accordion.js's
+                            data-accordion-toggle / data-accordion-content
+                            pattern (the same instant hidden-toggle +
+                            rotate-180 chevron idiom accordion_block.html
+                            uses) — one data-accordion container wraps the
+                            whole nav list above.
+                            {% endcomment %}
+                            <div>
+                                <button type="button"
+                                        class="flex w-full items-center justify-between gap-4 py-3 text-2xl font-heavy text-neutral-700 transition-colors"
+                                        aria-expanded="false"
+                                        data-accordion-toggle>
+                                    <span class="{% if is_active %}underline decoration-primary-600 decoration-2 underline-offset-4{% endif %}">{{ item.value.text }}</span>
+                                    <svg class="h-3 w-3 shrink-0 transition-transform duration-200" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M5 9L19 9L12 16Z" />
+                                    </svg>
+                                </button>
+                                <div class="hidden flex-col gap-1 pb-2" data-accordion-content>
+                                    {% for child in item.value.links %}
+                                        {% if child.block_type == "internal" and child.value.page %}
+                                            <a href="{% pageurl child.value.page|localized %}"
+                                               class="block py-2 text-xl font-medium text-neutral-700 hover:text-navy transition-colors">
+                                                {{ child.value.text }}
+                                            </a>
+                                        {% elif child.block_type == "external" %}
+                                            <a href="{{ child.value.url }}"
+                                               rel="noopener noreferrer"
+                                               class="block py-2 text-xl font-medium text-neutral-700 hover:text-navy transition-colors">
+                                                {{ child.value.text }}
+                                            </a>
+                                        {% elif child.block_type == "anchor" %}
+                                            <a href="#{{ child.value.anchor }}"
+                                               class="block py-2 text-xl font-medium text-neutral-700 hover:text-navy transition-colors">
+                                                {{ child.value.text }}
+                                            </a>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </nav>
+
+                <div class="mt-auto flex flex-col gap-6 pt-8">
+                    {% if social.show_in_header and social.social_links %}
+                        <div class="wtr-social-links flex items-center gap-4">
+                            {% for item in social.social_links %}
+                                <a href="{{ item.value.url }}"
+                                   rel="noopener noreferrer"
+                                   aria-label="{{ item.value.platform|social_platform_label }}"
+                                   class="text-neutral-500 hover:text-dark transition-colors">
+                                    {% social_icon item.value.platform %}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% comment %}
+                    Language switcher deliberately not rendered — see the note
+                    in the collapsed-desktop panel above.
+                    {% endcomment %}
+                </div>
             </div>
         </div>
     {% endif %}

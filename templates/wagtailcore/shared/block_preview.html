@@ -1,0 +1,177 @@
+{% extends "wagtailcore/shared/block_preview.html" %}
+{% load static wagtailcore_tags %}
+
+{% comment %}
+Global StreamField block-preview template.
+
+Wagtail's own default (wagtail/templates/wagtailcore/shared/block_preview.html)
+renders the block with NO stylesheets, so every preview would come out as
+unstyled HTML. This override extends it and injects the site's compiled
+Tailwind bundle so previews render the way the block actually looks on the
+front end.
+
+Its mere existence is also load-bearing: Block.is_previewable only returns
+True for a block that has a preview value when the global preview template
+has been overridden (wagtail.utils.templates.template_is_overridden compares
+the resolved template path against the one inside the wagtail package). Delete
+this file and every block preview in the picker silently disappears.
+
+Blocks supply their preview value either from real site content (see
+ContentPreviewMixin in wtrx/blocks/__init__.py) or from a hand-written
+Meta.preview_value, and may set `preview_layout` to pick a layout below.
+{% endcomment %}
+
+{% block css %}
+    {{ block.super }}
+    {% comment %}Mirrors wtrx/base.html: fonts first, then the compiled bundle.{% endcomment %}
+    {% block fonts %}{% endblock %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <style>
+        /*
+          Previews are laid out at a desktop width and scaled down to fit the
+          picker's pane -- see the script at the foot of this template for why
+          that cannot be done in CSS alone.
+        */
+        :root {
+            --wtr-preview-scale: 1;
+        }
+
+        /*
+          Every preview sits in 16px of whitespace. The whole frame is scaled
+          by --wtr-preview-scale, so the padding is divided by it to come out
+          as a true 16px on screen.
+        */
+        body {
+            margin: 0;
+            padding: calc(16px / var(--wtr-preview-scale));
+            /* The page background belongs on <body>, not on the frame: a frame
+               narrowed by preview_max_width would otherwise paint the site's
+               background only behind the block, leaving the rest of the pane
+               showing through. Falls back to white if the token is missing. */
+            background-color: var(--color-light, #ffffff);
+        }
+
+        /*
+          Centre every block in the pane rather than letting short ones sit
+          against the top edge.
+
+          `safe center` matters: a block taller than the pane (a long accordion,
+          a whole section) would otherwise be centred by overflowing equally in
+          both directions, putting its opening lines above the top of the frame
+          where they cannot be scrolled back to. `safe` falls back to
+          flex-start exactly in that case.
+        */
+        .wtr-preview-frame {
+            display: flex;
+            flex-direction: column;
+            justify-content: safe center;
+            min-height: calc(100vh - (32px / var(--wtr-preview-scale)));
+        }
+    </style>
+
+    {% if block_def.preview_layout == "center" %}
+        {% comment %}
+        For blocks too small to read when scaled down -- a lone button, say --
+        render at 1:1 and centre the block in the full pane. Deliberately not a
+        1:1 match for how the block sits on a real page: the point is to show
+        the editor what the thing looks like, not where it sits.
+        {% endcomment %}
+        <style>
+            /* Vertical centring is the default above; a centred block is
+               also shrink-wrapped and centred horizontally. */
+            .wtr-preview-frame {
+                align-items: center;
+                text-align: center;
+            }
+        </style>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% comment %}
+    Rebuilds Wagtail's own content block, adding `is_block_preview`. A block
+    that would otherwise call a third-party service to render -- fetching an
+    ActionKit form, waiting for Fundraise Up's script to hydrate an anchor --
+    checks this flag and renders a static stand-in instead. Previews are opened
+    constantly while editing, so they must not depend on, or generate traffic
+    to, an external platform.
+    {% endcomment %}
+    <div class="block-{{ block_def.name }}">
+        {% with is_block_preview=True %}
+            {% include_block bound_block %}
+        {% endwith %}
+    </div>
+{% endblock %}
+
+{% block body %}
+    {% comment %}
+    Match the front-end body classes so type and colour tokens resolve. The
+    frame is also the hook the layouts above style.
+    {% endcomment %}
+    <div class="wtr-preview-frame font-body text-dark"
+         {% if block_def.preview_max_width %}style="max-width: {{ block_def.preview_max_width }}px; margin-inline: auto;"{% endif %}>
+        {{ block.super }}
+    </div>
+{% endblock %}
+
+{% block js %}
+    {{ block.super }}
+    <script>
+        // Nothing in a preview leads anywhere. An editor browsing the picker
+        // should never be able to navigate the pane away from the block, open
+        // a third-party page, or submit one of the forms a block renders.
+        // Capture-phase, so a block's own handlers cannot re-enable it.
+        ["click", "submit"].forEach(function (type) {
+            document.addEventListener(type, function (event) {
+                event.preventDefault();
+            }, true);
+        });
+    </script>
+    <script>
+        // Lay the preview out at a desktop width, then scale it to fit.
+        //
+        // The picker's pane is only a few hundred CSS pixels wide, so blocks
+        // designed for a full-width page render at their mobile breakpoint:
+        // CardGridBlock shows one column instead of three, and the image-beside
+        // -text blocks stack instead of sitting side by side.
+        //
+        // CSS alone cannot fix this. `zoom` on :root gives the content more
+        // layout width but leaves media queries evaluating against the real
+        // viewport (verified in Chromium: window.innerWidth is unchanged by
+        // zoom), so Tailwind's md:/lg: variants never fire. `transform: scale`
+        // does not affect media queries either. The only thing that does is the
+        // iframe's own width -- which this document can set, because Wagtail
+        // serves the preview same-origin.
+        (function () {
+            // The width the block is laid out at before being scaled to fit
+            // the pane. The default of 1280 clears Tailwind's lg: breakpoint,
+            // which is what CardGridBlock needs for three columns. A block may
+            // set a narrower one, which scales it *up* -- a lone button is
+            // legible but lost at 1:1 in a pane this size.
+            var TARGET_WIDTH = {{ block_def.preview_target_width|default:"1280" }};
+            var frame = window.frameElement;
+            // Null when the preview URL is opened directly rather than in the
+            // picker, and 0 for a layout that opts out of scaling entirely.
+            if (!frame || !TARGET_WIDTH) {
+                return;
+            }
+            var rect = frame.getBoundingClientRect();
+            if (!rect.width || !rect.height) {
+                return;
+            }
+            var scale = rect.width / TARGET_WIDTH;
+            // `zoom`, not `transform: scale()`. A transform shrinks the frame
+            // visually but leaves its layout box at TARGET_WIDTH, so the iframe
+            // still occupies 1280px in the admin and pushes the picker off
+            // screen. `zoom` scales the layout box too: at width 1280 and zoom
+            // 0.5 the frame lays out at the 640px it started at, while the
+            // document inside still sees a 1280px viewport.
+            frame.style.width = TARGET_WIDTH + "px";
+            frame.style.height = rect.height / scale + "px";
+            frame.style.zoom = scale;
+            document.documentElement.style.setProperty(
+                "--wtr-preview-scale", scale
+            );
+        })();
+    </script>
+{% endblock %}

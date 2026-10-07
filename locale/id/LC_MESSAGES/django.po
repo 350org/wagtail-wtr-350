@@ -1,0 +1,146 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-22 17:33+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: templates/wagtailadmin/login.html:12
+msgid "Sign in with Google"
+msgstr "Masuk dengan Google"
+
+#: templates/wagtailadmin/login.html:15
+msgid "or sign in with a password"
+msgstr "atau masuk dengan kata sandi"
+
+#: templates/wagtailadmin/pages/listing/_page_title_cell.html:16
+#, python-format
+msgid "Created by %(owner_name)s"
+msgstr "Dibuat oleh %(owner_name)s"
+
+#: templates/wagtailimages/images/edit.html:47
+msgid "Image focal point"
+msgstr "Titik fokus gambar"
+
+#: templates/wagtailimages/images/edit.html:54
+msgid "URL Generator"
+msgstr "Generator URL"
+
+#: templates/wagtailimages/images/edit.html:60
+msgid "Focal point"
+msgstr "Titik fokus"
+
+#: templates/wagtailimages/images/edit.html:60
+msgid "(optional)"
+msgstr "(opsional)"
+
+#: templates/wagtailimages/images/edit.html:61
+msgid ""
+"To define this image's most important region, drag a box over the image "
+"above."
+msgstr ""
+"Untuk menentukan bagian terpenting dari gambar ini, seret kotak di atas "
+"gambar berikut."
+
+#: templates/wagtailimages/images/edit.html:61
+msgid "Current focal point shown"
+msgstr "Titik fokus saat ini ditampilkan"
+
+#: templates/wagtailimages/images/edit.html:63
+msgid "Remove focal area"
+msgstr "Hapus area fokus"
+
+#: templates/wagtailimages/images/edit.html:69
+msgid "Max dimensions"
+msgstr "Dimensi maksimum"
+
+#: templates/wagtailimages/images/edit.html:71
+msgid "Filesize"
+msgstr "Ukuran berkas"
+
+#: templates/wagtailimages/images/edit.html:72
+msgid "File not found"
+msgstr "Berkas tidak ditemukan"
+
+#: templates/wagtailimages/images/edit.html:74
+msgid "Usage"
+msgstr "Penggunaan"
+
+#: templates/wagtailimages/images/edit.html:76
+#, python-format
+msgid "Used %(usage_count)s time"
+msgid_plural "Used %(usage_count)s times"
+msgstr[0] "Digunakan %(usage_count)s kali"
+
+#: wagtail_wtr/settings/base.py:178
+msgid "English"
+msgstr "Inggris"
+
+#: wagtail_wtr/settings/base.py:179
+msgid "Spanish"
+msgstr "Spanyol"
+
+#: wagtail_wtr/settings/base.py:180
+msgid "German"
+msgstr "Jerman"
+
+#: wagtail_wtr/settings/base.py:181
+msgid "French"
+msgstr "Prancis"
+
+#: wagtail_wtr/settings/base.py:182
+msgid "Indonesian"
+msgstr "Indonesia"
+
+#: wagtail_wtr/settings/base.py:183
+msgid "Japanese"
+msgstr "Jepang"
+
+#: wagtail_wtr/settings/base.py:184
+msgid "Turkish"
+msgstr "Turki"
+
+#: wagtail_wtr/settings/base.py:185
+msgid "Dutch"
+msgstr "Belanda"
+
+#: wagtail_wtr/settings/base.py:186
+msgid "Filipino"
+msgstr "Filipino"
+
+#: wagtail_wtr/settings/base.py:188
+msgid "English - Canada"
+msgstr "Inggris - Kanada"
+
+#: wagtail_wtr/settings/base.py:189
+msgid "French - Canada"
+msgstr "Prancis - Kanada"
+
+#: wagtail_wtr/settings/base.py:190
+msgid "Portuguese - Brazil"
+msgstr "Portugis - Brasil"
+
+#: wagtail_wtr/settings/base.py:191
+msgid "English - Brazil"
+msgstr "Inggris - Brasil"
+
+#: wagtail_wtr/settings/base.py:192
+msgid "French - France"
+msgstr "Prancis - Prancis"
+
+#: wagtail_wtr/settings/base.py:193
+msgid "Spanish - France"
+msgstr "Spanyol - Prancis"

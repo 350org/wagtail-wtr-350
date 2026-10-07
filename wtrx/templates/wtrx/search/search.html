@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="max-w-3xl mx-auto px-4 py-12">
-    <h1 class="font-heading text-3xl font-bold mb-8">{% trans "Search" %}</h1>
+    <h1 class="font-heading text-32 mb-8">{% trans "Search" %}</h1>
     <form action="{% url 'search' %}" method="get" role="search">
         <div class="flex gap-2 mb-8">
             <input
@@ -12,10 +12,10 @@
                 name="query"
                 value="{{ search_query }}"
                 placeholder="{% trans 'Search...' %}"
-                class="flex-1 border border-neutral-300 rounded-sm px-4 py-2"
+                class="flex-1 border border-neutral-300 rounded-md px-4 py-2"
                 aria-label="{% trans 'Search query' %}"
             />
-            <button type="submit" class="wtr-btn wtr-btn-sm hover:bg-primary-500">
+            <button type="submit" class="wtr-btn hover:bg-primary-500">
                 {% trans "Search" %}
             </button>
         </div>

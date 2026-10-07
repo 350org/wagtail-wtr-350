@@ -1,26 +1,251 @@
 """
-Tests for concrete page models: HomePage, ContentPage, IndexPage.
+Tests for concrete page models: HomePage, ContentPage, IndexPage, Post,
+Blogs.
 
 WagtailPageTests covers parent/subpage type constraints.
 TestCase with RequestFactory covers get_context() behaviour.
 """
 
-from django.test import RequestFactory, TestCase
-from wagtail.models import Page
-from wagtail.test.utils import WagtailPageTests
+import json
+from datetime import timedelta
 
+from django.contrib.auth.models import User
+from django.test import Client, RequestFactory, TestCase
+from django.utils import timezone
+from wagtail.images.tests.utils import get_test_image_file
+from wagtail.models import Locale, Page, Site
+from wagtail.test.utils import WagtailPageTests
+from wagtail.test.utils.form_data import nested_form_data, streamfield
+
+from wtrx.images import CustomImage
 from wtrx.models import (
+    BlogCategory,
+    Blogs,
     ContentPage,
     FormPage,
+    HeroMixin,
     HomePage,
     IndexPage,
     ITEMS_PER_PAGE,
+    Post,
 )
+
+
+# ---------------------------------------------------------------------------
+# HeroMixin panel selection: hero_panels (full variant) vs.
+# banner_hero_panels (banner variant) — see HeroMixin/banner_hero_panels'
+# docstrings in wtrx/models.py.
+# ---------------------------------------------------------------------------
+
+
+def _collect_panel_field_names(panels):
+    """Walk a content_panels list (including nested MultiFieldPanel children)
+    and return every FieldPanel-derived field_name found."""
+    names = []
+    for panel in panels:
+        field_name = getattr(panel, "field_name", None)
+        if field_name:
+            names.append(field_name)
+        children = getattr(panel, "children", None)
+        if children:
+            names.extend(_collect_panel_field_names(children))
+    return names
+
+
+class TestHeroPanelSelection(TestCase):
+    """
+    HomePage is the only HeroMixin page type using the "full" hero variant,
+    so it alone should expose hero_video in the editor. ContentPage,
+    IndexPage, and Blogs always render the "banner" variant
+    (HeroMixin.hero_variant default) where hero_video sits inert, so their
+    content_panels use HeroMixin.banner_hero_panels instead — same
+    underlying model field (no migration), just a smaller edit form.
+
+    hero_cta is exposed on BOTH panel sets, but is NOT "same underlying
+    model field" the way hero_video is: ContentPage/IndexPage/Blogs each
+    override it to use BannerHeroCTABlock (button only) instead of
+    HeroMixin's own HeroCTABlock (button/signup) — see
+    BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py. This test
+    class only checks panel field *names*, which are identical either way;
+    TestBannerHeroCTABlock/TestHeroCTABlock (test_blocks.py) cover the
+    actual choice-set difference.
+
+    hero_layout no longer exists at all (removed rather than hidden) — the
+    "full" variant renders a single fixed left-aligned layout now, matching
+    what every real "full"-variant page already used in practice.
+    """
+
+    def test_home_page_has_all_six_hero_fields(self):
+        names = _collect_panel_field_names(HomePage.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_video",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+
+    def test_home_page_has_pre_header_field(self):
+        """
+        hero_pre_header is the mirror image of hero_image_caption below: a
+        home-page-only field exposed on hero_panels and omitted from
+        banner_hero_panels, with the column itself present on every
+        HeroMixin page (no schema split).
+        """
+        names = _collect_panel_field_names(HomePage.content_panels)
+        self.assertIn("hero_pre_header", names)
+
+    def test_banner_pages_have_no_pre_header_field(self):
+        for model in (ContentPage, IndexPage, Blogs):
+            with self.subTest(model=model.__name__):
+                names = _collect_panel_field_names(model.content_panels)
+                self.assertNotIn("hero_pre_header", names)
+
+    def test_home_page_has_no_image_caption_field(self):
+        """
+        hero_image_caption is a "banner"-only field — hero.html's "full"
+        variant (HomePage's only variant) has no caption chrome at all, so
+        hero_panels omits it even though the underlying model field still
+        exists (inherited from HeroMixin, no schema split).
+        """
+        names = _collect_panel_field_names(HomePage.content_panels)
+        self.assertNotIn("hero_image_caption", names)
+
+    def test_content_page_has_only_banner_hero_fields(self):
+        names = _collect_panel_field_names(ContentPage.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_image_caption",
+            "hero_jumbo_headline",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+        self.assertNotIn("hero_video", names)
+
+    def test_jumbo_headline_reaches_the_hero_context(self):
+        page = ContentPage(title="Big Oil profits.", hero_jumbo_headline=True)
+        self.assertTrue(page.get_hero_context()["jumbo"])
+        self.assertFalse(ContentPage(title="t").get_hero_context()["jumbo"])
+
+    def test_jumbo_headline_steps_the_banner_h1_up_on_desktop(self):
+        from django.template.loader import render_to_string
+
+        hero = ContentPage(title="Big Oil profits.", hero_jumbo_headline=True).get_hero_context()
+        html = render_to_string("wtrx/components/hero.html", {"hero": hero})
+        self.assertIn("lg:text-[clamp(3.5rem,16cqi,6rem)]", html)
+        hero["jumbo"] = False
+        html = render_to_string("wtrx/components/hero.html", {"hero": hero})
+        self.assertNotIn("16cqi", html)
+        self.assertIn("lg:text-5xl", html)
+
+    def _content_page_hero_panel(self):
+        """ContentPage's Hero panel, found by heading rather than index so
+        the test survives a panel being added above it."""
+        panels = [
+            panel
+            for panel in ContentPage.content_panels
+            if str(getattr(panel, "heading", "")) == "Hero"
+        ]
+        self.assertEqual(len(panels), 1)
+        return panels[0]
+
+    def test_hide_hero_is_the_last_field_in_the_hero_panel(self):
+        """
+        hide_hero is a property of the hero, so it belongs in the Hero panel
+        rather than a section of its own -- and last, after the fields it
+        turns off. ContentPage rebuilds the panel around
+        HeroMixin.banner_hero_fields to get this, since the shared
+        banner_hero_panels can't carry a field IndexPage and Blogs lack.
+        """
+        names = _collect_panel_field_names(self._content_page_hero_panel().children)
+        self.assertEqual(names[-1], "hide_hero")
+        self.assertEqual(names[:-1], [f.field_name for f in HeroMixin.banner_hero_fields])
+
+        all_names = _collect_panel_field_names(ContentPage.content_panels)
+        self.assertEqual(all_names.count("hide_hero"), 1)
+
+    def test_hide_hero_is_permission_gated(self):
+        """
+        Nesting must not weaken the permission gate: Wagtail builds the edit
+        form from the merged form options of every panel, and
+        PanelGroup.get_form_options() merges each child's field_permissions
+        dict upward, so a nested gated FieldPanel still keeps the field off
+        the form entirely -- unsettable by POST, not merely hidden.
+        """
+        panel = self._content_page_hero_panel().bind_to_model(ContentPage)
+        self.assertEqual(
+            panel.get_form_options().get("field_permissions"),
+            {"hide_hero": "wtrx.disable_hero"},
+        )
+
+    def test_shared_banner_hero_panels_are_unaffected(self):
+        """
+        ContentPage shares banner_hero_fields' FieldPanel instances with
+        banner_hero_panels, which IndexPage and Blogs still use.
+        bind_to_model() clones before setting .model, so neither binding can
+        leak into the other -- but an in-place mutation of the shared list
+        would, and this catches it.
+        """
+        for model in (IndexPage, Blogs):
+            with self.subTest(model=model.__name__):
+                names = _collect_panel_field_names(model.content_panels)
+                self.assertNotIn("hide_hero", names)
+                self.assertIn("hero_headline", names)
+
+    def test_index_page_has_only_banner_hero_fields(self):
+        names = _collect_panel_field_names(IndexPage.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_image_caption",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+        self.assertNotIn("hero_video", names)
+
+    def test_blogs_has_only_banner_hero_fields(self):
+        names = _collect_panel_field_names(Blogs.content_panels)
+        for field in (
+            "hero_headline",
+            "hero_copy",
+            "hero_image",
+            "hero_image_caption",
+            "hero_banner_color",
+            "hero_cta",
+        ):
+            self.assertIn(field, names)
+        self.assertNotIn("hero_video", names)
 
 
 # ---------------------------------------------------------------------------
 # HomePage
 # ---------------------------------------------------------------------------
+
+
+class TestEditFormScriptOrder(TestCase):
+    """
+    wagtail-ai's draftail.js reads `window.React` once at load, so no
+    React-loading Wagtail entry (telepath/blocks.js) may sit between it and
+    Wagtail's draftail.js: that entry replaces the global with its own React
+    copy and every AI toolbar crashes with React error #321 (see
+    HeadlineRichTextArea).
+    """
+
+    def test_wagtail_ai_draftail_follows_wagtail_draftail(self):
+        for model in (HomePage, ContentPage, IndexPage, Blogs, Post, FormPage):
+            with self.subTest(model=model.__name__):
+                js = [path.split("?")[0] for path in model.get_edit_handler().get_form_class()().media._js]
+                start = js.index("/static/wagtailadmin/js/draftail.js")
+                end = js.index("/static/wagtail_ai/draftail.js")
+                self.assertLess(start, end)
+                self.assertNotIn("/static/wagtailadmin/js/telepath/blocks.js", js[start:end])
 
 
 class TestHomePageParentSubpageTypes(WagtailPageTests):
@@ -29,14 +254,20 @@ class TestHomePageParentSubpageTypes(WagtailPageTests):
     def test_can_create_under_root(self):
         self.assertCanCreateAt(Page, HomePage)
 
-    def test_can_not_create_under_home_page(self):
-        self.assertCanNotCreateAt(HomePage, HomePage)
+    def test_can_create_under_home_page(self):
+        """Country/region sub-homes (e.g. /canada) nest under the site home page."""
+        self.assertCanCreateAt(HomePage, HomePage)
 
     def test_can_not_create_under_content_page(self):
         self.assertCanNotCreateAt(ContentPage, HomePage)
 
+    def test_can_not_create_under_index_page(self):
+        self.assertCanNotCreateAt(IndexPage, HomePage)
+
     def test_allowed_subpage_types(self):
-        self.assertAllowedSubpageTypes(HomePage, [ContentPage, IndexPage, FormPage])
+        self.assertAllowedSubpageTypes(
+            HomePage, [HomePage, ContentPage, IndexPage, FormPage, Blogs]
+        )
 
 
 class TestHomePageGetContext(TestCase):
@@ -50,8 +281,6 @@ class TestHomePageGetContext(TestCase):
             slug="home-test-hpgc",
             hero_headline="Welcome",
             hero_copy="<p>Subtext</p>",
-            hero_link_text="Learn more",
-            hero_link_url="https://example.com",
         )
         root.add_child(instance=cls.home)
 
@@ -81,10 +310,6 @@ class TestHomePageGetContext(TestCase):
         ctx = self._get_context(self.home)
         self.assertFalse(ctx["hero"]["copy_is_block"])
 
-    def test_hero_link_url_is_passed(self):
-        ctx = self._get_context(self.home)
-        self.assertEqual(ctx["hero"]["link_url"], "https://example.com")
-
     def test_hero_image_defaults_none(self):
         ctx = self._get_context(self.home)
         self.assertIsNone(ctx["hero"]["image"])
@@ -93,23 +318,76 @@ class TestHomePageGetContext(TestCase):
         ctx = self._get_context(self.home)
         self.assertIsNone(ctx["hero"]["video"])
 
-    def test_hero_link_page_defaults_none(self):
+    def test_hero_variant_is_full(self):
+        """HomePage is the only page type using the "full" hero variant."""
         ctx = self._get_context(self.home)
-        self.assertIsNone(ctx["hero"]["link_page"])
+        self.assertEqual(ctx["hero"]["variant"], "full")
+
+    def test_hero_banner_color_defaults_navy(self):
+        ctx = self._get_context(self.home)
+        self.assertEqual(ctx["hero"]["banner_color"], "navy")
 
     def test_hero_dict_has_all_required_keys(self):
         ctx = self._get_context(self.home)
         required_keys = {
+            "variant",
+            "pre_header",
             "headline",
             "copy",
             "copy_is_block",
             "image",
             "video",
-            "link_text",
-            "link_page",
-            "link_url",
+            "poster_url",
+            "image_caption",
+            "banner_color",
+            "cta",
+            "minimal",
+            "jumbo",
         }
         self.assertEqual(set(ctx["hero"].keys()), required_keys)
+
+    def test_poster_url_none_without_video(self):
+        ctx = self._get_context(self.home)
+        self.assertIsNone(ctx["hero"]["poster_url"])
+
+    def test_poster_url_uses_video_thumbnail(self):
+        """
+        base.html preloads this URL with fetchpriority=high (see
+        HeroMixin.get_hero_context()'s docstring) since Chrome doesn't honor
+        fetchpriority on a <video>'s own poster fetch -- so it must resolve
+        to the same thumbnail _hero_background_video.html renders as the
+        poster, not just be non-None.
+        """
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from wagtailmedia.models import Media
+
+        media = Media.objects.create(
+            title="Hero video",
+            type="video",
+            thumbnail=SimpleUploadedFile("poster.png", get_test_image_file().file.read(), content_type="image/png"),
+        )
+        self.home.hero_video = media
+        try:
+            ctx = self._get_context(self.home)
+            self.assertEqual(ctx["hero"]["poster_url"], media.thumbnail.url)
+        finally:
+            self.home.hero_video = None
+
+    def test_poster_url_falls_back_to_hero_image_rendition(self):
+        """No thumbnail on the video -- falls back to hero_image, same as
+        _hero_background_video.html's own fallback chain."""
+        from wagtailmedia.models import Media
+
+        media = Media.objects.create(title="Hero video", type="video")
+        image = CustomImage.objects.create(title="Hero image", file=get_test_image_file())
+        self.home.hero_video = media
+        self.home.hero_image = image
+        try:
+            ctx = self._get_context(self.home)
+            self.assertEqual(ctx["hero"]["poster_url"], image.get_rendition("fill-1600x700").url)
+        finally:
+            self.home.hero_video = None
+            self.home.hero_image = None
 
 
 class TestHomePageMeta(TestCase):
@@ -143,7 +421,9 @@ class TestContentPageParentSubpageTypes(WagtailPageTests):
         self.assertCanNotCreateAt(Page, ContentPage)
 
     def test_allowed_subpage_types(self):
-        self.assertAllowedSubpageTypes(ContentPage, [ContentPage, IndexPage, FormPage])
+        self.assertAllowedSubpageTypes(
+            ContentPage, [ContentPage, IndexPage, FormPage, Blogs]
+        )
 
 
 class TestContentPageGetContext(TestCase):
@@ -158,8 +438,6 @@ class TestContentPageGetContext(TestCase):
             title="About Us",
             slug="about",
             hero_headline="Our Story",
-            hero_link_text="Contact",
-            hero_link_url="https://example.com/contact",
         )
         cls.home.add_child(instance=cls.page)
 
@@ -188,19 +466,164 @@ class TestContentPageGetContext(TestCase):
         ctx = self._get_context(self.page)
         self.assertIsNone(ctx["hero"]["video"])
 
+    def test_hero_variant_is_banner(self):
+        """ContentPage uses HeroMixin's default "banner" variant, unlike HomePage."""
+        ctx = self._get_context(self.page)
+        self.assertEqual(ctx["hero"]["variant"], "banner")
+
     def test_hero_dict_keys(self):
         ctx = self._get_context(self.page)
         expected = {
+            "variant",
+            "pre_header",
             "headline",
             "copy",
             "copy_is_block",
             "image",
             "video",
-            "link_text",
-            "link_page",
-            "link_url",
+            "poster_url",
+            "image_caption",
+            "banner_color",
+            "cta",
+            "minimal",
+            "jumbo",
         }
         self.assertEqual(set(ctx["hero"].keys()), expected)
+
+    def test_hero_minimal_true_when_headline_only(self):
+        """cls.page has only hero_headline set — no copy/image/video/cta."""
+        ctx = self._get_context(self.page)
+        self.assertTrue(ctx["hero"]["minimal"])
+
+    def test_hero_minimal_true_with_image_and_no_copy(self):
+        image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(), description="A description"
+        )
+        self.page.hero_image = image
+        try:
+            ctx = self._get_context(self.page)
+            self.assertTrue(ctx["hero"]["minimal"])
+        finally:
+            self.page.hero_image = None
+
+    def test_hero_minimal_false_when_copy_present(self):
+        self.page.hero_copy = "<p>Some real copy.</p>"
+        try:
+            ctx = self._get_context(self.page)
+            self.assertFalse(ctx["hero"]["minimal"])
+        finally:
+            self.page.hero_copy = ""
+
+    def test_hero_minimal_true_when_copy_is_empty_paragraph(self):
+        """
+        A "cleared" Draftail field can persist "<p></p>" — truthy as a raw
+        string, but visually empty, so it must not count as real copy.
+        """
+        self.page.hero_copy = "<p></p>"
+        try:
+            ctx = self._get_context(self.page)
+            self.assertTrue(ctx["hero"]["minimal"])
+        finally:
+            self.page.hero_copy = ""
+
+
+class TestBannerHeroRendering(TestCase):
+    """
+    End-to-end check that hero.minimal actually changes the rendered
+    "banner" hero markup — not just that get_context() computes the right
+    boolean in isolation. See components/hero.html's `minimal` branching.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="hero-render-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="hero-render-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Hero Render Test",
+        )
+
+        cls.headline_only = ContentPage(
+            title="Headline Only",
+            slug="headline-only",
+            hero_headline="Just a heading",
+        )
+        cls.home.add_child(instance=cls.headline_only)
+
+        cls.image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(), description="A description"
+        )
+        cls.headline_and_image = ContentPage(
+            title="Headline And Image",
+            slug="headline-and-image",
+            hero_headline="Heading with a photo",
+            hero_image=cls.image,
+        )
+        cls.home.add_child(instance=cls.headline_and_image)
+
+        cls.full = ContentPage(
+            title="Full Hero",
+            slug="full-hero",
+            hero_headline="Full content hero",
+            hero_copy="<p>Real supporting copy.</p>",
+        )
+        cls.home.add_child(instance=cls.full)
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="hero-render-test.localhost")
+
+    def test_headline_only_hero_is_compact_single_column(self):
+        content = self.client.get(self.headline_only.url).content.decode()
+        self.assertIn("md:min-h-[300px]", content)
+        self.assertNotIn("md:min-h-[385px]", content)
+        self.assertNotIn("md:grid-cols-2", content)
+
+    def test_headline_and_image_hero_is_compact_two_column(self):
+        content = self.client.get(self.headline_and_image.url).content.decode()
+        self.assertIn("md:min-h-[300px]", content)
+        self.assertNotIn("md:min-h-[385px]", content)
+        self.assertIn("md:grid-cols-2", content)
+
+    def test_full_hero_keeps_original_height_and_columns(self):
+        content = self.client.get(self.full.url).content.decode()
+        self.assertIn("md:min-h-[385px]", content)
+        self.assertNotIn("md:min-h-[300px]", content)
+
+    def test_hide_hero_removes_the_hero(self):
+        page = ContentPage(
+            title="No Hero Here",
+            slug="no-hero-here",
+            hero_headline="This headline should not render",
+            hide_hero=True,
+        )
+        self.home.add_child(instance=page)
+        content = self.client.get(page.url).content.decode()
+        self.assertNotIn("wtr-page-hero", content)
+        self.assertNotIn("This headline should not render", content)
+
+    def test_hide_hero_keeps_exactly_one_h1_from_the_page_title(self):
+        """
+        The hero owns the page's only <h1>. With it hidden the document
+        would otherwise have none, since every body heading is h2 or lower.
+        """
+        page = ContentPage(
+            title="Accessible Without A Hero",
+            slug="accessible-without-a-hero",
+            hide_hero=True,
+        )
+        self.home.add_child(instance=page)
+        content = self.client.get(page.url).content.decode()
+        self.assertEqual(content.count("<h1"), 1)
+        self.assertIn(
+            '<h1 class="sr-only">Accessible Without A Hero</h1>', content
+        )
+
+    def test_hero_shown_by_default(self):
+        content = self.client.get(self.full.url).content.decode()
+        self.assertIn("wtr-page-hero", content)
 
 
 class TestContentPageMeta(TestCase):
@@ -232,7 +655,9 @@ class TestIndexPageParentSubpageTypes(WagtailPageTests):
         self.assertCanNotCreateAt(Page, IndexPage)
 
     def test_allowed_subpage_types(self):
-        self.assertAllowedSubpageTypes(IndexPage, [ContentPage, IndexPage, FormPage])
+        self.assertAllowedSubpageTypes(
+            IndexPage, [ContentPage, IndexPage, FormPage, Blogs]
+        )
 
 
 class TestIndexPageGetContext(TestCase):
@@ -258,6 +683,11 @@ class TestIndexPageGetContext(TestCase):
     def test_hero_dict_present(self):
         ctx = self._get_context(self.index)
         self.assertIn("hero", ctx)
+
+    def test_hero_variant_is_banner(self):
+        """IndexPage uses HeroMixin's default "banner" variant, unlike HomePage."""
+        ctx = self._get_context(self.index)
+        self.assertEqual(ctx["hero"]["variant"], "banner")
 
     def test_children_in_context(self):
         ctx = self._get_context(self.index)
@@ -291,3 +721,727 @@ class TestIndexPageMeta(TestCase):
 
     def test_verbose_name_plural(self):
         self.assertEqual(IndexPage._meta.verbose_name_plural, "index pages")
+
+
+# ---------------------------------------------------------------------------
+# BlogCategory
+# ---------------------------------------------------------------------------
+
+
+class TestBlogCategory(TestCase):
+    def test_str_is_name(self):
+        category = BlogCategory.objects.create(name="Climate Justice", slug="climate-justice")
+        self.assertEqual(str(category), "Climate Justice")
+
+    def test_slug_auto_generated_from_name_when_blank(self):
+        category = BlogCategory(name="Fossil Fuels")
+        category.save()
+        self.assertEqual(category.slug, "fossil-fuels")
+
+    def test_explicit_slug_is_preserved(self):
+        category = BlogCategory(name="Fossil Fuels", slug="ff")
+        category.save()
+        self.assertEqual(category.slug, "ff")
+
+
+# ---------------------------------------------------------------------------
+# Post
+# ---------------------------------------------------------------------------
+
+
+class TestPostParentSubpageTypes(WagtailPageTests):
+    def test_can_create_under_blogs(self):
+        self.assertCanCreateAt(Blogs, Post)
+
+    def test_can_not_create_under_home_page(self):
+        self.assertCanNotCreateAt(HomePage, Post)
+
+    def test_can_not_create_under_content_page(self):
+        self.assertCanNotCreateAt(ContentPage, Post)
+
+    def test_allowed_subpage_types(self):
+        self.assertAllowedSubpageTypes(Post, [])
+
+
+class TestPostGetContext(TestCase):
+    """
+    Post.get_context() must build a "banner" hero dict (via
+    BannerHeroMixin.get_banner_hero_context()) with author/published_at
+    folded in on top.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-bp")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-bp")
+        home.add_child(instance=cls.blogs)
+
+        cls.user = User.objects.create_user(username="jane", first_name="Jane", last_name="Doe")
+
+        cls.post = Post(
+            title="A Post",
+            slug="a-post-bp",
+            hero_headline="Custom headline",
+            author=cls.user,
+            published_at=timezone.now(),
+        )
+        cls.blogs.add_child(instance=cls.post)
+
+        cls.post_no_author = Post(title="No Author Post", slug="no-author-post-bp")
+        cls.blogs.add_child(instance=cls.post_no_author)
+
+    def _get_context(self, page):
+        request = RequestFactory().get("/")
+        return page.get_context(request)
+
+    def test_hero_variant_is_banner(self):
+        ctx = self._get_context(self.post)
+        self.assertEqual(ctx["hero"]["variant"], "banner")
+
+    def test_hero_headline_uses_custom(self):
+        ctx = self._get_context(self.post)
+        self.assertEqual(ctx["hero"]["headline"], "Custom headline")
+
+    def test_hero_author_uses_full_name(self):
+        ctx = self._get_context(self.post)
+        self.assertEqual(ctx["hero"]["author"], "Jane Doe")
+
+    def test_hero_published_at_matches_field(self):
+        ctx = self._get_context(self.post)
+        self.assertEqual(ctx["hero"]["published_at"], self.post.published_at)
+
+    def test_hero_author_is_none_when_unset(self):
+        ctx = self._get_context(self.post_no_author)
+        self.assertIsNone(ctx["hero"]["author"])
+
+    def test_hero_cta_is_always_empty(self):
+        """Banner variant never renders a cta — see BannerHeroMixin."""
+        ctx = self._get_context(self.post)
+        self.assertEqual(ctx["hero"]["cta"], [])
+
+    def test_hero_minimal_is_always_false(self):
+        """
+        A Post always sets published_at (PublishedDateMixin's non-blank
+        default), which hero_is_minimal() treats the same as a tag/date —
+        so a Post hero never gets the compact treatment, even one with no
+        other hero content set, without needing a Post-specific exclusion.
+        """
+        ctx = self._get_context(self.post)
+        self.assertFalse(ctx["hero"]["minimal"])
+        ctx_no_author = self._get_context(self.post_no_author)
+        self.assertFalse(ctx_no_author["hero"]["minimal"])
+
+    def test_related_headings_follow_parent_title(self):
+        ctx = self._get_context(self.post)
+        self.assertEqual(ctx["related_heading"], "Related blogs")
+        self.assertEqual(ctx["related_link_text"], "Read more blogs")
+
+    def test_related_posts_are_scoped_to_own_parent(self):
+        """A post under another Blogs page never appears in these related posts."""
+        other_blogs = Blogs(title="Press Releases", slug="press-releases-bp")
+        self.blogs.get_parent().add_child(instance=other_blogs)
+        other_post = Post(title="A Release", slug="a-release-bp", published_at=timezone.now())
+        other_blogs.add_child(instance=other_post)
+
+        headings = [card["heading"] for card in self._get_context(self.post)["related_posts"]]
+        self.assertNotIn("A Release", headings)
+        self.assertIn("No Author Post", headings)
+
+    def test_related_headings_adapt_to_press_releases_parent(self):
+        other_blogs = Blogs(title="Press Releases", slug="press-releases-bp2")
+        self.blogs.get_parent().add_child(instance=other_blogs)
+        release = Post(title="A Release", slug="a-release-bp2", published_at=timezone.now())
+        other_blogs.add_child(instance=release)
+
+        ctx = self._get_context(release)
+        self.assertEqual(ctx["related_heading"], "Related press releases")
+        self.assertEqual(ctx["related_link_text"], "Read more press releases")
+
+    def test_related_headings_use_parent_overrides(self):
+        """An editor-set heading/button text replaces the automated string whole."""
+        self.blogs.related_heading = "Articles liés"
+        self.blogs.related_link_text = "Lire plus d'articles"
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_heading"], "Articles liés")
+        self.assertEqual(ctx["related_link_text"], "Lire plus d'articles")
+
+    def test_related_heading_overrides_are_independent(self):
+        self.blogs.related_heading = "Articles liés"
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_heading"], "Articles liés")
+        self.assertEqual(ctx["related_link_text"], "Read more blogs")
+
+    def test_related_intro_uses_parent_related_intro(self):
+        self.blogs.related_intro = "Stories from the movement."
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_intro"], "Stories from the movement.")
+
+    def test_related_intro_falls_back_to_parent_hero_copy(self):
+        self.blogs.related_intro = ""
+        self.blogs.hero_copy = "<p>News and insights.</p>"
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post.pk))
+        self.assertEqual(ctx["related_intro"], "News and insights.")
+
+    def test_hero_image_falls_back_to_parent_default_card_image(self):
+        """A post with no header image of its own and no default_hero_image
+        set on its parent falls back to the parent Blogs page's
+        default_card_image instead (get_context() routes the hero image
+        through get_hero_image(), which chains to default_card_image so an
+        already-configured page keeps behaving the same)."""
+        default_image = CustomImage.objects.create(
+            title="Blogs default card image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post_no_author.pk))
+        self.assertEqual(ctx["hero"]["image"], default_image)
+
+    def test_hero_image_prefers_parent_default_hero_image_over_default_card_image(self):
+        """When both are set, the hero-specific fallback wins for the hero
+        (unlike a card, which never looks at default_hero_image — see
+        TestPostGetCardImage.test_does_not_fall_back_to_parent_default_hero_image)."""
+        default_card_image = CustomImage.objects.create(
+            title="Blogs default card image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        default_hero_image = CustomImage.objects.create(
+            title="Blogs default hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        ctx = self._get_context(Post.objects.get(pk=self.post_no_author.pk))
+        self.assertEqual(ctx["hero"]["image"], default_hero_image)
+
+
+class TestPostForm(TestCase):
+    """
+    PostForm must pre-fill author with the creating user, only for new
+    pages.
+
+    Asserts against form["author"].value() (the bound field's actual
+    resolved value — what really ends up pre-selected in the rendered
+    widget and submitted if untouched), not form.fields["author"].initial.
+    Django's Form.get_initial_for_field() checks self.initial (the dict)
+    before ever falling back to a field's own .initial attribute, and
+    ModelForm.__init__ always populates self.initial from model_to_dict()
+    on the instance — including "author": None for a brand new unsaved
+    Post — so asserting on fields["author"].initial alone would pass
+    even if the pre-fill were silently shadowed and never actually applied.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-bpf")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-bpf")
+        home.add_child(instance=cls.blogs)
+        cls.user = User.objects.create_user(username="alex")
+
+    def test_author_defaults_to_for_user_on_new_page(self):
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(for_user=self.user, parent_page=self.blogs, instance=Post())
+        self.assertEqual(form["author"].value(), self.user.pk)
+
+    def test_author_not_overridden_on_existing_page(self):
+        other_user = User.objects.create_user(username="sam")
+        post = Post(title="Existing", slug="existing-bpf", author=other_user)
+        self.blogs.add_child(instance=post)
+
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(for_user=self.user, parent_page=self.blogs, instance=post)
+        self.assertEqual(form["author"].value(), other_user.pk)
+
+    def _category_choices(self, instance):
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(for_user=self.user, parent_page=self.blogs, instance=instance)
+        return list(form.fields["categories"].choices)
+
+    def test_category_choices_use_the_posts_locale_sorted_by_label(self):
+        from wtrx.models import BlogCategoryLabel
+
+        climate = BlogCategory.objects.create(name="Climate", slug="climate-bpf")
+        justice = BlogCategory.objects.create(name="Justice", slug="justice-bpf")
+        other = Locale.objects.create(language_code="fr-fr")
+        BlogCategoryLabel.objects.create(category=climate, locale=self.blogs.locale, name="Zeta")
+        BlogCategoryLabel.objects.create(category=justice, locale=other, name="Justice climatique")
+
+        # New page: no locale yet, so the parent's. Justice has no label here.
+        self.assertEqual(self._category_choices(Post()), [(justice.pk, "Justice"), (climate.pk, "Zeta")])
+
+        post = Post(title="Existing", slug="existing-labels-bpf")
+        self.blogs.add_child(instance=post)
+        self.assertEqual(self._category_choices(post), [(justice.pk, "Justice"), (climate.pk, "Zeta")])
+
+
+class TestPostCategoryLimit(TestCase):
+    """PostForm rejects more than MAX_POST_CATEGORIES categories."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.categories = [BlogCategory.objects.create(name=f"Cat {i}") for i in range(3)]
+
+    def _categories_errors(self, categories):
+        form_class = Post.get_edit_handler().get_form_class()
+        form = form_class(
+            # categories is set after flattening: nested_form_data() would
+            # otherwise split the list into categories-0, categories-1, ...
+            data={
+                **nested_form_data({"title": "Post", "slug": "post", "body": streamfield([])}),
+                "categories": [c.pk for c in categories],
+            },
+            instance=Post(),
+            for_user=User.objects.create_user(username=f"u{len(categories)}"),
+        )
+        form.is_valid()
+        return form.errors.get("categories")
+
+    def test_two_categories_allowed(self):
+        self.assertIsNone(self._categories_errors(self.categories[:2]))
+
+    def test_three_categories_rejected(self):
+        self.assertEqual(self._categories_errors(self.categories), ["Choose at most 2 categories."])
+    def test_verbose_name(self):
+        self.assertEqual(Post._meta.verbose_name, "post")
+
+    def test_verbose_name_plural(self):
+        self.assertEqual(Post._meta.verbose_name_plural, "posts")
+
+
+class TestPostGetCardImage(TestCase):
+    """
+    Post.get_card_image() is what feeds post_card.html a thumbnail — via
+    the override in Post.get_context()/Blogs.get_context() (related posts /
+    the Blogs index) and in PageCardsBlock.get_context() — for a post that
+    never had an explicit header image set.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-cci")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-cci")
+        home.add_child(instance=cls.blogs)
+
+        cls.hero_image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        cls.body_image = CustomImage.objects.create(
+            title="Body image", file=get_test_image_file(size=(1200, 800))
+        )
+
+    def _make_post(self, slug, hero_image=None, body=None):
+        post = Post(title="Test post", slug=slug, hero_image=hero_image)
+        if body is not None:
+            post.body = json.dumps(body)
+        self.blogs.add_child(instance=post)
+        # Re-fetch so `body` is the real deserialized StreamValue a saved
+        # page would have, not the raw JSON string just assigned above.
+        return Post.objects.get(pk=post.pk)
+
+    def test_explicit_hero_image_wins(self):
+        """An explicit header image is used as-is — the body isn't even inspected."""
+        body = [
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "11111111-1111-1111-1111-111111111111",
+            }
+        ]
+        post = self._make_post("hero-wins", hero_image=self.hero_image, body=body)
+        self.assertEqual(post.get_card_image(), self.hero_image)
+
+    def test_falls_back_to_first_image_in_body(self):
+        """No header image: the first image found in the body is used instead."""
+        body = [
+            {"type": "text", "value": "<p>No image here.</p>", "id": "22222222-2222-2222-2222-222222222222"},
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "33333333-3333-3333-3333-333333333333",
+            },
+        ]
+        post = self._make_post("body-fallback", hero_image=None, body=body)
+        self.assertEqual(post.get_card_image(), self.body_image)
+
+    def test_finds_image_nested_inside_a_card_grids_list_items(self):
+        """The search reaches into a ListBlock item's own `image` field (a CardGridBlock card)."""
+        body = [
+            {
+                "type": "card_grid",
+                "value": {
+                    "heading": "Grid",
+                    "cards": [
+                        {
+                            "tag": "",
+                            "icon": None,
+                            "content": "<h3>No image</h3>",
+                            "image": None,
+                            "link_page": None,
+                            "link_url": None,
+                            "link_text": "",
+                        },
+                        {
+                            "tag": "",
+                            "icon": None,
+                            "content": "<h3>Has image</h3>",
+                            "image": self.body_image.pk,
+                            "link_page": None,
+                            "link_url": None,
+                            "link_text": "",
+                        },
+                    ],
+                },
+                "id": "44444444-4444-4444-4444-444444444444",
+            }
+        ]
+        post = self._make_post("card-grid-fallback", hero_image=None, body=body)
+        self.assertEqual(post.get_card_image(), self.body_image)
+
+    def test_none_when_no_image_anywhere(self):
+        """No header image and no image in the body degrades to None, not an error."""
+        body = [{"type": "text", "value": "<p>Just words.</p>", "id": "55555555-5555-5555-5555-555555555555"}]
+        post = self._make_post("no-image", hero_image=None, body=body)
+        self.assertIsNone(post.get_card_image())
+
+    def test_none_when_body_is_empty(self):
+        post = self._make_post("empty-body", hero_image=None, body=[])
+        self.assertIsNone(post.get_card_image())
+
+    def test_falls_back_to_parent_default_card_image(self):
+        """No header image and no image in the body: falls back to the
+        parent Blogs page's default_card_image (e.g. a "Breaking News"
+        graphic set once on a Press Releases index)."""
+        default_image = CustomImage.objects.create(
+            title="Default card image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        post = self._make_post("no-image-with-default", hero_image=None, body=[])
+        self.assertEqual(post.get_card_image(), default_image)
+
+    def test_hero_image_wins_over_parent_default(self):
+        default_image = CustomImage.objects.create(
+            title="Default card image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        post = self._make_post("hero-wins-over-default", hero_image=self.hero_image, body=[])
+        self.assertEqual(post.get_card_image(), self.hero_image)
+
+    def test_body_image_wins_over_parent_default(self):
+        default_image = CustomImage.objects.create(
+            title="Default card image 3", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_image
+        self.blogs.save()
+        body = [
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "66666666-6666-6666-6666-666666666666",
+            }
+        ]
+        post = self._make_post("body-wins-over-default", hero_image=None, body=body)
+        self.assertEqual(post.get_card_image(), self.body_image)
+
+    def test_no_parent_default_still_returns_none(self):
+        post = self._make_post("no-default-set", hero_image=None, body=[])
+        self.assertIsNone(post.get_card_image())
+
+    def test_explicit_parent_kwarg_is_used_instead_of_a_fresh_lookup(self):
+        """Callers that already have the parent Blogs page (Blogs.get_context(),
+        Post.get_context()'s related posts loop) pass it in directly rather
+        than triggering an extra get_parent() query."""
+        other_blogs = Blogs(title="Other Blog", slug="other-blog-cci")
+        Page.objects.filter(depth=1).first().add_child(instance=other_blogs)
+        other_default = CustomImage.objects.create(
+            title="Other default", file=get_test_image_file(size=(1200, 800))
+        )
+        other_blogs.default_card_image = other_default
+        other_blogs.save()
+
+        post = self._make_post("explicit-parent-kwarg", hero_image=None, body=[])
+        # post's real parent (self.blogs) has no default set, but passing a
+        # different parent explicitly should be what's actually used.
+        self.assertEqual(post.get_card_image(parent=other_blogs), other_default)
+
+    def test_does_not_fall_back_to_parent_default_hero_image(self):
+        """default_hero_image is a hero-only fallback (see
+        TestPostGetHeroImage) — a card never uses it, even when
+        default_card_image is left blank."""
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image, not a card fallback", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("hero-default-not-for-cards", hero_image=None, body=[])
+        self.assertIsNone(post.get_card_image())
+
+
+class TestPostGetHeroImage(TestCase):
+    """
+    Post.get_hero_image() feeds ctx["hero"]["image"] in get_context() —
+    a separate fallback chain from get_card_image() (see
+    TestPostGetCardImage) so a Blogs page can configure a different image
+    for a post's own header versus its card, while a page that only ever
+    set default_card_image keeps working unchanged (get_hero_image() chains
+    to it when default_hero_image is blank).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-ghi")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-ghi")
+        home.add_child(instance=cls.blogs)
+
+        cls.hero_image = CustomImage.objects.create(
+            title="Hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        cls.body_image = CustomImage.objects.create(
+            title="Body image", file=get_test_image_file(size=(1200, 800))
+        )
+
+    def _make_post(self, slug, hero_image=None, body=None):
+        post = Post(title="Test post", slug=slug, hero_image=hero_image)
+        if body is not None:
+            post.body = json.dumps(body)
+        self.blogs.add_child(instance=post)
+        return Post.objects.get(pk=post.pk)
+
+    def test_explicit_hero_image_wins(self):
+        post = self._make_post("hero-wins-ghi", hero_image=self.hero_image, body=[])
+        self.assertEqual(post.get_hero_image(), self.hero_image)
+
+    def test_falls_back_to_first_image_in_body(self):
+        body = [
+            {
+                "type": "image_text",
+                "value": {"image": self.body_image.pk, "content": "<h2>Body</h2>"},
+                "id": "77777777-7777-7777-7777-777777777777",
+            }
+        ]
+        post = self._make_post("body-fallback-ghi", hero_image=None, body=body)
+        self.assertEqual(post.get_hero_image(), self.body_image)
+
+    def test_none_when_nothing_is_set(self):
+        post = self._make_post("no-image-ghi", hero_image=None, body=[])
+        self.assertIsNone(post.get_hero_image())
+
+    def test_falls_back_to_parent_default_hero_image(self):
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("default-hero-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(), default_hero_image)
+
+    def test_chains_to_parent_default_card_image_when_default_hero_image_is_blank(self):
+        """A Blogs page that only ever set default_card_image (nothing has
+        set default_hero_image yet) keeps feeding the hero the same image it
+        always did."""
+        default_card_image = CustomImage.objects.create(
+            title="Default card image", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.save()
+        post = self._make_post("chains-to-card-default-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(), default_card_image)
+
+    def test_default_hero_image_wins_over_default_card_image(self):
+        default_card_image = CustomImage.objects.create(
+            title="Default card image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image 2", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("hero-wins-over-card-default-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(), default_hero_image)
+
+    def test_own_image_wins_over_both_parent_defaults(self):
+        default_card_image = CustomImage.objects.create(
+            title="Default card image 3", file=get_test_image_file(size=(1200, 800))
+        )
+        default_hero_image = CustomImage.objects.create(
+            title="Default hero image 3", file=get_test_image_file(size=(1200, 800))
+        )
+        self.blogs.default_card_image = default_card_image
+        self.blogs.default_hero_image = default_hero_image
+        self.blogs.save()
+        post = self._make_post("own-wins-ghi", hero_image=self.hero_image, body=[])
+        self.assertEqual(post.get_hero_image(), self.hero_image)
+
+    def test_explicit_parent_kwarg_is_used_instead_of_a_fresh_lookup(self):
+        other_blogs = Blogs(title="Other Blog", slug="other-blog-ghi")
+        Page.objects.filter(depth=1).first().add_child(instance=other_blogs)
+        other_default = CustomImage.objects.create(
+            title="Other default hero image", file=get_test_image_file(size=(1200, 800))
+        )
+        other_blogs.default_hero_image = other_default
+        other_blogs.save()
+
+        post = self._make_post("explicit-parent-kwarg-ghi", hero_image=None, body=[])
+        self.assertEqual(post.get_hero_image(parent=other_blogs), other_default)
+
+
+# ---------------------------------------------------------------------------
+# Blogs
+# ---------------------------------------------------------------------------
+
+
+class TestBlogsParentSubpageTypes(WagtailPageTests):
+    def test_can_create_under_home_page(self):
+        self.assertCanCreateAt(HomePage, Blogs)
+
+    def test_can_not_create_under_blogs(self):
+        self.assertCanNotCreateAt(Blogs, Blogs)
+
+    def test_allowed_subpage_types(self):
+        self.assertAllowedSubpageTypes(Blogs, [Post])
+
+
+class TestBlogsGetContext(TestCase):
+    """
+    Blogs.get_context() must list live/public Post children newest-first by
+    published_at, and support narrowing to one category via
+    ?category=<slug>.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-bip")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-bip")
+        home.add_child(instance=cls.blogs)
+
+        cls.climate = BlogCategory.objects.create(name="Climate", slug="climate")
+        cls.justice = BlogCategory.objects.create(name="Justice", slug="justice")
+
+        base_time = timezone.now() - timedelta(days=10)
+        cls.posts = []
+        for i in range(3):
+            post = Post(
+                title=f"Post {i}",
+                slug=f"post-bip-{i}",
+                published_at=base_time + timedelta(days=i),
+            )
+            cls.blogs.add_child(instance=post)
+            cls.posts.append(post)
+
+        # ParentalManyToManyField.add() only updates the in-memory cluster —
+        # an explicit save() is needed to persist the M2M rows, same as any
+        # other change to an already-saved page instance made outside the
+        # normal admin edit-form flow (which always re-saves the whole
+        # cluster on submit, so this gotcha never surfaces there).
+        cls.posts[0].categories.add(cls.climate)
+        cls.posts[0].save()
+        cls.posts[1].categories.add(cls.justice)
+        cls.posts[1].save()
+        cls.posts[2].categories.add(cls.climate, cls.justice)
+        cls.posts[2].save()
+
+        cls.draft_post = Post(title="Draft", slug="draft-bip", live=False)
+        cls.blogs.add_child(instance=cls.draft_post)
+
+    def _get_context(self, query_string=""):
+        request = RequestFactory().get("/", query_string)
+        return self.blogs.get_context(request)
+
+    def test_posts_ordered_newest_first(self):
+        ctx = self._get_context()
+        titles = [p.title for p in ctx["posts"].object_list]
+        self.assertEqual(titles, ["Post 2", "Post 1", "Post 0"])
+
+    def test_excludes_non_live_posts(self):
+        ctx = self._get_context()
+        titles = [p.title for p in ctx["posts"].object_list]
+        self.assertNotIn("Draft", titles)
+
+    def test_categories_in_context(self):
+        ctx = self._get_context()
+        self.assertEqual({item["category"] for item in ctx["categories"]}, {self.climate, self.justice})
+
+    def test_category_label_falls_back_to_name(self):
+        ctx = self._get_context()
+        self.assertEqual({item["label"] for item in ctx["categories"]}, {self.climate.name, self.justice.name})
+
+    def test_category_label_uses_the_pages_locale(self):
+        from wtrx.models import BlogCategoryLabel
+
+        other = Locale.objects.create(language_code="fr-fr")
+        BlogCategoryLabel.objects.create(category=self.climate, locale=self.blogs.locale, name="Local label")
+        BlogCategoryLabel.objects.create(category=self.justice, locale=other, name="Justice climatique")
+        labels = {item["category"]: item["label"] for item in self._get_context()["categories"]}
+        self.assertEqual(labels[self.climate], "Local label")
+        self.assertEqual(labels[self.justice], self.justice.name)
+
+    def test_no_category_filter_selected_by_default(self):
+        ctx = self._get_context()
+        self.assertIsNone(ctx["selected_category"])
+
+    def test_category_filter_narrows_posts(self):
+        ctx = self._get_context({"category": "justice"})
+        titles = {p.title for p in ctx["posts"].object_list}
+        self.assertEqual(titles, {"Post 1", "Post 2"})
+
+    def test_category_filter_sets_selected_category(self):
+        ctx = self._get_context({"category": "climate"})
+        self.assertEqual(ctx["selected_category"], self.climate)
+
+    def test_unknown_category_slug_ignored(self):
+        ctx = self._get_context({"category": "nonexistent"})
+        self.assertIsNone(ctx["selected_category"])
+        self.assertEqual(len(ctx["posts"].object_list), 3)
+
+
+class TestBlogsPostLabel(TestCase):
+    """
+    Blogs.post_label drives the "Related …" headings on child posts, so it
+    must pluralise the page title without doubling an existing "s".
+    """
+
+    def test_singular_title_is_pluralised(self):
+        self.assertEqual(Blogs(title="Blog").post_label, "blogs")
+
+    def test_plural_title_is_left_alone(self):
+        self.assertEqual(Blogs(title="Press Releases").post_label, "press releases")
+
+    def test_title_ending_in_s_is_left_alone(self):
+        self.assertEqual(Blogs(title="News").post_label, "news")
+
+
+class TestCreatablePageTypes(TestCase):
+    """Form and Index pages are hidden from the "Create a page" menu."""
+
+    def test_hidden_page_types(self):
+        from wtrx.models import FormPage
+
+        for model in (FormPage, IndexPage):
+            self.assertFalse(model.is_creatable, model.__name__)
+            self.assertNotIn(model, HomePage.creatable_subpage_models())
+
+    def test_offered_page_types(self):
+        for model in (ContentPage, Blogs):
+            self.assertIn(model, HomePage.creatable_subpage_models())
+
+
+class TestBlogsMeta(TestCase):
+    def test_verbose_name(self):
+        self.assertEqual(Blogs._meta.verbose_name, "Media index")
+
+    def test_verbose_name_plural(self):
+        self.assertEqual(Blogs._meta.verbose_name_plural, "Media indexes")

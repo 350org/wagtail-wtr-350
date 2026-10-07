@@ -1,1 +1,8 @@
-{{ value }}
+{% comment %}
+Wrapper exists only to scope third-party markup's own CSS (see
+.wtr-raw-html form rules in main.css, styling e.g. the Salesforce
+Web-to-Case form on /contact-us) without touching this block's actual
+content -- RawHTMLBlock.clean() validates tag balance only (AGENTS.md
+pitfall #40), never rewrites the markup itself.
+{% endcomment %}
+<div class="wtr-raw-html">{{ value }}</div>

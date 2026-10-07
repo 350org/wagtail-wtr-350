@@ -2,8 +2,14 @@
 import os
 import sys
 
+from dotenv import load_dotenv
+
 
 def main():
+    # No-ops if .env doesn't exist (e.g. production, where the platform sets
+    # env vars directly) and never overrides vars already set in the shell.
+    load_dotenv()
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wagtail_wtr.settings.dev")
 
     try:

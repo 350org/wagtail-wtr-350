@@ -14,6 +14,18 @@ class CustomImage(AbstractImage):
     WAGTAILIMAGES_IMAGE_MODEL in settings/base.py points to this model.
     """
 
+    # Overrides AbstractImage's description field (blank=True there) to make
+    # it required — this is what alt text is derived from (default_alt_text
+    # falls back to the filename-derived title when it's blank). Allowed
+    # because AbstractImage is abstract; only concrete-model field overrides
+    # are disallowed in Django.
+    description = models.CharField(
+        max_length=255,
+        default="",
+        verbose_name=_("description"),
+        help_text=_("Used as alt text for screen readers. Describe what the image shows."),
+    )
+
     credit = models.CharField(
         max_length=255,
         blank=True,

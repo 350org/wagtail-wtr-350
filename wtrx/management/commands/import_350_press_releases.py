@@ -1,0 +1,375 @@
+"""
+import_350_press_releases management command.
+
+350.org's press releases are a custom WordPress post type that is NOT
+exposed via the WP REST API (unlike regular posts — see import_350_blog.py).
+Confirmed: /wp-json/wp/v2/types lists no press-release type, and
+/wp-json/wp/v2/press-release(s) 404s. Instead this scrapes the live pages,
+discovering their URLs from Yoast's dedicated XML sitemap
+(https://350.org/press-release-sitemap*.xml), which is complete and already
+sorted oldest-to-newest.
+
+Usage:
+    python manage.py import_350_press_releases                # last 20 (default)
+    python manage.py import_350_press_releases --limit 100
+    python manage.py import_350_press_releases --since 2026-01-01
+    python manage.py import_350_press_releases --dry-run        # preview only
+    python manage.py import_350_press_releases --update         # overwrite already-imported
+    python manage.py import_350_press_releases --target press-releases  # pick a Blogs page
+    python manage.py import_350_press_releases --site fr --target press-releases-fr
+                                                          # a 350.org country/language site
+
+Country/language sites: 350.org's other-language sites (e.g.
+https://350.org/fr) are separate WordPress multisite subdirectory installs
+with an identical sitemap/theme shape to the main site, just path-prefixed
+-- --site swaps only the base URL (see resolve_site_base_url() in
+_wp_content_utils.py); fetch_press_release()'s page-structure parsing and
+the Yoast site-name stripping both already follow whatever page was
+actually fetched. Imported country-site posts land as ordinary Posts under
+whichever --target Blogs page you point at, in the existing single Wagtail
+locale -- not a separate Wagtail Locale/translation tree, even though
+WAGTAIL_I18N_ENABLED and the header's language switcher exist for that
+purpose (a deliberate scope choice, not an oversight). Since Page.slug is
+only unique among siblings, not site-wide, a country/region sub-home's own
+Blogs child (e.g. wanting 350.org/france/press-releases to have the plain
+slug "press-releases") can collide with an identically-slugged page
+elsewhere in the tree -- --target then also accepts a slash-separated path
+from the site root (e.g. --target france/press-releases) instead of a bare
+slug; see resolve_blogs_target()'s docstring in _wp_content_utils.py.
+
+Field mapping:
+    Page <h2> in #press-release-header  -> Post.title
+    URL slug                            -> Post.slug
+    "#post-time" text (e.g. "August 19, 2026") -> Post.published_at
+                                (also first_published_at, which Wagtail
+                                only sets on an admin publish)
+    <article class="clearfix"> content  -> Post.body (StreamField)
+    Yoast SEO <title>/<meta name="description"> -> Post.seo_title /
+                                Post.search_description. The " - <Site
+                                Name>" suffix Yoast's title template adds is
+                                stripped. Left blank if Yoast has none set
+                                (common for older press releases).
+
+Post's author/categories/hero_image are all optional (see wtrx.models) and
+deliberately left unset here — a press release has no byline or category,
+and with hero_headline/hero_image blank the hero banner just renders the
+title and date. A leading image inside the article content simply becomes
+the first "image" block in the body, same as any other inline image.
+"""
+
+import html
+import re
+from datetime import datetime
+from datetime import timezone as dt_timezone
+from urllib.parse import unquote
+
+import requests
+from bs4 import BeautifulSoup
+from django.core.management.base import BaseCommand
+from django.utils import timezone as dj_timezone
+from django.utils.text import slugify
+
+from wtrx.management.commands._wp_content_utils import (
+    convert_body,
+    resolve_blogs_target,
+    resolve_site_base_url,
+    verify_site_reachable,
+    yoast_seo_fields_from_page,
+)
+
+USER_AGENT = "350-wagtail-press-release-import/1.0 (+https://github.com/)"
+
+_LOC_RE = re.compile(r"<loc>(.*?)</loc>")
+_URL_BLOCK_RE = re.compile(r"<url>(.*?)</url>", re.DOTALL)
+_LASTMOD_RE = re.compile(r"<lastmod>(.*?)</lastmod>")
+
+
+def _sitemap_shard_urls(session, sitemap_index_url):
+    resp = session.get(sitemap_index_url, timeout=30)
+    resp.raise_for_status()
+    return [
+        loc for loc in _LOC_RE.findall(resp.text) if "press-release-sitemap" in loc
+    ]
+
+
+def _parse_lastmod(text):
+    """Parse a sitemap <lastmod> value, or None if missing/unparseable."""
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def fetch_press_release_urls(session, sitemap_index_url):
+    """
+    Return every (url, lastmod) pair, most recently published first.
+
+    ``lastmod`` (a timezone-aware datetime, or None if the sitemap didn't
+    carry one) is Yoast's own ISO 8601 ``<lastmod>`` for that URL -- ISO 8601
+    is locale-independent, unlike the visible published date scraped from
+    each page later (see fetch_press_release()'s docstring), so it's kept
+    here as a fallback for when that scrape can't be parsed at all.
+
+    The sitemap shards are each internally oldest-to-newest, and later
+    shards contain newer posts than earlier ones (verified against the
+    live /media page), so concatenating shards in document order and
+    reversing the combined list gives newest-first.
+    """
+    urls = []
+    for shard_url in _sitemap_shard_urls(session, sitemap_index_url):
+        resp = session.get(shard_url, timeout=30)
+        resp.raise_for_status()
+        for block in _URL_BLOCK_RE.findall(resp.text):
+            loc_match = _LOC_RE.search(block)
+            if not loc_match:
+                continue
+            url = loc_match.group(1)
+            if url.rstrip("/").endswith("/press-release"):
+                continue  # the archive index itself, not a single post
+            lastmod_match = _LASTMOD_RE.search(block)
+            lastmod = _parse_lastmod(lastmod_match.group(1) if lastmod_match else None)
+            urls.append((url, lastmod))
+    urls.reverse()
+    return urls
+
+
+def _slug_from_url(url):
+    """
+    Derive a Page-safe slug from the URL's last path segment.
+
+    A WordPress permalink segment isn't guaranteed to already be a valid
+    Wagtail slug -- a title containing an em dash, curly apostrophe, or
+    other punctuation can end up percent-encoded in the URL (e.g.
+    "%e2%80%99"), and Post.slug (a plain Page.slug, SlugField(allow_unicode
+    =True)) rejects anything outside unicode letters/numbers/underscores/
+    hyphens. unquote() first so a percent-encoded character gets a chance
+    to become a real (possibly unicode) letter before slugify() strips
+    whatever's left that still isn't a valid slug character -- same
+    allow_unicode=True Wagtail itself uses when deriving a slug from a page
+    title (Page._get_autogenerated_slug()). A no-op for the already-clean,
+    lowercase-hyphenated slugs most WP permalinks use, so this doesn't
+    change dedup behavior (Post.objects.filter(slug=...)) for anything
+    that imported successfully before this existed.
+    """
+    segment = url.rstrip("/").rsplit("/", 1)[-1]
+    return slugify(unquote(segment), allow_unicode=True)
+
+
+def fetch_press_release(session, url, sitemap_lastmod=None):
+    """
+    Fetch and parse a single press release page.
+
+    ``sitemap_lastmod`` is that URL's <lastmod> from the sitemap (see
+    fetch_press_release_urls()), used as a fallback published_at.
+
+    Returns (title, published_at, body_blocks, seo_title,
+    search_description), or None if the page is missing the expected
+    structure (title or article content).
+    """
+    resp = session.get(url, timeout=30)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    header = soup.find(id="press-release-header")
+    title_tag = header.find("h2") if header else None
+    if title_tag is None:
+        return None
+    title = html.unescape(title_tag.get_text(strip=True))
+
+    # "#post-time"'s text is the theme's own rendering of the date, in
+    # whatever language the site is in ("26 septembre, 2026",
+    # "24. November 2021", "2026年8月26日", ...) -- "%B %d, %Y" only ever
+    # matches the English site's "Month DD, YYYY" shape. Rather than build
+    # out a per-language format table, fall back to the sitemap's own
+    # <lastmod> (locale-independent ISO 8601) when the scrape doesn't
+    # parse, and only as a last resort to "now" -- silently stamping every
+    # press release on a non-English site with today's date (the previous
+    # behavior) is worse than an approximate "last modified" date, since it
+    # also feeds first_published_at/listing order (pitfall #30).
+    published_at = sitemap_lastmod or dj_timezone.now()
+    date_span = soup.find(id="post-time")
+    if date_span:
+        try:
+            dt = datetime.strptime(date_span.get_text(strip=True), "%B %d, %Y")
+            published_at = dj_timezone.make_aware(dt, dt_timezone.utc)
+        except ValueError:
+            pass
+
+    article = soup.find("article", class_="clearfix")
+    if article is None:
+        return None
+
+    seo_title, search_description = yoast_seo_fields_from_page(soup)
+
+    return title, published_at, str(article), seo_title, search_description
+
+
+class Command(BaseCommand):
+    help = "Import press releases from 350.org/media as wtrx.Post instances."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=20,
+            help="Maximum number of press releases to import, most recent first "
+            "(default: 20). Use 0 for no limit.",
+        )
+        parser.add_argument(
+            "--since",
+            help="Only import press releases published on/after this date (YYYY-MM-DD). "
+            "Stops as soon as an older one is reached (list is newest-first).",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Print what would be imported without writing to the database.",
+        )
+        parser.add_argument(
+            "--update",
+            action="store_true",
+            help="Overwrite Posts that were already imported (matched by "
+            "slug), instead of skipping them.",
+        )
+        parser.add_argument(
+            "--target",
+            help="Slug of the Blogs page to import under, or a slash-separated path "
+            "from the site root (e.g. 'france/press-releases', or '/press-releases' "
+            "for one directly under it) if a bare slug would be ambiguous. Required if more than one Blogs page exists; optional "
+            "(and inferred) if there's only one.",
+        )
+        parser.add_argument(
+            "--site",
+            default="",
+            help="URL path segment for a 350.org country/language site, e.g. 'fr' "
+            "for https://350.org/fr. Omit for the main English site.",
+        )
+
+    def handle(self, *args, **options):
+        # Deferred imports to avoid import-time DB access (architecture rule #4).
+        from wtrx.models import Post
+
+        limit = options["limit"] or None
+        since = options["since"]
+        since_date = datetime.strptime(since, "%Y-%m-%d").date() if since else None
+        dry_run = options["dry_run"]
+        update = options["update"]
+
+        try:
+            base_url = resolve_site_base_url(options["site"])
+        except ValueError as exc:
+            self.stderr.write(self.style.ERROR(str(exc)))
+            return
+        sitemap_index_url = f"{base_url}/sitemap_index.xml"
+
+        blogs_index = resolve_blogs_target(self.stderr, self.style, options["target"])
+        if blogs_index is None:
+            return
+
+        session = requests.Session()
+        session.headers["User-Agent"] = USER_AGENT
+
+        if not verify_site_reachable(session, base_url):
+            self.stderr.write(
+                self.style.ERROR(f"No WordPress site found at {base_url} — check the --site value.")
+            )
+            return
+
+        self.stdout.write("Fetching press release list from sitemap…")
+        urls = fetch_press_release_urls(session, sitemap_index_url)
+        self.stdout.write(f"Found {len(urls)} press releases total.")
+
+        created, updated, skipped, errors = 0, 0, 0, 0
+        processed = 0
+
+        for url, lastmod in urls:
+            if limit and processed >= limit:
+                break
+
+            slug = _slug_from_url(url)
+            existing = Post.objects.child_of(blogs_index).filter(slug=slug).first()
+            if existing and not update:
+                self.stdout.write(f"  skip (already imported): {slug}")
+                skipped += 1
+                processed += 1
+                continue
+
+            parsed = fetch_press_release(session, url, sitemap_lastmod=lastmod)
+            if parsed is None:
+                self.stdout.write(self.style.WARNING(f"  skip (unrecognized page structure): {url}"))
+                continue
+            title, published_at, content_html, seo_title, search_description = parsed
+
+            if since_date and published_at.date() < since_date:
+                self.stdout.write(f"  reached --since cutoff at: {slug}")
+                break
+
+            processed += 1
+            self.stdout.write(f"{'updating' if existing else 'importing'}: {title}")
+
+            body = convert_body(content_html, session, self.stdout, dry_run=dry_run)
+
+            if dry_run:
+                self.stdout.write(
+                    f"    [dry-run] title={title!r} slug={slug!r} published_at={published_at} "
+                    f"seo_title={seo_title!r} search_description={search_description!r} "
+                    f"blocks={len(body)}"
+                )
+                continue
+
+            try:
+                if existing:
+                    existing.title = title
+                    existing.published_at = published_at
+                    # Only fill it in when it is missing: a page published through
+                    # the admin since the last import has a real value that must not
+                    # be overwritten by the source's date.
+                    existing.first_published_at = (
+                        existing.first_published_at or published_at
+                    )
+                    existing.body = body
+                    existing.seo_title = seo_title
+                    existing.search_description = search_description
+                    existing.save()
+                    updated += 1
+                else:
+                    page = Post(
+                        title=title,
+                        slug=slug,
+                        seo_title=seo_title,
+                        search_description=search_description,
+                        published_at=published_at,
+                        # Wagtail only sets first_published_at when a page is
+                        # published through the admin, so an imported page would
+                        # otherwise have none. Anything ordering by it then sorts on
+                        # mostly-NULL data -- and PostgreSQL puts NULLs *first* under
+                        # DESC, so genuinely recent pages sink below every import.
+                        # PageCardsBlock ("3 most recently published") is the visible
+                        # casualty. See `manage.py backfill_first_published`, which
+                        # repairs content imported before this was set here.
+                        first_published_at=published_at,
+                        body=body,
+                    )
+                    blogs_index.add_child(instance=page)
+                    created += 1
+            except Exception as exc:  # noqa: BLE001 -- deliberately broad
+                # A scrape of hundreds of press releases shouldn't die on one
+                # post's unanticipated save error (e.g. a slug collision
+                # outside this index, an unexpectedly-long field) -- same
+                # "one bad item shouldn't abort the run" reasoning as
+                # download_image()'s own broad except in _wp_content_utils.py
+                # and import_350_blog.py's equivalent page-save guard.
+                self.stdout.write(f"  WARNING: failed to save {slug!r} — {exc!r}")
+                errors += 1
+                continue
+
+        if dry_run:
+            self.stdout.write(self.style.SUCCESS("Dry run complete — no changes written."))
+        else:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Done. Created {created}, updated {updated}, skipped {skipped}, errors {errors}."
+                )
+            )

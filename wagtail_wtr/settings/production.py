@@ -5,6 +5,35 @@ from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401, F403
 
+# Divio's "Object Storage" service injects these DEFAULT_STORAGE_* env vars
+# directly at runtime (bucket, endpoint, credentials, region) — no DSN
+# parsing needed. Map them onto the discrete AWS_* env vars the S3 config
+# below already reads. Only sets vars that aren't already set (see
+# setdefault() below), so an explicit AWS_* var always wins, and Render
+# deployments (which set discrete AWS_* vars against a real AWS bucket, no
+# DEFAULT_STORAGE_* vars involved) are unaffected.
+#
+# Deliberately does NOT map DEFAULT_STORAGE_CUSTOM_DOMAIN onto
+# AWS_S3_CUSTOM_DOMAIN — django-storages concatenates custom_domain directly
+# with "/{key}" (see its url() method), so a virtual-hosted-style domain
+# (bucket baked into the domain, e.g. "<bucket>.divio-media.com") breaks
+# HTTPS for any dotted domain (SSL cert mismatch). Leaving AWS_S3_CUSTOM_DOMAIN
+# unset lets django-storages build the URL itself via boto3 from bucket +
+# endpoint_url + addressing_style="path" (see the "path" default below),
+# which is correct regardless of the domain's shape.
+_DIVIO_STORAGE_ENV_MAP = {
+    "AWS_STORAGE_BUCKET_NAME": "DEFAULT_STORAGE_BUCKET",
+    "AWS_ACCESS_KEY_ID": "DEFAULT_STORAGE_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY": "DEFAULT_STORAGE_SECRET_ACCESS_KEY",
+    "AWS_S3_ENDPOINT_URL": "DEFAULT_STORAGE_ENDPOINT_URL",
+    "AWS_S3_REGION_NAME": "DEFAULT_STORAGE_REGION",
+}
+if os.environ.get("DEFAULT_STORAGE_BUCKET"):
+    for _aws_key, _divio_key in _DIVIO_STORAGE_ENV_MAP.items():
+        _divio_value = os.environ.get(_divio_key)
+        if _divio_value:
+            os.environ.setdefault(_aws_key, _divio_value)
+
 DEBUG = False
 
 SECRET_KEY = os.environ["SECRET_KEY"]  # noqa: F405
@@ -24,36 +53,35 @@ for _loopback in ("127.0.0.1", "localhost"):
     if _loopback not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_loopback)
 
-WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"]  # noqa: F405
+# Wagtail joins this with paths that already start with "/" (e.g. the edit
+# links in moderation emails), so a trailing slash here yields "//admin/...".
+WAGTAILADMIN_BASE_URL = os.environ["WAGTAILADMIN_BASE_URL"].rstrip("/")  # noqa: F405
 
-DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
+# ssl_require=True: some managed Postgres instances (e.g. certain RDS parameter
+# groups) enforce SSL and refuse plaintext connections outright. Connecting
+# over SSL works whether or not the server actually requires it, so forcing it
+# here is safe regardless — and avoids depending on knowing (or being able to
+# check) the target instance's specific enforcement setting. (The actual fix
+# for the $HOME/.postgresql/postgresql.crt permission error this surfaced
+# lives in bin/start.sh, not here — see the comment there.)
+DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
 
 _s3_bucket = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 
 # AssumeTlsFromEdgeMiddleware runs before SecurityMiddleware so SECURE_PROXY_SSL_HEADER
 # sees https when TRUST_EDGE_TLS is set. WhiteNoise must follow SecurityMiddleware.
-_MIDDLEWARE_SECURITY_PREFIX = [
+#
+# Builds on base.py's MIDDLEWARE (imported via `from .base import *` above)
+# rather than re-declaring the whole list here — a hand-duplicated copy
+# silently drifted out of sync in the past (missing a middleware entry added
+# to base.py caused a 500 on every admin page in production; see git log).
+assert MIDDLEWARE[0] == "django.middleware.security.SecurityMiddleware"  # noqa: F405
+MIDDLEWARE = [  # noqa: F405
     "wagtail_wtr.middleware.AssumeTlsFromEdgeMiddleware",
-    "django.middleware.security.SecurityMiddleware",
+    MIDDLEWARE[0],  # noqa: F405
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    *MIDDLEWARE[1:],  # noqa: F405
 ]
-_MIDDLEWARE_TAIL = [
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
-]
-
-if _s3_bucket:
-    MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + _MIDDLEWARE_TAIL
-else:
-    MIDDLEWARE = _MIDDLEWARE_SECURITY_PREFIX + [
-        "whitenoise.middleware.WhiteNoiseMiddleware",
-        *_MIDDLEWARE_TAIL,
-    ]
 
 STORAGES = {
     "default": {
@@ -72,24 +100,17 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
 # ---------------------------------------------------------------------------
-# AWS S3 storage (optional — omit AWS_STORAGE_BUCKET_NAME to disable)
-# When configured, both user-uploaded media AND collected static files are
-# stored in S3 under separate prefixes (media/ and static/).
+# AWS S3 storage for MEDIA ONLY (optional — omit AWS_STORAGE_BUCKET_NAME to disable)
+# When configured, user-uploaded media (images, documents) is stored in S3 under
+# the media/ prefix. Static files (CSS, JS, fonts) are NOT put on S3 — they are
+# always served by WhiteNoise from the container's STATIC_ROOT, with collectstatic
+# run at container startup by bin/start.sh in every environment. This decoupling
+# keeps static serving reliable on platforms without a pre-deploy hook (e.g. Divio),
+# while still giving media persistent, shared storage.
 #
-# Bucket layout:
-#   {bucket}/static/  — collected static assets (CSS, JS, fonts)
-#   {bucket}/media/   — user-uploaded content (images, documents)
-#
-# When S3 is configured, collectstatic runs in Render's preDeployCommand
-# (render.yaml) before the container starts so gunicorn binds immediately
-# and the health check responds without delay.
-# When S3 is not configured (WhiteNoise path), collectstatic runs in
-# start.sh instead so the manifest lands in the correct container filesystem.
-#
-# WARNING: Without S3, media is stored on the local filesystem. Render's
-# Docker containers have ephemeral disks — media will be lost on every deploy.
-# Always configure S3 (or another persistent storage backend) for production
-# deployments where editors upload images or documents.
+# WARNING: Without S3, media is stored on the local filesystem, which is ephemeral
+# on Divio/Render — uploads are lost on every deploy. Configure S3 for any
+# deployment where editors upload images or documents.
 # ---------------------------------------------------------------------------
 if _s3_bucket:
     _s3_custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN")
@@ -100,11 +121,47 @@ if _s3_bucket:
     # Only pass explicit credentials when set — omitting them lets boto3 use its
     # full credential chain (env vars, ~/.aws/credentials, IAM instance role).
     _s3_region = os.environ.get("AWS_S3_REGION_NAME", "us-east-1")
+    _s3_endpoint_url = os.environ.get("AWS_S3_ENDPOINT_URL")
     _s3_opts_base = {
         "bucket_name": _s3_bucket,
         "region_name": _s3_region,
         "custom_domain": _s3_custom_domain,
-        "querystring_auth": False,  # public read; all objects in this bucket are publicly accessible via direct URL
+        "endpoint_url": _s3_endpoint_url,  # non-AWS S3-compatible providers (e.g. Divio Object Storage)
+        # Public read is achieved differently depending on how the bucket was
+        # provisioned:
+        #
+        # - A manually-provisioned AWS bucket (bin/provision.sh) blocks
+        #   public ACLs and grants public read via an explicit bucket policy
+        #   instead (its "Apply bucket policy" step) — no per-object ACL
+        #   needed, so AWS_S3_DEFAULT_ACL should stay unset there (sending an
+        #   ACL header to a bucket that blocks public ACLs is a hard error).
+        # - Divio's "Object Storage" service does the opposite: its
+        #   documentation (docs.divio.com/how-to/interact-storage/) says
+        #   objects are private by default and must be given the
+        #   'public-read' ACL individually, and confirms its credentials
+        #   don't grant s3:PutBucketPolicy/PutPublicAccessBlock (verified
+        #   directly — that call returns AccessDenied). Set
+        #   AWS_S3_DEFAULT_ACL=public-read there; django-storages then sends
+        #   an ACL header on every upload automatically.
+        "default_acl": os.environ.get("AWS_S3_DEFAULT_ACL") or None,
+        # Alternative to the ACL approach above, for a bucket that supports
+        # neither a public bucket policy nor public ACLs: presigned URLs need
+        # only s3:GetObject on our own credentials. Off by default since
+        # every provider this project currently targets supports one of the
+        # two options above.
+        "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "false").lower() in ("true", "1", "yes"),
+        # Only takes effect when querystring_auth is True. Matches the
+        # CacheControl max-age below so a signed URL stays valid at least as
+        # long as a client/CDN might cache the page embedding it — a signed
+        # URL that outlives its own page's cache window would 403 on reuse.
+        "querystring_expire": _aws_expiry,
+        # "path" (not virtual-hosted, boto3's default) works for every bucket
+        # name, including ones containing a dot (e.g. "example.com") — a
+        # dotted bucket name breaks HTTPS virtual-hosted-style addressing,
+        # since it produces a hostname like "example.com.s3.amazonaws.com"
+        # that AWS's own wildcard cert (*.s3.amazonaws.com) doesn't cover,
+        # causing an SSL validation error on every request.
+        "addressing_style": os.environ.get("AWS_S3_ADDRESSING_STYLE", "path"),
     }
     if os.environ.get("AWS_ACCESS_KEY_ID"):
         _secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
@@ -129,30 +186,20 @@ if _s3_bucket:
         },
     }
 
-    # Static files storage — S3ManifestStaticStorage layers ManifestFilesMixin
-    # on top of S3Storage, rewriting asset URLs with content-hash suffixes
-    # (e.g. main.abc123de.css) for safe far-future Cache-Control headers.
-    # file_overwrite=True is correct here: collectstatic regenerates files
-    # deterministically on each deploy and filenames change with content.
-    STORAGES["staticfiles"] = {
-        "BACKEND": "wtrx.storage_backends.S3ManifestStaticStorage",
-        "OPTIONS": {
-            **_s3_opts_base,
-            "location": "static",
-            "file_overwrite": True,
-            "object_parameters": {
-                "CacheControl": f"max-age={_aws_expiry}, s-maxage={_aws_expiry}, must-revalidate",
-            },
-        },
-    }
-
-    _s3_base_url = (
-        f"https://{_s3_custom_domain}"
-        if _s3_custom_domain
-        else f"https://{_s3_bucket}.s3.{_s3_region}.amazonaws.com"
-    )
-    MEDIA_URL = f"{_s3_base_url}/media/"  # noqa: F405
-    STATIC_URL = f"{_s3_base_url}/static/"  # noqa: F405
+    # NOTE: static files are intentionally NOT placed on S3. STORAGES["staticfiles"]
+    # keeps its WhiteNoise default (set above), and STATIC_URL keeps its local
+    # default from base.py. Only media (STORAGES["default"]) uses S3.
+    #
+    # settings.MEDIA_URL is NOT set here (base.py's "/media/" default is left
+    # as-is) — it's vestigial for S3-backed media: urls.py only ever consumes
+    # it inside `if settings.DEBUG`, which production never is, and Wagtail's
+    # own image rendering calls the storage instance's .url() directly
+    # (django-storages' S3Storage.url(), which — since AWS_S3_CUSTOM_DOMAIN is
+    # unset above — builds the URL itself via boto3, correctly respecting
+    # addressing_style for any bucket name). A hand-built MEDIA_URL here would
+    # just be a second, easy-to-drift copy of that same logic — see git log
+    # for a prior version of this file that got the dotted-bucket-name case
+    # wrong by doing exactly that.
 
 # ---------------------------------------------------------------------------
 # Email / SMTP (optional — omit EMAIL_HOST to fall back to console backend)
@@ -185,6 +232,47 @@ if _email_host:
     DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# ---------------------------------------------------------------------------
+# Logging — with DEBUG=False, Django's own default LOGGING config only prints
+# exceptions to console when DEBUG=True; otherwise it tries to email ADMINS
+# (unset here) and the traceback goes nowhere. Every 500 was previously
+# invisible in container logs because of this. Route django (request errors,
+# security warnings, etc.) and our own app loggers (logging.getLogger(__name__)
+# in views.py/models.py) to stderr, which gunicorn's --error-logfile - and
+# Divio both already capture.
+# ---------------------------------------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
 
 # ---------------------------------------------------------------------------
 # Cloudflare cache invalidation (optional — omit env vars to disable)

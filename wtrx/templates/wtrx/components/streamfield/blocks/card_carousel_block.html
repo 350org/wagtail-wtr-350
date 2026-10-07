@@ -1,0 +1,197 @@
+{% load i18n wagtailcore_tags %}
+{% comment %}
+Heading + rich text (+ optional CTA button) sit in a fixed left column;
+cards scroll horizontally in the right column via native CSS scroll-snap
+(see main.css's .wtr-card-carousel-track), with JS-driven prev/next arrow
+buttons that scroll by one card width at a time and disable themselves at
+the start/end — no wraparound. The buttons are a progressive-enhancement
+layer on top of the track's own native scroll/swipe, which works with JS
+disabled too.
+
+data-carousel is scoped per block instance (not a single page-wide guard
+like _actionkit_form.html's) since a page can have more than one carousel,
+each needing its own track/button wiring.
+
+Edge fade: a white-to-transparent gradient (.wtr-card-carousel-fade, see
+main.css) is pinned over the track's right edge, not baked into any one
+card — the card that's actually half-cut-off there changes as the user
+scrolls, so a fixed overlay at the edge (content scrolls underneath it)
+is what actually tracks "whichever card is currently half offscreen",
+rather than a per-card gradient that would only be correct for one
+scroll position. It's hidden (via the same updateArrows() that toggles
+the arrow buttons) once nextBtn is disabled — at the end of the scroll
+the last card is fully visible, not cut off, so nothing there should be
+faded.
+
+No vertical padding on the root: this block is special-cased out of the
+shared `mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8` wrapper every other
+non-"section" block gets from content_page.html/home_page.html (see the
+Width note below for why), so it doesn't inherit that wrapper's horizontal
+gutters either — it owns its own pl-4/6/8 directly. The gap between body
+blocks comes from the page templates' space-y-* on the block loop, not
+from padding here.
+
+The arrow row's -mb-8 is a correction rather than styling: unlike every
+other block, this one ends in a 60px arrow row (the 44px buttons plus
+their mt-4) that is chrome, not content. The block loop's gap then starts
+below *that*, so the space under the last card read as 156px against the
+96px every neighbouring block gets. Pulling 32px back lands it at 124px
+— deliberately not the full 60px, since the buttons still need room
+beneath them.
+
+The negative margin goes on the arrow row, NOT on this root. Tailwind v4
+applies the loop's spacing as `margin-block-end` on the root, and the
+`:where()` in its selector contributes no specificity — so a `-mb-8` on
+the root does not *reduce* that gap, it replaces it outright (96px → -32px,
+dropping the next block on top of the arrows). On the arrow row it instead
+ends the block's own box 32px higher, letting the buttons overhang it, and
+the loop's gap is measured from there — so this stays correct on the home
+page's larger space-y-32 as well, which a hardcoded root margin would not.
+
+Equal card heights: the track's own flex row already stretches each
+[data-carousel-item] wrapper to match the tallest one (align-items'
+default is stretch), but that stretch only affects the wrapper's own box
+— .wtr-card inside it (components/card.html) is a plain block child, not
+itself a flex item, so it doesn't inherit that stretched height and was
+sitting at its own natural (shorter) height inside a taller wrapper.
+Making the wrapper `flex` too promotes .wtr-card to a flex item of it,
+picking up the same default stretch and filling the wrapper's full
+(already-stretched-to-tallest) height.
+
+Width: card_carousel is special-cased in content_page.html/home_page.html
+(alongside "section") to skip the shared `mx-auto max-w-5xl px-4 sm:px-6
+lg:px-8` wrapper every other block gets, so this template owns its own
+width instead — `mx-auto max-w-[1500px]` on the row itself, wider than
+that shared 1024px cap (per design) and no longer bound by it, with its
+own matching pl-4/6/8 so the text column's left edge still lines up with
+every other block at any viewport up to 1500px (both are just "edge of
+viewport" until 1500px, where this one alone stops growing and centers).
+
+An earlier version kept the shared wrapper and used the `50% - 50vw`
+bleed trick to break just the cards column out to the true viewport edge.
+That caused real horizontal page overflow: 100vw is the *layout* viewport
+width, which includes the scrollbar's own width, so the bleed
+overshot the visible area by the scrollbar's width on any OS/browser that
+reserves space for one (most non-macOS-overlay setups) — a well-known
+gotcha with that technique. Owning a capped, self-contained width instead
+of computing a bleed relative to the true viewport sidesteps that
+entirely, and also gives the ~1500px cap directly, with no extra work.
+No pr-4/6/8 on the row itself — the cards column intentionally has no
+padding there, so cards still visually run to (and get cut off at) this
+container's own right edge, same look as before, just capped at 1500px
+instead of the true viewport edge. The text column carries its own
+pr-4/sm:pr-6 instead (reset to md:pr-0), scoped to mobile only — below
+md: the columns stack (flex-col) and share the row's full width, so
+without it the right-aligned text/button would run flush to the row's
+own right edge same as the cards; at md:+ the column's width is already
+capped well short of that edge by md:max-w-[400px], so no extra padding
+is needed there.
+
+md:, not lg:, is the row-split breakpoint: side-by-side now holds through
+tablet, and only phones (below md:) stack — narrower than the 520/583px
+column this used to size against, so tablet has plenty of room for the
+row without wrapping oddly.
+{% endcomment %}
+<div class="wtr-card-carousel mx-auto flex max-w-[1500px] flex-col gap-8 pl-4 sm:pl-6 lg:pl-8 md:flex-row md:items-center md:gap-12" data-carousel>
+    {% comment %}
+    md:max-w-[400px]: the copy column caps at 400px on tablet and desktop
+    alike (not a fixed width — a short heading/paragraph shouldn't force
+    the column out to 400px, only wrap short of it).
+
+    text-right only kicks in at md:, matching the row's own md:flex-row
+    split above: right-aligning only makes sense once the copy column
+    sits beside the cards at a narrower 400px measure, where it reads
+    close to the full column width. Below md: the row is still stacked
+    (text above cards), so it stays text-left to match the neighboring
+    blocks (Callout, FeaturePanel) on mobile/tablet.
+
+    md:ml-8 sits on this column, not on the row's own pl-4/6/8: at a
+    narrower 400px measure the right-aligned copy still reads close to the
+    full column width, so this keeps a little breathing room from the
+    row's left edge. Margin (not padding) leaves the column's own max-w
+    untouched; it only shifts the column right, which the cards column
+    (flex-1) simply yields room for.
+    {% endcomment %}
+    {% comment %}
+    in-data-[bg-tone=dark]: on this one prose container covers heading +
+    body now they're a single richtext field — the cards in the scrolling
+    track keep their own always-light bg-neutral-50 fill regardless
+    (AGENTS.md pitfall #34), so only this text column needs to invert. The
+    h2's font-size/tracking are pinned via .wtr-card-carousel-content in
+    main.css, same technique .wtr-text-block uses.
+    {% endcomment %}
+    <div class="flex flex-col gap-4 pr-4 text-left md:text-right sm:pr-6 md:ml-8 md:max-w-[400px] md:shrink-0 md:pr-0">
+        <div class="wtr-card-carousel-content prose prose-neutral max-w-none text-lg leading-[1.2] sm:text-xl in-data-[bg-tone=dark]:prose-invert">
+            {{ value.content|richtext }}
+        </div>
+        {% if value.link_page or value.link_url %}
+            <div class="mt-2">
+                {% trans "Take action" as default_link_text %}
+                {% include "wtrx/components/button.html" with text=value.link_text|default:default_link_text link_page=value.link_page link_url=value.link_url style="primary" size="lg" %}
+            </div>
+        {% endif %}
+    </div>
+    <div class="min-w-0 flex-1">
+        <div class="relative">
+            <div class="wtr-card-carousel-track flex gap-6 overflow-x-auto" data-carousel-track>
+                {% for card in value.cards %}
+                    <div class="flex w-[85%] shrink-0 sm:w-80" data-carousel-item>
+                        {% include "wtrx/components/card.html" with card=card description_size="text-xl" %}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="wtr-card-carousel-fade pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-24 lg:w-32" data-carousel-fade aria-hidden="true"></div>
+        </div>
+        <div class="mt-4 -mb-8 flex justify-end gap-3 pr-4 sm:pr-6 lg:pr-8">
+            <button type="button" class="wtr-carousel-arrow" data-carousel-prev aria-label="{% trans 'Previous cards' %}">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button type="button" class="wtr-carousel-arrow" data-carousel-next aria-label="{% trans 'Next cards' %}">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        document.querySelectorAll("[data-carousel]").forEach(function (root) {
+            if (root.__wtrCarouselInit) { return; }
+            root.__wtrCarouselInit = true;
+
+            var track = root.querySelector("[data-carousel-track]");
+            var prevBtn = root.querySelector("[data-carousel-prev]");
+            var nextBtn = root.querySelector("[data-carousel-next]");
+            var fade = root.querySelector("[data-carousel-fade]");
+            if (!track || !prevBtn || !nextBtn) { return; }
+
+            function itemStep() {
+                var item = track.querySelector("[data-carousel-item]");
+                if (!item) { return track.clientWidth; }
+                var trackStyle = getComputedStyle(track);
+                var gap = parseFloat(trackStyle.columnGap || trackStyle.gap || "0");
+                return item.getBoundingClientRect().width + gap;
+            }
+
+            function updateArrows() {
+                var maxScroll = track.scrollWidth - track.clientWidth;
+                prevBtn.disabled = track.scrollLeft <= 1;
+                nextBtn.disabled = track.scrollLeft >= maxScroll - 1;
+                if (fade) { fade.style.opacity = nextBtn.disabled ? "0" : "1"; }
+            }
+
+            prevBtn.addEventListener("click", function () {
+                track.scrollBy({left: -itemStep(), behavior: "smooth"});
+            });
+            nextBtn.addEventListener("click", function () {
+                track.scrollBy({left: itemStep(), behavior: "smooth"});
+            });
+            track.addEventListener("scroll", updateArrows);
+            window.addEventListener("resize", updateArrows);
+            updateArrows();
+        });
+    })();
+</script>

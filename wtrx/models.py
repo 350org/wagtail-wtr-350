@@ -1,8 +1,17 @@
+import logging
+
+from django import forms
+from django.conf import settings
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
 from django.http import JsonResponse
+from django.utils import timezone, translation
+from django.utils.html import strip_tags
+from django.utils.text import format_lazy, slugify
 from django.utils.translation import gettext_lazy as _
-from modelcluster.fields import ParentalKey
+from modelcluster.fields import ParentalKey, ParentalManyToManyField
+from modelcluster.models import ClusterableModel
+from wagtail.admin.forms import WagtailAdminPageForm
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
@@ -10,21 +19,35 @@ from wagtail.admin.panels import (
     ObjectList,
     TabbedInterface,
 )
+from wagtail.blocks import StreamValue, StructValue
+from wagtail.blocks.list_block import ListValue
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.fields import RichTextField, StreamField
-from wagtail.models import Page
+from wagtail.models import Locale, Orderable, Page
+from wagtail.snippets.models import register_snippet
+from wagtail_ai.panels import AIDescriptionFieldPanel, AITitleFieldPanel
 from wagtailmedia.edit_handlers import MediaChooserPanel
 
-from .blocks import BodyStreamBlock
-from .constants import RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
+from .blocks import (
+    BACKGROUND_COLOR_CHOICES,
+    BannerHeroCTABlock,
+    BodyStreamBlock,
+    HeroCTABlock,
+    headline_html,
+    hero_is_minimal,
+)
+from .constants import RICHTEXT_FEATURES_HEADLINE, RICHTEXT_FEATURES_HERO, RICHTEXT_FEATURES_INLINE
 from .images import CustomImage, CustomRendition  # noqa: F401 — register with Django ORM
+from .integrations import actionkit
+from .widgets import HeadlineRichTextArea
 from .site_settings import (  # noqa: F401 — register with Django ORM
     BrandingSEOSettings,
     FooterSettings,
     IntegrationSettings,
     NavigationSettings,
-    SocialSettings,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class BasePage(Page):
@@ -55,31 +78,91 @@ class BasePage(Page):
         verbose_name=_("hide from search"),
         help_text=_("Exclude this page from search results and the sitemap."),
     )
+    canonical_url = models.URLField(
+        blank=True,
+        verbose_name=_("canonical URL"),
+        help_text=_(
+            "Optional. Set if this page's content is duplicated elsewhere "
+            "and search engines should treat another URL as the primary "
+            "version. Defaults to this page's own URL."
+        ),
+    )
 
-    promote_panels = Page.promote_panels + [
+    # AI-assisted title panel, reused by every concrete page model below in
+    # place of Page.content_panels (which is just [TitleFieldPanel("title")])
+    # — swaps in wagtail-ai's drop-in replacement so the title field gets an
+    # AI-assist button in the admin.
+    title_panels = [AITitleFieldPanel("title")]
+
+    promote_panels = [
+        # Rebuilt by hand (not Page.promote_panels[0]) because
+        # AIDescriptionFieldPanel needs to replace one nested field
+        # (search_description) inside it — accepted tradeoff: if a future
+        # Wagtail release adds a new field to its own default "For search
+        # engines" panel, it won't automatically appear here too.
+        MultiFieldPanel(
+            [
+                FieldPanel("slug"),
+                FieldPanel("seo_title"),
+                # AI-assisted meta description, in place of Page.promote_panels'
+                # plain FieldPanel("search_description").
+                AIDescriptionFieldPanel("search_description"),
+            ],
+            heading=_("For search engines"),
+        ),
+        # "For site menus" is intentionally omitted — this project doesn't
+        # use Wagtail's automatic page-tree menu APIs (navigation is driven
+        # entirely by NavigationSettings, a hand-curated StreamField), so
+        # editors never need to see the show_in_menus checkbox. The field
+        # itself is untouched (Wagtail core still reads/writes it, default
+        # False), only the editor UI panel is dropped.
         MultiFieldPanel(
             [
                 FieldPanel("meta_image"),
                 FieldPanel("hide_from_search"),
+                FieldPanel("canonical_url"),
             ],
             heading=_("SEO"),
         ),
     ]
 
-    def get_context(self, request, *args, **kwargs):
-        ctx = super().get_context(request, *args, **kwargs)
-        # Ensure transparent_header is always present in context so header.html
-        # never relies on implicit falsy-absent behaviour. setdefault is used
-        # intentionally: HomePage.get_context() calls super() first and then
-        # sets ctx["transparent_header"] = self.use_transparent_header, so this
-        # default is only applied for non-home pages where the key is absent.
-        ctx.setdefault("transparent_header", False)
-        return ctx
+    # Page.settings_panels (scheduled "go live"/"expire" dates, and
+    # internal commenting) — inherited automatically, but every concrete
+    # page model below defines its own edit_handler as a TabbedInterface of
+    # explicit ObjectLists, which does NOT pull in settings_panels the way
+    # Wagtail's own default single-ObjectList edit_handler would. Named here
+    # (matching the title_panels/promote_panels pattern above) so it's
+    # obvious every concrete model must include
+    # ObjectList(settings_panels, heading=_("Settings")) as a third tab —
+    # omit it and the whole Settings tab, including comments, silently
+    # disappears with no error.
+    settings_panels = Page.settings_panels
 
     def get_sitemap_urls(self, request=None):
         if self.hide_from_search:
             return []
         return super().get_sitemap_urls(request)
+
+    def serve_preview(self, request, mode_name):
+        """
+        Render the preview in the page's own language, not the editor's.
+
+        A served page gets its language from the URL prefix (`/pt/...`) via
+        LocaleMiddleware, but a preview is requested from an admin URL outside
+        `i18n_patterns`, so the active language there is whatever the editor's
+        admin is set to. Without this, previewing a Portuguese page renders
+        every `{% trans %}` string in the chrome -- buttons, pagination, form
+        errors -- in English, which makes the preview useless for exactly the
+        pages that need checking most. Wagtail does not do this itself:
+        `Page.serve_preview()` builds its own TemplateResponse and never
+        touches the active translation.
+        """
+        with translation.override(self.locale.language_code):
+            response = super().serve_preview(request, mode_name)
+            # TemplateResponse renders lazily, after this block would exit.
+            if hasattr(response, "render") and not response.is_rendered:
+                response.render()
+            return response
 
     class Meta:
         abstract = True
@@ -87,27 +170,75 @@ class BasePage(Page):
 
 class HeroMixin(models.Model):
     """
-    Mixin adding a full hero section to any page type.
+    Mixin adding a hero section to any page type.
+
+    Renders as one of two variants (see components/hero.html): "full" — the
+    original full-viewport hero, background image or video, left-aligned
+    text anchored toward the bottom, optional cta — or "banner" — a compact
+    rounded panel, solid/gradient color background (reusing CalloutBlock's
+    5-color system) beside an image, no cta. Which variant a page gets is
+    fixed per page type via the hero_variant class attribute, not
+    editor-controlled: HomePage overrides it to "full"; every other
+    HeroMixin page type (ContentPage, IndexPage, Blogs) uses the "banner"
+    default.
 
     Fields:
     - hero_headline: optional override for the page title as the displayed h1
     - hero_copy: optional subtext below the headline
-    - hero_image: optional background/feature image (also used as video poster fallback)
-    - hero_video: optional video; switches hero to two-column text-left / video-right layout
-    - hero_link_text + hero_link_page / hero_link_url: optional CTA button
+    - hero_image: optional background/feature image. "full" variant: also
+      used as the video poster fallback, and as the background itself when
+      no video is set. "banner" variant: the image beside the color panel.
+    - hero_video: optional background video (autoplay/muted/loop), with a
+      custom pause/play toggle in the corner. Takes over from hero_image as
+      the background/image area on both variants; hero_image is still used
+      as the poster fallback if the video has none.
+    - hero_image_caption: optional caption pill overlaid at the bottom of
+      whichever of hero_image/hero_video is showing, e.g. a photo credit —
+      same .wtr-image-caption chrome as SignupActionKitBlock/ImageBlock.
+      "banner" variant only — hero.html's "full" section has no caption
+      chrome, and hero_panels (HomePage's panel set) omits this field for
+      the same reason. See banner_hero_panels below.
+    - hero_banner_color: background color/gradient. "banner" variant only —
+      "full" never shows a solid color background.
+    - hero_cta: optional button/signup widget, at most one. HomePage
+      ("full" variant) uses HeroCTABlock (button or signup); every other
+      HeroMixin page type ("banner" variant) redeclares this field to use
+      BannerHeroCTABlock instead (button only) — see that class's own
+      docstring for why banner needed a genuinely separate StreamBlock
+      rather than a template-side restriction of HeroCTABlock. A donate
+      block and an announcement bar are also possible choices here, but
+      commented out in HeroCTABlock's definition until they're properly
+      implemented for the hero — see HeroCTABlock's docstring.
+
+    There used to be an editable hero_layout field (centered vs. left-
+    aligned text, "full" variant only) — removed in favor of a single fixed
+    layout (left-aligned, matching what every real "full"-variant page
+    already used in practice: Home and every regional homepage). See
+    components/hero.html — it no longer branches on layout at all.
+
+    hero_video only matters for the "full" variant, so a "banner"-only page
+    type should use banner_hero_panels (defined below, next to hero_panels)
+    instead of hero_panels — it exposes headline/copy/image/banner_color
+    plus hero_cta, the fields "banner" actually renders. hero_video stays a
+    real model field on every HeroMixin subclass (including "banner"-only
+    ones) rather than being split into a separate mixin, so this is a
+    panel-only choice with no schema difference between page types — see
+    banner_hero_panels' own docstring for why. hero_cta itself IS a schema
+    difference between page types, unlike hero_video — see
+    BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
 
     Use: include `components/hero.html` in the page template.
-    Exactly one of hero_link_page or hero_link_url should be set (not validated
-    at model level — validated in the admin panel via help text guidance).
     """
 
-    hero_headline = models.CharField(
-        max_length=255,
+    hero_variant = "banner"
+
+    hero_headline = RichTextField(
         blank=True,
+        features=RICHTEXT_FEATURES_HEADLINE,
         verbose_name=_("hero headline"),
         help_text=_(
             "Optional. Overrides the page title as the displayed heading. "
-            "Leave blank to use the page title."
+            "Leave blank to use the page title. Press Enter for a line break."
         ),
     )
     hero_copy = RichTextField(
@@ -136,50 +267,417 @@ class HeroMixin(models.Model):
         limit_choices_to={"type": "video"},
         verbose_name=_("hero video"),
         help_text=_(
-            "Optional video displayed in the hero. When set, the layout switches to "
-            "two columns: text on the left, video on the right. "
+            "Optional. When set, this video autoplays (muted, looping) as the "
+            "hero's full-bleed background instead of the hero image, with a "
+            "pause/play button in the corner. "
             "Upload a thumbnail on the video in the media library to use as a poster frame; "
             "falls back to the hero image above if no thumbnail is set."
         ),
     )
-    hero_link_text = models.CharField(
-        max_length=100,
+    hero_pre_header = models.CharField(
+        max_length=255,
         blank=True,
-        verbose_name=_("hero link text"),
-        help_text=_("CTA button label. Required if a link is set."),
+        verbose_name=_("hero pre-header"),
+        help_text=_(
+            "Optional short line shown above the headline, e.g. "
+            "\"Welcome to 350 Canada\"."
+        ),
     )
-    hero_link_page = models.ForeignKey(
-        "wagtailcore.Page",
-        null=True,
+    hero_image_caption = models.CharField(
+        max_length=255,
         blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        verbose_name=_("hero link page"),
-        help_text=_("Internal CTA link. Set either this or Hero link URL, not both."),
+        verbose_name=_("hero image caption"),
+        help_text=_(
+            "Optional caption overlaid at the bottom of the hero image or "
+            "video, e.g. a photo credit."
+        ),
     )
-    hero_link_url = models.URLField(
+    hero_jumbo_headline = models.BooleanField(
+        default=False,
+        verbose_name=_("jumbo headline"),
+        help_text=_(
+            "Show the headline at the home page's display size on desktop. "
+            "Best with a short headline."
+        ),
+    )
+    hero_banner_color = models.CharField(
+        max_length=20,
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="navy",
+        verbose_name=_("hero banner color"),
+        help_text=_(
+            "Background color for the compact hero banner. Only affects pages whose "
+            "hero renders as a banner (i.e. every page except the homepage)."
+        ),
+    )
+    hero_cta = StreamField(
+        HeroCTABlock(),
         blank=True,
-        verbose_name=_("hero link URL"),
-        help_text=_("External CTA link. Set either this or Hero link page, not both."),
+        verbose_name=_("hero call to action"),
+        help_text=_("Optional button or signup bar shown below the hero copy. At most one."),
+        use_json_field=True,
     )
 
+    # hero_image_caption is deliberately omitted here (unlike
+    # banner_hero_panels below) — the "full" variant's own hero.html
+    # section has no caption chrome; it's a "banner"-only field. The model
+    # field itself still exists on HomePage (inherited from HeroMixin, no
+    # schema split), it's just never exposed as editable on the only page
+    # type that gets the "full" variant.
+    #
+    # hero_pre_header is the exact inverse: exposed here and omitted from
+    # banner_hero_panels. It is a home-page device ("Welcome to 350
+    # Canada" above the 96px display headline) and reads as clutter above
+    # the compact banner's 48px one. Same no-schema-split arrangement —
+    # the column exists on every HeroMixin page, only the panel differs,
+    # so widening it later to a banner page is a one-line change with no
+    # migration.
     hero_panels = [
         MultiFieldPanel(
             [
-                FieldPanel("hero_headline"),
+                FieldPanel("hero_pre_header"),
+                FieldPanel("hero_headline", widget=HeadlineRichTextArea(features=RICHTEXT_FEATURES_HEADLINE)),
                 FieldPanel("hero_copy"),
                 FieldPanel("hero_image"),
                 MediaChooserPanel("hero_video", media_type="video"),
-                FieldPanel("hero_link_text"),
-                FieldPanel("hero_link_page"),
-                FieldPanel("hero_link_url"),
+                FieldPanel("hero_banner_color"),
+                FieldPanel("hero_cta"),
             ],
             heading=_("Hero"),
         ),
     ]
 
+    # Panel-only subset for HeroMixin page types that never leave the
+    # "banner" variant (ContentPage, IndexPage, Blogs — every HeroMixin page
+    # except HomePage). hero_video stays a real model field (so no
+    # migration, and no risk to any content already saved on existing
+    # pages) but sits inert on "banner" per this class's own docstring, so
+    # offering it as an editable option is misleading rather than merely
+    # unused.
+    #
+    # hero_cta IS included here, unlike hero_video — but on these page
+    # types it's redeclared below (ContentPage/IndexPage/Blogs) to use
+    # BannerHeroCTABlock instead of HeroCTABlock, so the "Add block"
+    # picker itself only ever offers `button` — see that class's
+    # docstring for why a dead-field mismatch (the picker offering
+    # choices components/hero.html's "banner" variant would have
+    # silently skipped anyway) used to exist here and no longer does.
+    # Split out so a page type can rebuild the same Hero panel with an extra
+    # field appended (ContentPage.hide_hero). Sharing FieldPanel instances
+    # across two MultiFieldPanels on two models is safe — bind_to_model()
+    # clones before setting .model.
+    banner_hero_fields = [
+        FieldPanel("hero_headline", widget=HeadlineRichTextArea(features=RICHTEXT_FEATURES_HEADLINE)),
+        FieldPanel("hero_copy"),
+        FieldPanel("hero_image"),
+        FieldPanel("hero_jumbo_headline"),
+        FieldPanel("hero_image_caption"),
+        FieldPanel("hero_banner_color"),
+        FieldPanel("hero_cta"),
+    ]
+
+    banner_hero_panels = [
+        MultiFieldPanel(banner_hero_fields, heading=_("Hero")),
+    ]
+
+    def get_hero_context(self):
+        """
+        Build the context dict consumed by components/hero.html. Same shape
+        as HeroBlock.get_context()'s "hero" key so the template works
+        identically for pages and StreamField hero blocks.
+
+        copy_is_block=False because hero_copy is a RichTextField (string),
+        not a StreamField block value — the template renders it with |richtext.
+
+        minimal is only meaningful for the "banner" variant (see hero.html)
+        but is computed unconditionally here, same as banner_color/cta —
+        the "full" variant's template simply ignores it.
+
+        poster_url duplicates _hero_background_video.html's own
+        thumbnail-then-image fallback chain (same poster_spec sizes:
+        fill-1600x700 for "full", fill-1000x800 for "banner") so base.html's
+        <head> can <link rel="preload"> it. This is only ever needed at all
+        because Chrome's `fetchpriority` attribute isn't honored on a
+        <video>'s implicit `poster` image fetch (only on <img>/<link
+        rel=preload>/<script>/<iframe>) -- Chrome still treats the poster as
+        the LCP paint candidate for a video hero, so without a preload link
+        naming it directly, that fetch never gets bumped off default
+        priority no matter what's set on the <video> tag itself. None when
+        there's no video (a plain <img> hero already gets fetchpriority
+        correctly via the attribute right on its own tag, see hero.html).
+        """
+        poster_url = None
+        if self.hero_video:
+            if self.hero_video.thumbnail:
+                poster_url = self.hero_video.thumbnail.url
+            elif self.hero_image:
+                spec = "fill-1600x700" if self.hero_variant == "full" else "fill-1000x800"
+                poster_url = self.hero_image.get_rendition(spec).url
+        return {
+            "variant": self.hero_variant,
+            "pre_header": self.hero_pre_header,
+            "headline": headline_html(self.hero_headline) or self.title,
+            "jumbo": self.hero_jumbo_headline,
+            "copy": self.hero_copy,
+            "copy_is_block": False,
+            "image": self.hero_image,
+            "video": self.hero_video,
+            "poster_url": poster_url,
+            "image_caption": self.hero_image_caption,
+            "banner_color": self.hero_banner_color,
+            "cta": self.hero_cta,
+            "minimal": hero_is_minimal(copy=self.hero_copy, video=self.hero_video, cta=self.hero_cta),
+        }
+
     class Meta:
         abstract = True
+
+
+class PublishedDateMixin(models.Model):
+    """
+    Adds an editable "published at" date, independent of Wagtail's own
+    first_published_at.
+
+    Wagtail already tracks first_published_at automatically, but it's not
+    editable and doesn't survive a page being unpublished/republished the
+    way editors expect a display date to (e.g. backdating a post, or fixing
+    a typo weeks later without it looking freshly published). Blog posts
+    and press releases both need editors to control this directly, so it's
+    a real field rather than reusing first_published_at — see
+    PageCardsBlock.get_context(), which prefers this field when present.
+    """
+
+    published_at = models.DateTimeField(
+        default=timezone.now,
+        verbose_name=_("published at"),
+        help_text=_("The date shown on this page and used to order listings."),
+    )
+
+    published_date_panels = [
+        FieldPanel("published_at"),
+    ]
+
+    class Meta:
+        abstract = True
+
+
+class BannerHeroMixin(models.Model):
+    """
+    A small header for page types that always render hero.html's "banner"
+    variant and don't need HeroMixin's video/cta options — currently
+    just Post. See HeroMixin for the full page-hero field set used by
+    HomePage, and hero.html for the "banner" variant itself (same
+    rendering, same 5-color system).
+
+    Deliberately not built on top of HeroMixin: unlike ContentPage/IndexPage/
+    Blogs (which already have HeroMixin's hero_video and hero_cta columns
+    from before HeroMixin.banner_hero_panels existed, and keep them —
+    unused — to avoid a schema change), Post has never had those columns at
+    all. Per product decision a blog post's header shouldn't offer them as
+    editable options, so there's no reason for Post to carry the unused
+    database columns HeroMixin would add.
+
+    No hero_copy either: a subtext line under the headline made the post
+    header too busy alongside the tag, author and date, so it was removed.
+    """
+
+    hero_headline = RichTextField(
+        blank=True,
+        features=RICHTEXT_FEATURES_HEADLINE,
+        verbose_name=_("headline"),
+        help_text=_(
+            "Optional. Overrides the page title as the displayed heading. "
+            "Leave blank to use the page title. Press Enter for a line break."
+        ),
+    )
+    hero_image = models.ForeignKey(
+        CustomImage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("image"),
+    )
+    hero_banner_color = models.CharField(
+        max_length=20,
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="navy",
+        verbose_name=_("banner color"),
+    )
+
+    banner_hero_panels = [
+        MultiFieldPanel(
+            [
+                FieldPanel("hero_headline", widget=HeadlineRichTextArea(features=RICHTEXT_FEATURES_HEADLINE)),
+                FieldPanel("hero_image"),
+                FieldPanel("hero_banner_color"),
+            ],
+            heading=_("Header"),
+        ),
+    ]
+
+    def get_banner_hero_context(self, **extra):
+        """
+        Build the "hero" context dict components/hero.html expects, forced
+        to the "banner" variant. **extra lets a subclass merge in fields
+        hero.html doesn't otherwise know about but the "banner" variant
+        renders anyway when present — Post uses this for author/
+        published_at.
+
+        minimal is computed from **extra's tag/published_at (before they're
+        merged in) as well as this mixin's own fields, so a hero showing a
+        tag pill or date/author is never treated as minimal — see
+        hero_is_minimal()'s docstring.
+        """
+        context = {
+            "variant": "banner",
+            # Post has no hero_pre_header column at all (it is a HeroMixin
+            # field and Post uses BannerHeroMixin); pinned None to keep the
+            # hero.html contract complete.
+            "pre_header": None,
+            "headline": headline_html(self.hero_headline) or self.title,
+            "copy": None,
+            "copy_is_block": False,
+            "image": self.hero_image,
+            "video": None,
+            "banner_color": self.hero_banner_color,
+            "cta": [],
+            "jumbo": False,
+            "minimal": hero_is_minimal(
+                copy=None,
+                video=None,
+                cta=[],
+                tag=extra.get("tag", ""),
+                published_at=extra.get("published_at"),
+            ),
+        }
+        context.update(extra)
+        return context
+
+    class Meta:
+        abstract = True
+
+
+@register_snippet
+class BlogCategory(ClusterableModel):
+    """
+    Editor-managed taxonomy for Post.categories — a Snippet (rather
+    than freeform tagging via the already-installed-but-unused `taggit`
+    app) since categories here are meant to be a curated, admin-managed
+    list, not something any author invents ad hoc per post. Snippets get
+    their own list/create/edit/delete admin screens for free.
+    """
+
+    name = models.CharField(max_length=100, unique=True, verbose_name=_("name"))
+    slug = models.SlugField(
+        max_length=100,
+        unique=True,
+        verbose_name=_("slug"),
+        help_text=_("Used in the blog's category filter URL. Auto-filled from the name if left blank."),
+        blank=True,
+    )
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("slug"),
+        InlinePanel("labels", label=_("Translated labels")),
+    ]
+
+    class Meta:
+        verbose_name = _("blog category")
+        verbose_name_plural = _("blog categories")
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def label_for(self, locale):
+        """The category's name in `locale`, falling back to `name`.
+
+        One category is shared by every language tree (posts in all locales
+        point at the same row), so a translation is a label on it rather than
+        a separate translated snippet.
+        """
+        for label in self.labels.all():
+            if label.locale_id == locale.pk:
+                return label.name
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+
+class BlogCategoryLabel(Orderable):
+    """A BlogCategory's display name in one locale."""
+
+    category = ParentalKey(BlogCategory, on_delete=models.CASCADE, related_name="labels")
+    locale = models.ForeignKey(Locale, on_delete=models.PROTECT, related_name="+", verbose_name=_("locale"))
+    name = models.CharField(max_length=100, verbose_name=_("name"))
+
+    panels = [
+        FieldPanel("locale"),
+        FieldPanel("name"),
+    ]
+
+    class Meta(Orderable.Meta):
+        verbose_name = _("translated label")
+        verbose_name_plural = _("translated labels")
+        constraints = [
+            models.UniqueConstraint(fields=["category", "locale"], name="unique_blog_category_label_per_locale"),
+        ]
+
+
+MAX_POST_CATEGORIES = 2
+
+
+class PostForm(WagtailAdminPageForm):
+    """
+    Pre-fills the author field with the current user when creating a new
+    Post — "defaults to whoever publishes, but is editable": rather
+    than a signal that silently overwrites author on publish (fights an
+    editor who already set it, or credits whoever happened to click
+    publish rather than who actually wrote it), this just pre-selects the
+    field on a fresh draft; from then on it's a normal editable field like
+    any other, never touched again by anything but the editor.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk is None and self.for_user is not None:
+            # self.initial (not self.fields["author"].initial) — ModelForm's
+            # __init__ (already run via super() above) builds self.initial
+            # from model_to_dict() on the new/unsaved instance, which
+            # includes "author": None as an explicit key. Form.
+            # get_initial_for_field() checks self.initial before ever
+            # falling back to the field's own .initial, so setting
+            # self.fields["author"].initial here would be silently shadowed
+            # by that pre-existing None and never actually render as the
+            # field's pre-selected value.
+            self.initial["author"] = self.for_user.pk
+
+        # Category checkboxes in the post's own language, sorted like the
+        # blog filter (Blogs.get_context()). A new page has no locale until
+        # saved, so it takes its parent's.
+        categories = self.fields.get("categories")
+        locale = self.instance.locale if self.instance.locale_id else getattr(self.parent_page, "locale", None)
+        if categories is not None and locale is not None:
+            categories.choices = sorted(
+                ((category.pk, category.label_for(locale)) for category in categories.queryset.prefetch_related("labels")),
+                key=lambda choice: choice[1].casefold(),
+            )
+
+    def clean_categories(self):
+        # Enforced here rather than in Post.clean(): a ParentalManyToManyField's
+        # submitted value only exists on the form until save, and the importers
+        # write categories directly without going through this form.
+        categories = self.cleaned_data.get("categories")
+        if categories is not None and len(categories) > MAX_POST_CATEGORIES:
+            raise forms.ValidationError(
+                _("Choose at most %(max)d categories.") % {"max": MAX_POST_CATEGORIES}
+            )
+        return categories
 
 
 # ---------------------------------------------------------------------------
@@ -195,9 +693,22 @@ class HomePage(BasePage, HeroMixin):
 
     Combines a full hero section (from HeroMixin) with a flexible StreamField
     body. Intended as the root page of the site.
+
+    The only page type using HeroMixin's "full" hero variant (see
+    HeroMixin.hero_variant) — every other page type gets the compact
+    "banner" variant instead.
+
+    A HomePage may also be nested under another HomePage. That is the
+    country/region sub-home pattern (350.org/canada, 350.org/africa): a
+    landing page that is structurally a home page — full-viewport hero with
+    its own CTA, self-contained campaign body — rather than an article. It
+    is deliberately *only* allowed under another HomePage, not under
+    ContentPage or IndexPage, so "home page" keeps meaning "top of a site or
+    of a region" instead of becoming a general-purpose page type.
     """
 
     template = "wtrx/pages/home_page.html"
+    hero_variant = "full"
 
     body = StreamField(
         BodyStreamBlock(),
@@ -206,41 +717,31 @@ class HomePage(BasePage, HeroMixin):
         help_text=_("Page body content."),
         use_json_field=True,
     )
-    use_transparent_header = models.BooleanField(
-        default=False,
-        verbose_name=_("transparent header"),
-        help_text=_(
-            "Make the header transparent so the hero image extends behind it. "
-            "Automatically uses the dark logo variant when enabled."
-        ),
-    )
 
     content_panels = (
-        Page.content_panels
+        BasePage.title_panels
         + HeroMixin.hero_panels
-        + [
-            FieldPanel("body"),
-            MultiFieldPanel(
-                [FieldPanel("use_transparent_header")],
-                heading=_("Header options"),
-            ),
-        ]
+        + [FieldPanel("body")]
     )
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
-    parent_page_types = ["wagtailcore.Page"]
+    parent_page_types = ["wagtailcore.Page", "wtrx.HomePage"]
     subpage_types = [
+        "wtrx.HomePage",
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
+        "wtrx.Blogs",
     ]
 
     class Meta:
@@ -249,25 +750,7 @@ class HomePage(BasePage, HeroMixin):
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
-        # Build the hero context dict consumed by components/hero.html.
-        # The same template is used by HeroBlock (StreamField) and all page types,
-        # so every caller must provide this exact dict shape. Mapping is done here
-        # in Python rather than in the template so that:
-        #   - The headline fallback (hero_headline or page title) is in one place.
-        #   - hero.html stays logic-free and works identically for pages and blocks.
-        # copy_is_block=False because hero_copy is a RichTextField (string),
-        # not a StreamField block value — the template renders it with |richtext.
-        ctx["hero"] = {
-            "headline": self.hero_headline or self.title,
-            "copy": self.hero_copy,
-            "copy_is_block": False,
-            "image": self.hero_image,
-            "video": self.hero_video,
-            "link_text": self.hero_link_text,
-            "link_page": self.hero_link_page,
-            "link_url": self.hero_link_url,
-        }
-        ctx["transparent_header"] = self.use_transparent_header
+        ctx["hero"] = self.get_hero_context()
         return ctx
 
 
@@ -282,6 +765,26 @@ class ContentPage(BasePage, HeroMixin):
 
     template = "wtrx/pages/content_page.html"
 
+    # Overrides HeroMixin's own hero_cta (HeroCTABlock) to restrict the
+    # "banner" hero variant's CTA picker to a plain button only — see
+    # BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
+    hero_cta = StreamField(
+        BannerHeroCTABlock(),
+        blank=True,
+        verbose_name=_("hero call to action"),
+        help_text=_("Optional button shown below the hero copy. At most one."),
+        use_json_field=True,
+    )
+
+    hide_hero = models.BooleanField(
+        default=False,
+        verbose_name=_("hide hero"),
+        help_text=_(
+            "Hide the hero banner entirely and start the page at its body. "
+            "The page title is still announced to screen readers."
+        ),
+    )
+
     body = StreamField(
         BodyStreamBlock(),
         blank=True,
@@ -290,20 +793,39 @@ class ContentPage(BasePage, HeroMixin):
         use_json_field=True,
     )
 
+    # hide_hero is a property of the hero, so it sits inside the Hero panel
+    # rather than in a section of its own — last, after the fields it turns
+    # off. The shared banner_hero_panels can't carry it (IndexPage and Blogs
+    # have no such field), hence the rebuild around banner_hero_fields.
+    #
+    # It is gated on a custom permission rather than shown to every editor:
+    # a page with no hero has no visible <h1> and no banner, which is a
+    # deliberate, site-shaping choice rather than routine page setup.
+    # FieldPanel(permission=...) removes the field from the form entirely
+    # for anyone without it, and nesting does not weaken that —
+    # PanelGroup.get_form_options() merges each child's field_permissions
+    # dict upward, so it cannot be set by POSTing the form either.
+    # Superusers always pass has_perm.
     content_panels = (
-        Page.content_panels
-        + HeroMixin.hero_panels
+        BasePage.title_panels
         + [
+            MultiFieldPanel(
+                HeroMixin.banner_hero_fields
+                + [FieldPanel("hide_hero", permission="wtrx.disable_hero")],
+                heading=_("Hero"),
+            ),
             FieldPanel("body"),
         ]
     )
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -316,26 +838,22 @@ class ContentPage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
+        "wtrx.Blogs",
     ]
 
     class Meta:
         verbose_name = _("content page")
         verbose_name_plural = _("content pages")
+        # Hung off ContentPage itself rather than a dedicated proxy/unmanaged
+        # model: this is the only page type with the field, so there is
+        # nothing to share, and this costs one AlterModelOptions instead of
+        # a second model and ContentType. Assign it to a group in
+        # Settings > Groups; "wtrx.disable_hero" is the codename.
+        permissions = [("disable_hero", "Can disable a page hero")]
 
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
-        # Build the hero context dict consumed by components/hero.html.
-        # See HomePage.get_context() for the full explanation of this pattern.
-        ctx["hero"] = {
-            "headline": self.hero_headline or self.title,
-            "copy": self.hero_copy,
-            "copy_is_block": False,
-            "image": self.hero_image,
-            "video": self.hero_video,
-            "link_text": self.hero_link_text,
-            "link_page": self.hero_link_page,
-            "link_url": self.hero_link_url,
-        }
+        ctx["hero"] = self.get_hero_context()
         return ctx
 
 
@@ -349,6 +867,17 @@ class IndexPage(BasePage, HeroMixin):
     """
 
     template = "wtrx/pages/index_page.html"
+
+    # Overrides HeroMixin's own hero_cta (HeroCTABlock) to restrict the
+    # "banner" hero variant's CTA picker to a plain button only — see
+    # BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
+    hero_cta = StreamField(
+        BannerHeroCTABlock(),
+        blank=True,
+        verbose_name=_("hero call to action"),
+        help_text=_("Optional button shown below the hero copy. At most one."),
+        use_json_field=True,
+    )
 
     intro = RichTextField(
         blank=True,
@@ -367,8 +896,8 @@ class IndexPage(BasePage, HeroMixin):
     )
 
     content_panels = (
-        Page.content_panels
-        + HeroMixin.hero_panels
+        BasePage.title_panels
+        + HeroMixin.banner_hero_panels
         + [
             FieldPanel("intro"),
             FieldPanel("body"),
@@ -376,11 +905,13 @@ class IndexPage(BasePage, HeroMixin):
     )
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -393,7 +924,12 @@ class IndexPage(BasePage, HeroMixin):
         "wtrx.ContentPage",
         "wtrx.IndexPage",
         "wtrx.FormPage",
+        "wtrx.Blogs",
     ]
+
+    # Hidden from the "Create a page" menu until a site needs it; the model
+    # and template stay so it can be switched back on.
+    is_creatable = False
 
     class Meta:
         verbose_name = _("index page")
@@ -402,18 +938,7 @@ class IndexPage(BasePage, HeroMixin):
     def get_context(self, request, *args, **kwargs):
         ctx = super().get_context(request, *args, **kwargs)
 
-        # Build the hero context dict consumed by components/hero.html.
-        # See HomePage.get_context() for the full explanation of this pattern.
-        ctx["hero"] = {
-            "headline": self.hero_headline or self.title,
-            "copy": self.hero_copy,
-            "copy_is_block": False,
-            "image": self.hero_image,
-            "video": self.hero_video,
-            "link_text": self.hero_link_text,
-            "link_page": self.hero_link_page,
-            "link_url": self.hero_link_url,
-        }
+        ctx["hero"] = self.get_hero_context()
 
         children_qs = (
             self.get_children()
@@ -436,6 +961,558 @@ class IndexPage(BasePage, HeroMixin):
 
         ctx["children"] = children
         ctx["paginator"] = paginator
+        return ctx
+
+
+def _first_image_in_body(value):
+    """
+    Depth-first search for the first real image anywhere inside a body
+    StreamField value. Backs Post.get_card_image()'s fallback for a post
+    with no explicit header image.
+
+    Recurses through every StreamValue/StructValue/ListValue container
+    Wagtail can produce here -- the same three-type walk
+    harvest_block_previews._richness() already uses to score a whole
+    StreamField, just short-circuiting on the first hit instead of summing
+    everything. That means it reaches into SectionBlock's own nested
+    content stream and into every card/image/logo/person grid's list
+    items with no hardcoded list of "blocks that might contain an image",
+    and needs no changes when a new block type is added later.
+
+    Every image-carrying block in this codebase names its ImageChooserBlock
+    field `image` (ImageBlock, ImageTextBlock, FeaturePanelBlock, HeroBlock,
+    QuoteBlock, CalloutBlock, DonateFundraiseUpBlock, SignupActionKitBlock/
+    HeroSignupActionKitBlock, CardBlock, PersonCardBlock, ImageGridItemBlock,
+    LogoGridItemBlock -- CardBlock's separate `icon` field is deliberately
+    not matched), so this looks for that one field name rather than
+    branching on block type. It returns the first one found in document
+    order and stops there: this is a "better than a blank card" fallback,
+    not a curated "best photo in the post" pick, so it makes no attempt to
+    skip a more decorative image (e.g. CalloutBlock's background wash) in
+    favor of a later, more "content" one.
+    """
+    if isinstance(value, StreamValue):
+        for child in value:
+            found = _first_image_in_body(child.value)
+            if found:
+                return found
+        return None
+    if isinstance(value, StructValue):
+        for key, sub_value in value.items():
+            if key == "image":
+                if sub_value:
+                    return sub_value
+                continue
+            found = _first_image_in_body(sub_value)
+            if found:
+                return found
+        return None
+    if isinstance(value, ListValue):
+        for item in value:
+            found = _first_image_in_body(item)
+            if found:
+                return found
+        return None
+    return None
+
+
+class Post(BasePage, PublishedDateMixin, BannerHeroMixin):
+    """
+    A single post — covers both blog posts and press releases, which share
+    an identical shape (see PLAN.md); author and categories are both
+    optional, so a press-release-style post simply leaves them blank.
+
+    published_at (PublishedDateMixin) is the editable display/ordering
+    date; author defaults to whoever creates the post (PostForm) but
+    stays freely editable afterwards; categories is an editor-managed
+    multi-select against the BlogCategory snippet. Header is
+    BannerHeroMixin's compact "banner" style (same look as ContentPage's
+    header) with author/date folded in — see get_context(). When author
+    and hero_image are left blank (e.g. an official statement with no
+    byline), the banner just renders the title and date.
+    """
+
+    template = "wtrx/pages/post_page.html"
+    base_form_class = PostForm
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("author"),
+        help_text=_("Defaults to whoever creates this post. Editable."),
+    )
+    author_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("author name"),
+        help_text=_(
+            "Byline for a guest writer or imported post who doesn't have a "
+            "site account. Ignored if Author (above) is set."
+        ),
+    )
+    author_title = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("author title"),
+        help_text=_(
+            "Optional role/affiliation shown next to Author name, e.g. "
+            "\"Senior Campaigner at Oil Change International\"."
+        ),
+    )
+    categories = ParentalManyToManyField(
+        "wtrx.BlogCategory",
+        blank=True,
+        related_name="posts",
+        verbose_name=_("categories"),
+    )
+    hide_from_blogroll = models.BooleanField(
+        default=False,
+        verbose_name=_("hide from blogroll"),
+        help_text=_(
+            "Exclude this post from the Blogs page listing and from any "
+            "\"latest posts\" cards elsewhere on the site (e.g. Page Cards "
+            "on the home page). The post is still directly accessible and "
+            "still appears in search."
+        ),
+    )
+    body = StreamField(
+        BodyStreamBlock(),
+        blank=True,
+        verbose_name=_("body"),
+        help_text=_("Page body content."),
+        use_json_field=True,
+    )
+
+    content_panels = (
+        BasePage.title_panels
+        + BannerHeroMixin.banner_hero_panels
+        + PublishedDateMixin.published_date_panels
+        + [
+            FieldPanel("author"),
+            FieldPanel("author_name"),
+            FieldPanel("author_title"),
+            FieldPanel(
+                "categories",
+                widget=forms.CheckboxSelectMultiple,
+                help_text=format_lazy(_("Choose up to {max}."), max=MAX_POST_CATEGORIES),
+            ),
+            FieldPanel("hide_from_blogroll"),
+            FieldPanel("body"),
+        ]
+    )
+
+    promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
+        ]
+    )
+
+    parent_page_types = ["wtrx.Blogs"]
+    subpage_types = []
+
+    class Meta:
+        verbose_name = _("post")
+        verbose_name_plural = _("posts")
+
+    @property
+    def author_display(self):
+        """
+        Byline text for this post: the site account's name if Author (FK) is
+        set, else the guest/imported Author name (+ title), else None.
+        Shared by the hero banner and the Blogs listing cards so the
+        two never drift out of sync.
+        """
+        if self.author_id:
+            return self.author.get_full_name() or self.author.get_username()
+        if self.author_name:
+            if self.author_title:
+                return f"{self.author_name}, {self.author_title}"
+            return self.author_name
+        return None
+
+    def _own_or_body_image(self):
+        """
+        Shared first two steps of both get_card_image() and get_hero_image():
+        this post's own explicit header image (hero_image, from
+        BannerHeroMixin), else the first image found anywhere in its body
+        StreamField (see _first_image_in_body() for the search rules).
+        Returns None if neither is set -- the two callers differ only in
+        which of the parent Blogs page's fields they fall back to next.
+        """
+        if self.hero_image_id:
+            return self.hero_image
+        return _first_image_in_body(self.body)
+
+    def get_card_image(self, parent=None):
+        """
+        This post's card/listing image, used wherever it's shown as a card
+        (the Blogs index, PageCardsBlock, and its own "Related posts" panel
+        on other posts -- see get_context() below and Blogs.get_context()).
+
+        Prefers this post's own image (see _own_or_body_image()); finally
+        falls back to this post's parent Blogs page's own default_card_image,
+        if set (e.g. a generic graphic configured once on a Press Releases
+        index, for statements with no photo of their own, rather than
+        needing one hand-picked per post). Returns None -- not an error --
+        if none of those is set; post_card.html already degrades gracefully
+        with no image (AGENTS.md Error Handling).
+
+        `parent` lets a caller that already has this post's parent Blogs
+        page on hand (Blogs.get_context(), Post.get_context()'s related
+        posts loop) pass it in and skip a redundant get_parent() query; it's
+        resolved here when omitted (e.g. PageCardsBlock, which doesn't
+        already have it).
+        """
+        own = self._own_or_body_image()
+        if own:
+            return own
+        if parent is None:
+            parent = self.get_parent().specific
+        return getattr(parent, "default_card_image", None)
+
+    def get_hero_image(self, parent=None):
+        """
+        This post's own header image (see get_context() below) -- a
+        separate fallback chain from get_card_image() above, since a
+        page-wide "no photo" graphic (e.g. Press Releases' default_card_image)
+        isn't always the right thing to show full-bleed at the top of the
+        post itself.
+
+        Prefers this post's own image (see _own_or_body_image()); then the
+        parent Blogs page's own default_hero_image, if set; then, since most
+        Blogs pages will only ever configure one of the two fields, falls
+        back further to the parent's default_card_image -- the same
+        pre-existing fallback get_card_image() uses -- so a page that only
+        set default_card_image (nothing has set default_hero_image yet)
+        keeps behaving exactly as before this method existed. Returns None
+        if nothing at all is set.
+
+        `parent` behaves the same as on get_card_image() -- see its
+        docstring.
+        """
+        own = self._own_or_body_image()
+        if own:
+            return own
+        if parent is None:
+            parent = self.get_parent().specific
+        return getattr(parent, "default_hero_image", None) or getattr(
+            parent, "default_card_image", None
+        )
+
+    def get_context(self, request, *args, **kwargs):
+        from wtrx.templatetags.wtrx_tags import page_as_card
+
+        ctx = super().get_context(request, *args, **kwargs)
+        parent = self.get_parent().specific
+        ctx["hero"] = self.get_banner_hero_context(
+            author=self.author_display,
+            published_at=self.published_at,
+            tag=parent.title,
+            tag_url=parent.url,
+        )
+        ctx["hero"]["image"] = self.get_hero_image(parent=parent)
+
+        # "Related <posts>" — the 3 most recent other live/public posts under
+        # this post's own Blogs parent, per Figma's fixed (non-editor-
+        # configurable) section at the bottom of every post. Same card
+        # conversion PageCardsBlock/Blogs.get_context() use.
+        #
+        # Headings adapt to whichever Blogs page this post lives under, so a
+        # post under "Press Releases" reads "Related press releases" /
+        # "Read more press releases" with no per-page configuration — see
+        # Blogs.post_label / Blogs.get_related_intro().
+        related = (
+            Post.objects.child_of(parent)
+            .live()
+            .public()
+            .exclude(pk=self.pk)
+            .order_by("-published_at")[:3]
+        )
+        related_posts = []
+        for post in related:
+            card = page_as_card(post)
+            card["image"] = post.get_card_image(parent=parent)
+            card["date"] = post.published_at
+            related_posts.append(card)
+        ctx["related_posts"] = related_posts
+        ctx["parent_page"] = parent
+        #
+        # The two automated strings only read correctly in English (the noun
+        # is a lowercased title with a naive "s", and can't agree in gender or
+        # number with the words around it), so a Blogs page can replace either
+        # one outright — see Blogs.related_heading / related_link_text.
+        label = getattr(parent, "post_label", None) or _("posts")
+        ctx["related_heading"] = getattr(parent, "related_heading", "") or (
+            _("Related %(label)s") % {"label": label}
+        )
+        ctx["related_link_text"] = getattr(parent, "related_link_text", "") or (
+            _("Read more %(label)s") % {"label": label}
+        )
+        ctx["related_intro"] = (
+            parent.get_related_intro() if hasattr(parent, "get_related_intro") else ""
+        )
+
+        return ctx
+
+
+class Blogs(BasePage, HeroMixin):
+    """
+    Post listing page — covers both blog posts and press releases, since
+    Post itself covers both (see PLAN.md).
+
+    Live/public Post children, newest first by published_at, optionally
+    filtered to one category via ?category=<slug>. The filter row (see
+    blogs_page.html) only lists categories actually used by this page's own
+    posts, so it disappears on its own for a page whose posts never carry
+    categories (e.g. a press-release-only Blogs page) — see get_context().
+    Unlike the generic IndexPage (which lists any child page type, ordered
+    by title), this is specific to Post and its date/category semantics.
+
+    Uses HeroMixin's "banner" default variant (per Figma's "Blog" hero) —
+    hero_headline/hero_copy cover what a separate "intro" field used to,
+    so there's no dedicated intro field here.
+
+    Also supplies the copy for the "Related <posts>" section at the bottom
+    of each of its child posts (see Post.get_context()), so that section
+    adapts to the index page a post lives under instead of always saying
+    "blogs".
+    """
+
+    template = "wtrx/pages/blogs_page.html"
+
+    # Overrides HeroMixin's own hero_cta (HeroCTABlock) to restrict the
+    # "banner" hero variant's CTA picker to a plain button only — see
+    # BannerHeroCTABlock's docstring in wtrx/blocks/__init__.py.
+    hero_cta = StreamField(
+        BannerHeroCTABlock(),
+        blank=True,
+        verbose_name=_("hero call to action"),
+        help_text=_("Optional button shown below the hero copy. At most one."),
+        use_json_field=True,
+    )
+
+    related_heading = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("related posts heading"),
+        help_text=_(
+            "Heading of the \"Related …\" section at the bottom of each post "
+            "under this page. Leave blank to build it from this page's title "
+            "(\"Related press releases\"), which only reads correctly in "
+            "English — fill it in on a page in any other language."
+        ),
+    )
+    related_link_text = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("related posts button text"),
+        help_text=_(
+            "Text of the button under that section, which links back to this "
+            "page. Leave blank to build it from this page's title (\"Read more "
+            "press releases\"), which only reads correctly in English — fill "
+            "it in on a page in any other language."
+        ),
+    )
+    related_intro = models.TextField(
+        blank=True,
+        verbose_name=_("related posts intro"),
+        help_text=_(
+            "Supporting copy under the \"Related …\" heading at the bottom of "
+            "each post under this page. Falls back to this page's header copy "
+            "when blank."
+        ),
+    )
+    default_card_image = models.ForeignKey(
+        CustomImage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("default card image"),
+        help_text=_(
+            "Shown for any post under this page that has no image of its own "
+            "(no header image, and none found in its body content) wherever "
+            "it's shown as a card — the listing below, \"Related …\" panels, "
+            "and Page Cards blocks. Also used as that post's own header image "
+            "when Default hero image (below) is left blank. Useful for a "
+            "Press Releases page, where a statement often has no photo. "
+            "Leave blank for no fallback."
+        ),
+    )
+    default_hero_image = models.ForeignKey(
+        CustomImage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("default hero image"),
+        help_text=_(
+            "Shown as the header image for any post under this page that has "
+            "no image of its own, instead of Default card image (above) — "
+            "for when the two should differ, e.g. a generic banner graphic "
+            "at the top of the post versus a smaller icon on its card. Falls "
+            "back to Default card image when left blank. Leave both blank "
+            "for no fallback."
+        ),
+    )
+
+    content_panels = (
+        BasePage.title_panels
+        + HeroMixin.banner_hero_panels
+        + [
+            MultiFieldPanel(
+                [
+                    FieldPanel("related_heading"),
+                    FieldPanel("related_intro"),
+                    FieldPanel("related_link_text"),
+                ],
+                heading=_("Related posts section"),
+            ),
+            FieldPanel("default_card_image"),
+            FieldPanel("default_hero_image"),
+        ]
+    )
+
+    promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
+        ]
+    )
+
+    parent_page_types = [
+        "wtrx.HomePage",
+        "wtrx.ContentPage",
+        "wtrx.IndexPage",
+    ]
+    subpage_types = ["wtrx.Post"]
+
+    class Meta:
+        verbose_name = _("Media index")
+        verbose_name_plural = _("Media indexes")
+
+    @property
+    def post_label(self):
+        """
+        Lowercase plural noun for this page's posts, used to build the
+        default "Related …" / "Read more …" headings on each child Post when
+        related_heading / related_link_text are blank (see
+        Post.get_context()). Derived from the page title so a "Press
+        Releases" page reads "press releases" and a "Blog" page reads
+        "blogs" with nothing for an editor to configure — pluralisation is
+        deliberately naive (append "s" unless the title already ends in
+        one), since the title is the only signal available.
+        """
+        label = self.title.strip().lower()
+        if not label:
+            return ""
+        if not label.endswith("s"):
+            label = f"{label}s"
+        return label
+
+    def get_related_intro(self):
+        """
+        Supporting copy for a child Post's "Related …" section: the
+        editor-set related_intro, else this page's own header copy with
+        markup stripped (hero_copy is a RichTextField, the section renders
+        plain text), else "".
+        """
+        if self.related_intro:
+            return self.related_intro
+        return strip_tags(self.hero_copy or "").strip()
+
+    def get_listing_queryset(self, category=None):
+        """
+        This page's live/public posts, newest first by the editor-controlled
+        published_at (not Wagtail's own first_published_at — see
+        PublishedDateMixin).
+
+        A method rather than an inline query so PageCardsBlock can list the
+        same posts in the same order this page's own listing uses; a card
+        row on the home page and the index it links to must never disagree
+        about which posts are the most recent. The optional `category`
+        (a BlogCategory instance) is the same reasoning extended to
+        PageCardsBlock's own optional category filter (see that block's
+        docstring) — both it and this page's own `?category=` filtering in
+        get_context() below now filter through this one method, so a
+        filtered card row and this page's own filtered listing can never
+        disagree either.
+
+        Excludes posts with hide_from_blogroll set — this is the single
+        place both the Blogs page listing and PageCardsBlock's home page
+        cards draw from, so a hidden post disappears from both at once.
+        """
+        qs = (
+            Post.objects.child_of(self)
+            .live()
+            .public()
+            .filter(hide_from_blogroll=False)
+            .order_by("-published_at")
+        )
+        if category:
+            qs = qs.filter(categories=category)
+        return qs
+
+    def get_context(self, request, *args, **kwargs):
+        ctx = super().get_context(request, *args, **kwargs)
+        ctx["hero"] = self.get_hero_context()
+
+        posts_qs = self.get_listing_queryset()
+
+        # Scoped to categories actually used by this page's own posts (not
+        # every BlogCategory site-wide) so the filter row disappears on its
+        # own wherever it doesn't apply — e.g. a press-release-only Blogs
+        # page, where posts never carry categories — with no separate
+        # toggle for editors to manage.
+        available_categories = (
+            BlogCategory.objects.filter(posts__in=posts_qs).distinct().prefetch_related("labels")
+        )
+
+        selected_category = None
+        category_slug = request.GET.get("category")
+        if category_slug:
+            selected_category = available_categories.filter(slug=category_slug).first()
+            if selected_category:
+                posts_qs = self.get_listing_queryset(category=selected_category)
+
+        paginator = Paginator(posts_qs, ITEMS_PER_PAGE)
+        page_number = request.GET.get("page", 1)
+        try:
+            posts = paginator.page(page_number)
+        except PageNotAnInteger:
+            posts = paginator.page(1)
+        except EmptyPage:
+            posts = paginator.page(paginator.num_pages)
+
+        from wtrx.templatetags.wtrx_tags import page_as_card
+
+        cards = []
+        for post in posts:
+            card = page_as_card(post)
+            card["image"] = post.get_card_image(parent=self)
+            card["date"] = post.published_at
+            cards.append(card)
+
+        ctx["posts"] = posts
+        ctx["cards"] = cards
+        ctx["paginator"] = paginator
+        ctx["categories"] = sorted(
+            ({"category": category, "label": category.label_for(self.locale)} for category in available_categories),
+            key=lambda item: item["label"].casefold(),
+        )
+        ctx["selected_category"] = selected_category
         return ctx
 
 
@@ -465,13 +1542,13 @@ class FormPage(BasePage, AbstractEmailForm):
     MRO note: BasePage must come before AbstractEmailForm to keep Wagtail's
     page machinery (slug, tree, routing) in the correct resolution order.
 
-    content_panels is explicitly defined starting from
-    AbstractEmailForm.content_panels (== Page.content_panels) to avoid the
-    MRO resolving to BasePage.content_panels and dropping email fields.
+    content_panels is explicitly defined starting from BasePage.title_panels
+    (BasePage itself has no content_panels of its own, so there's no MRO
+    ambiguity to worry about here).
 
-    Future: override process_form_submission() to forward submissions to
-    Action Network when IntegrationSettings.signup_platform == "action_network".
-    See PLAN.md FormPage notes for the full forwarding design.
+    Future: override process_form_submission() to also forward submissions to
+    Action Network when that integration is enabled. See PLAN.md FormPage
+    notes for the full forwarding design.
     """
 
     template = "wtrx/pages/form_page.html"
@@ -488,12 +1565,22 @@ class FormPage(BasePage, AbstractEmailForm):
         verbose_name=_("thank you text"),
         help_text=_("Text displayed after a successful form submission."),
     )
+    actionkit_page = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("ActionKit page name"),
+        help_text=_(
+            "The ActionKit page short name this form submits to. Only used when "
+            "the ActionKit integration (Settings → Integrations) is enabled. "
+            "Leave blank to disable ActionKit forwarding for this form."
+        ),
+    )
 
-    # Explicitly start from AbstractEmailForm.content_panels, which extends
-    # Page.content_panels with the email notification fields (to_address, from_address,
-    # subject). Do NOT use BasePage.content_panels here — Python's MRO would resolve
-    # to BasePage.content_panels and drop those email fields entirely.
-    content_panels = AbstractEmailForm.content_panels + [
+    # Explicitly defined on FormPage itself (not inherited) — BasePage has no
+    # content_panels of its own (only the reusable title_panels list, mixed
+    # in explicitly here), so there's no MRO ambiguity to worry about despite
+    # FormPage(BasePage, AbstractEmailForm)'s multiple inheritance.
+    content_panels = BasePage.title_panels + [
         FieldPanel("intro"),
         InlinePanel("form_fields", label=_("Form fields")),
         FieldPanel("thank_you_text"),
@@ -505,14 +1592,20 @@ class FormPage(BasePage, AbstractEmailForm):
             ],
             heading=_("Email notifications"),
         ),
+        MultiFieldPanel(
+            [FieldPanel("actionkit_page")],
+            heading=_("ActionKit"),
+        ),
     ]
 
     promote_panels = BasePage.promote_panels
+    settings_panels = BasePage.settings_panels
 
     edit_handler = TabbedInterface(
         [
             ObjectList(content_panels, heading=_("Content")),
             ObjectList(promote_panels, heading=_("Promote")),
+            ObjectList(settings_panels, heading=_("Settings")),
         ]
     )
 
@@ -522,6 +1615,10 @@ class FormPage(BasePage, AbstractEmailForm):
         "wtrx.IndexPage",
     ]
     subpage_types = []
+
+    # Hidden from the "Create a page" menu: signups go through the ActionKit/
+    # Action Network blocks instead. Switch back on if a site needs it.
+    is_creatable = False
 
     class Meta:
         verbose_name = _("form page")
@@ -539,11 +1636,44 @@ class FormPage(BasePage, AbstractEmailForm):
             "copy_is_block": False,
             "image": None,
             "video": None,
-            "link_text": None,
-            "link_page": None,
-            "link_url": None,
+            "cta": [],
         }
         return ctx
+
+    def process_form_submission(self, form):
+        """
+        Store the submission normally (Wagtail DB + email), then forward it to
+        ActionKit when the signup platform is set to ActionKit and this form has
+        an ActionKit page configured.
+
+        Forwarding is best-effort: any failure (misconfiguration, API error, or
+        network error) is logged and swallowed so it never blocks the user's
+        signup. The local submission is always saved first and returned.
+        """
+        submission = super().process_form_submission(form)
+
+        try:
+            integration = IntegrationSettings.for_site(self.get_site())
+            actionkit_config = integration.get_integration_config("actionkit")
+            if actionkit_config and self.actionkit_page:
+                fields = actionkit.map_form_fields(form.cleaned_data)
+                if fields.get("email"):
+                    actionkit.submit_action(
+                        actionkit_config.get("hostname"),
+                        actionkit_config.get("api_username"),
+                        integration.get_actionkit_api_password(),
+                        self.actionkit_page,
+                        fields,
+                    )
+                else:
+                    logger.warning(
+                        "ActionKit forwarding skipped for FormPage %s: no email in submission.",
+                        self.pk,
+                    )
+        except Exception:
+            logger.exception("ActionKit forwarding failed for FormPage %s.", self.pk)
+
+        return submission
 
     def serve(self, request, *args, **kwargs):
         if request.method == "POST":

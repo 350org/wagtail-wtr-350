@@ -1,0 +1,723 @@
+"""
+Shared helpers for importing 350.org WordPress content into StreamField
+bodies (wtrx.blocks.BodyStreamBlock's "text"/"image"/"video" blocks).
+
+Leading underscore keeps this out of manage.py's command autodiscovery
+(Django's find_commands() skips filenames starting with "_") — it's a
+plain helper module, not itself a command. Used by both
+import_350_blog.py and import_350_press_releases.py.
+"""
+
+import html
+import os
+import re
+import uuid
+from urllib.parse import parse_qs, urlparse
+
+import requests
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+
+# WordPress rewrites <img src> to a scaled rendition of the original upload
+# (e.g. "photo-700x560.jpg") sized for its theme's display context; the
+# unscaled original is almost always still hosted alongside it at the
+# un-suffixed filename (e.g. "photo.jpg"). Matches that "-WIDTHxHEIGHT"
+# suffix so we can strip it and import the original instead.
+_WP_SCALED_IMAGE_RE = re.compile(r"^(?P<base>.+)-\d+x\d+(?P<ext>\.[A-Za-z0-9]+)$")
+
+
+def _full_size_wp_image_url(url):
+    """Strip WordPress's "-WIDTHxHEIGHT" scaled-image suffix from a URL's path, if present."""
+    parsed = urlparse(url)
+    match = _WP_SCALED_IMAGE_RE.match(parsed.path)
+    if not match:
+        return url
+    return parsed._replace(path=match.group("base") + match.group("ext")).geturl()
+
+
+MAX_IMPORTED_IMAGE_DIMENSION = 3000
+
+
+def downsize_oversized_image(content, filename, stdout):
+    """
+    Return ``content``, or a resized copy capped to
+    MAX_IMPORTED_IMAGE_DIMENSION on its longest side.
+
+    A WordPress "full size" upload URL (see _full_size_wp_image_url()) is
+    sometimes a raw, uncompressed-for-web original rather than something
+    actually sized for display -- one imported this way was 8192x5464
+    (44.8MP). Wagtail's rendition pipeline always fully decodes a source
+    image into memory before resizing it down, for *any* filter spec,
+    regardless of the requested output size -- so on the first live request
+    for e.g. a fill-640x360 card thumbnail, that decode alone was enough to
+    OOM-kill the worker (an uncatchable SIGKILL -- nothing gets logged,
+    which is exactly what made this hard to diagnose from Divio's logs
+    alone). Downsizing once here, at import time, bounds that cost for
+    every future request instead of paying it unpredictably on live
+    traffic.
+
+    Unlike wtrx/media_optimization.py's video-thumbnail handling (which
+    always re-encodes to JPEG, since a thumbnail only ever plays one fixed
+    poster role), this preserves the original format/mode -- these become
+    real content images (hero, cards, in-body), used at a range of sizes
+    across the site, so transparency and format still matter.
+
+    Returns ``content`` unchanged if it's already within the cap, or if
+    anything goes wrong decoding/resizing it -- the resulting bytes still
+    have to survive CustomImage.save() right after this call, and that's
+    already wrapped in its own broad except (a bad decode there is reported
+    the same way a bad decode here would be).
+    """
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    try:
+        image = PILImage.open(BytesIO(content))
+        image.load()
+    except Exception:
+        return content
+
+    width, height = image.size
+    longest_side = max(width, height)
+    if longest_side <= MAX_IMPORTED_IMAGE_DIMENSION:
+        return content
+
+    try:
+        scale = MAX_IMPORTED_IMAGE_DIMENSION / longest_side
+        resized = image.resize(
+            (round(width * scale), round(height * scale)),
+            PILImage.Resampling.LANCZOS,
+        )
+        output = BytesIO()
+        save_format = image.format or "PNG"
+        save_kwargs = {"quality": 88, "optimize": True} if save_format == "JPEG" else {}
+        resized.save(output, format=save_format, **save_kwargs)
+    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see docstring
+        stdout.write(f"    WARNING: failed to downsize oversized image {filename} — {exc!r}")
+        return content
+
+    stdout.write(f"    downsized oversized image: {filename} ({width}x{height} -> {resized.size[0]}x{resized.size[1]})")
+    return output.getvalue()
+
+
+_MAIN_SITE_BASE_URL = "https://350.org"
+
+
+def resolve_site_base_url(site):
+    """
+    Resolve a --site CLI value into a base URL for either import command.
+
+    350.org's other-language "country sites" (e.g. https://350.org/fr) are
+    separate WordPress multisite subdirectory installs, not a query-param
+    switch on the main site — confirmed live: https://350.org/fr/wp-json/
+    returns its own independent site index ("350 Français"), and
+    /fr/sitemap_index.xml, /fr/press-release-sitemap.xml,
+    /fr/wp-json/wp/v2/posts all exist in the exact same shape as the main
+    site's, served by the same theme (a live /fr/ press release page has
+    the identical #press-release-header/#post-time/article.clearfix
+    markup fetch_press_release() already expects). So the only thing that
+    ever needs to change per-site is this base URL — everything else
+    (Yoast site-name stripping, author-byline scraping, image URLs) is
+    already relative to whatever page/response was actually fetched.
+
+    ``site`` is a raw URL path segment (e.g. "fr", or "/fr/" with stray
+    slashes) -- blank (the default) resolves to the main English site.
+    Raises ValueError for a value that looks like a mistaken full URL
+    rather than a bare path segment.
+    """
+    site = site.strip("/")
+    if not site:
+        return _MAIN_SITE_BASE_URL
+    if "://" in site or site.startswith("."):
+        raise ValueError(
+            f"--site should be a URL path segment like 'fr', not {site!r}."
+        )
+    return f"{_MAIN_SITE_BASE_URL}/{site}"
+
+
+def verify_site_reachable(session, base_url):
+    """
+    Confirm base_url points at a real WordPress site before an import run
+    starts, so a typo'd or nonexistent --site value fails fast with one
+    clear message instead of a confusing error partway through paginated
+    REST fetching or sitemap parsing.
+    """
+    try:
+        resp = session.get(f"{base_url}/wp-json/", timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.exceptions.RequestException, ValueError):
+        return False
+    return "wp/v2" in (data.get("namespaces") or [])
+
+
+def _strip_site_name_suffix(title, site_name):
+    """
+    Yoast's default title template appends " - <Site Name>" to every page's
+    <title>/og:title (e.g. "Chokepoints: The Global Oil Supply's Weak Links
+    - 350"). Strip it so the imported SEO title matches what an editor
+    would type by hand, not the browser-tab rendering of it.
+    """
+    if not title or not site_name:
+        return title
+    suffix = f" - {site_name}"
+    if title.endswith(suffix):
+        return title[: -len(suffix)]
+    return title
+
+
+def yoast_seo_fields_from_api_post(post):
+    """
+    Extract (seo_title, search_description) from a WP REST API post's
+    embedded Yoast SEO data.
+
+    ``yoast_head_json`` is added to every post/page response by the Yoast
+    SEO plugin's REST API integration whenever the plugin is active -- no
+    ``_embed`` or other special request param needed, unlike the
+    featured-media/author embeds this module also reads.
+    """
+    yoast = post.get("yoast_head_json") or {}
+    title = html.unescape(yoast.get("title") or "")
+    description = html.unescape(yoast.get("description") or "")
+    site_name = yoast.get("og_site_name") or ""
+    return _strip_site_name_suffix(title, site_name), description
+
+
+def yoast_seo_fields_from_page(soup):
+    """
+    Extract (seo_title, search_description) from a scraped page's <head>.
+
+    Used for content not exposed via the WP REST API (press releases --
+    see that command's module docstring), where Yoast's SEO data only
+    exists as the rendered <title>/<meta name="description"> tags.
+    """
+    title_tag = soup.find("title")
+    title = html.unescape(title_tag.get_text(strip=True)) if title_tag else ""
+    meta_desc = soup.find("meta", attrs={"name": "description"})
+    description = html.unescape(meta_desc.get("content", "")) if meta_desc else ""
+    site_tag = soup.find("meta", attrs={"property": "og:site_name"})
+    site_name = site_tag.get("content", "") if site_tag else ""
+    return _strip_site_name_suffix(title, site_name), description
+
+
+def _find_page_by_path(path):
+    """
+    Walk the page tree by slug, one path segment at a time, and return the
+    page found there (as its real subtype, via .specific), or None if any
+    segment doesn't match.
+
+    E.g. "france/blog" -> a page sliced by slug "france", then that page's
+    own child sliced by slug "blog". Exists because Page.slug is only
+    unique among siblings, not site-wide (see resolve_blogs_target's
+    docstring) -- a bare slug can't disambiguate a page nested under a
+    country/region sub-home from an identically-slugged page elsewhere in
+    the tree.
+
+    The *first* segment is resolved two ways, tried in order: as a child of
+    site.root_page (an ordinary nested section, the original/legacy
+    shape), then -- if that finds nothing -- as a sibling of site.root_page
+    (a child of the tree's real root instead). Country/language sections
+    were moved from nested-under-Home to top-level siblings of Home
+    (AGENTS.md pitfall #77: a language tree is a sibling of the site root,
+    not a descendant); this importer predates that move and walked only
+    site.root_page's descendants, so a --target path starting at one of
+    those sections (e.g. "indonesia/press-releases", where "indonesia" is
+    now a sibling of Home) silently failed to resolve even though the page
+    exists. Every segment *after* the first still resolves as an ordinary
+    child, same as before -- only the root of the walk needed the fallback.
+    Shared by both import_350_blog.py and import_350_press_releases.py via
+    resolve_blogs_target(), so this fixes --target resolution for both.
+    """
+    # Deferred import to avoid import-time DB access.
+    from wagtail.models import Site
+
+    site = Site.objects.filter(is_default_site=True).first() or Site.objects.first()
+    if site is None:
+        return None
+
+    segments = path.strip("/").split("/")
+    first_segment, remaining_segments = segments[0], segments[1:]
+
+    page = site.root_page.get_children().filter(slug=first_segment).first()
+    if page is None:
+        page = site.root_page.get_parent().get_children().filter(slug=first_segment).first()
+    if page is None:
+        return None
+
+    for segment in remaining_segments:
+        page = page.get_children().filter(slug=segment).first()
+        if page is None:
+            return None
+    return page.specific
+
+
+def resolve_blogs_target(stderr, style, target):
+    """
+    Resolve which Blogs page an import command should add children under.
+
+    With --target given, looks it up by slug. Without it, only succeeds if
+    exactly one Blogs page exists — sites with more than one (e.g. separate
+    "Blog Index" and "Press Releases" pages) must pick explicitly, rather
+    than the command silently guessing via Blogs.objects.first().
+
+    --target also accepts a slash-separated path from the site root (e.g.
+    "france/blog") instead of a bare slug, resolved via _find_page_by_path()
+    -- needed because Page.slug is only unique among siblings, not
+    site-wide, so a country/region sub-home's own Blogs child (e.g.
+    350.org/france/blog) can't always be picked out by slug alone once more
+    than one page in the tree shares that slug. A leading slash forces the
+    path lookup for a single segment too ("/blog" is the Blogs page directly
+    under Home), and a bare slug matching more than one Blogs page is an
+    error rather than an arbitrary pick.
+
+    Returns the Blogs instance, or None (having already written an error
+    to stderr) if it can't be resolved.
+    """
+    # Deferred import to avoid import-time DB access.
+    from wtrx.models import Blogs
+
+    if target:
+        if "/" in target.strip("/") or target.startswith("/"):
+            page = _find_page_by_path(target)
+            if page is None:
+                stderr.write(style.ERROR(f"No page found at path '{target}'."))
+                return None
+            if not isinstance(page, Blogs):
+                stderr.write(
+                    style.ERROR(f"Page at path '{target}' is a {type(page).__name__}, not a Blogs page.")
+                )
+                return None
+            return page
+        matches = list(Blogs.objects.filter(slug=target))
+        if not matches:
+            stderr.write(style.ERROR(f"No Blogs page found with slug '{target}'."))
+            return None
+        if len(matches) > 1:
+            paths = ", ".join(sorted(f"'{b.url_path}'" for b in matches))
+            stderr.write(
+                style.ERROR(
+                    f"More than one Blogs page has slug '{target}' ({paths}). Pass a path "
+                    f"instead, e.g. '/{target}' for the one directly under the site root."
+                )
+            )
+            return None
+        return matches[0]
+
+    all_blogs = list(Blogs.objects.all())
+    if not all_blogs:
+        stderr.write(style.ERROR("No Blogs page found. Create one first."))
+        return None
+    if len(all_blogs) > 1:
+        slugs = ", ".join(f"'{b.slug}'" for b in all_blogs)
+        stderr.write(
+            style.ERROR(f"Multiple Blogs pages exist ({slugs}). Pass --target <slug> to pick one.")
+        )
+        return None
+    return all_blogs[0]
+
+# Block-level tags kept as-is (mapped to themselves or normalized), matching
+# wtrx.constants.RICHTEXT_FEATURES_FULL: h2/h3/h4, lists, blockquote.
+_BLOCK_TAG_MAP = {
+    "h1": "h2",
+    "h2": "h2",
+    "h3": "h3",
+    "h4": "h4",
+    "h5": "h4",
+    "h6": "h4",
+    "p": "p",
+    "ul": "ul",
+    "ol": "ol",
+    "li": "li",
+    "blockquote": "blockquote",
+}
+
+# Inline tags kept as-is, matching RICHTEXT_FEATURES_FULL: bold, italic, link.
+_INLINE_TAG_MAP = {
+    "strong": "strong",
+    "b": "strong",
+    "em": "em",
+    "i": "em",
+    "a": "a",
+    "br": "br",
+}
+
+# Tags dropped entirely, along with their contents.
+_DROP_ENTIRELY = {"script", "style", "noscript", "iframe", "form", "svg", "button", "input"}
+
+_TAG_FACTORY = BeautifulSoup("", "html.parser")
+
+_CF_EMAIL_PROTECTION_PREFIX = "/cdn-cgi/l/email-protection"
+
+
+def _decode_cf_email(cfemail_hex):
+    """Reverse Cloudflare's "Email Address Obfuscation" single-byte XOR encoding."""
+    key = int(cfemail_hex[:2], 16)
+    return "".join(
+        chr(int(cfemail_hex[i : i + 2], 16) ^ key) for i in range(2, len(cfemail_hex), 2)
+    )
+
+
+def _unmask_cf_emails(soup):
+    """
+    Replace Cloudflare's email-obfuscation markup with the real address, in place.
+
+    Cloudflare's edge rewrites any visible ``mailto:`` link into
+    ``<a href="/cdn-cgi/l/email-protection#hexhash">`` and marks the
+    obfuscated text with ``class="__cf_email__" data-cfemail="hexhash"``,
+    only restoring the real address client-side via injected JS that never
+    runs for a plain ``requests`` fetch — so without this, an imported body
+    carries the literal "[email protected]" placeholder and a dead link
+    instead of the address.
+
+    That class/data-cfemail pair lands on two different elements depending
+    on the original markup: wrapped in a separate
+    ``<span class="__cf_email__">`` nested inside the ``<a>`` when the email
+    text wasn't already the anchor's sole content, or directly on the
+    ``<a>`` itself (no inner span at all) when it was — confirmed against a
+    real 350.org press release, where the latter shape left the placeholder
+    completely untouched by a span-only lookup.
+    """
+    for node in soup.find_all(class_="__cf_email__"):
+        cfemail = node.get("data-cfemail")
+        if not cfemail:
+            continue
+        try:
+            email = _decode_cf_email(cfemail)
+        except ValueError:
+            continue
+        if node.name == "a":
+            if node.get("href", "").startswith(_CF_EMAIL_PROTECTION_PREFIX):
+                node["href"] = f"mailto:{email}"
+            node.string = email
+        else:
+            anchor = node.find_parent("a")
+            if anchor is not None and anchor.get("href", "").startswith(_CF_EMAIL_PROTECTION_PREFIX):
+                anchor["href"] = f"mailto:{email}"
+            node.replace_with(NavigableString(email))
+
+
+def _build_clean(node):
+    """
+    Recursively rebuild a bs4 node's subtree using only tags allowed by
+    RICHTEXT_FEATURES_FULL, unwrapping (keeping children/text of) anything
+    else and dropping _DROP_ENTIRELY tags along with their contents.
+
+    Returns a list of cleaned bs4 nodes (Tag/NavigableString) suitable for
+    appending into a parent tag or serializing directly with str().
+    """
+    if isinstance(node, Comment):
+        return []
+    if isinstance(node, NavigableString):
+        return [NavigableString(str(node))]
+    if not isinstance(node, Tag):
+        return []
+
+    name = node.name.lower()
+    if name in _DROP_ENTIRELY:
+        return []
+
+    mapped = _BLOCK_TAG_MAP.get(name) or _INLINE_TAG_MAP.get(name)
+    if not mapped:
+        # Unknown/disallowed wrapper (span, div, font, u, sup, ...) — unwrap.
+        result = []
+        for child in node.children:
+            result.extend(_build_clean(child))
+        return result
+
+    if mapped == "a":
+        href = node.get("href")
+        if not href:
+            result = []
+            for child in node.children:
+                result.extend(_build_clean(child))
+            return result
+        new_tag = _TAG_FACTORY.new_tag("a", href=href)
+    else:
+        new_tag = _TAG_FACTORY.new_tag(mapped)
+
+    for child in node.children:
+        for cleaned_child in _build_clean(child):
+            new_tag.append(cleaned_child)
+    return [new_tag]
+
+
+def download_image(session, url, stdout, dry_run=False, alt_text=""):
+    """
+    Download an image from ``url`` and create a CustomImage, or return an
+    existing one whose title already matches the source filename (dedup
+    across runs, since CustomImage has no dedicated external-URL field).
+
+    ``alt_text`` (WordPress's own alt text for this image, when the source
+    provides one) is stored on CustomImage.description -- Wagtail's
+    "default_alt_text" fallback (description, else title) used any time this
+    image is rendered somewhere that doesn't carry its own contextual alt
+    (e.g. reused as a post card thumbnail via Post.get_card_image()). Without
+    it, that fallback lands on the filename instead (see AGENTS.md pitfall
+    #38). Left as "" (falls back to title, same as before) when WordPress has
+    no alt text for this image either -- most WP images don't.
+
+    An already-existing image (dedup match) has its description backfilled
+    too, but only if it doesn't already have one -- this fills in alt text
+    for images downloaded before this was tracked (rerun with --update) without
+    ever overwriting a real description an editor has since written by hand.
+    """
+    if not url:
+        return None
+
+    # Deferred import to avoid import-time DB access.
+    from wtrx.images import CustomImage
+
+    # CustomImage.save() (called below, and via existing.save() just above)
+    # doesn't run Django's max_length validation -- only full_clean() does --
+    # so a WordPress alt text or filename longer than the column truncates
+    # here instead of raising a DataError from Postgres.
+    title_max_length = CustomImage._meta.get_field("title").max_length
+    description_max_length = CustomImage._meta.get_field("description").max_length
+    alt_text = alt_text[:description_max_length]
+
+    full_url = _full_size_wp_image_url(url)
+    filename = (os.path.basename(urlparse(full_url).path) or "imported-image")[:title_max_length]
+    existing = CustomImage.objects.filter(title=filename).first()
+    if existing:
+        if alt_text and not existing.description and not dry_run:
+            existing.description = alt_text
+            existing.save(update_fields=["description"])
+        return existing
+
+    if dry_run:
+        stdout.write(f"    [dry-run] would download image: {full_url}")
+        return None
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    try:
+        resp = session.get(full_url, timeout=30)
+        if resp.status_code == 404 and full_url != url:
+            # Rare: the unscaled original isn't hosted (e.g. deleted after WP's
+            # "big image threshold" processing) — fall back to the scaled copy
+            # actually linked in the post content rather than failing the import.
+            full_url = url
+            filename = (os.path.basename(urlparse(url).path) or "imported-image")[:title_max_length]
+            resp = session.get(url, timeout=30)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        # A single broken/dead image link on the source WP site shouldn't
+        # abort the whole import run — skip it and keep going.
+        stdout.write(f"    WARNING: failed to download image {full_url} — {exc}")
+        return None
+
+    try:
+        content = downsize_oversized_image(resp.content, filename, stdout)
+        uploaded = SimpleUploadedFile(filename, content)
+        image = CustomImage(title=filename, file=uploaded, description=alt_text)
+        image.save()
+    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see below
+        # A 200 response doesn't guarantee valid image content -- e.g. a
+        # deleted/corrupt WP attachment can serve an HTML error page (or
+        # truncated bytes) at what looks like an image URL. CustomImage's
+        # post_init signal has Willow probe the content to read its
+        # dimensions, and a bad decode raises whatever error Willow/PIL/the
+        # stdlib XML parser (while probing for SVG) happens to throw --
+        # there's no single exception type to catch narrowly. Same "a single
+        # bad image shouldn't abort the whole import run" reasoning as the
+        # RequestException handling above, just for a bad body instead of a
+        # failed request.
+        stdout.write(f"    WARNING: failed to process image {full_url} — {exc!r}")
+        return None
+    stdout.write(f"    downloaded image: {filename}")
+    return image
+
+
+def _make_image_block(img_tag, caption, session, stdout, dry_run=False):
+    if img_tag is None:
+        return None
+    src = img_tag.get("src")
+    if not src:
+        return None
+    alt = img_tag.get("alt", "")
+    image = download_image(session, src, stdout, dry_run=dry_run, alt_text=alt)
+    if image is None:
+        return None
+    return {
+        "type": "image",
+        "value": {
+            "image": image.pk,
+            "alt_text": alt,
+            "caption": caption,
+        },
+    }
+
+
+_YOUTUBE_EMBED_RE = re.compile(
+    r"^(?:https?:)?//(?:www\.)?youtube(?:-nocookie)?\.com/embed/([\w-]{6,})", re.IGNORECASE
+)
+_VIMEO_PLAYER_RE = re.compile(r"^(?:https?:)?//player\.vimeo\.com/video/(\d+)", re.IGNORECASE)
+
+
+def video_embed_url(iframe_src: str) -> str | None:
+    """
+    Map an <iframe> player URL to the public page URL VideoBlock's oEmbed
+    lookup understands, or None for any other iframe.
+
+    Only YouTube and Vimeo are converted -- together ~90% of 350.org's post
+    iframes. Wagtail's YouTube oEmbed patterns don't match /embed/ URLs at
+    all, hence the rewrite to /watch?v=. Facebook (the next most common)
+    needs an app access token for oEmbed, and the long tail is mostly dead
+    services (Storify, Vine, Ooyala).
+    """
+    src = html.unescape(iframe_src or "").strip()
+    match = _YOUTUBE_EMBED_RE.match(src)
+    if match:
+        url = f"https://www.youtube.com/watch?v={match.group(1)}"
+        start = parse_qs(urlparse(src).query).get("start")
+        if start and start[0].isdigit():
+            url += f"&t={start[0]}"
+        return url
+    match = _VIMEO_PLAYER_RE.match(src)
+    if match:
+        # An unlisted video's player URL carries its privacy hash as ?h=.
+        private_hash = parse_qs(urlparse(src).query).get("h")
+        return f"https://vimeo.com/{match.group(1)}" + (f"/{private_hash[0]}" if private_hash else "")
+    return None
+
+
+def _make_video_block(iframe_tag, stdout):
+    src = iframe_tag.get("src", "")
+    url = video_embed_url(src)
+    if url is None:
+        stdout.write(f"    WARNING: dropped unsupported embed: {src}")
+        return None
+    return {"type": "video", "value": {"embed_url": url, "caption": ""}}
+
+
+def _process_nodes(nodes, blocks, pending, session, stdout, dry_run=False):
+    """
+    Walk a list of top-level bs4 nodes, appending finished blocks to
+    ``blocks`` and accumulating consecutive text-eligible HTML fragments in
+    ``pending`` (flushed into a single "text" block on any break).
+    """
+
+    def flush():
+        if not pending:
+            return
+        combined = "".join(pending).strip()
+        pending.clear()
+        if combined:
+            blocks.append({"type": "text", "value": combined})
+
+    for node in nodes:
+        if isinstance(node, Comment):
+            continue
+        if isinstance(node, NavigableString):
+            text = str(node).strip()
+            if text:
+                p = _TAG_FACTORY.new_tag("p")
+                p.append(NavigableString(text))
+                pending.append(str(p))
+            continue
+        if not isinstance(node, Tag):
+            continue
+
+        name = node.name.lower()
+        if name == "iframe":
+            block = _make_video_block(node, stdout)
+            if block:
+                flush()
+                blocks.append(block)
+            continue
+        if name in _DROP_ENTIRELY:
+            continue
+
+        # WP's captioned-image wrapper: <div class="wp-caption">...<img>...
+        # <p class="wp-caption-text">caption</p></div>, or a <figure>/<figcaption>.
+        if name in ("div", "figure") and node.find("img"):
+            img_tag = node.find("img")
+            caption_tag = node.find(class_="wp-caption-text") or node.find("figcaption")
+            caption = caption_tag.get_text(strip=True) if caption_tag else ""
+            flush()
+            block = _make_image_block(img_tag, caption, session, stdout, dry_run=dry_run)
+            if block:
+                blocks.append(block)
+            continue
+
+        if name == "img":
+            flush()
+            block = _make_image_block(node, "", session, stdout, dry_run=dry_run)
+            if block:
+                blocks.append(block)
+            continue
+
+        if name == "a":
+            # A link reached directly here (rather than via _build_clean, which
+            # handles ordinary in-paragraph links) is a standalone CTA -- e.g. a
+            # WordPress "Take Action" button, typically wrapped in table/div
+            # cruft for email-client compatibility that gets unwrapped away by
+            # the generic fallback below. Import it as a proper button block
+            # instead of losing the link, so long as it has both a target and
+            # visible text (an image-only link falls through to the fallback
+            # below, which preserves the existing bare-image behavior).
+            href = node.get("href")
+            text = node.get_text(strip=True)
+            if href and text:
+                flush()
+                blocks.append(
+                    {
+                        "type": "button",
+                        "value": {
+                            "text": text,
+                            "link_url": href,
+                            "style": "primary",
+                        },
+                    }
+                )
+                continue
+
+        if name in _BLOCK_TAG_MAP:
+            iframes = node.find_all("iframe")
+            if iframes:
+                # Classic-editor posts paste the player into a paragraph
+                # (<p style="text-align: center;"><iframe ...></p>), where
+                # _build_clean would drop it. Keep any text first, then the
+                # videos as blocks of their own.
+                for cleaned in _build_clean(node):
+                    text = cleaned.get_text(strip=True) if isinstance(cleaned, Tag) else str(cleaned).strip()
+                    if text:
+                        pending.append(str(cleaned))
+                for iframe in iframes:
+                    block = _make_video_block(iframe, stdout)
+                    if block:
+                        flush()
+                        blocks.append(block)
+                continue
+            imgs = node.find_all("img")
+            if imgs and not node.get_text(strip=True):
+                # A block whose only content is one or more bare images
+                # (e.g. <p><img></p>), no surrounding text.
+                flush()
+                for img_tag in imgs:
+                    block = _make_image_block(img_tag, "", session, stdout, dry_run=dry_run)
+                    if block:
+                        blocks.append(block)
+                continue
+            for cleaned in _build_clean(node):
+                text = cleaned.get_text(strip=True) if isinstance(cleaned, Tag) else str(cleaned).strip()
+                if text:
+                    pending.append(str(cleaned))
+            continue
+
+        # Unrecognized wrapper tag (div/section with no image, etc.) — flatten
+        # by treating its children as if they were top-level nodes.
+        _process_nodes(list(node.children), blocks, pending, session, stdout, dry_run=dry_run)
+
+    flush()
+
+
+def convert_body(content_html, session, stdout, dry_run=False):
+    fragment = BeautifulSoup(content_html or "", "html.parser")
+    _unmask_cf_emails(fragment)
+    blocks = []
+    pending = []
+    _process_nodes(list(fragment.children), blocks, pending, session, stdout, dry_run=dry_run)
+    for block in blocks:
+        block["id"] = str(uuid.uuid4())
+    return blocks

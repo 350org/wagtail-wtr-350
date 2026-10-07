@@ -1,0 +1,15 @@
+{% load i18n wagtailcore_tags %}
+{% comment %}
+HeroSignupActionKitBlock — HeroCTABlock's "signup" choice (components/hero.html).
+The slim inline CTA wrapper: no heading/copy, no image, no card — light text
+sitting directly in the hero's own dark overlay. See SignupActionKitBlock
+(signup_actionkit_block.html) for the standalone panel with a heading.
+
+inline=True (not stacked=True) on _actionkit_form.html: one wrapping row of
+pill inputs with the submit button on the same line, since the hero CTA is a
+full-width strip with no room to stack. See main.css's
+.wtr-actionkit-embed-inline rules.
+{% endcomment %}
+<div class="wtr-signup wtr-signup-actionkit wtr-signup-inline flex flex-col gap-4" {% if value.anchor_id %}id="{{ value.anchor_id }}"{% endif %}>
+    {% include "wtrx/components/streamfield/blocks/_actionkit_form.html" with inline=True %}
+</div>

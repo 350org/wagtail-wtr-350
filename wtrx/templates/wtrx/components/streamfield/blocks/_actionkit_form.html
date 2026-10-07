@@ -1,0 +1,785 @@
+{% load i18n wagtailcore_tags %}
+{% comment %}
+    Shared ActionKit form renderer, used by signup_actionkit_block.html's
+    standalone panel (SignupActionKitBlock) and by
+    signup_actionkit_hero_block.html's hero CTA strip
+    (HeroSignupActionKitBlock, HeroCTABlock's "signup" choice). Both block
+    classes share their form-fetching/caching/panel-tone logic via
+    SignupActionKitFormMixin.
+
+    Expects from context: form_html, actionkit_base_url, short_form_id (set
+    by SignupActionKitFormMixin.get_context()), and exactly one of the
+    layout flags `inline` / `stacked`, passed explicitly by the including
+    template.
+    Also expects thank-you content, in one of two forms depending on the
+    caller: `success_message` (a SuccessMessageBlock StreamValue, set by
+    SignupActionKitFormMixin.get_context() — rendered via include_block) or
+    `success_text` (a plain string, set by resolved_footer_newsletter_signup()
+    for the footer's newsletter box, which has no StreamField content editor
+    of its own — rendered as-is). A caller sets at most one; either enables
+    the thank-you swap below.
+
+      inline=True  → .wtr-actionkit-embed-inline: fields wrap across one
+                     row with the submit button on the same line. For the
+                     hero CTA strip, which is wide and short.
+      stacked=True → .wtr-actionkit-embed-stacked: full-width fields in a
+                     single column with a full-width submit below. For the
+                     panel's 370px form column (Figma node 1:1245).
+
+    Neither flag renders ActionKit's own unstyled vertical stack; both are
+    full restyles of the same fetched markup. See main.css for each.
+
+    `panel_tone` (from SignupActionKitFormMixin.get_context(), via
+    SignupActionKitFormMixin.PANEL_TONES) adds a .wtr-ak-on-{tone} modifier for
+    the panel fills the stacked chrome collides with — a dark panel behind
+    the dark fine-print box, a blue panel behind the blue submit button, a
+    light panel behind light-on-color labels. Applied only alongside
+    stacked=True: the inline variant sits in the hero's own overlay, whose
+    color this block's `background` field has no say over.
+{% endcomment %}
+{% if form_html %}
+    {% comment %}
+    The block picker preview renders a static stand-in form (see
+    SignupActionKitFormMixin.PREVIEW_FORM_HTML), which needs neither jQuery
+    nor the submit/UTM wiring below -- and must not pull either from a
+    third party.
+    {% endcomment %}
+    {% if not is_block_preview %}
+        <script>
+            {% comment %}
+            MUST stay document.write(), even though it's exactly what
+            PageSpeed Insights' "render-blocking requests" audit flags. A
+            past attempt replaced this with a dynamically-created (and
+            therefore non-blocking/async) <script> element instead, which
+            broke in production: form_html below is ActionKit's own fetched
+            fragment, and it isn't just form fields -- it carries several
+            inline <script> blocks of its own (e.g.
+            `jQuery( document ).ready(function() { ... });` right near the
+            top, for its "oneclick" prefill, plus more further down for
+            radio/checkbox styling) that call jQuery *immediately and
+            synchronously* as the browser parses them, with no deferral of
+            their own to wait for it. document.write() is what guarantees
+            jQuery has finished loading and executing before the parser
+            reaches those scripts -- confirmed live via a
+            "Uncaught ReferenceError: jQuery is not defined" console error
+            once the async version shipped (intermittent, since it's a race
+            against however long the script takes to fetch). Signups
+            themselves keep working either way -- validation/submit below
+            is vanilla JS, not jQuery -- but the oneclick lead-hiding and
+            radio/checkbox styling silently no-op whenever the race is lost.
+            A dynamically-appended <script> loses the ordering guarantee
+            entirely (that's the whole point of using one), so there's no
+            way to keep those two features reliable short of not using
+            jQuery at all in ActionKit's own fragment -- not something to
+            "fix" for Lighthouse again without changing that.
+            {% endcomment %}
+            if (typeof jQuery === "undefined") {
+                document.write('<scr' + 'ipt src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"><\/scr' + 'ipt>');
+            }
+        </script>
+    {% endif %}
+    {% comment %}
+    Neither variant carries a top margin. The inline one is the hero CTA,
+    and the hero already sets the gap between its headline and this widget
+    (20px, per Figma's Content frame) on the wrapper it renders around the
+    block; stacking another 32px inside pushed the form to 52px below the
+    headline. HeroSignupActionKitBlock has no heading/description field of
+    its own, so there is nothing else for that gap to space from.
+
+    The stacked one used to carry mt-8, which was always dead space: its
+    only caller is signup_actionkit_block.html's standalone panel, where
+    this embed is the sole child of its own column and has nothing above it
+    to be spaced from. All it did was push the form 32px below the panel's
+    own p-16, which reads as a gap at the top of the panel — most visible
+    when the form is short (the home page's two-field form) and the copy
+    column beside it is shorter still.
+    {% endcomment %}
+    <div class="wtr-actionkit-embed {% if inline %}wtr-actionkit-embed-inline{% elif stacked %}wtr-actionkit-embed-stacked{% if panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}{% endif %}"
+         data-form-container
+         data-msg-required="{% trans 'This field is required.' %}"
+         data-msg-email="{% trans 'Enter a valid email address.' %}"
+         data-msg-network-error="{% trans 'Something went wrong. Please try again.' %}">
+        {{ form_html|safe }}
+    </div>
+    {% comment %}
+    Always rendered, not just alongside success_message: the submit handler
+    below now intercepts every instance's form unconditionally (see the
+    script's comment), and needs this token whether or not the block has a
+    custom success_message configured.
+    {% endcomment %}
+    <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
+    {% if success_message or success_text %}
+        {% comment %}
+        The tone modifier rides along here as well as on the embed above,
+        because this box replaces the form on success and so has to survive
+        the same panel fills. Its bg-dark is --color-dark, which *is* the
+        dark grey panel — without the modifier a successful signup on that
+        fill swaps the form for a box that cannot be seen at all. Only the
+        stacked panel needs it: the hero's compact rendering sits on the
+        hero's own scrim, which this block's background field has no say
+        over. See main.css for the rule.
+
+        data-bg-tone="dark" is unconditional (not tied to stacked/panel_tone
+        above): success_message's "text" field renders through
+        text_block.html, whose `prose-neutral` defaults to dark grey body
+        text and only flips to `prose-invert` when an ancestor carries this
+        attribute (see SectionBlock's own data-bg-tone). Without it, the
+        message text was grey-on-dark-grey and unreadable on every fill —
+        stacked or inline (hero). success_text (the footer newsletter box's
+        plain-string case) isn't wrapped in .wtr-text-block/.prose at all,
+        so it doesn't need this to invert — but the attribute is harmless
+        either way, and keeping it unconditional avoids a third branch here.
+        {% endcomment %}
+        <div class="wtr-signup-thank-you hidden rounded-lg bg-dark p-6 text-neutral-50{% if stacked and panel_tone %} wtr-ak-{{ panel_tone }}{% endif %}"
+             data-thank-you data-bg-tone="dark">
+            {% if success_message %}
+                {% include_block success_message %}
+            {% else %}
+                <p>{{ success_text }}</p>
+            {% endif %}
+        </div>
+    {% endif %}
+    <script>
+        (function () {
+            {% if is_block_preview %}return;{% endif %}
+            {% comment %}
+            A page can carry more than one SignupActionKitBlock (the home
+            page always does: the hero CTA plus this standalone panel).
+            Every instance fetches and renders the *same* ActionKit
+            fragment, which hardcodes id="action-form"/name="act". Every
+            instance after the first has its ids suffixed server-side
+            (actionkit.uniquify_form_ids(), keeping the original in
+            data-ak-id), so the ids are unique, but the fragment's own
+            scripts still only see the first instance. document.getElementById and
+            ActionKit's own actionkit.js (forms.setForm walks
+            document.getElementsByTagName('form') and stops at the first
+            name match) can therefore only ever resolve the first instance
+            on the page. A single page-global "have I run yet" flag made
+            this worse: every instance after the first got no wiring at
+            all, so its form fell back to a bare, un-intercepted browser
+            POST straight to ActionKit — landing on ActionKit's raw
+            response instead of behaving inline.
+
+            The fix is to never do a page-global element lookup. Each
+            instance scopes every query to its own wrapper, found via
+            document.currentScript — reliable here because this script tag
+            always renders inside the same .wtr-signup-actionkit wrapper as
+            its own copy of the form (see signup_actionkit_block.html).
+            querySelector scoped to that wrapper finds the right #action-
+            form even though the id isn't unique page-wide. Loading jQuery/
+            actionkit.js still happens at most once per page (via the
+            shared promise below) since it's still useful for actionkit.js
+            to be present, but wiring submission and validation no longer
+            waits on it or defers to it — that's what left ActionKit's own
+            client validation as the only thing available, and it shares
+            the exact same first-instance-only limitation.
+            {% endcomment %}
+            var wrapper = document.currentScript.closest(".wtr-signup-actionkit");
+            if (!wrapper) { return; }
+            var formContainer = wrapper.querySelector("[data-form-container]");
+            var form = formContainer && formContainer.querySelector('#action-form, [data-ak-id="action-form"]');
+            if (!form) { return; }
+            var thankYou = wrapper.querySelector("[data-thank-you]");
+            var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
+            var msgRequired = formContainer.dataset.msgRequired;
+            var msgEmail = formContainer.dataset.msgEmail;
+            var msgNetworkError = formContainer.dataset.msgNetworkError;
+            var REQUIRED_FIELD_SELECTOR = ".input-text.required, .input-select.required, .input-checkbox.required, .input-radio.required";
+
+            function populateUtmFields() {
+                var params = new URLSearchParams(window.location.search);
+                ["source", "medium", "campaign", "term", "content"].forEach(function (name) {
+                    var value = params.get("utm_" + name);
+                    if (!value) { return; }
+                    var field = form.querySelector('[name="action_utm_' + name + '"]');
+                    if (field) { field.value = value; }
+                });
+            }
+            populateUtmFields();
+
+            {% comment %}
+            ActionKit's own attribution values, copied from the page URL
+            into hidden fields. actionkit.js does this in onContextLoaded(),
+            which only runs from forms.initForm() (never called here, see
+            the multi-instance comment above). A value already in the form
+            is kept, as actionkit.js keeps a page's own action_id.
+
+            Unlike actionkit.js, an akid is always sent as akid: the move to
+            referring_akid there depends on its recognised-user view, which
+            this form doesn't have.
+            {% endcomment %}
+            function populateTrackingFields() {
+                var params = new URLSearchParams(window.location.search);
+                ["source", "akid", "referring_akid", "aktmid", "action_id"].forEach(function (name) {
+                    var value = params.get(name);
+                    if (!value) { return; }
+                    var field = form.querySelector('input[name="' + name + '"]');
+                    if (!field) {
+                        field = document.createElement("input");
+                        field.type = "hidden";
+                        field.name = name;
+                        form.appendChild(field);
+                    }
+                    if (!field.value) { field.value = value; }
+                });
+            }
+            populateTrackingFields();
+
+            {% comment %}
+            Country-dependent fields — a port of actionkit.js's own
+            forms.reflectCountryChange(), which this form never gets because
+            it only runs from forms.initForm() (see the multi-instance
+            comment above). Two things hang off the country select:
+
+              - ZIP Code vs Postal Code (and State vs Region, when a page
+                has them): ActionKit renders both of each pair and expects
+                its client to show the US one for the United States — or
+                for no country yet, same as actionkit.js's isUnitedStates()
+                — and the global one everywhere else. The hidden one is
+                disabled too, so FormData never posts it, and a value typed
+                into it carries over, exactly as actionkit.js does.
+              - The "Millions of people…" opt-in radios (.ak-privacy): shown
+                only for a country in ActionKit's privacy_record_countries
+                (the EU/GDPR list, configured in ActionKit and served on its
+                /context/ endpoint, fetched below). Hidden inputs are
+                disabled so a non-EU signup doesn't post `required=privacy`,
+                and the fine print's "350 will send you email updates"
+                sentence (.privacy-non_eu) takes their place, as ActionKit's
+                own fragment script would do if actionkit.form existed here.
+
+            Until the country list arrives, the opt-in stays hidden (most
+            visitors aren't in it); if /context/ can't be reached at all it
+            is shown instead, since asking for consent unnecessarily is the
+            safe way round to be wrong.
+            {% endcomment %}
+            var countrySelect = form.querySelector('select[name="country"]');
+            var privacyBox = form.querySelector(".ak-privacy");
+            var privacyCountries = null;
+            var privacyRequired = false;
+
+            function setFieldActive(name, active) {
+                var input = form.querySelector('[name="' + name + '"]');
+                if (!input) { return null; }
+                var row = input.closest('[id^="ak-fieldbox-"]');
+                input.disabled = !active;
+                if (row) { row.style.display = active ? "" : "none"; }
+                return input;
+            }
+
+            function showOneOf(showName, hideName) {
+                if (!form.querySelector('[name="' + showName + '"]') || !form.querySelector('[name="' + hideName + '"]')) { return; }
+                var hidden = setFieldActive(hideName, false);
+                var shown = setFieldActive(showName, true);
+                if (hidden.value && !shown.value) { shown.value = hidden.value; }
+            }
+
+            function setPrivacyRequired(required) {
+                privacyRequired = required;
+                if (!privacyBox) { return; }
+                privacyBox.style.display = required ? "" : "none";
+                Array.prototype.forEach.call(privacyBox.querySelectorAll("input, select, textarea"), function (el) {
+                    el.disabled = !required;
+                });
+                Array.prototype.forEach.call(form.querySelectorAll(".privacy-non_eu"), function (el) {
+                    el.style.display = required ? "none" : "";
+                });
+            }
+
+            function reflectCountry() {
+                var country = countrySelect ? countrySelect.value : "";
+                var isUs = !country || country === "United States" || country === "US";
+                showOneOf(isUs ? "zip" : "postal", isUs ? "postal" : "zip");
+                showOneOf(isUs ? "state" : "region", isUs ? "region" : "state");
+                if (privacyCountries && countrySelect) {
+                    setPrivacyRequired(privacyCountries.indexOf(country) !== -1);
+                }
+            }
+
+            if (countrySelect) {
+                countrySelect.addEventListener("change", reflectCountry);
+            }
+            reflectCountry();
+
+            {% comment %}
+            Field-level errors reuse ActionKit's own convention exactly —
+            .ak-error on the label/input, a <ul class="ak-err"><li> inside
+            the fieldbox — so main.css's existing (already-styled, already
+            fill-aware) rules for both the inline and stacked variants apply
+            with no new CSS. data-wtr-client-err distinguishes an error list
+            we inserted from one ActionKit itself might render, so clearing
+            never touches a node we don't own.
+            {% endcomment %}
+            function clearFieldError(fieldbox) {
+                var label = fieldbox.querySelector("label");
+                var control = fieldbox.querySelector("input, select, textarea");
+                if (label) { label.classList.remove("ak-error"); }
+                if (control) { control.classList.remove("ak-error"); }
+                var err = fieldbox.querySelector("ul.ak-err[data-wtr-client-err]");
+                if (err) { err.remove(); }
+            }
+
+            function showFieldError(fieldbox, message) {
+                var label = fieldbox.querySelector("label");
+                var control = fieldbox.querySelector("input, select, textarea");
+                if (label) { label.classList.add("ak-error"); }
+                if (control) { control.classList.add("ak-error"); }
+                var err = fieldbox.querySelector("ul.ak-err[data-wtr-client-err]");
+                if (!err) {
+                    err = document.createElement("ul");
+                    err.className = "ak-err";
+                    err.setAttribute("data-wtr-client-err", "");
+                    err.appendChild(document.createElement("li"));
+                    fieldbox.appendChild(err);
+                }
+                err.querySelector("li").textContent = message;
+            }
+
+            function fieldIsEmpty(fieldbox) {
+                var choices = fieldbox.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+                if (choices.length) {
+                    return !Array.prototype.some.call(choices, function (c) { return c.checked; });
+                }
+                var control = fieldbox.querySelector("input, select, textarea");
+                return !control || !control.value.trim();
+            }
+
+            function validateForm() {
+                var firstInvalid = null;
+                Array.prototype.forEach.call(form.querySelectorAll(REQUIRED_FIELD_SELECTOR), function (fieldbox) {
+                    clearFieldError(fieldbox);
+                    if (fieldbox.style.display === "none") { return; }
+                    if (fieldIsEmpty(fieldbox)) {
+                        showFieldError(fieldbox, msgRequired);
+                        firstInvalid = firstInvalid || fieldbox;
+                    }
+                });
+
+                {% comment %}
+                The opt-in carries no .required class of its own — ActionKit
+                enforces it server-side from the `required=privacy` hidden
+                input — so it's checked here whenever it's showing.
+                {% endcomment %}
+                var privacyGroup = privacyRequired && privacyBox && privacyBox.querySelector(".input-radio-group");
+                if (privacyGroup) {
+                    clearFieldError(privacyGroup);
+                    if (fieldIsEmpty(privacyGroup)) {
+                        showFieldError(privacyGroup, msgRequired);
+                        firstInvalid = firstInvalid || privacyGroup;
+                    }
+                }
+
+                {% comment %}
+                ActionKit renders email as type="text", not type="email" —
+                there's no native format validation to lean on, so this is
+                the only field that gets an extra, explicit check.
+                {% endcomment %}
+                var emailField = form.querySelector('[name="email"]');
+                if (emailField && emailField.value.trim()) {
+                    var emailFieldbox = emailField.closest(".input-text, .input-select");
+                    if (emailFieldbox && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailField.value.trim())) {
+                        clearFieldError(emailFieldbox);
+                        showFieldError(emailFieldbox, msgEmail);
+                        firstInvalid = firstInvalid || emailFieldbox;
+                    }
+                }
+
+                if (firstInvalid) {
+                    var control = firstInvalid.querySelector("input, select, textarea");
+                    if (control) { control.focus(); }
+                    return false;
+                }
+                return true;
+            }
+
+            function clearErrorFor(event) {
+                var fieldbox = event.target.closest(".input-text, .input-select, .input-checkbox, .input-radio");
+                if (fieldbox) { clearFieldError(fieldbox); }
+                var group = event.target.closest(".input-radio-group");
+                if (group) { clearFieldError(group); }
+            }
+            form.addEventListener("input", clearErrorFor);
+            form.addEventListener("change", clearErrorFor);
+
+            {% comment %}
+            #ak-errors is ActionKit's own form-level error list, already in
+            the fetched fragment (hidden via an inline style) and already
+            styled by main.css for server-side failures that belong to no
+            single field. ActionKit's own client normally toggles it; since
+            this form is never handed to ActionKit's client, this handler
+            owns it instead.
+            {% endcomment %}
+            function showFormError(message) {
+                var errs = form.querySelector('#ak-errors, [data-ak-id="ak-errors"]');
+                if (!errs) { return; }
+                if (message) {
+                    errs.querySelector("li").textContent = message;
+                    errs.style.display = "";
+                } else {
+                    errs.style.display = "none";
+                }
+            }
+
+            {% comment %}
+            PostSignupDonationBlock: opens a Fundraise Up campaign checkout
+            in place of the thank-you box, prefilled from this signup. Returns
+            false (so the thank-you box shows as usual) when no campaign is
+            set for this visitor, or when Fundraise Up's installation snippet isn't on the
+            page — its stub defines window.FundraiseUp and queues calls until
+            the full script loads, so its absence means it never will (e.g.
+            live preview, where base.html suppresses integration head HTML).
+            {% endcomment %}
+            var fundraiseupCampaigns = {
+                US: "{{ fundraiseup_campaign_code_us|escapejs }}",
+                CA: "{{ fundraiseup_campaign_code_ca|escapejs }}",
+                _default: "{{ fundraiseup_campaign_code|escapejs }}"
+            };
+            var fundraiseupDesignation = "{{ fundraiseup_designation_id|escapejs }}";
+            var CHECKOUT_OPEN_TIMEOUT_MS = 5000;
+
+            {% comment %}
+            The campaign can differ for US and Canadian visitors. The country
+            comes from Cloudflare's /cdn-cgi/trace edge endpoint, as in
+            donate_fundraiseup_block.html: it never reaches Django, so the
+            cached page stays the same for everyone. Asked for at load, and
+            only when a country has its own campaign, so the answer is ready
+            long before the form is submitted. Until it arrives, or if it
+            never does, every visitor gets the rest of world campaign.
+            {% endcomment %}
+            var visitorCountry = "";
+            if (fundraiseupCampaigns.US !== fundraiseupCampaigns._default || fundraiseupCampaigns.CA !== fundraiseupCampaigns._default) {
+                fetch("/cdn-cgi/trace")
+                    .then(function (response) { return response.ok ? response.text() : ""; })
+                    .then(function (text) {
+                        var match = text.match(/^loc=([A-Z]{2})$/m);
+                        if (match) { visitorCountry = match[1]; }
+                    })
+                    .catch(function () {});
+            }
+
+            function donationCampaign() {
+                if (visitorCountry === "US" || visitorCountry === "CA") {
+                    return fundraiseupCampaigns[visitorCountry];
+                }
+                return fundraiseupCampaigns._default;
+            }
+
+            function canOpenDonationCheckout() {
+                return !!donationCampaign() && !!window.FundraiseUp && typeof window.FundraiseUp.openCheckout === "function";
+            }
+
+            function openDonationCheckout() {
+                if (!canOpenDonationCheckout()) { return false; }
+                var fundraiseupCampaign = donationCampaign();
+                var data = new FormData(form);
+                var firstName = String(data.get("first_name") || "").trim();
+                var lastName = String(data.get("last_name") || "").trim();
+                if (!firstName && !lastName && data.get("name")) {
+                    var parts = String(data.get("name")).trim().split(/\s+/);
+                    firstName = parts.shift() || "";
+                    lastName = parts.join(" ");
+                }
+                var supporter = {};
+                if (firstName) { supporter.firstName = firstName; }
+                if (lastName) { supporter.lastName = lastName; }
+                if (data.get("email")) { supporter.email = String(data.get("email")).trim(); }
+                var options = { supporter: supporter };
+                if (fundraiseupDesignation) { options.designations = [{ id: fundraiseupDesignation }]; }
+                formContainer.classList.add("hidden");
+
+                {% comment %}
+                openCheckout() fails silently on a code that isn't a campaign
+                code (an editor pasting a form/element ID is the likely one),
+                leaving an empty space where the form was. So wait for
+                Fundraise Up's own checkoutOpen event, and if it hasn't fired
+                in time, fall back to what a signup without this option does:
+                the thank-you box, or the form itself when there is none.
+                {% endcomment %}
+                var opened = false;
+                window.FundraiseUp.on("checkoutOpen", function () { opened = true; });
+                window.FundraiseUp.openCheckout(fundraiseupCampaign, options);
+                setTimeout(function () {
+                    if (opened) { return; }
+                    if (window.console) {
+                        console.warn("Fundraise Up checkout did not open for campaign code \"" + fundraiseupCampaign + "\". Is it a campaign code (FUN...) rather than a form ID?");
+                    }
+                    if (thankYou) {
+                        thankYou.classList.remove("hidden");
+                    } else {
+                        formContainer.classList.remove("hidden");
+                    }
+                }, CHECKOUT_OPEN_TIMEOUT_MS);
+                return true;
+            }
+
+            {% comment %}
+            Tells GTM about a successful signup (Google Ads, Meta, GA4 all
+            hang off this one event). Call it once per success, before the
+            next step. Pass `done` only when that next step navigates away:
+            it runs once GTM has finished with the event, or after
+            SIGNUP_EVENT_FALLBACK_MS if GTM is blocked or slow (Usercentrics
+            can hold it back), whichever comes first.
+            Never call it ahead of a redirect to an ActionKit-hosted page —
+            ActionKit's own thank-you page counts the signup from action_id,
+            so pushing here as well would count it twice.
+            {% endcomment %}
+            var SIGNUP_EVENT_FALLBACK_MS = 2500;
+
+            function pushSignupEvent(done) {
+                var pageInput = form.querySelector('[name="page"]');
+                var payload = {
+                    event: "actionkit_signup",
+                    ak_page: (pageInput && pageInput.value) || ""
+                };
+                if (typeof done === "function") {
+                    var finished = false;
+                    var finish = function () {
+                        if (finished) { return; }
+                        finished = true;
+                        done();
+                    };
+                    payload.eventCallback = finish;
+                    payload.eventTimeout = 2000;
+                    setTimeout(finish, SIGNUP_EVENT_FALLBACK_MS);
+                }
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push(payload);
+            }
+
+            form.onsubmit = null;
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                showFormError("");
+
+                if (!validateForm()) { return; }
+
+                var submitButton = form.querySelector('[type="submit"]');
+                if (submitButton) { submitButton.disabled = true; }
+
+                fetch("{% url 'actionkit_inline_signup' %}", {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: {
+                        "X-CSRFToken": csrfInput ? csrfInput.value : "",
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (data) {
+                    if (data.success) {
+                        {% comment %}
+                        The ActionKit page's own "redirect to" setting wins
+                        over the thank-you box and the checkout. An
+                        ActionKit-hosted destination counts the signup itself
+                        (from action_id, already on the URL), so only any
+                        other destination gets our event first.
+                        ActionKit's default /cms/thanks/<page> (what a page
+                        has when nobody set a redirect) is the last resort
+                        instead: followed only when this block has neither a
+                        checkout to open nor a thank-you box to show.
+                        {% endcomment %}
+                        var hasOwnNextStep = !!thankYou || canOpenDonationCheckout();
+                        if (data.redirect_url && !(data.redirect_is_default && hasOwnNextStep)) {
+                            var followRedirect = function () { window.location.assign(data.redirect_url); };
+                            if (data.redirect_is_actionkit) {
+                                followRedirect();
+                            } else {
+                                pushSignupEvent(followRedirect);
+                            }
+                            return;
+                        }
+                        pushSignupEvent();
+                        if (openDonationCheckout()) { return; }
+                        {% if success_message or success_text %}
+                        if (formContainer) { formContainer.classList.add("hidden"); }
+                        if (thankYou) { thankYou.classList.remove("hidden"); }
+                        {% endif %}
+                    } else {
+                        showFormError(data.message);
+                        if (submitButton) { submitButton.disabled = false; }
+                    }
+                }).catch(function () {
+                    showFormError(msgNetworkError);
+                    if (submitButton) { submitButton.disabled = false; }
+                });
+            });
+
+            {% comment %}
+            actionkit.js itself is loaded both for compatibility (other
+            ActionKit page chrome may expect window.actionkit to exist) and,
+            below, for its actionkit.utils.template()/add_commas() helpers —
+            but actionkit.forms.initForm is never called: forms.setForm can
+            only ever target the first "act"-named form on the page and
+            would silently do nothing useful for any later instance.
+            {% endcomment %}
+            var baseUrl = "{{ actionkit_base_url|escapejs }}";
+            if (baseUrl) {
+                if (!window.__wtrAkScriptPromise) {
+                    window.__wtrAkScriptPromise = new Promise(function (resolve) {
+                        var s = document.createElement("script");
+                        s.src = baseUrl + "/resources/actionkit.js";
+                        s.onload = resolve;
+                        document.body.appendChild(s);
+                    });
+                }
+                window.__wtrAkScriptPromise.then(function () {
+                    if (window.__wtrAkPageInit) { return; }
+                    window.__wtrAkPageInit = true;
+                    actionkit.forms.contextRoot = baseUrl + "/context/";
+                    actionkit.forms.initPage();
+                });
+            }
+
+            var shortFormId = "{{ short_form_id|escapejs }}";
+            var wantsProgress = false;
+
+            {% if stacked %}
+            {% comment %}
+            Progress bar. AK's fetched fragment carries an empty #progress
+            container plus a sibling <script type="text/ak-template"
+            for="progress"> holding AK's own (per-campaign, already
+            localized) template for it — but the numbers that template
+            needs (signature/donation totals, the campaign's goal, and two
+            AK "custom fields" that tune it: a manual starting-value offset
+            editors add for e.g. non-digital signatures, and a percent
+            visibility threshold below which the bar stays hidden) only
+            ever arrive via AK's own client-side context fetch. That fetch
+            normally happens through actionkit.forms.initForm()/setForm(),
+            which this block already can't call for the multi-instance
+            reason above — and even if it could, AK's own
+            onProgressLoaded() renders through plain
+            document.getElementById('progress'), not anything scoped to one
+            instance, so on a page with more than one of these blocks (the
+            home page always has two) it would only ever populate the
+            *first* #progress on the page, repeatedly, and leave every
+            other instance blank.
+
+            So this fetches the same data itself, from ActionKit's public
+            /context/ endpoint, scoped with its own JSONP callback name so
+            concurrent instances can't clobber each other, then renders it
+            with actionkit.utils.template() — AK's own template engine —
+            against the <script type="text/ak-template"> tag already
+            sitting inside *this* instance's own fetched fragment. That
+            reuses AK's own per-campaign copy, number formatting, and
+            goal/threshold logic exactly, rather than us re-deriving it,
+            while writing the result only into this instance's own
+            #progress element. Nothing progress-related happens if this
+            fragment has no #progress (the block's ActionKit page has no
+            progress meter configured); the /context/ request itself is
+            shared with the opt-in, below.
+
+            /context/'s own embedded `progress` field is itself flaky —
+            confirmed by comparing it directly against a real ActionKit
+            page's live network traffic: ActionKit's own actionkit.js
+            treats it as unreliable too (see its onContextLoaded: `if
+            (ak.form.want_progress && !context.progress)
+            forms.loadProgress();`) and always fires a second, separate
+            request to the dedicated /progress/ endpoint as a fallback
+            whenever /context/ didn't come back with one. This mirrors
+            that fallback — only firing the extra request on that same
+            condition, not on every load.
+            {% endcomment %}
+            var progressEl = formContainer.querySelector('#progress, [data-ak-id="progress"]');
+            var progressTemplate = formContainer.querySelector("script[type='text/ak-template'][for='progress']");
+            wantsProgress = !!(progressEl && progressTemplate);
+
+            function renderProgress(progressData, pageData) {
+                window.__wtrAkScriptPromise.then(function () {
+                    var context = pageData || {};
+                    {% comment %}
+                    Matches ak.context's own fallback in actionkit.js:
+                    older/simpler progress templates guard on
+                    `if (goal && total)`, but nothing stops a template
+                    from reading `progress.goal` unconditionally, which
+                    would throw on a plain missing key.
+                    {% endcomment %}
+                    context.progress = progressData || {goal: undefined, total: undefined};
+                    context.args = {};
+                    context.capitalize = actionkit.utils.capitalize;
+                    context.add_commas = actionkit.utils.add_commas;
+                    try {
+                        progressEl.innerHTML = actionkit.utils.template(progressTemplate.innerHTML, context);
+                    } catch (e) {}
+                });
+            }
+
+            function loadProgress(data, callbackName) {
+                if (data.progress) {
+                    renderProgress(data.progress, data);
+                    return;
+                }
+                var fallbackCbName = callbackName + "_fallback";
+                window[fallbackCbName] = function (progressData) {
+                    delete window[fallbackCbName];
+                    renderProgress(progressData, data);
+                };
+                var fallbackScript = document.createElement("script");
+                fallbackScript.src = baseUrl + "/progress/" + shortFormId + "?form_name=act&callback=" + fallbackCbName;
+                fallbackScript.onerror = function () {
+                    delete window[fallbackCbName];
+                    renderProgress(null, data);
+                };
+                document.body.appendChild(fallbackScript);
+            }
+            {% endif %}
+
+            {% comment %}
+            One /context/ request per instance serves both the progress bar
+            (stacked only, above) and the opt-in's country list (every
+            variant — the hero and footer forms carry the same .ak-privacy
+            block). Nothing is requested when neither is present.
+            {% endcomment %}
+            var wantsPrivacy = !!privacyBox;
+            if (baseUrl && shortFormId && (wantsProgress || wantsPrivacy)) {
+                if (wantsPrivacy) { setPrivacyRequired(false); }
+                window.__wtrAkContextCbSeq = (window.__wtrAkContextCbSeq || 0) + 1;
+                var contextCbName = "__wtrAkContextCb" + window.__wtrAkContextCbSeq;
+                window[contextCbName] = function (data) {
+                    delete window[contextCbName];
+                    data = data || {};
+                    if (wantsPrivacy) {
+                        if (!Array.isArray(data.privacy_record_countries)) {
+                            setPrivacyRequired(true);
+                        } else if (countrySelect) {
+                            privacyCountries = data.privacy_record_countries;
+                            reflectCountry();
+                        } else {
+                            {% comment %}
+                            No country field to go on: actionkit.js falls
+                            back to ActionKit's own geo-IP verdict.
+                            {% endcomment %}
+                            setPrivacyRequired(!!data.privacy_needed);
+                        }
+                    }
+                    {% if stacked %}if (wantsProgress) { loadProgress(data, contextCbName); }{% endif %}
+                };
+                var contextScript = document.createElement("script");
+                contextScript.src = baseUrl + "/context/" + shortFormId + "?callback=" + contextCbName +
+                    "&form_name=act" + (wantsProgress ? "&want_progress=1" : "") + "&r=" + Math.random();
+                contextScript.onerror = function () {
+                    delete window[contextCbName];
+                    if (wantsPrivacy) { setPrivacyRequired(true); }
+                };
+                document.body.appendChild(contextScript);
+            }
+        })();
+    </script>
+{% elif is_page_preview %}
+    {% comment %}
+    Editor-facing stand-in for the visitor message below: in Wagtail's live
+    preview a missing form is something the editor can fix (no short form ID
+    yet, a mistyped one, or ActionKit not set up in Settings > Integrations).
+
+    The colour is set here rather than inherited: the panel's form column
+    carries no text colour of its own. `on_light` comes from
+    signup_actionkit_block.html; the hero strip doesn't set it and sits on
+    the hero's dark scrim, which the light default suits.
+    {% endcomment %}
+    <div class="wtr-actionkit-preview-notice rounded-lg border border-dashed px-4 py-6 text-center text-base
+                {% if on_light %}border-dark/30 text-dark/70{% else %}border-light/30 text-light/70{% endif %}">
+        {% trans "The ActionKit form will be rendered here on the live site. It could not be loaded for this preview: check the short form ID and the ActionKit integration settings." %}
+    </div>
+{% else %}
+    <div class="mt-8 rounded-lg bg-white p-6 text-sm text-neutral-500">
+        {% trans "This signup form is temporarily unavailable. Please try again shortly." %}
+    </div>
+{% endif %}

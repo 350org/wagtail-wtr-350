@@ -1,0 +1,241 @@
+"""
+Tests for the backfill_image_descriptions management command (see
+wtrx/management/commands/backfill_image_descriptions.py).
+
+BasicPromptAgent.execute is mocked throughout -- these tests must never make
+a real LLM call. They pin: generation is cached to disk without touching the
+database unless --apply is passed, a cached entry is never regenerated, a
+failure on one image doesn't stop the rest, only images with a blank
+description are ever considered, and --apply saves each description as it
+goes so an interrupted run keeps its progress.
+"""
+
+import json
+import tempfile
+from datetime import timedelta
+from io import StringIO
+from pathlib import Path
+from unittest.mock import patch
+
+from django.core.exceptions import ValidationError
+from django.core.management import CommandError, call_command
+from django.test import SimpleTestCase, TestCase
+
+from wagtail.images.tests.utils import get_test_image_file
+
+from wtrx.images import CustomImage
+from wtrx.management.commands.backfill_image_descriptions import fit_description
+
+
+class BackfillImageDescriptionsTest(TestCase):
+    def setUp(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpdir.cleanup)
+        self.cache_path = Path(tmpdir.name) / "cache.json"
+
+    def _image(self, title="filename_title", description=""):
+        return CustomImage.objects.create(
+            title=title,
+            description=description,
+            file=get_test_image_file(size=(1200, 800)),
+        )
+
+    def _run(self, execute_return="A generated description.", execute_side_effect=None, **kwargs):
+        out = StringIO()
+        with patch(
+            "wagtail_ai.agents.basic_prompt.BasicPromptAgent.execute",
+            return_value=execute_return,
+            side_effect=execute_side_effect,
+        ) as mock_execute:
+            call_command(
+                "backfill_image_descriptions",
+                cache_file=str(self.cache_path),
+                stdout=out,
+                **kwargs,
+            )
+        return out.getvalue(), mock_execute
+
+    def _cache(self):
+        if not self.cache_path.exists():
+            return {}
+        return json.loads(self.cache_path.read_text())
+
+    def test_generates_and_caches_without_writing_to_the_database(self):
+        image = self._image()
+
+        self._run(execute_return="A vivid description.")
+
+        image.refresh_from_db()
+        self.assertEqual(image.description, "")
+        self.assertEqual(self._cache()[str(image.pk)]["description"], "A vivid description.")
+
+    def test_apply_writes_the_cached_description(self):
+        image = self._image()
+
+        self._run(execute_return="A vivid description.", apply=True)
+
+        image.refresh_from_db()
+        self.assertEqual(image.description, "A vivid description.")
+
+    def test_apply_reuses_an_existing_cache_entry_without_regenerating(self):
+        image = self._image()
+        self._run(execute_return="First pass.")
+
+        _, mock_execute = self._run(
+            execute_return="Would be a second pass.", apply=True
+        )
+
+        mock_execute.assert_not_called()
+        image.refresh_from_db()
+        self.assertEqual(image.description, "First pass.")
+
+    def test_images_with_an_existing_description_are_never_touched(self):
+        self._image(description="Already described.")
+
+        _, mock_execute = self._run()
+
+        mock_execute.assert_not_called()
+        self.assertEqual(self._cache(), {})
+
+    def test_limit_caps_how_many_new_generations_happen(self):
+        self._image(title="one")
+        self._image(title="two")
+
+        self._run(execute_return="Generated.", limit=1)
+
+        self.assertEqual(len(self._cache()), 1)
+
+    def test_newest_first_generates_the_latest_upload_first(self):
+        older = self._image(title="older")
+        newer = self._image(title="newer")
+        CustomImage.objects.filter(pk=older.pk).update(created_at=newer.created_at - timedelta(days=1))
+
+        self._run(execute_return="Generated.", limit=1, newest_first=True)
+
+        self.assertEqual(list(self._cache().keys()), [str(newer.pk)])
+
+    def test_a_failure_on_one_image_does_not_stop_the_batch(self):
+        first = self._image(title="broken")
+        second = self._image(title="fine")
+
+        out = StringIO()
+        with patch(
+            "wagtail_ai.agents.basic_prompt.BasicPromptAgent.execute",
+            side_effect=[ValidationError("boom"), "A fine description."],
+        ):
+            call_command(
+                "backfill_image_descriptions",
+                cache_file=str(self.cache_path),
+                stdout=out,
+                stderr=out,
+            )
+
+        cache = self._cache()
+        self.assertNotIn(str(first.pk), cache)
+        self.assertEqual(cache[str(second.pk)]["description"], "A fine description.")
+
+    def test_image_id_filters_to_a_single_image(self):
+        wanted = self._image(title="wanted")
+        self._image(title="not wanted")
+
+        self._run(execute_return="Generated.", image_id=wanted.pk)
+
+        self.assertEqual(list(self._cache().keys()), [str(wanted.pk)])
+
+    def test_apply_saves_each_description_before_generating_the_next(self):
+        first = self._image(title="first")
+        self._image(title="second")
+
+        with self.assertRaises(RuntimeError):
+            self._run(execute_side_effect=["Saved before the crash.", RuntimeError("killed")], apply=True)
+
+        first.refresh_from_db()
+        self.assertEqual(first.description, "Saved before the crash.")
+
+    def test_aborts_after_consecutive_failures(self):
+        for title in ("a", "b", "c"):
+            self._image(title=title)
+
+        with self.assertRaises(CommandError):
+            self._run(
+                execute_side_effect=[ValidationError("boom")] * 2 + ["Never reached."],
+                max_consecutive_failures=2,
+                stderr=StringIO(),
+            )
+
+        self.assertEqual(self._cache(), {})
+
+    def test_exits_without_generating_when_another_run_holds_the_lock(self):
+        self._image()
+
+        with patch(
+            "wtrx.management.commands.backfill_image_descriptions.Command._try_lock",
+            return_value=False,
+        ):
+            out, mock_execute = self._run(apply=True)
+
+        mock_execute.assert_not_called()
+        self.assertIn("in progress", out)
+
+    def test_does_not_overwrite_a_description_filled_in_during_the_run(self):
+        first = self._image(title="first")
+        second = self._image(title="second")
+
+        def editor_fills_in_second(**kwargs):
+            CustomImage.objects.filter(pk=second.pk).update(description="Written by an editor.")
+            return "Generated."
+
+        _, mock_execute = self._run(execute_side_effect=editor_fills_in_second, apply=True)
+
+        self.assertEqual(mock_execute.call_count, 1)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.description, "Generated.")
+        self.assertEqual(second.description, "Written by an editor.")
+
+    def test_an_over_long_description_is_trimmed_to_fit_before_saving(self):
+        image = self._image()
+        max_length = CustomImage._meta.get_field("description").max_length
+
+        self._run(execute_return="A sentence that runs on. " * 20, apply=True)
+
+        image.refresh_from_db()
+        self.assertLessEqual(len(image.description), max_length)
+        self.assertTrue(image.description.endswith("runs on."))
+
+    def test_an_over_long_cached_entry_is_trimmed_when_applied(self):
+        image = self._image()
+        self.cache_path.write_text(json.dumps({str(image.pk): {"title": "t", "description": "word " * 100}}))
+
+        _, mock_execute = self._run(apply=True)
+
+        mock_execute.assert_not_called()
+        image.refresh_from_db()
+        self.assertLessEqual(len(image.description), CustomImage._meta.get_field("description").max_length)
+
+
+    def test_raises_when_no_prompt_is_configured(self):
+        # Patch the name as imported into the command module (AGENTS.md #24)
+        # -- not wagtail_ai.agents.base, whose reference the command doesn't use.
+        with patch(
+            "wtrx.management.commands.backfill_image_descriptions.get_agent_settings"
+        ) as mock_get_settings:
+            mock_get_settings.return_value.image_description_prompt = ""
+            with self.assertRaises(CommandError):
+                call_command(
+                    "backfill_image_descriptions", cache_file=str(self.cache_path)
+                )
+
+
+class FitDescriptionTest(SimpleTestCase):
+    def test_short_descriptions_are_unchanged(self):
+        self.assertEqual(fit_description("  A short one.  ", 255), "A short one.")
+
+    def test_ends_on_the_last_full_sentence_when_it_keeps_enough(self):
+        text = "First sentence here. Second sentence here. Third one runs past the limit."
+        self.assertEqual(fit_description(text, 50), "First sentence here. Second sentence here.")
+
+    def test_cuts_at_a_word_boundary_with_an_ellipsis_otherwise(self):
+        result = fit_description("one two three four five six seven", 20)
+        self.assertLessEqual(len(result), 20)
+        self.assertEqual(result, "one two three four\u2026")

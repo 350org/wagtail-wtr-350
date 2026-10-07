@@ -29,7 +29,8 @@ wagtail-wtr/
 │   ├── blocks/
 │   │   ├── __init__.py                 # Exports BodyStreamBlock, SectionContentBlock
 │   │   ├── content.py                  # TextBlock, ImageBlock, VideoBlock, ButtonBlock,
-│   │   │                               #   QuoteBlock, RawHTMLBlock, TableBlock
+│   │   │                               #   QuoteBlock, RawHTMLBlock, TableBlock,
+│   │   │                               #   HeadingBlock
 │   │   ├── layout.py                   # SectionBlock, CardGridBlock, AccordionBlock
 │   │   ├── composite.py                # CalloutBlock, HeroBlock
 │   │   ├── cards.py                    # CardBlock, PersonCardBlock
@@ -38,7 +39,7 @@ wagtail-wtr/
 │   │                                   #   IndexPage, FormField, FormPage
 │   ├── views.py                        # search() view
 │   ├── site_settings.py                # BrandingSEOSettings, NavigationSettings,
-│   │                                   #   FooterSettings, SocialSettings, IntegrationSettings
+│   │                                   #   FooterSettings, IntegrationSettings
 │   ├── images.py                       # CustomImage, Rendition
 │   ├── templatetags/
 │   │   ├── __init__.py
@@ -141,13 +142,13 @@ wagtail-wtr/
 | Future pip package | `wagtail-wtrx` (CodeRed pattern) | Package ships concrete models; forks extend with new page types in separate apps. Extraction happens when wtrx is stable. |
 | CSS framework | Tailwind CSS v4 with semantic design tokens | `bg-primary`, `font-heading`, etc. Sites customize via `@theme {}` block in `static_src/css/theme.css`. No raw color values in templates. |
 | Dark mode | No (post-MVP) | Reduces CSS complexity |
-| Multi-lingual | Yes, via `wagtail-localize` | i18n infrastructure from day one. Sites default to English, add languages as needed. |
+| Multi-lingual | Yes, via `wagtail-localize` | One page tree per language under Root, each served at `/<code>/`; English unprefixed. Sites default to English, add languages as needed. |
 | Layout philosophy | Opinionated composite blocks, no raw columns | Editors can't break layouts |
 | Hero | HeroMixin on pages + HeroBlock in StreamField | Dedicated hero at top of page + mid-page hero sections |
 | Page title / h1 | Page title is the h1. `hero_headline` overrides if set. | Every page gets an h1 automatically |
 | Form submission | AJAX | Form stays on page, thank-you text replaces form on success |
-| Platform integrations | Site-wide settings, defaults from `settings.py`, overridable in admin | One configuration point, not per-block |
-| Block field visibility | All SignupBlock variants always registered; irrelevant ones hidden via `wagtail_hooks.py` based on `IntegrationSettings` | Avoids DB access at import time |
+| Platform integrations | Pluggable registry (`wtrx/integrations/`); any number independently enabled via `IntegrationSettings.integrations` | Add a new integration without touching a shared god-object |
+| Block field visibility | All SignupBlock/DonateBlock variants always registered; ones for disabled integrations hidden via `wagtail_hooks.py`, driven by the registry | Avoids DB access at import time |
 | Frontend build | Tailwind CLI (no webpack, no PostCSS config, no Sass) | Simpler pipeline, fewer deps, same semantic token output |
 | Settings panels | 5 clear panels under Settings | Each panel has a clear purpose, no grab-bags |
 | Python deps | `pyproject.toml` | Modern Python packaging standard |
@@ -162,6 +163,15 @@ wagtail-wtr/
 - Type: RichTextBlock (no StructBlock wrapper)
 - Features: bold, italic, link, ol, ul, h2, h3, h4
 - (value) **required**
+
+**1b. HeadingBlock** (StructBlock)
+
+| Field | Type | Required |
+|---|---|---|
+| heading | CharBlock | **Yes** |
+
+A standalone centered H2, rendering the same markup as `CardGridBlock`'s own
+optional heading so the two line up when both appear on a page.
 
 **2. ImageBlock** (StructBlock)
 
@@ -203,9 +213,11 @@ Custom `clean()` enforces exactly one link field.
 | attribution | CharBlock | No |
 | title | CharBlock | No |
 
-**6. RawHTMLBlock**
+**6. RawHTMLBlock** — labelled "Custom embed" in the editor
 - Type: RawHTMLBlock (no wrapper)
 - (value) **required**
+- Picker description leads with "Please talk to Tech & Security before using."
+
 
 **7. TableBlock**
 - Type: wagtail.contrib.table_block.TableBlock (no wrapper)
@@ -218,7 +230,7 @@ Custom `clean()` enforces exactly one link field.
 | Field | Type | Required |
 |---|---|---|
 | content | StreamBlock (all blocks except SectionBlock) | **Yes** |
-| background | ChoiceBlock (light/dark/primary/muted) | No, default: light |
+| background | ChoiceBlock (BACKGROUND_COLOR_CHOICES) | No, default: white |
 | padding | ChoiceBlock (sm/md/lg) | No, default: md |
 | anchor_id | CharBlock | No |
 
@@ -306,7 +318,7 @@ Optional icon image displayed beside the heading. Rendered at 24x24px with
 
 ### Action Blocks (dynamically registered)
 
-**15a. DonateBlock** (StructBlock) — single variant, behavior from IntegrationSettings
+**15a. DonateBlock** (StructBlock) — ActBlue variant, behavior from the "actblue" integration config (`IntegrationSettings.get_integration_config("actblue")`)
 
 | Field | Type | Required |
 |---|---|---|
@@ -361,10 +373,12 @@ by extending the `ACTION_NETWORK_URL_TYPES` dict.
 
 Simple link-out CTA.
 
-The correct SignupBlock variant is shown to editors via `wagtail_hooks.py`, which
-reads `IntegrationSettings` at request time (not at import/class-definition time)
-and hides irrelevant block types in the Wagtail editor interface. All variants are
-always registered in `BodyStreamBlock` — hiding is purely a UI concern.
+The SignupBlock variants shown to editors are controlled via `wagtail_hooks.py`,
+which reads `IntegrationSettings` at request time (not at import/class-definition
+time) and hides block types whose integration isn't enabled. All variants are
+always registered in `BodyStreamBlock` — hiding is purely a UI concern. Since
+integrations are independently enabled (see "Settings > Integrations" below),
+more than one signup variant can be available to editors at once.
 
 ---
 
@@ -372,12 +386,11 @@ always registered in `BodyStreamBlock` — hiding is purely a UI concern.
 
 ### HomePage
 - **Inherits**: BasePage + HeroMixin
-- **Fields**: body (BodyStreamBlock), use_transparent_header (BooleanField)
+- **Fields**: body (BodyStreamBlock)
 - **Template**: `pages/home_page.html`
-- **Parent**: Root (Site root page)
+- **Parent**: Root (Site root page) or another HomePage (country/region
+  sub-home, e.g. `/canada`). Not allowed under ContentPage or IndexPage.
 - **Notes**: Hero at top (from HeroMixin), StreamField body below.
-  `use_transparent_header=True` makes the header `position:absolute` so the hero
-  image extends behind it; automatically uses `BrandingSEOSettings.dark_logo` if set.
 
 ### ContentPage
 - **Inherits**: BasePage + HeroMixin
@@ -433,16 +446,15 @@ always registered in `BodyStreamBlock` — hiding is purely a UI concern.
 - **Parent**: Any page
 - **Notes**: AJAX submission. Form replaced with thank_you_text on success. Also
   used by SignupBlock (wagtail_forms variant) for inline form rendering.
-- **Future: platform forwarding** — `process_form_submission()` is the correct
-  override point for forwarding submissions to Action Network (or other platforms).
-  When `IntegrationSettings.signup_platform == "action_network"`, override this
-  method to POST cleaned form data to the Action Network API using
-  `IntegrationSettings.action_network_api_key`. Field mapping (email → email,
-  first_name, last_name, zip, etc.) and an optional `action_network_action_id`
-  field on `FormPage` will be needed. A `FormMixin` in `wtrx/` is the clean
-  abstraction for this — keeps the AN forwarding logic in the extractable package.
-  Error handling: log API failures and continue (don't block the user's submission).
-  Not implemented in Phase 3 — no architectural changes to Phase 3 required.
+- **Platform forwarding** — `process_form_submission()` already forwards to
+  ActionKit when that integration is enabled (`IntegrationSettings.is_integration_enabled("actionkit")`)
+  and the page has `actionkit_page` set (see `wtrx/models.py`). Forwarding to
+  Action Network the same way (when that integration is enabled, using
+  `IntegrationSettings.get_action_network_api_key()`) is the same pattern,
+  not yet implemented. Field mapping (email → email, first_name, last_name,
+  zip, etc.) and an optional `action_network_action_id` field on `FormPage`
+  would be needed. Error handling: log API failures and continue (don't block
+  the user's submission) — same as the existing ActionKit forwarding.
 
 ---
 
@@ -515,19 +527,23 @@ class BasePage(Page):
 |---|---|---|
 | layout | CharField (choices: columns, minimal) | No, default: columns |
 | footer_navigation | StreamField (FooterColumnBlock: heading + links) | No — used by columns layout |
-| minimal_links | StreamField (InternalLinkBlock, ExternalLinkBlock, AnchorLinkBlock) | No — used by minimal layout |
+| minimal_links | StreamField (InternalLinkBlock, ExternalLinkBlock, AnchorLinkBlock, CookieSettingsLinkBlock) | No — used by minimal layout (renders in both layouts' bottom bar) |
 | copyright_text | CharField | No, falls back to "(c) {year} {site name}" |
 
 **Columns layout**: multi-column navigation grid, logo at top, social links + copyright in bottom bar.
 **Minimal layout**: single row — `[logo + copyright] [social icons] [inline links]`, stacking on mobile.
 
-### Settings > Social (`SocialSettings`)
+### Social links (on Settings > Footer, `FooterSettings`)
 
 | Field | Type | Required |
 |---|---|---|
 | social_links | StreamField of SocialLinkBlock (platform: ChoiceBlock, url: URLBlock) | No |
-| show_in_header | BooleanField | No, default False — show social icons in header menu panel |
-| show_in_footer | BooleanField | No, default True — show social icons in footer |
+| show_social_in_header | BooleanField | No, default False — show social icons in header menu panel |
+| show_social_in_footer | BooleanField | No, default True — show social icons in footer |
+
+Each footer override (`FooterOverrideBlock.social_links`) can replace the
+links for a country site; an override with none uses the site default.
+Resolved per page by `{% resolved_social %}`.
 
 `SocialLinkBlock` is an explicitly named `StructBlock` subclass. Use a `StreamField`,
 not a `ListBlock`, so each item is independently typed and editable in the admin.
@@ -535,20 +551,42 @@ not a `ListBlock`, so each item is independently typed and editable in the admin
 Platform choices: Facebook, Twitter/X, Instagram, TikTok, LinkedIn, YouTube, Threads,
 Bluesky, Mastodon
 
-### Settings > Integrations (`IntegrationSettings`)
+### Settings > Integrations (`IntegrationSettings`) — pluggable framework
 
-| Field | Type | Required |
-|---|---|---|
-| donation_platform | CharField (choices: none, actblue) | No, default from `WTRX_DONATION_PLATFORM` |
-| donation_base_url | URLField | No |
-| donation_suggested_amounts | CharField | No, comma-separated integers (e.g., "10,25,50,100"). Parse in templates/views with `[int(x) for x in amounts.split(",") if x.strip()]`. |
-| donation_default_recurring | BooleanField | No, default: False |
-| signup_platform | CharField (choices: wagtail_forms, action_network, none) | No, default from `WTRX_SIGNUP_PLATFORM` |
-| action_network_api_key | CharField | No |
+`IntegrationSettings` has a single field, `integrations` (a `StreamField`),
+instead of the flat `donation_platform`/`signup_platform` choice fields this
+section originally specified. Editors click "Add" and pick a pre-set
+integration type (ActionKit, Fundraise Up, ActBlue, Action Network today; more
+can be added later); each entry is independently enabled/disabled and
+configured — there is no single "active platform" per category, so e.g.
+ActionKit and Action Network can both be enabled for signups at once.
 
-Note: `DonateBlock.override_amounts` uses `ListBlock(IntegerBlock)` (already a Python list).
-`IntegrationSettings.donation_suggested_amounts` uses a `CharField` (comma-separated string)
-for simpler admin UI. The template/view layer must parse the CharField when using it.
+Architecture (see `wtrx/integrations/`):
+- `registry.py` — an `IntegrationType` dataclass (slug, label, category,
+  `content_block_names`, optional `head_html_field`) registered by each
+  integration module at import time. Pure metadata, no DB access.
+- One module per integration (`actionkit.py`, `fundraiseup.py`, `actblue.py`,
+  `action_network.py`) defines that integration's config `StructBlock` and
+  calls `register_integration(...)`.
+- `IntegrationsStreamBlock` in `site_settings.py` is the named `StreamBlock`
+  that assembles the "Add integration" UI (one attribute per integration —
+  same fork-override pattern as `SectionContentBlock`).
+- `IntegrationSettings.get_integration_config(slug)` returns the enabled
+  entry's config (a `StructValue`) or `None`. `is_integration_enabled(slug)`
+  and `enabled_slugs_by_category(category)` build on top of it.
+- `IntegrationSettings.head_html()` concatenates markup for every enabled
+  integration with a `head_html_field` (currently only Fundraise Up's
+  installation script), rendered in `base.html`'s `<head>`.
+
+Block-chooser visibility (`wagtail_hooks.py`) now derives hidden blocks
+directly from the registry's `content_block_names` and which integrations are
+enabled, rather than a hand-maintained mapping — adding a new integration type
+never requires editing `wagtail_hooks.py`.
+
+Note: `DonateBlock.override_amounts` uses `ListBlock(DecimalBlock)` (already a
+Python list). The ActBlue integration's `suggested_amounts` field is a
+`CharBlock` (comma-separated string) for simpler admin UI; `DonateBlock.get_context()`
+parses it into `donation_suggested_amounts_list` for the template.
 
 ---
 
@@ -556,24 +594,42 @@ for simpler admin UI. The template/view layer must parse the CharField when usin
 
 ```python
 # settings/base.py
-WTRX_DONATION_PLATFORM = "none"           # none, actblue
-WTRX_SIGNUP_PLATFORM = "wagtail_forms"    # wagtail_forms, action_network, none
-
 # Internationalization
 USE_I18N = True
 WAGTAIL_I18N_ENABLED = True
 LANGUAGE_CODE = "en"
+
+# Every language a site might need, so one can be picked in the admin without
+# a deploy. A language becomes real only when it gets a Locale row.
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES = [
-    ("en", "English"),
-    # Sites add languages as needed:
-    # ("es", "Spanish"),
-    # ("fr", "French"),
+    ("en", _("English")),
+    ("es", _("Spanish")),
+    ("fr", _("French")),
+    # Countries
+    ("pt-br", _("Portuguese - Brazil")),
+    ("fr-fr", _("French - France")),
+    # ...
 ]
+
+# The path segment a language serves under, where it should not be the
+# language code. A language with no entry serves under its own code.
+WTRX_LANGUAGE_URL_PREFIXES = {
+    "pt-br": "brasil",
+    "fr-fr": "france",
+}
 ```
 
-`WTRX_*` defaults are overridable in Wagtail admin via IntegrationSettings.
-Language configuration is in `settings/base.py` — sites uncomment or add
-languages to `WAGTAIL_CONTENT_LANGUAGES`.
+Per-integration secrets (ActionKit API password, Action Network API key) can
+be overridden via `WTRX_ACTIONKIT_API_PASSWORD` / `WTRX_ACTION_NETWORK_API_KEY`
+environment variables, which take precedence over the DB-stored value in
+`IntegrationSettings.integrations` so secrets aren't required to live in the
+database in production. There is no longer a `WTRX_DONATION_PLATFORM` /
+`WTRX_SIGNUP_PLATFORM` env-var fallback — each integration's enabled state
+lives only in `IntegrationSettings.integrations`.
+Language configuration is in `settings/base.py`: a language is *offered* by
+`WAGTAIL_CONTENT_LANGUAGES` and *created* separately with
+`manage.py bootstrap_locales`. Its URL comes from
+`WTRX_LANGUAGE_URL_PREFIXES` via `wtrx/i18n.py`. See Phase 18.
 
 ### Required INSTALLED_APPS entries (non-obvious ones)
 
@@ -585,7 +641,7 @@ INSTALLED_APPS = [
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",     # Required for site settings models
     "wagtail.contrib.frontend_cache",  # Required for CDN cache invalidation
-    "wagtail.locales",              # Required for locale management UI (wagtail-localize)
+    "wagtail.locales",              # Locale management UI (NOT wagtail_localize.locales)
     "wagtail_localize",             # Required for i18n support
     "wagtailmedia",                 # Required for VideoBlock (VideoChooserBlock)
     # ... project apps ...
@@ -604,7 +660,7 @@ base.html
 
   base_page.html (extends base.html)
     -- Includes navigation/header.html (reads NavigationSettings)
-    -- Includes navigation/footer.html (reads FooterSettings, SocialSettings)
+    -- Includes navigation/footer.html (reads FooterSettings, incl. its social links)
     -- Blocks: hero, above_content, content, below_content
 
     pages/home_page.html (extends base_page.html)
@@ -629,18 +685,17 @@ base.html
 ```
 
 ### Header (`navigation/header.html`)
-- Logo left (from BrandingSEOSettings.logo; uses dark_logo when transparent header active)
+- Logo left (from BrandingSEOSettings.logo)
 - Nav links right (from NavigationSettings.primary_navigation — InternalLink, ExternalLink, AnchorLink)
 - CTA button right (from NavigationSettings.cta_text/cta_page/cta_url/cta_anchor)
-- Social icons in menu panel (from SocialSettings when show_in_header=True)
+- Social icons in menu panel (from FooterSettings when show_social_in_header=True)
 - Collapsed desktop menu option (NavigationSettings.collapse_desktop_menu) — hides desktop nav, shows hamburger at all breakpoints
-- Transparent header option (HomePage.use_transparent_header) — absolute position, transparent bg, light text colors
 - Mobile: logo left, hamburger right. Hamburger opens nav panel (same JS, breakpoint-agnostic).
 
 ### Footer (`navigation/footer.html`)
 - **Columns layout** (default): logo at top, multi-column navigation grid (FooterSettings.footer_navigation), social links + copyright in bottom bar
 - **Minimal layout**: single row — `[logo + copyright] [social icons] [inline links]`
-- Social icons guarded by SocialSettings.show_in_footer (default True)
+- Social icons guarded by FooterSettings.show_social_in_footer (default True)
 - Copyright line (from FooterSettings.copyright_text, fallback: "(c) {year} {site name}")
 
 ### Hero (`components/hero.html`)
@@ -696,7 +751,7 @@ processes utilities:
   --color-primary-600: #0284c7;
   /* ... full scale 50–950 ... */
 
-  --color-secondary-600: #7c3aed;
+  --color-secondary-600: var(--color-navy);
   /* ... */
 
   --color-accent-500: #f97316;
@@ -748,7 +803,7 @@ Named `[data-theme]` presets override tokens at runtime — no rebuild needed.
 
 ```
 django>=5.2,<5.3           # Django 5.2 LTS
-wagtail>=7.0,<8.0          # Wagtail 7.0 LTS
+wagtail>=7.4,<7.5          # Wagtail 7.4
 wagtail-localize
 wagtailmedia
 modelsearch                # Required by Wagtail 7.3 (extracted from wagtail.search)
@@ -875,6 +930,13 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
 - [x] `wtrx_tags.py` -- `social_icon` tag + `social_platform_label` filter
 - [x] `template` attribute added to all concrete page models
 - [x] Fix `{# ... #}` multi-line comment in `hero.html` → `{% comment %}...{% endcomment %}`
+- [x] Per-section navigation overrides (`NavigationOverrideBlock`,
+  `NavigationSettings.resolved_for_page()`, `{% resolved_navigation %}`)
+- [x] Regional label badge beside the logo for sub-regional sections
+  (`regional_label`; Figma "Regional Nav" node 83:1815)
+- [x] Nav interaction states (Figma nav node 1:965): navy hover, blue active
+  underline via `nav_item_is_active`, `cursor-pointer` on nav buttons,
+  logo brightness-filter hover matching the regional badge
 
 ### ✅ Phase 5: Frontend Build & Styling — COMPLETE (commit f56c74d)
 - [x] `tailwind.config.js` (TW3) with full semantic token system (primary, secondary,
@@ -915,24 +977,37 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   when block-level `override_amounts` is empty
 - [x] `IntegrationSettings.donation_suggested_amounts_list` property for template iteration
 - [x] Tests for constants, wagtail_hooks, setup_site command, site_settings
-- [x] `management/commands/create_test_page.py` -- creates a `ContentPage` with
-  every block type and every field permutation populated (ImageBlock, CardBlock,
-  PersonCardBlock, CalloutBlock with both alignments, ButtonBlock in all 3 styles,
-  QuoteBlock with/without attribution, HeroBlock full/minimal, DonateBlock
-  with/without overrides, SectionBlock with all 4 backgrounds and sm/md/lg padding);
-  loads a real JPEG from `fixtures/placeholder.jpg` for all image-bearing blocks
-- [x] `fixtures/placeholder.jpg` -- committed 1200×800 JPEG placeholder image
-  (indigo background, white label text) used by `create_test_page` for visual QA
-- [x] `wtrx/tests/test_create_test_page.py` -- automated rendering tests: command
-  creates the page, HTTP GET returns 200, each block type and variant produces
-  expected output (43 tests total)
+- [x] `management/commands/create_test_page.py` -- creates a `ContentPage`
+  exercising every block type registered in `BodyStreamBlock`, in every
+  meaningful configuration: both `ImageBlock` variants, `CardBlock` full and
+  minimal, `CardGridBlock` at 3 and 4 cards (the 2x2 special case),
+  `PersonCardBlock` full and minimal, `ButtonBlock` in all 3 styles plus an
+  anchor link, `QuoteBlock` in both alignments, `FeaturePanelBlock` in both
+  alignments across 3 fills, `CalloutBlock` / `HeroBlock` / `SignupActionKitBlock`
+  once per colour in `BACKGROUND_COLOR_CHOICES`, `DonateBlock` with and without
+  overrides, the Action Network and ActionKit signups with and without a custom
+  success message, and `SectionBlock` across every background, every padding and
+  every content width. Opens with a typography reference (h1-h6 heading ramp,
+  the full `--text-*` size ramp, and a rich text sample covering every
+  `RICHTEXT_FEATURES_FULL` feature). Generates its own `IndexPage` (3 children)
+  and `FormPage` (2 fields) as children so `PageCardsBlock` and
+  `SignupWagtailFormsBlock` have real targets. Loads a real image from
+  `fixtures/placeholder.png` for all image-bearing blocks
+- [x] `fixtures/placeholder.png` -- committed placeholder image used by
+  `create_test_page` for visual QA
+- [x] `wtrx/tests/test_create_test_page.py` -- automated tests: command
+  behaviour (slug, `--force`, DEBUG guard, missing site), block-coverage
+  enforcement (every registered block and every palette colour is exercised;
+  supporting pages created; `first_published_at` set on index children), and
+  rendering (HTTP GET returns 200, the typography reference covers h1-h6, and
+  each block type and variant produces expected output) -- 57 tests total
 - [x] `video_block.html` -- fixed missing `{% load wagtailembeds_tags %}` (caused
   `TemplateSyntaxError: Invalid block tag 'embed'`)
 - [x] `video_block.html` -- fixed YouTube iframe size: added Tailwind arbitrary
   variant `[&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full`
   to wrapper so the oEmbed-generated iframe fills the `aspect-video` container
-- [x] Social icon display toggles: `SocialSettings.show_in_header` (default False),
-  `SocialSettings.show_in_footer` (default True) — social icons rendered in header
+- [x] Social icon display toggles: `FooterSettings.show_social_in_header` (default False),
+  `FooterSettings.show_social_in_footer` (default True) — social icons rendered in header
   menu panel and/or footer based on these flags
 - [x] Footer layout modes: `FooterSettings.layout` choice (columns/minimal) +
   `FooterSettings.minimal_links` StreamField — minimal layout is a single-row bar
@@ -941,14 +1016,20 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   and left of minimal-layout footer when set
 - [x] Anchor links in nav: `AnchorLinkBlock` added to NavigationSettings.primary_navigation,
   FooterColumnBlock.links, and FooterSettings.minimal_links; renders as `<a href="#anchor">`
+- [x] Cookie settings footer link: `CookieSettingsLinkBlock` (text + fallback
+  `policy_url`), added to `FooterSettings.minimal_links` and
+  `FooterOverrideBlock.minimal_links` only. Renders with the `uc-cookie-link`
+  marker class that the Usercentrics wrapper script
+  (`usercentrics-consent.js`, see `wtrx/integrations/usercentrics.py`) already
+  looks for: it intercepts the click and opens the Usercentrics preferences
+  panel for a GDPR-applicable visitor, and otherwise leaves the link alone to
+  follow `policy_url` normally
 - [x] Collapsed desktop menu: `NavigationSettings.collapse_desktop_menu` (BooleanField,
   default False) — when True, desktop nav is hidden and hamburger is shown at all
   breakpoints; uses existing mobile-menu.js (no JS changes needed)
 - [x] CTA anchor link: `NavigationSettings.cta_anchor` — CTA button can link to an
   anchor instead of a page or URL
-- [x] Transparent header on HomePage: `HomePage.use_transparent_header` (BooleanField,
-  default False) — makes header `position:absolute` over hero, transparent bg, light
-  text; automatically uses `BrandingSEOSettings.dark_logo` when enabled
+- [x] ~~Transparent header on HomePage~~ — removed; the header is always solid
 - [x] `wtr-*` CSS class hooks on all critical elements: `wtr-header`, `wtr-footer`,
   `wtr-hero`, `wtr-section`, `wtr-card`, `wtr-card-grid`, `wtr-callout`, `wtr-accordion`,
   `wtr-quote`, `wtr-donate`, `wtr-signup`, `wtr-social-links` — no default styles,
@@ -966,13 +1047,21 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   updated with conditional icon rendering. `create_test_page` and tests updated.
 - [x] README `Customizing Blocks` section — documents the subclass-and-override
   pattern for fork sites, with a concrete example of adding a field to `CardBlock`
+- [x] Block picker previews: `templates/wagtailcore/shared/block_preview.html`
+  (global override that loads the compiled Tailwind bundle, and whose existence
+  is what enables previews at all), `Meta.description` + `Meta.preview_value` on
+  the blocks, `ContentPreviewMixin` sourcing previews from real site content, and
+  `manage.py harvest_block_previews` to regenerate `wtrx/previews/block_previews.json`
+- [x] `first_published_at` set by the WordPress importers, plus
+  `manage.py backfill_first_published` for content imported before that
+  (NULLs sort first under `DESC` in PostgreSQL, which broke `PageCardsBlock`)
 - [ ] `fixtures/demo.json` -- demo content (deferred)
 - [ ] Verify settings panels work
 - [ ] Verify AJAX form submission
 - [ ] Verify ActBlue donation link generation
 - [x] Verify Action Network widget embedding
 - [ ] Verify IndexPage child page listing with pagination
-- [ ] Verify i18n: add a second language, translate a page, confirm language switcher works
+- [x] Verify i18n: add a second language, translate a page, confirm language switcher works
 
 ---
 
@@ -1076,9 +1165,11 @@ is configured.
   - `purge_page_with_related(page)` purges a page and its parent if the parent is an
     `IndexPage`; silent no-op when unconfigured
 - [x] `wtrx/signals.py` — signal handlers and `connect_signals()`:
-  - `on_settings_saved` connected to `post_save` for all 5 settings models
-    (`BrandingSEOSettings`, `NavigationSettings`, `FooterSettings`, `SocialSettings`,
-    `IntegrationSettings`); calls `purge_all()` because header/footer affects every page
+  - `on_settings_saved` connected to `post_save` for every `BaseSiteSetting` model in
+    wtrx (discovered from the app registry, so new settings models are covered
+    automatically); calls `purge_all()` because header/footer affects every page
+  - Every purge is deferred with `transaction.on_commit()` so the CDN can't re-cache
+    pre-commit content
   - `on_page_published` connected to Wagtail's `page_published` signal; calls
     `purge_page_with_related()` to also refresh parent index listings
   - Signal connection deferred inside `connect_signals()` to avoid
@@ -1187,8 +1278,27 @@ HTML level (existing) and at the pixel level (visual regression).
   definitions.
 - Convention: when a new block is added to `BodyStreamBlock`, a corresponding
   `_<block_name>_block()` factory function must be added to `create_test_page.py`
-  and the block appended to `_FLAT_BLOCKS`. A test in `test_create_test_page.py`
+  and referenced from `_content_blocks()` (or `_section_blocks()` for anything
+  worth exercising inside a `SectionBlock`). A test in `test_create_test_page.py`
   must assert that the block's key content string appears in the rendered response.
+- Enforcement, not just convention: `TestCreateTestPageCoverage` asserts that
+  every block name registered in `BodyStreamBlock` appears in the generated
+  page, and that every colour in `BACKGROUND_COLOR_CHOICES` is exercised as a
+  section background, a callout colour, a hero banner colour and an ActionKit
+  signup background. Adding a block or a palette entry without updating the
+  command fails the suite. The command itself also raises a `CommandError` if
+  `BACKGROUND_COLOR_CHOICES` no longer matches its own `_BACKGROUND_KEYS`, and
+  prints a coverage line (`25/25 block types covered`) on every run.
+- The page opens with a typography reference before any block: the full heading
+  ramp (h1-h6) rendered inside the real `.wtr-text-block prose` container, the
+  complete `--text-*` size ramp labelled with the utility and pixel size that
+  produces each step, and a rich text sample using every feature
+  `RICHTEXT_FEATURES_FULL` offers. h1/h5/h6 are not reachable from the editor
+  and are shown for comparison only.
+- Blocks needing a real page to point at (`PageCardsBlock` needs an index page,
+  `SignupWagtailFormsBlock` needs a `FormPage`) get one generated as a child of
+  the test page, so the fixture is self-contained and `--force` cleans up the
+  whole tree in one delete.
 - CI gate: `make test` already covers `test_create_test_page.py`. This ensures
   the test page renders without errors on every push.
 
@@ -1289,7 +1399,7 @@ does not break silently when upstream changes are merged.
 - **pip extraction of wtrx/ package** (`wagtail-wtrx` on PyPI, following CodeRed CMS pattern)
 - **Theme switching** (multiple built-in themes)
 - **Additional blocks**: Stats, Events, Logo showcase, Countdown, Social links block
-- **Additional pages**: Blog/news listing, event listing
+- **Additional pages**: event listing
 
 ---
 
@@ -1388,3 +1498,123 @@ via Render's Shell tab after any deploy that changes static assets.
 - [ ] Update `bin/start.sh`, `render.yaml`, `README.md`, and `AGENTS.md` once
   the correct approach is determined; remove the TODO comment and workaround note
 - [ ] Document the resolution in this phase entry
+
+---
+
+### Phase 18: Multilingual Language Sites — ✅ COMPLETE (branch feature/multilingual-language-sites)
+
+350.org's country sites (`/brasil/`, `/france/`, `/germany/`, `/indonesia/`)
+become real Wagtail language trees — one page tree per language under Root —
+rather than English subtrees under Home. Wagtail's own model throughout:
+`WAGTAIL_I18N_ENABLED = True`, `LocaleMiddleware`, and a single `Site` serving
+every language — `Site.get_site_root_paths()` emits one root path per
+translation of the site root, so a language needs no extra `Site` row and no
+extra domain. (A `Site` is matched by hostname and port only, never by path,
+which is why an extra domain remains the only way to give a region its own
+root URL and its own per-Site settings rows.)
+
+- [x] **Language is the only axis that changes the URL.** An English-language
+  *region* (`/canada/`, `/australia/`) stays an ordinary section under the
+  English Home with its own navigation/footer overrides — it is not a locale.
+- [x] **Country-addressed URLs** (`wtrx/i18n.py`): Django ties a tree's prefix
+  to its language code, so the French site would serve at `/fr-fr/`.
+  `WTRX_LANGUAGE_URL_PREFIXES` maps each code to a path segment instead,
+  giving one rule — a country site takes the country slug (`pt-br` →
+  `/brasil`), a translation of that site nests under it (`en-br` →
+  `/brasil/en`), a global language with no country site keeps its own code
+  (`es` → `/es`), and English stays unprefixed. The country sites therefore
+  keep the URLs they already publish instead of moving behind redirects.
+  Both halves are required and both subclass Django rather than reimplement
+  it: `NamedLocalePrefixPattern` (what `reverse()` writes and the resolver
+  strips — `is_language_prefix_patterns_used()` finds i18n URLs by
+  `isinstance`) and `NamedPrefixLocaleMiddleware` (Django's
+  `get_language_from_path()` matches the first segment against language
+  *codes*, so `/france/` would otherwise mean nothing to it).
+  Multi-segment prefixes are load-bearing, not decorative: a country slug
+  carries no language segment of its own, so `brasil` and `brasil/en` are both
+  mapped and `language_from_url_prefix()` sorts longest-first to keep the two
+  trees apart. A mapped language is reachable *only* at its prefix, so each
+  tree has one canonical URL, and a prefix whose language has no `Locale` row
+  does not resolve — so a mapping can be added ahead of the conversion.
+- [x] **Offering a language and creating it are separate steps.**
+  `WAGTAIL_CONTENT_LANGUAGES` lists every language any 350 site might need so
+  it can be picked in the admin without a deploy;
+  `manage.py bootstrap_locales` names the ones to actually create (`--all`
+  exists but is not the default). A stray `Locale` is not free: it appears in
+  every "translate into" menu and its FKs are `on_delete=PROTECT`.
+- [x] **A country translation needs its own language code**, because one
+  locale maps to exactly one URL prefix: `/brasil/en` cannot be served by the
+  global `en` locale, which already owns `/`. Brazilian English is `en-br`, a
+  separate code and a separate tree. Codes read `language-country`, matching
+  the order of the URL segments (`es-fr` → `/france/es`), and labels follow
+  (`Spanish - France`) below the settings list's `# Countries` comment.
+  A language with one home keeps its plain code whatever its URL: `de` serves
+  at `/germany/` and would only need a `de-de` if Germany gained a second
+  language. Portuguese has only Brazil, so `pt` is not offered — but
+  `locale/pt/` stays, because a country code falls back to its base language's
+  catalogue for UI chrome.
+- [x] **`manage.py convert_section_to_locale`** turns an existing English
+  section into a language tree: moves the section root to Root level, retags
+  every descendant to the target locale, and makes the root a translation of
+  the site root (without which the tree has no URL at all). None of it is
+  doable in the admin — `Page.locale` is `editable=False` and
+  `Page.can_move_to()` refuses a parent in another locale. Per-page permanent
+  redirects are built afterwards from URLs captured before the first write,
+  and skipped where the URL is unchanged (a section whose slug already matches
+  its mapped prefix, e.g. `/brasil/` for `pt-br`, moves invisibly).
+  Deliberately *not* wagtail-localize's "Translate this page": nothing is
+  duplicated and no `TranslationSource` is created.
+- [x] **`wagtail.locales`, not `wagtail_localize.locales`** — the fork's only
+  addition is a "Synchronise content from another locale" panel that mirrors
+  one tree into another as alias pages, which would spray the English tree
+  into an independent country site. It also ships pre-rework admin templates.
+- [x] **`IdentifierBlock`** (`wtrx/blocks/__init__.py`): wagtail-localize
+  extracts every `CharBlock`/`TextBlock`/`RichTextBlock` as translatable, which
+  would hand an ActionKit `short_form_id`, an `anchor_id` or a Fundraise Up
+  `element_id_*` to a translator and get back a form that no longer resolves.
+  Opts out via wagtail-localize's own `get_translatable_segments()` /
+  `restore_translated_segments()` pair. `slug` stays translatable — that is
+  what produces `/brasil/sobre-nos/`.
+- [x] **Preview renders in the page's language**: preview is requested from an
+  admin URL outside `i18n_patterns`, and `Page.serve_preview()` never touches
+  the active translation, so `BasePage.serve_preview()` wraps it in
+  `translation.override()` and forces the `TemplateResponse` to render inside
+  that block (it renders lazily otherwise).
+- [x] **Language switcher built, then deliberately left unrendered** — both
+  includes removed from `header.html`; the template and tag stay, so it is one
+  line to restore. `hreflang` alternates in `<head>` are separate and still
+  emitted. It is links, not `set_language` — `language_links`
+  (`wtrx_tags.py`) resolves each language through the page's real translations
+  and falls back to that language's home page, omitting a language with
+  neither. `page_translation_alternates` is the stricter `<head>` sibling:
+  hreflang alternates only for genuinely linked pages, plus `x-default`.
+- [x] **UI catalogues** for pt, es, fr, de and id (`make messages`,
+  `make compile-messages`). Two catalogue roots: `locale/` for `templates/`
+  and `wagtail_wtr/`, `wtrx/locale/` for the app. Built for the languages in
+  use rather than the languages on offer (`--locale=` derived from the
+  directories under `locale/`), or each offered language would gain ~600 empty
+  strings. `.po` committed, `.mo` gitignored and compiled in the Dockerfile
+  (which pins `DJANGO_SETTINGS_MODULE=wagtail_wtr.settings.base` so the build
+  never needs runtime secrets).
+- [x] `wtrx/tests/test_i18n.py` asserts resolving *and* reversing in both
+  directions, so a Django upgrade that changes the non-public
+  `LocalePrefixPattern` fails the suite rather than the site; it also asserts
+  the identifier-field exclusions against the real wagtail-localize extractor.
+- [x] **Production migration rehearsed against a restored prod database.**
+  Five English country subtrees become language trees: `canada` → `en-ca` (43
+  pages), `brasil` → `pt-br` (885), `france` → `fr-fr` (362), `indonesia` →
+  `id` (1423), `germany` → `de` (234). Every slug already matches its mapped
+  prefix, so all 2,947 pages change locale with **no URL change and no
+  redirects**. Rehearsal confirmed no search reindex is needed (database
+  backend filters `locale_id`/`path` on live columns), navigation and footer
+  overrides follow their `root_page` reference from depth 3 to depth 2
+  untouched, and page IDs are stable so internal links survive. Runbook in
+  `README.md` ("Migrating the country sites"). Deploy order is load-bearing:
+  the prefix map must be live *before* conversion, or the trees land at
+  `/pt-br/`, `/de/` and need real redirects to undo.
+  The rehearsal also caught a reporting bug — `convert_section_to_locale`
+  printed the destination as `/{language_code}/` rather than the mapped
+  prefix, which would have told an operator that 2,947 URLs were about to move
+  when none were. Fixed, plus a `URLs:` line stating which case the run is in,
+  both covered by tests.
+- [x] `AGENTS.md` pitfalls #65–#76, `README.md` "Languages", this entry

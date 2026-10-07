@@ -1,0 +1,48 @@
+{% load i18n wagtailcore_tags wtrx_tags %}
+{% comment %}
+Pipe-separated inline link list (e.g. "Privacy Policy | Terms of Service").
+Shared by both footer layouts — the minimal layout's top row and the columns
+layout's bottom bar. Expects `links` (a minimal_links StreamValue).
+forloop.first skips the separator before the first link.
+{% endcomment %}
+{% if links %}
+    <nav class="flex items-center flex-wrap gap-x-3 gap-y-2" aria-label="{% trans 'Footer links' %}">
+        {% for item in links %}
+            {% if not forloop.first %}
+                <span class="text-light" aria-hidden="true">|</span>
+            {% endif %}
+            {% if item.block_type == "internal" and item.value.page %}
+                <a href="{% pageurl item.value.page|localized %}"
+                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                    {{ item.value.text }}
+                </a>
+            {% elif item.block_type == "external" %}
+                <a href="{{ item.value.url }}"
+                   rel="noopener noreferrer"
+                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                    {{ item.value.text }}
+                </a>
+            {% elif item.block_type == "anchor" %}
+                <a href="#{{ item.value.anchor }}"
+                   class="text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                    {{ item.value.text }}
+                </a>
+            {% elif item.block_type == "cookie_settings" %}
+                {% comment %}
+                uc-cookie-link is the marker class usercentrics-consent.js
+                (see wtrx/integrations/usercentrics.py) already looks for: on
+                load, for a GDPR-applicable visitor, it intercepts clicks on
+                every ".uc-cookie-link" and opens the Usercentrics
+                preferences panel instead of following the href. Everywhere
+                else the script never wires it, so this behaves like a plain
+                external link to policy_url.
+                {% endcomment %}
+                <a href="{{ item.value.policy_url }}"
+                   rel="noopener noreferrer"
+                   class="uc-cookie-link text-sm text-light hover:underline hover:decoration-primary-400 underline-offset-4 transition-colors">
+                    {{ item.value.text }}
+                </a>
+            {% endif %}
+        {% endfor %}
+    </nav>
+{% endif %}

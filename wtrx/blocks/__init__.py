@@ -2,26 +2,46 @@
 StreamField blocks for the BodyStreamBlock.
 
 Block categories (in definition order):
-  Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock, QuoteBlock,
+  Content:  TextBlock, ImageBlock, VideoBlock, ButtonBlock, ButtonGroupBlock,
             RawHTMLBlock, TableBlock
-  Cards:    CardBlock, PersonCardBlock
-  Layout:   AccordionItemBlock, CardGridBlock, AccordionBlock,
-            CalloutBlock, HeroBlock
+  Cards:    CardBlock, CarouselCardBlock, PersonCardBlock
+  Layout:   AccordionItemBlock, CardGridBlock, ImageGridItemBlock,
+            ImageGridBlock, LogoGridItemBlock, LogoGridBlock,
+            PersonCardGridBlock, ImageCardListItemBlock,
+            ImageCardListBlock, ImageTextBlock, FeaturePanelBlock,
+            CardCarouselBlock, PageCardsBlock, AccordionBlock, QuoteBlock,
+            CalloutBlock
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
-            SignupLinkBlock
-  Layout²:  SectionBlock  (defined after action blocks so its nested
-            StreamBlock can instantiate the action block classes)
+            SignupActionKitBlock
+  Layout²:  AnnouncementBarBlock, HeroCTABlock, BannerHeroCTABlock,
+            HeroBlock, SectionBlock (defined after action blocks so their
+            nested/optional fields can instantiate the action block classes)
 
 All blocks are assembled into BodyStreamBlock at the bottom of this file.
 """
 
-from decimal import Decimal
+import copy
+from decimal import Decimal, InvalidOperation
+from functools import lru_cache
+from html import unescape as html_unescape
+import json
+import math
+from pathlib import Path
 import re
 from urllib.parse import urlparse
 
+from django import forms
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.utils.functional import cached_property
+from django.utils.text import format_lazy
+from django.utils.html import escape, strip_tags
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from wagtail.admin.staticfiles import versioned_static
+from wagtail.admin.telepath import register
 from wagtail.blocks import (
+    BooleanBlock,
     CharBlock,
     ChoiceBlock,
     DecimalBlock,
@@ -36,43 +56,161 @@ from wagtail.blocks import (
     URLBlock,
 )
 from wagtail.blocks import RawHTMLBlock as WagtailRawHTMLBlock
+from wagtail.blocks.stream_block import StreamBlockAdapter
 from wagtail.contrib.table_block.blocks import TableBlock as WagtailTableBlock
+from wagtail.documents.blocks import DocumentChooserBlock
 from wagtail.images.blocks import ImageChooserBlock
+from wagtail.models import Site
+from wagtail.snippets.blocks import SnippetChooserBlock
+from wagtail_ai.blocks import ai_image_block
 from wagtailmedia.blocks import VideoChooserBlock
 
 from wtrx.constants import (
     RICHTEXT_FEATURES_FULL,
+    RICHTEXT_FEATURES_HEADING_H2,
+    RICHTEXT_FEATURES_HEADING_H3,
+    RICHTEXT_FEATURES_HEADINGS_H2_H3,
+    RICHTEXT_FEATURES_HEADLINE,
     RICHTEXT_FEATURES_INLINE,
+    RICHTEXT_FEATURES_HERO,
 )
+from wtrx.integrations import actionkit
+from wtrx.site_settings import IntegrationSettings
+from wtrx.validators import html_is_balanced
 
 # ---------------------------------------------------------------------------
 # Choice constants
 # ---------------------------------------------------------------------------
 
+# Shown in two places on purpose: the block picker (RawHTMLBlock.Meta
+# .description) and above the textarea in the editor, so it still reaches an
+# editor who opened an existing block rather than coming via the picker.
+RAW_HTML_SECURITY_NOTICE = _("Please talk to Tech & Security before using.")
+
 BUTTON_STYLE_CHOICES = [
     ("primary", _("Primary")),
     ("secondary", _("Secondary")),
     ("outline", _("Outline")),
+    ("urgent", _("Urgent")),
 ]
 
-CALLOUT_ALIGNMENT_CHOICES = [
+# Only two tiers exist: "large" is the handful of hardcoded, non-editor-
+# configurable CTAs in specific templates (hero, post_page back-link,
+# FeaturePanelBlock, PageCardsBlock, CalloutBlock); everything else,
+# including an unset size, is "regular" (button.html's base size — no
+# modifier class). There used to be a third "small" tier (wtr-btn-sm) but
+# it had exactly one caller (the search page's submit button) and offered
+# editors nothing, so it was removed rather than exposed here.
+BUTTON_SIZE_CHOICES = [
+    ("regular", _("Regular")),
+    ("large", _("Large")),
+]
+
+# Shared by every block that puts an image in a side column and lets the
+# editor flip which side it's on: QuoteBlock, FeaturePanelBlock,
+# ImageCardListBlock, ImageTextBlock, DonateFundraiseUpBlock. Each of these
+# used to define its own identical list (or, for the latter three, no
+# alignment field at all) — one shared constant here, following the same
+# "reuse rather than duplicate" precedent as BACKGROUND_COLOR_CHOICES below.
+IMAGE_ALIGNMENT_CHOICES = [
     ("image-left", _("Image left")),
     ("image-right", _("Image right")),
 ]
 
-SECTION_BACKGROUND_CHOICES = [
-    ("light", _("Light")),
-    ("dark", _("Dark")),
-    ("primary", _("Primary")),
-    ("secondary", _("Secondary")),
-    ("muted", _("Muted")),
+# ImageTextBlock's image column width. There's no Figma spec for anything
+# but the default (378px, the measure documented in image_text_block.html) —
+# these are a judgment call, kept in reasonable proportion to the shared
+# 1186px row width (see that template) so the text column never gets
+# uncomfortably narrow even at "Large".
+IMAGE_TEXT_SIZE_CHOICES = [
+    ("small", _("Small (280px)")),
+    ("default", _("Default (378px)")),
+    ("large", _("Large (480px)")),
 ]
+
+# ---------------------------------------------------------------------------
+# Background palette
+# ---------------------------------------------------------------------------
+#
+# One palette, offered identically by every block that has a background
+# choice: SectionBlock, CalloutBlock, FeaturePanelBlock, HeroBlock /
+# HeroMixin's banner variant, and SignupActionKitBlock. Each of those used to
+# carry its own list — Section offered light/dark/primary/secondary/muted,
+# the feature panel only light/dark, signup spelled dark grey "dark" — so
+# the same visual decision was made from a different vocabulary depending on
+# which block an editor happened to be standing in. There is one list now,
+# and a block that grows a background field should reuse it rather than
+# define a sixth.
+#
+# The colors are Figma's callout/hero swatches plus White, which the old
+# Section list called "light" and which a section sitting on the page
+# background still needs. See main.css's .wtr-bg-{color} classes for the
+# token behind each key.
+BACKGROUND_COLOR_CHOICES = [
+    ("white", _("White")),
+    ("light-grey", _("Light grey")),
+    ("dark-grey", _("Dark grey")),
+    ("navy", _("Navy")),
+    ("red", _("Red")),
+    ("blue-gradient", _("350 Blue")),
+]
+
+BACKGROUND_COLOR_KEYS = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+
+# The fills light enough to need dark text, a dark-outline button and an
+# inverted eyebrow pill; every other color in the palette is dark enough for
+# light (white) text. Block templates branch on this one set via the
+# `background_is_light` filter instead of testing color keys inline, so
+# adding a light color to the palette never means hunting down a scattered
+# `== 'light-grey'` check in five templates.
+LIGHT_BACKGROUND_COLORS = {"white", "light-grey"}
+
+# Keys that predate the shared palette and may still be sitting in
+# StreamField content. A data migration rewrites the ones it can reach, but a
+# legacy value can also arrive from an old page revision (Wagtail stores each
+# revision as its own JSON blob, and reverting to one re-publishes that JSON
+# verbatim), so resolution stays in the render path permanently rather than
+# being a one-shot fixup.
+LEGACY_BACKGROUND_VALUES = {
+    "light": "white",            # SectionBlock, FeaturePanelBlock
+    "dark": "dark-grey",         # SectionBlock, FeaturePanelBlock, SignupActionKitBlock
+    "muted": "light-grey",       # SectionBlock
+    "primary": "blue-gradient",  # SectionBlock
+    "secondary": "navy",         # SectionBlock
+}
 
 SECTION_PADDING_CHOICES = [
     ("sm", _("Small")),
     ("md", _("Medium")),
     ("lg", _("Large")),
 ]
+
+# How wide a section's inner content column is. Figma draws sections at three
+# distinct measures rather than one: a 1266px media/full-width band (The Great
+# Power Shift's video section), the shared 1152px default, and an 800px reading
+# column for text + accordion stacks (that page's "Get the full picture."). The
+# section owns this rather than each child block, because every child in a
+# section shares one left edge — a narrow accordion inside a default-width
+# section would sit 176px right of the heading above it.
+SECTION_WIDTH_CHOICES = [
+    ("narrow", _("Narrow (800px)")),
+    ("default", _("Default (1152px)")),
+    ("wide", _("Wide (1266px)")),
+]
+
+# How wide a body-level image or video sits. The first three are
+# SECTION_WIDTH_CHOICES' measures, with section_block.html's own container
+# classes, so a video set to "wide" lines up with a "wide" section; "full" is
+# the shared full-width container (AGENTS.md pitfall #60).
+MEDIA_WIDTH_CHOICES = SECTION_WIDTH_CHOICES + [
+    ("full", _("Full (1500px)")),
+]
+MEDIA_WIDTH_CONTAINER_CLASSES = {
+    "narrow": "mx-auto max-w-[800px] px-4 sm:px-6 lg:px-0",
+    "default": "mx-auto max-w-6xl px-4 sm:px-6 lg:px-8",
+    "wide": "mx-auto max-w-[1330px] px-4 sm:px-6 lg:px-8",
+    "full": "mx-auto max-w-[1500px] px-4",
+}
 
 # Mapping of Action Network URL path segments (plural) to embed types (singular).
 # Only 'forms' is supported initially; others will be added as needed.
@@ -83,6 +221,75 @@ ACTION_NETWORK_URL_TYPES = {
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+
+def resolve_background(value, default="white"):
+    """
+    Map a stored background key onto its BACKGROUND_COLOR_CHOICES key.
+
+    Translates the pre-palette keys listed in LEGACY_BACKGROUND_VALUES, and
+    falls back to `default` for anything unrecognised — a background is
+    decorative, so an unreadable value should render the plain fill rather
+    than emit a `.wtr-bg-` class that matches no rule and leaves the panel
+    transparent with light text on it.
+    """
+    key = LEGACY_BACKGROUND_VALUES.get(value, value)
+    return key if key in BACKGROUND_COLOR_KEYS else default
+
+
+def background_is_light(value):
+    """True when `value` names a fill that needs dark text rather than light."""
+    return resolve_background(value) in LIGHT_BACKGROUND_COLORS
+
+
+_PARAGRAPH_RE = re.compile(r"<p\b[^>]*>(.*?)</p>", re.DOTALL | re.IGNORECASE)
+_LINE_BREAK_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+
+
+def headline_html(value) -> str:
+    """
+    A hero headline's rich text as inline HTML for its <h1>: every paragraph
+    and line break becomes a <br>, and any other markup is dropped, so the
+    editor can break lines but never change what the heading is. Also
+    accepts plain text (headlines saved before the field became rich text).
+    Returns "" for an empty headline so callers can fall back with `or`.
+    """
+    html = str(value or "")
+    blocks = _PARAGRAPH_RE.findall(html) or [html]
+    lines = []
+    for block in blocks:
+        for line in _LINE_BREAK_RE.split(block):
+            text = strip_tags(line).strip()
+            if text:
+                # strip_tags leaves entities encoded; escape() would double them.
+                lines.append(escape(html_unescape(text)))
+    return mark_safe("<br>".join(lines))
+
+
+def hero_is_minimal(*, copy, video, cta, tag="", published_at=None):
+    """
+    True when a "banner" hero has nothing but a headline (and optionally an
+    image) -- no copy, video, cta, tag or published_at. Drives components/
+    hero.html's compact treatment (shorter or no explicit min-height,
+    reduced text-column padding) -- see the "banner" variant's docstring
+    there. Independent of `image`: a heading+image-only hero still counts
+    as minimal but keeps the two-column grid, since there's still something
+    for the second column.
+
+    `copy` is checked via strip_tags(...).strip(), not bare truthiness --
+    Draftail can persist "<p></p>" for a "cleared" richtext field, which is
+    truthy as a raw string but visually empty. Same pattern as
+    Blogs.get_related_intro() in wtrx/models.py.
+
+    tag/published_at are only ever passed by BannerHeroMixin.
+    get_banner_hero_context()'s **extra (currently just Post, which always
+    sets published_at via PublishedDateMixin's non-blank default) -- they
+    exist here so a hero showing a tag pill or date/author above the
+    headline is never treated as minimal, without hardcoding a
+    Post-specific exclusion.
+    """
+    has_copy = bool(strip_tags(copy or "").strip())
+    return not has_copy and not video and not cta and not tag and not published_at
 
 
 def parse_action_network_url(url):
@@ -146,16 +353,75 @@ def parse_action_network_url(url):
     }
 
 
-def _validate_at_most_one_link(cleaned, errors):
+def _validate_at_most_one_link(cleaned, errors, extra_fields=()):
     """
-    Raise if both link_page and link_url are set.
+    Raise if more than one link target is set.
+
+    The base pair is link_page/link_url, which every caller has.
+    ``extra_fields`` names further link fields a block also offers —
+    FeaturePanelBlock/ImageCardListItemBlock pass ("anchor",), CardBlock
+    passes ("link_document", "modal") — so a block that gained a third target does
+    not need its own copy of this check. Blocks that pass nothing keep the
+    original two-field message verbatim. Each extra-field combination gets
+    its own full sentence rather than one built by joining field names, to
+    keep every message a single translatable string.
+
     Modifies the errors dict in place and returns it.
     """
-    if bool(cleaned.get("link_page")) and bool(cleaned.get("link_url")):
-        msg = ValidationError(_("Provide either a link page or a link URL, not both."))
-        errors["link_page"] = msg
-        errors["link_url"] = msg
+    fields = ("link_page", "link_url", *extra_fields)
+    set_fields = [name for name in fields if cleaned.get(name)]
+    if len(set_fields) > 1:
+        if extra_fields == ("anchor",):
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, or anchor.")
+            )
+        elif extra_fields == ("link_document",):
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, or link document.")
+            )
+        elif extra_fields == ("link_document", "modal"):
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, link document, or modal content.")
+            )
+        else:
+            msg = ValidationError(
+                _("Provide either a link page or a link URL, not both.")
+            )
+        for name in set_fields:
+            errors[name] = msg
     return errors
+
+
+# ---------------------------------------------------------------------------
+# Translation safety
+# ---------------------------------------------------------------------------
+
+
+class IdentifierBlock(CharBlock):
+    """
+    A CharBlock holding a machine identifier rather than prose.
+
+    An ActionKit form shortname, a Fundraise Up element ID and an in-page
+    anchor slug are all strings, but translating one breaks whatever it points
+    at: a translated `short_form_id` fetches a form that does not exist, and a
+    translated `anchor_id` silently breaks every link aimed at it.
+    wagtail-localize extracts every CharBlock as a translatable segment by
+    default, so these fields opt out through its two documented per-block hooks
+    (`segments/extract.py` and `segments/ingest.py` check for them before
+    falling back to type-based handling). The value is copied to the
+    translation untouched and never reaches a translator, human or machine.
+
+    Storage and admin form are CharBlock's -- switching a field to this changes
+    the block definition, not its data.
+    """
+
+    def get_translatable_segments(self, value):
+        """Nothing to translate: keep this field out of the segment editor."""
+        return []
+
+    def restore_translated_segments(self, value, segments):
+        """Paired with the above. Nothing is extracted, so nothing is restored."""
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +429,346 @@ def _validate_at_most_one_link(cleaned, errors):
 # ---------------------------------------------------------------------------
 
 
-class TextBlock(RichTextBlock):
+# ---------------------------------------------------------------------------
+# Block previews
+#
+# Wagtail renders the block picker's preview by server-side rendering the block
+# with a placeholder value (`Meta.preview_value`) through the global preview
+# template at templates/wagtailcore/shared/block_preview.html. A block only
+# becomes previewable once it declares `preview_value` -- see that template's
+# comment for the full contract. `Meta.description` is shown as prose beside
+# the preview, and is worth setting even on blocks with no preview.
+#
+# Keep preview values realistic but obviously fake: they are what an editor
+# sees when deciding which block to reach for.
+# ---------------------------------------------------------------------------
+
+
+PREVIEW_DATA_PATH = Path(__file__).resolve().parent.parent / "previews" / "block_previews.json"
+
+
+@lru_cache(maxsize=1)
+def _preview_data():
+    """
+    Load the harvested block-preview values, keyed by block name.
+
+    Regenerate with `python manage.py harvest_block_previews`. Cached for the
+    process lifetime: this reads a file, never the database, so it is safe to
+    call from `is_previewable` (which Wagtail evaluates while building the
+    picker). A missing file simply means no content-sourced previews.
+    """
+    try:
+        return json.loads(PREVIEW_DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+class ContentPreviewMixin:
+    """
+    Sources a block's picker preview from real site content.
+
+    Mix into any block whose preview should come from
+    `wtrx/previews/block_previews.json` rather than a hand-written
+    `Meta.preview_value`. The two are alternatives -- use this mixin when real
+    content exists for the block, and `Meta.preview_value` when it doesn't.
+
+    Two details make this work:
+
+    - The harvested JSON is in `get_prep_value()` form, where an image is a
+      bare pk. `Block.normalize()` (which `get_preview_value` would otherwise
+      apply) does NOT turn a pk back into an image -- only `to_python()` does,
+      so that is what this uses. Skipping it renders an int where a template
+      expects an image.
+    - Overriding `get_preview_value` is itself what Wagtail's default
+      `is_previewable` looks for, so it would mark *every* mixed-in block as
+      previewable even with no data behind it, producing blank previews.
+      `is_previewable` is therefore pinned to "do we actually have data".
+    """
+
+    #: Key into the harvested JSON. Defaults to the block's name in its parent
+    #: StreamBlock, which is what the harvester keys on.
+    preview_key = None
+
+    #: Optional ``{field_name: count}`` caps applied to list fields in the
+    #: harvested value. Real content is not always the clearest preview: a
+    #: CardGridBlock with exactly four cards deliberately lays out 2x2 rather
+    #: than in three columns, so its preview trims to three to show the layout
+    #: an editor gets by default. Trimming beats hand-authoring the block --
+    #: the copy and images stay real.
+    preview_max_items = {}
+
+    def _harvested_preview(self):
+        entry = self._harvested_entry()
+        return entry.get("value") if entry else None
+
+    def _harvested_entry(self):
+        key = self.preview_key or getattr(self, "name", None)
+        return _preview_data().get(key) if key else None
+
+    def get_preview_value(self):
+        raw = self._harvested_preview()
+        if raw is None:
+            return super().get_preview_value()
+        raw = copy.deepcopy(raw)
+        for field, limit in self.preview_max_items.items():
+            if isinstance(raw.get(field), list):
+                raw[field] = raw[field][:limit]
+        repaired, _ = _repair_image_references(self, raw)
+        return self.to_python(repaired)
+
+    @property
+    def is_previewable(self):
+        # Deliberately a plain property, unlike Wagtail's cached_property.
+        # Wagtail shares one block instance across every StreamBlock that
+        # declares it, so a cached value computed from database state would be
+        # frozen process-wide -- an image library that fills up later would
+        # never start offering previews. The queries behind it are cached
+        # below, and this only runs while building the admin block picker.
+        raw = self._harvested_preview()
+        if raw is None:
+            return False
+        # An image-dependent block with nothing to show would render a broken
+        # preview rather than a degraded one -- better to offer none at all.
+        _, images_ok = _repair_image_references(self, copy.deepcopy(raw))
+        return images_ok
+
+
+def _repair_image_references(block, raw):
+    """
+    Swap any image pk in harvested preview data that no longer resolves for one
+    that does, in place, returning `raw`.
+
+    Harvested previews store images the way StreamField does -- as a primary
+    key -- and those keys only mean anything in the database they came from. A
+    fresh clone, CI, or a re-imported library leaves them dangling, and
+    `to_python()` turns a dangling pk into None. That is not a harmless blank:
+    block templates reasonably assume a required image is present (see
+    image_block.html, which calls `{% image %}` with no None-guard because the
+    field cannot be empty in real content), so the preview breaks rather than
+    degrading. Substituting any real image keeps the preview representative.
+
+    Walks the block tree rather than the raw data alone, because only the block
+    definition says which values are image references and which are ordinary
+    integers.
+    """
+    from wagtail.images.blocks import ImageChooserBlock
+
+    def resolve(block, raw):
+        if isinstance(raw, dict) and hasattr(block, "child_blocks"):
+            for name, value in raw.items():
+                child = block.child_blocks.get(name)
+                if child is None:
+                    continue
+                if isinstance(child, ImageChooserBlock):
+                    if value and not _image_exists(value):
+                        raw[name] = _fallback_image_pk()
+                        if raw[name] is None:
+                            unsatisfied.append(name)
+                else:
+                    resolve(child, value)
+        elif isinstance(raw, list):
+            for item in raw:
+                # ListBlock items are bare values; StreamBlock children are
+                # {type, value, id} dicts naming the child block to use.
+                if hasattr(block, "child_block"):
+                    resolve(block.child_block, item)
+                elif isinstance(item, dict) and "type" in item:
+                    child = getattr(block, "child_blocks", {}).get(item["type"])
+                    if child is not None:
+                        resolve(child, item.get("value"))
+
+    unsatisfied = []
+    resolve(block, raw)
+    return raw, not unsatisfied
+
+
+#: Preview lookups run once per block while rendering the picker, so the
+#: handful of queries behind them are cached briefly rather than per request.
+#: Short enough that a newly-populated image library starts working promptly.
+PREVIEW_LOOKUP_CACHE_TIMEOUT = 60
+
+
+def _image_exists(pk):
+    from wtrx.images import CustomImage
+
+    key = "wtrx:preview_image_exists:%s" % pk
+    cached = cache.get(key)
+    if cached is None:
+        cached = CustomImage.objects.filter(pk=pk).exists()
+        cache.set(key, cached, PREVIEW_LOOKUP_CACHE_TIMEOUT)
+    return cached
+
+
+def _fallback_image_pk():
+    key = "wtrx:preview_fallback_image"
+    cached = cache.get(key)
+    if cached is None:
+        image = preview_image()
+        cached = image.pk if image else 0
+        cache.set(key, cached, PREVIEW_LOOKUP_CACHE_TIMEOUT)
+    return cached or None
+
+
+def preview_image(min_width=800):
+    """
+    Return an arbitrary image from the library, for use as a `preview_value`
+    placeholder on blocks with an ImageChooserBlock field.
+
+    MUST only be called at request time -- from inside a `preview_value`
+    callable, never at import time (AGENTS.md "Common Pitfalls" #1).
+
+    Returns None on an empty image library. Callers must handle that: block
+    templates do NOT all tolerate a missing image (image_block.html calls
+    `{% image %}` unguarded, since its field is required in real content), so a
+    None here means "do not offer a preview", not "preview without the image".
+    """
+    from wtrx.images import CustomImage
+
+    return (
+        CustomImage.objects.filter(width__gte=min_width).order_by("pk").first()
+        or CustomImage.objects.order_by("pk").first()
+    )
+
+
+def _hero_preview_value():
+    """Placeholder value for HeroBlock's picker preview."""
+    return {
+        "headline": _("A future powered by people"),
+        "content": "<p>Supporting copy introducing the section that follows.</p>",
+        "image": preview_image(),
+        "banner_color": "navy",
+    }
+
+
+def _person_card_preview_value():
+    """Placeholder value for PersonCardBlock's picker preview."""
+    return {
+        "name": _("Jane Doe"),
+        "role": _("Regional Organising Lead"),
+        "image": preview_image(),
+        "bio": _(
+            "Jane coordinates campaign partners across the region and has "
+            "organised with the climate movement for over a decade."
+        ),
+        "email": "jane@example.org",
+    }
+
+
+def _image_grid_preview_value():
+    """
+    Placeholder value for ImageGridBlock's picker preview. Not
+    ContentPreviewMixin: no real page uses this brand-new block yet, so
+    there is nothing to harvest -- see preview_image()'s docstring for why
+    a hand-written preview_value is the right tool here, same as
+    HeroBlock/PersonCardBlock above. Reuses the one placeholder image
+    across all four slots, same as any hand-authored multi-image preview
+    in this file.
+    """
+    img = preview_image()
+    return {
+        "heading": "",
+        "images": [{"image": img, "alt_text": ""} for _i in range(4)],
+    }
+
+
+def _logo_grid_preview_value():
+    """
+    Placeholder value for LogoGridBlock's picker preview.
+
+    Uses real partner-logo images already in the media library where
+    available (title contains "logo", excluding "350" -- that's the
+    site's own brand mark, not a partner) rather than repeating one
+    arbitrary image four times the way preview_image() alone would: a
+    logo grid specifically reads better with genuinely different marks
+    side by side, since the whole point is showing several organizations
+    at once. Falls back to preview_image() -- repeated, same as any other
+    hand-authored multi-image preview in this file -- when the library
+    doesn't have enough logo-titled images (e.g. a fresh dev DB with no
+    fixture data).
+
+    Deduplicates by title before capping at 7: the fixture library has at
+    least one logo re-uploaded under an identical title (Wagtail suffixes
+    the file name on a duplicate upload but leaves the title alone), which
+    would otherwise show the same mark twice in the preview.
+    """
+    from wtrx.images import CustomImage
+
+    candidates = (
+        CustomImage.objects.filter(title__icontains="logo")
+        .exclude(title__icontains="350")
+        .order_by("pk")[:20]
+    )
+    seen_titles = set()
+    logos = []
+    for img in candidates:
+        if img.title in seen_titles:
+            continue
+        seen_titles.add(img.title)
+        logos.append(img)
+        if len(logos) == 7:
+            break
+    if len(logos) < 2:
+        fallback = preview_image()
+        logos = [fallback] * 4
+    return {
+        "heading": "",
+        "logos": [
+            {
+                "image": img,
+                "name": _("Partner Organization %(n)d") % {"n": i + 1},
+                "link_page": None,
+                "link_url": "",
+            }
+            for i, img in enumerate(logos)
+        ],
+    }
+
+
+def _person_card_grid_preview_value():
+    """
+    Placeholder value for PersonCardGridBlock's picker preview. Five
+    people demonstrates the 3+2 row split -- see _balanced_rows().
+    """
+    img = preview_image()
+    return {
+        "heading": "",
+        "people": [
+            {
+                "name": _("Jane Doe"),
+                "role": _("Regional Organising Lead"),
+                "image": img,
+                "bio": "",
+                "email": "",
+                "phone": "",
+                "website": "",
+            }
+            for _i in range(5)
+        ],
+    }
+
+
+def _signup_wagtail_forms_preview_value():
+    """
+    Placeholder value for SignupWagtailFormsBlock's picker preview.
+
+    `form_page` is required on the block, but a site need not have built a Form
+    page yet -- and there is nothing sensible to invent, since the fields come
+    from whichever page is chosen. Falls back to None, which the template
+    renders as the surrounding prompt without a form body.
+    """
+    from wtrx.models import FormPage
+
+    return {
+        "content": (
+            "<h2>Sign up for updates</h2>"
+            "<p>Tell us where to reach you and we will keep you posted.</p>"
+        ),
+        "button_text": _("Sign up"),
+        "form_page": FormPage.objects.live().first(),
+    }
+
+
+class TextBlock(ContentPreviewMixin, RichTextBlock):
     """
     A rich text content block.
 
@@ -179,13 +784,135 @@ class TextBlock(RichTextBlock):
         icon = "pilcrow"
         label = _("Text")
         template = "wtrx/components/streamfield/blocks/text_block.html"
+        description = _(
+            "Rich text: paragraphs, headings, lists, bold/italic and links. "
+            "The default choice for ordinary body copy."
+        )
 
 
-class ImageBlock(StructBlock):
+class LeadTextBlock(RichTextBlock):
+    """
+    A short lead-in paragraph, rendered larger than ordinary body copy.
+
+    Restricted to RICHTEXT_FEATURES_HERO (inline marks and lists, no
+    headings/blockquote) — a lead is an opening statement, which may be a
+    short list; TextBlock already covers longer structured copy.
+
+    Deliberately NOT ContentPreviewMixin (AGENTS.md pitfall #45): no real
+    page uses this block yet, so there is nothing in
+    wtrx/previews/block_previews.json to harvest, and that mixin's
+    is_previewable ignores Meta.preview_value entirely -- it would leave
+    this block with no picker preview at all. Plain Wagtail preview_value is
+    a full alternative here since, unlike an image-bearing block, nothing
+    needs to be looked up at request time.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("features", RICHTEXT_FEATURES_HERO)
+        super().__init__(**kwargs)
+
+    class Meta:
+        icon = "pilcrow"
+        label = _("Lead paragraph")
+        template = "wtrx/components/streamfield/blocks/lead_text_block.html"
+        description = _(
+            "A larger introductory paragraph for opening a page or section. "
+            "Bold/italic/links and lists only — use a regular Text block for "
+            "headings."
+        )
+        # preview_value must live on Meta, not the block class itself --
+        # Wagtail's default get_preview_value()/is_previewable() only ever
+        # look at self.meta.preview_value (AGENTS.md pitfall #45).
+        preview_value = _(
+            "<p>A short, larger opening statement that sits above the "
+            "regular body copy.</p>"
+        )
+
+
+class HeadingBlock(StructBlock):
+    """
+    A standalone centered H2.
+
+    Card rows (CardGridBlock, AccordionBlock) already carry an optional
+    `heading` that renders as a centered H2 above their items. This is that
+    same heading with nothing beneath it, for the case where a section needs
+    a title but the content under it is several separate blocks rather than
+    one card row.
+
+    Deliberately renders byte-identical markup to card_grid_block.html's
+    heading -- same three-tier container and the same h2 class string -- so a
+    standalone heading and a card-row heading sitting in the same page line
+    up on the left edge and share a type size. Changing one means changing
+    both; they are not linked in code, only by convention and this docstring.
+
+    Heading only, no supporting copy: a Text block directly beneath covers
+    that, and the body stack already tightens text-before-a-card-row
+    adjacencies (see main.css's "Body-stack spacing").
+
+    Deliberately NOT ContentPreviewMixin (AGENTS.md pitfall #42/#45): no real
+    page uses this block yet, so block_previews.json has nothing to harvest
+    and that mixin's is_previewable ignores Meta.preview_value.
+    """
+
+    heading = CharBlock(
+        required=True,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as a centered H2."),
+    )
+
+    class Meta:
+        icon = "title"
+        label = _("Heading")
+        template = "wtrx/components/streamfield/blocks/heading_block.html"
+        description = _(
+            "A standalone centered section heading (H2), matching the heading "
+            "style used above card rows."
+        )
+        preview_value = {"heading": _("What we're working on")}
+
+
+SPACER_SIZE_CHOICES = [
+    ("small", _("Small (32px)")),
+    ("medium", _("Medium (64px)")),
+    ("large", _("Large (128px)")),
+]
+
+
+class SpacerBlock(StructBlock):
+    """
+    Extra vertical space between two blocks.
+
+    Adds its height on top of the normal gap before it: main.css's
+    "Body-stack spacing" zeroes the gap after a spacer, so a spacer between
+    two blocks gives one gap plus the spacer rather than two gaps plus it.
+    Preset sizes rather than a free value, so pages keep one rhythm.
+    """
+
+    size = ChoiceBlock(
+        choices=SPACER_SIZE_CHOICES,
+        default="medium",
+        label=_("Size"),
+    )
+
+    class Meta:
+        icon = "order"
+        label = _("Spacer")
+        template = "wtrx/components/streamfield/blocks/spacer_block.html"
+        description = _("Extra vertical space between two blocks.")
+        preview_value = {"size": "medium"}
+
+
+@ai_image_block()
+class ImageBlock(ContentPreviewMixin, StructBlock):
     """
     An image with optional alt text override and caption.
 
-    The image's built-in title is used as a fallback when alt_text is blank.
+    When alt_text is blank the rendition's own alt is used, which is the
+    image's description falling back to its title (Wagtail's
+    ``default_alt_text``) — never the raw filename if a description is set.
+    Decorated with wagtail-ai's ai_image_block() (default field names match:
+    "image"/"alt_text") to add a "generate alt text from image" button in
+    the admin.
     """
 
     image = ImageChooserBlock(label=_("Image"))
@@ -193,7 +920,8 @@ class ImageBlock(StructBlock):
         required=False,
         label=_("Alt text"),
         help_text=_(
-            "Overrides the image title for screen readers. Leave blank to use the image title."
+            "Overrides the image description for screen readers. "
+            "Leave blank to use the description set on the image itself."
         ),
     )
     caption = CharBlock(
@@ -201,6 +929,14 @@ class ImageBlock(StructBlock):
         label=_("Caption"),
         help_text=_("Optional caption displayed below the image."),
     )
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        width = value.get("width") or "full"
+        if width not in MEDIA_WIDTH_CONTAINER_CLASSES:
+            width = "full"
+        ctx["container_class"] = MEDIA_WIDTH_CONTAINER_CLASSES[width]
+        ctx["is_full_width"] = width == "full"
+        return ctx
 
     class Meta:
         icon = "image"
@@ -208,7 +944,7 @@ class ImageBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/image_block.html"
 
 
-class VideoBlock(StructBlock):
+class VideoBlock(ContentPreviewMixin, StructBlock):
     """
     A video block supporting either an embed URL (YouTube, Vimeo, etc.)
     or an uploaded media file via wagtailmedia.
@@ -255,89 +991,281 @@ class VideoBlock(StructBlock):
         label = _("Video")
         template = "wtrx/components/streamfield/blocks/video_block.html"
 
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        # Only a body-level video (BodyVideoBlock) has a width and owns its
+        # container; elsewhere the parent's column sizes it.
+        ctx["container_class"] = MEDIA_WIDTH_CONTAINER_CLASSES.get(
+            value.get("width")
+        )
+        ctx["is_full_width"] = value.get("width") == "full"
+        return ctx
+
+
+class BodyImageBlock(ImageBlock):
+    """
+    ImageBlock as placed directly in a page body, with a width choice.
+
+    Only the body gets one: inside a SectionBlock the section's own width
+    sets the column, and accordion/timeline content has a fixed measure.
+    Stored as the same "image" type, so adding the field is additive.
+    """
+
+    width = ChoiceBlock(
+        choices=MEDIA_WIDTH_CHOICES,
+        default="full",
+        label=_("Width"),
+    )
+
+
+class BodyVideoBlock(VideoBlock):
+    """
+    VideoBlock as placed directly in a page body, with a width choice.
+
+    See BodyImageBlock for why only the body gets one. Defaults to "narrow",
+    the closest match to the body text column a video used to sit in.
+    """
+
+    width = ChoiceBlock(
+        choices=MEDIA_WIDTH_CHOICES,
+        default="narrow",
+        label=_("Width"),
+    )
+
 
 class ButtonBlock(StructBlock):
     """
     A CTA button with text, style, and exactly one link target.
 
-    Exactly one of link_page or link_url must be set. clean() enforces this.
+    Exactly one of link_page, link_url or anchor must be set. clean()
+    enforces this.
+
+    `anchor` is a separate field rather than something an editor could type
+    into link_url because link_url is a URLBlock — Django's URLValidator
+    rejects a bare "#petition", so a same-page jump link had no way to be
+    expressed at all before. It is the natural target for a hero CTA that
+    scrolls to a signup/donate block further down the same page (see
+    components/hero.html's banner CTA and each block's own anchor_id field).
+
+    `size` is the only editor-facing size control anywhere on the site —
+    every other `wtr-btn-lg` usage (hero, post_page's back-link,
+    FeaturePanelBlock, PageCardsBlock, CalloutBlock) is a hardcoded,
+    non-editor-configurable design choice baked into its own template, and
+    the third "small" tier (wtr-btn-sm) was removed outright rather than
+    exposed here — it had exactly one caller (the search page) and gave
+    editors nothing worth choosing. See BUTTON_SIZE_CHOICES.
     """
 
     text = CharBlock(label=_("Button text"))
     link_page = PageChooserBlock(
         required=False,
         label=_("Link page"),
-        help_text=_("Internal page link. Set either this or Link URL, not both."),
+        help_text=_("Internal page link. Set only one of the three link fields."),
     )
     link_url = URLBlock(
         required=False,
         label=_("Link URL"),
-        help_text=_("External link. Set either this or Link page, not both."),
+        help_text=_("External link. Set only one of the three link fields."),
+    )
+    anchor = IdentifierBlock(
+        required=False,
+        label=_("Anchor"),
+        help_text=_(
+            "Jump to a block on this same page, by its Anchor ID and without "
+            "the # symbol (e.g. 'petition'). Set only one of the three link "
+            "fields."
+        ),
     )
     style = ChoiceBlock(
         choices=BUTTON_STYLE_CHOICES,
         default="primary",
         label=_("Style"),
     )
+    size = ChoiceBlock(
+        choices=BUTTON_SIZE_CHOICES,
+        default="regular",
+        label=_("Size"),
+    )
 
     def clean(self, value):
         cleaned = super().clean(value)
+        fields = ("link_page", "link_url", "anchor")
+        set_count = sum(1 for name in fields if cleaned.get(name))
         errors = {}
-        has_page = bool(cleaned.get("link_page"))
-        has_url = bool(cleaned.get("link_url"))
-        if not has_page and not has_url:
-            msg = ValidationError(_("Provide either a link page or a link URL."))
-            errors["link_page"] = msg
-            errors["link_url"] = msg
-        elif has_page and has_url:
+        if set_count == 0:
             msg = ValidationError(
-                _("Provide either a link page or a link URL, not both.")
+                _("Provide a link page, a link URL, or an anchor.")
             )
-            errors["link_page"] = msg
-            errors["link_url"] = msg
+            errors = {name: msg for name in fields}
+        elif set_count > 1:
+            msg = ValidationError(
+                _("Provide only one of link page, link URL, or anchor.")
+            )
+            errors = {name: msg for name in fields if cleaned.get(name)}
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
+
+    #: Centred in the pane, and laid out narrow so the preview scales the
+    #: button *up*: at 1:1 a lone button is legible but lost in a pane this
+    #: size. See templates/wagtailcore/shared/block_preview.html.
+    preview_layout = "center"
+    preview_target_width = 340
 
     class Meta:
         icon = "link"
         label = _("Button")
         template = "wtrx/components/streamfield/blocks/button_block.html"
+        description = _(
+            "A single call-to-action button. Links to a page on this site, an "
+            "external URL, or an anchor further down the same page."
+        )
+        preview_value = {
+            "text": _("Take action"),
+            "link_url": "https://example.com",
+            "style": "primary",
+            "size": "regular",
+        }
 
 
-class QuoteBlock(StructBlock):
+BUTTON_GROUP_LAYOUT_CHOICES = [
+    ("horizontal", _("Horizontal")),
+    ("vertical", _("Vertical")),
+]
+
+
+class ButtonGroupBlock(StructBlock):
     """
-    A pull quote with optional attribution.
+    Two or more CTA buttons. Does not replace ButtonBlock (a single
+    button) — that stays registered separately for pages that only need
+    one CTA and for backward compatibility with existing content.
+
+    `layout` picks between two arrangements:
+      - "horizontal" (default): the same dynamic-centering row rendering
+        (centered flex rows) as CardGridBlock/ImageGridBlock/LogoGridBlock/
+        PersonCardGridBlock use, computed here via _balanced_rows()
+        (max_per_row=3) directly — the only remaining direct caller of
+        that function; those four grid blocks now use
+        _full_rows_with_balanced_tail()/_full_rows_merging_lone_remainder()
+        instead (see either's docstring for why). Buttons themselves size
+        to their own content, unlike those other blocks' items — a button
+        stretched to fill a row would look wrong.
+      - "vertical": a single centered column, no row-balancing needed.
+
+    NOTE: inline mid-paragraph buttons in rich text (a button embedded in
+    the flow of a text block, like a styled link) were explicitly deferred
+    — no custom Draftail entity/register_rich_text_features hook exists
+    anywhere in this codebase, and building one is a materially bigger
+    lift than this block. Revisit as a separate project if requested.
     """
 
-    quote = WagtailTextBlock(
-        label=_("Quote"),
-        help_text=_("The quotation text."),
+    buttons = ListBlock(ButtonBlock(), min_num=1, max_num=5, label=_("Buttons"))
+    layout = ChoiceBlock(
+        choices=BUTTON_GROUP_LAYOUT_CHOICES,
+        default="horizontal",
+        label=_("Layout"),
+        help_text=_(
+            "Horizontal lays buttons out in centered rows. Vertical stacks "
+            "them in a centered column."
+        ),
     )
-    attribution = CharBlock(
-        required=False,
-        label=_("Attribution"),
-        help_text=_("Who said it (e.g. 'Jane Smith')."),
-    )
+
+    MAX_PER_ROW = 3
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        if value.get("layout") != "vertical":
+            ctx["rows"] = _balanced_rows(value["buttons"], self.MAX_PER_ROW)
+        return ctx
 
     class Meta:
-        icon = "openquote"
-        label = _("Quote")
-        template = "wtrx/components/streamfield/blocks/quote_block.html"
+        icon = "link"
+        label = _("Button Group")
+        template = "wtrx/components/streamfield/blocks/button_group_block.html"
+        description = _(
+            "Two or more call-to-action buttons, laid out horizontally or "
+            "vertically. Use the single Button block instead for one CTA."
+        )
+        preview_value = {
+            "buttons": [
+                {
+                    "text": _("Take action"),
+                    "link_page": None,
+                    "link_url": "https://example.com",
+                    "anchor": "",
+                    "style": "primary",
+                    "size": "regular",
+                },
+                {
+                    "text": _("Learn more"),
+                    "link_page": None,
+                    "link_url": "https://example.com",
+                    "anchor": "",
+                    "style": "outline",
+                    "size": "regular",
+                },
+            ],
+            "layout": "horizontal",
+        }
 
 
 class RawHTMLBlock(WagtailRawHTMLBlock):
     """
     A raw HTML passthrough block for embed codes, custom widgets, etc.
 
-    Use sparingly. Output is not sanitized. wagtail-localize will expose
-    the raw markup to translators — brief editor guidance is recommended.
+    Use sparingly. Output is not sanitized -- validation only checks tag
+    balance (every opening tag has a matching closing tag), not markup
+    safety. wagtail-localize will expose the raw markup to translators —
+    brief editor guidance is recommended.
     """
+
+    #: Laid out narrow so the preview scales it up: at the default desktop
+    #: width this block's content is too small to read in the pane.
+    preview_target_width = 700
+
+    def __init__(self, **kwargs):
+        # help_text is a constructor arg on Wagtail's RawHTMLBlock, not a Meta
+        # option, so defaulting it here is what gives every registration the
+        # notice without repeating it at each one.
+        kwargs.setdefault("help_text", RAW_HTML_SECURITY_NOTICE)
+        super().__init__(**kwargs)
+
+    def clean(self, value):
+        value = super().clean(value)
+        if value and not html_is_balanced(value):
+            raise ValidationError(
+                _(
+                    "This HTML appears to have mismatched or unclosed tags "
+                    "— check that every opening tag has a matching closing "
+                    "tag."
+                )
+            )
+        return value
 
     class Meta:
         icon = "code"
-        label = _("Raw HTML")
+        label = _("Custom embed")
         template = "wtrx/components/streamfield/blocks/raw_html_block.html"
+        description = format_lazy(
+            "{notice} {body}",
+            notice=RAW_HTML_SECURITY_NOTICE,
+            body=_(
+                "Paste in HTML supplied by another service -- an embed, a "
+                "widget, a snippet of markup. It is rendered exactly as given, "
+                "so only use it for code you trust. Tag balance is validated "
+                "on save; markup safety is not."
+            ),
+        )
+        preview_value = (
+            '<div style="border:2px dashed #9aa5a8;border-radius:8px;padding:24px;'
+            'font-family:ui-monospace,monospace">'
+            '<p style="margin:0 0 12px;font-weight:700">Embedded HTML</p>'
+            '<p style="margin:0 0 16px">Markup you paste here renders as-is -- '
+            'an embed, an iframe, or a widget from another service.</p>'
+            '<code style="display:block;background:#eef1f2;padding:12px;'
+            'border-radius:6px">&lt;iframe src="..."&gt;&lt;/iframe&gt;</code>'
+            "</div>"
+        )
 
 
 class TableBlock(WagtailTableBlock):
@@ -345,10 +1273,29 @@ class TableBlock(WagtailTableBlock):
     A tabular data block using Wagtail's built-in table editor.
     """
 
+    #: Same as RawHTMLBlock: table text is unreadable at the default width.
+    preview_target_width = 800
+
     class Meta:
         icon = "table"
         label = _("Table")
         template = "wtrx/components/streamfield/blocks/table_block.html"
+        description = _(
+            "A simple data table, edited as a spreadsheet-style grid. The first "
+            "row and column can each be marked as headers."
+        )
+        preview_value = {
+            "first_row_is_table_header": True,
+            "first_col_is_header": False,
+            "table_caption": "",
+            "data": [
+                ["Region", "Coal plants retired", "Renewable capacity added"],
+                ["Africa", "12", "4.1 GW"],
+                ["Asia", "48", "31.7 GW"],
+                ["Europe", "23", "18.2 GW"],
+                ["Latin America", "9", "7.5 GW"],
+            ],
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -356,27 +1303,73 @@ class TableBlock(WagtailTableBlock):
 # ---------------------------------------------------------------------------
 
 
-class CardBlock(StructBlock):
+class CardModalContentBlock(StreamBlock):
+    """
+    StreamBlock used inside CardBlock.modal: what the card's button opens in a
+    <dialog> instead of following a link.
+
+    A StreamBlock rather than one richtext field so a modal can carry a
+    third-party widget alongside its copy — the DAFdirect form on How to
+    Give's "Donor Advised Funds" modal is the case that needed it (see
+    import_350_how_to_give_modals). Same small, purpose-built list reasoning
+    as AccordionItemContentBlock: a modal is a compact overlay, not a layout
+    region. card.html renders the children itself rather than through each
+    child's own template — text_block.html inverts to light prose inside a
+    dark SectionBlock, which would be unreadable on the dialog's white panel.
+    """
+
+    text = TextBlock()
+    raw_html = RawHTMLBlock()
+
+    class Meta:
+        label = _("Modal content")
+
+
+class CardBlock(ContentPreviewMixin, StructBlock):
     """
     A content card with a heading, optional icon, optional image, description,
     and link.
 
-    When an icon is set, it renders at 24x24 beside the heading. Used directly
-    in the StreamField and as the child block of CardGridBlock. At most one of
-    link_page or link_url may be set. clean() enforces this.
+    When an icon is set, it renders at 24x24 beside the content block. Used
+    directly in the StreamField and as the child block of CardGridBlock. At
+    most one of link_page, link_url, link_document, or modal may be set.
+    clean() enforces this.
+
+    `modal` is the fourth CTA target: when set, the card's button opens that
+    content in a native <dialog> (components/card.html, card-modal.js)
+    instead of navigating — 350.org's "Ways to give" cards each open their
+    details this way. link_document was originally a "document-link" Draftail
+    feature inside `content` (letting an editor link arbitrary text to an
+    uploaded Document), replaced by this structured field so a document
+    behaves as a third CTA target alongside link_page/link_url instead of a
+    freeform in-body link.
+
+    `content` used to be two fields — `heading` (CharBlock, required) and
+    `description` (a plain TextBlock, optional — no markup at all, unlike
+    every other block condensed this way, whose body field was already
+    richtext) — condensed into one richtext field, heading typed as an H3 to
+    match the level card.html already rendered it at. Migration
+    0051_condense_card_heading_description folded every existing card's
+    heading/description pair into this field's HTML on upgrade, escaping and
+    `<p>`-wrapping the plain-text description in the same step.
     """
 
+    tag = CharBlock(
+        required=False,
+        label=_("Tag"),
+        help_text=_("Optional short label displayed as a pill above the heading (e.g. 'Global')."),
+    )
     icon = ImageChooserBlock(
         required=False,
         label=_("Icon"),
         help_text=_(
-            "Optional small icon image (ideally square) displayed beside the heading."
+            "Optional small icon image (ideally square) displayed beside the content."
         ),
     )
-    heading = CharBlock(label=_("Heading"))
-    description = WagtailTextBlock(
-        required=False,
-        label=_("Description"),
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H3,
+        label=_("Content"),
+        help_text=_("Type your heading as an H3 at the top, then optional supporting copy."),
     )
     image = ImageChooserBlock(
         required=False,
@@ -385,25 +1378,89 @@ class CardBlock(StructBlock):
     link_page = PageChooserBlock(
         required=False,
         label=_("Link page"),
-        help_text=_("Internal link. Set either this or Link URL, not both."),
+        help_text=_("Internal link. Set only one of link page, link URL, or link document."),
     )
     link_url = URLBlock(
         required=False,
         label=_("Link URL"),
-        help_text=_("External link. Set either this or Link page, not both."),
+        help_text=_("External link. Set only one of link page, link URL, or link document."),
     )
-
+    link_document = DocumentChooserBlock(
+        required=False,
+        label=_("Link document"),
+        help_text=_(
+            "Link to an uploaded document (e.g. a PDF). Set only one of "
+            "link page, link URL, or link document."
+        ),
+    )
+    modal = CardModalContentBlock(
+        required=False,
+        label=_("Modal content"),
+        help_text=_(
+            "Opens in a pop-up when the card's button is clicked. Use instead "
+            "of link page, link URL, or link document."
+        ),
+    )
+    link_text = CharBlock(
+        required=False,
+        default=_("Learn more"),
+        label=_("Link text"),
+        help_text=_("Label for the card's CTA button."),
+    )
     def clean(self, value):
         cleaned = super().clean(value)
-        errors = _validate_at_most_one_link(cleaned, {})
+        errors = _validate_at_most_one_link(cleaned, {}, extra_fields=("link_document", "modal"))
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
+
+    #: A card is never full width in practice -- it sits in a grid three to a
+    #: row. Constrain the lone-card preview to the width one occupies there,
+    #: so it matches what the Card Grid preview shows.
+    preview_max_width = 400
+
+    #: ...and lay that out in a narrower viewport than the 1280 default, which
+    #: scales the card up to fill the pane instead of sitting small in the
+    #: middle of it. Safe to do here only because card.html uses no responsive
+    #: variants, so there are no breakpoints to lose.
+    #:
+    #: Height is what caps this, not width. A card is ~450px tall at 400px
+    #: wide, and Wagtail gives the preview pane a 400px minimum height, so
+    #: anything below ~790 here starts clipping the CTA off the bottom in a
+    #: short pane.
+    preview_target_width = 800
 
     class Meta:
         icon = "doc-full"
         label = _("Card")
         template = "wtrx/components/streamfield/blocks/card_block.html"
+        description = _(
+            "A single linked card: heading, short description, optional image, "
+            "tag and icon. Usually reached for via Card Grid, which lays "
+            "several out together."
+        )
+
+
+class CarouselCardBlock(CardBlock):
+    """
+    CardBlock variant used by CardCarouselBlock's `cards` ListBlock.
+
+    Identical to CardBlock except image is required — every carousel card
+    needs one, unlike the general-purpose CardBlock (used standalone and by
+    CardGridBlock) where it's optional. Overriding just this one field, via
+    subclassing rather than editing CardBlock directly, keeps every other
+    use of CardBlock unchanged. No template of its own: rendered the same
+    way as any other card, via components/card.html (see
+    card_carousel_block.html).
+    """
+
+    image = ImageChooserBlock(
+        label=_("Image"),
+    )
+
+    class Meta:
+        icon = "doc-full"
+        label = _("Card")
 
 
 class PersonCardBlock(StructBlock):
@@ -437,10 +1494,22 @@ class PersonCardBlock(StructBlock):
         label=_("Website"),
     )
 
+    #: A person card sits in a grid alongside others, never full width --
+    #: same treatment as CardBlock, scaled up to fill the pane. It carries no
+    #: image banner so it is shorter than a CardBlock and can be scaled further
+    #: before the pane's 400px minimum height clips it.
+    preview_max_width = 400
+    preview_target_width = 640
+
     class Meta:
         icon = "user"
         label = _("Person")
         template = "wtrx/components/streamfield/blocks/person_card_block.html"
+        description = _(
+            "A person: photo, name, role and short bio, with optional contact "
+            "details. Use for staff, spokespeople or board listings."
+        )
+        preview_value = staticmethod(_person_card_preview_value)
 
 
 # ---------------------------------------------------------------------------
@@ -448,9 +1517,48 @@ class PersonCardBlock(StructBlock):
 # ---------------------------------------------------------------------------
 
 
+class AccordionItemContentBlock(StreamBlock):
+    """
+    StreamBlock used inside AccordionItemBlock.content.
+
+    An accordion answer is free-form: any number of text/image/video blocks
+    in any order (a paragraph, then an image, then more text, say), rather
+    than one richtext field plus two bolted-on "optional" image/video
+    struct fields -- the shape this replaced. That struct shape actively
+    lied about being optional: ImageBlock.image is a plain, correctly-
+    required ImageChooserBlock, and VideoBlock.clean() always demands
+    exactly one of embed_url/media_file -- both entirely correct when
+    either block is used standalone in SectionContentBlock (an editor
+    wouldn't deliberately add an empty one there), but wrapping either
+    field="required=False" on the *outer* AccordionItemBlock field did
+    nothing to stop the *inner* block's own clean() from still demanding
+    real content, so any item genuinely missing an image or a video (most
+    of them -- see import_350_our_impact.py) failed validation, even
+    though "an item may set neither, either, or both" was always this
+    block's own documented intent. A StreamBlock expresses "no image" as
+    "no image block in this list" instead of a present-but-blank struct
+    value, which isn't a validation edge case at all.
+
+    Deliberately a small, purpose-built list -- not SectionContentBlock --
+    since an accordion answer is a compact expandable panel, not a general
+    layout region; nesting a CardGrid, Hero, or another Accordion inside
+    one would be a strange editing experience even though nothing here
+    technically prevents adding more block types later if a real need
+    shows up.
+    """
+
+    text = TextBlock()
+    image = ImageBlock()
+    video = VideoBlock()
+
+    class Meta:
+        label = _("Content")
+
+
 class AccordionItemBlock(StructBlock):
     """
-    A single item in an AccordionBlock: a title and rich-text content.
+    A single item in an AccordionBlock: a title and freely composed content
+    (AccordionItemContentBlock: text/image/video, in any order/quantity).
 
     Explicitly named (not anonymous) so Django migration serialization can
     reference it by dotted path.
@@ -461,25 +1569,47 @@ class AccordionItemBlock(StructBlock):
     """
 
     title = CharBlock(label=_("Title"))
-    content = RichTextBlock(
-        features=RICHTEXT_FEATURES_FULL,
-        label=_("Content"),
-    )
+    content = AccordionItemContentBlock()
 
     class Meta:
         icon = "collapse-down"
         label = _("Accordion item")
 
 
-class CardGridBlock(StructBlock):
+class CardGridBlock(ContentPreviewMixin, StructBlock):
     """
     An auto-responsive grid of content cards.
 
-    Minimum 2, maximum 12 cards. Column count is determined automatically
-    by CSS (2-col on sm, 3-col on md+). No heading or column-count controls
-    — editors cannot break the layout.
+    Minimum 2, maximum 12 cards. Same full-rows-plus-balanced-tail layout
+    as PersonCardGridBlock/ImageGridBlock (`_full_rows_with_balanced_tail()`,
+    max_per_row=3, defined further down this file before ImageGridBlock —
+    Python doesn't care about definition order across a module for a call
+    inside a method body, only that the name exists by the time the
+    method actually runs). LogoGridBlock uses a different helper of its
+    own — see `_full_rows_merging_lone_remainder()`. No column-count
+    controls — editors cannot break the layout.
+
+    This replaced an earlier CSS-only special case (2 or 4 cards get
+    lg:grid-cols-2, everything else lg:grid-cols-3) that only handled one
+    bad count: 7 cards under that scheme rendered as an unbalanced 3+3+1,
+    the exact orphan-row bug this now avoids by construction (see
+    `_full_rows_with_balanced_tail()`'s own docstring). It briefly used the
+    shared `_balanced_rows()` (evenly spread every row) before switching to
+    `_full_rows_with_balanced_tail()` (full rows at the cap, only the last
+    row or two balanced) to match every other card-shaped grid on the
+    site.
+
+    heading is optional (blank renders nothing above the grid), same
+    required=False pattern as PageCardsBlock.heading — for consistency with
+    the other section-heading-plus-cards blocks (CardCarouselBlock,
+    PageCardsBlock), not because CardGridBlock's own layout needs it.
     """
 
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
     cards = ListBlock(
         CardBlock(),
         min_num=2,
@@ -487,20 +1617,849 @@ class CardGridBlock(StructBlock):
         label=_("Cards"),
     )
 
+    MAX_PER_ROW = 3
+
+    #: 5 demonstrates the 3+2 balanced-tail case in the block picker preview.
+    preview_max_items = {"cards": 5}
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _full_rows_with_balanced_tail(value["cards"], self.MAX_PER_ROW)
+        return ctx
+
     class Meta:
         icon = "grip"
         label = _("Card Grid")
         template = "wtrx/components/streamfield/blocks/card_grid_block.html"
+        description = _(
+            "An auto-responsive grid of 2-12 linked cards, laid out "
+            "automatically — never a lone card on its own row. There are no "
+            "column controls."
+        )
 
 
-class AccordionBlock(StructBlock):
+class ImageGridItemBlock(StructBlock):
+    """
+    A single item in an ImageGridBlock's `images` list: just an image and
+    an optional alt-text override. This is an internal sub-block rendered
+    by image_grid_block.html — no Meta.template, same as
+    ImageCardListItemBlock.
+    """
+
+    image = ImageChooserBlock(label=_("Image"))
+    alt_text = CharBlock(
+        required=False,
+        label=_("Alt text"),
+        help_text=_(
+            "Overrides the image description for screen readers. Leave "
+            "blank to use the description set on the image itself."
+        ),
+    )
+
+    class Meta:
+        icon = "image"
+        label = _("Image")
+
+
+def _balanced_rows(items, max_per_row):
+    """
+    Split `items` into rows of `max_per_row` (preferred) and
+    `max_per_row - 1`, larger rows first, so a partial trailing row is
+    never a lone item of 1 — auto layout, no editor column control,
+    generalized to genuinely avoid an orphan row for *every* count, not
+    just one special-cased count.
+
+    Used directly by ButtonGroupBlock only. CardGridBlock/ImageGridBlock/
+    LogoGridBlock/PersonCardGridBlock used to call this too, but now use
+    _full_rows_with_balanced_tail() instead (full rows at the cap, only
+    the last row or two balanced) — this function's own "spread every row
+    evenly" behavior reads wrong for a grid of many rows (see that
+    function's docstring); ButtonGroupBlock's row of buttons is a much
+    smaller, always-1-or-2-row case where that distinction rarely shows.
+    This function is still used internally by
+    _full_rows_with_balanced_tail() itself, to balance its own tail.
+
+    A single global row size (uniformly `k` or `k - 1` for every row)
+    cannot avoid a trailing row of exactly 1 for every possible count —
+    see PersonCardGridBlock's original derivation for `max_per_row == 3`,
+    proven in AGENTS.md pitfall #44. The general fix: choose the minimum
+    row count `R = ceil(n / max_per_row)` needed to respect the cap, then
+    distribute `n` items across those `R` rows as evenly as possible
+    (`divmod(n, R)`), rather than always preferring the biggest row size.
+    This provably keeps every row at 2+ items whenever `n > max_per_row`
+    and `max_per_row >= 3` (see TestBalancedRows for the property test).
+    `n <= max_per_row` is simply one centered row of everything.
+    """
+    # Wagtail's ListValue.__getitem__ only handles integer indices, not
+    # slice objects (items[i:j] silently misbehaves rather than raising),
+    # so convert to a plain list up front.
+    items = list(items)
+    n = len(items)
+    if n <= max_per_row:
+        return [items]
+    rows_count = math.ceil(n / max_per_row)
+    base, extra = divmod(n, rows_count)
+    sizes = [base + 1] * extra + [base] * (rows_count - extra)
+    rows, i = [], 0
+    for size in sizes:
+        rows.append(items[i : i + size])
+        i += size
+    return rows
+
+
+def _full_rows_with_balanced_tail(items, max_per_row):
+    """
+    Row layout shared by CardGridBlock, ImageGridBlock and
+    PersonCardGridBlock (each with their own max_per_row) — deliberately
+    different from _balanced_rows() above, whose whole design is to spread
+    every row evenly so no row is ever more than one item bigger than
+    another. A grid with many rows read as "wrong" under that scheme (e.g.
+    8 logos at a 5-per-row cap rendering 4+4 instead of a full 5-row
+    followed by a shorter 3), so this fills every row to `max_per_row`
+    except the last, which simply holds whatever's left over.
+
+    That alone would reintroduce _balanced_rows()'s original problem for
+    a remainder of exactly 1 (e.g. 6 items at cap 5 -> a full row of 5
+    plus one item alone on its own row) — so a remainder of 1 is handled
+    as a special case: the final full row and that one leftover item
+    (max_per_row + 1 items total) are balanced evenly across two rows via
+    _balanced_rows() itself, instead of leaving a lone item. Every row
+    before that pair still stays packed at the cap. A remainder of 2 or
+    more is never a problem on its own (2+ items is never "lone"), so it's
+    left as the final, shorter row.
+
+    Originally built LogoGridBlock-only, then extended to
+    CardGridBlock/ImageGridBlock/PersonCardGridBlock too (same request
+    extended to "every card grid") — so today the only remaining caller of
+    _balanced_rows() itself, besides this function's own internal use, is
+    ButtonGroupBlock. At max_per_row=3 (CardGridBlock, PersonCardGridBlock)
+    this function and _balanced_rows() always agree, so that switch was
+    behavior-preserving for those two; ImageGridBlock's max_per_row=4 is
+    wide enough for them to genuinely diverge (see TestImageGridBlockFields).
+
+    LogoGridBlock itself has since moved to its own
+    _full_rows_merging_lone_remainder() instead of this function — see
+    that function's docstring for why a remainder of 1 needed different
+    handling for logos specifically (fold into the last row) than for
+    cards/photos/people (balance across two rows, as here).
+    """
+    items = list(items)
+    n = len(items)
+    if n <= max_per_row:
+        return [items]
+    remainder = n % max_per_row
+    if remainder == 0:
+        return [items[i : i + max_per_row] for i in range(0, n, max_per_row)]
+    if remainder >= 2:
+        full_rows_count = n // max_per_row
+        rows = [
+            items[i * max_per_row : (i + 1) * max_per_row] for i in range(full_rows_count)
+        ]
+        rows.append(items[full_rows_count * max_per_row :])
+        return rows
+    # remainder == 1: balance the last full row plus the leftover single
+    # item (max_per_row + 1 items) evenly across two rows, rather than
+    # leaving that one item alone on its own row.
+    lead_rows_count = n // max_per_row - 1
+    rows = [items[i * max_per_row : (i + 1) * max_per_row] for i in range(lead_rows_count)]
+    tail = items[lead_rows_count * max_per_row :]
+    rows.extend(_balanced_rows(tail, max_per_row))
+    return rows
+
+
+def _full_rows_merging_lone_remainder(items, max_per_row):
+    """
+    LogoGridBlock's own row layout — like _full_rows_with_balanced_tail()
+    above (full rows at the cap, never a lone item of 1), but handles a
+    remainder of exactly 1 differently: instead of balancing the last
+    full row plus that one leftover logo evenly across two rows (e.g. 26
+    logos at cap 5 -> 5,5,5,5,3,3), it folds the leftover into the last
+    row instead, giving one row of `max_per_row + 1` (5,5,5,5,6).
+
+    Logos are small, dense marks — one extra logo in an otherwise-full
+    row barely changes how that row reads, so a single slightly-fuller
+    last row was preferred over a second, visibly shorter row of 3.
+    Deliberately kept separate from _full_rows_with_balanced_tail()
+    rather than folded into it (e.g. via a flag): CardGridBlock/
+    ImageGridBlock/PersonCardGridBlock's items carry much more content
+    each, where the same rule would read as cramped (e.g. 4 cards at cap
+    3 becoming one row of 4, instead of a cleaner 2+2) rather than barely
+    noticeable — so this is LogoGridBlock's own tweak, not a change to
+    what every other grid does with the same edge case.
+    """
+    items = list(items)
+    n = len(items)
+    if n <= max_per_row:
+        return [items]
+    remainder = n % max_per_row
+    full_rows_count = n // max_per_row
+    if remainder == 1:
+        # Fold the lone leftover into the last row instead of giving it a
+        # row of its own or splitting the tail across two rows.
+        full_rows_count -= 1
+    rows = [items[i * max_per_row : (i + 1) * max_per_row] for i in range(full_rows_count)]
+    if remainder:
+        rows.append(items[full_rows_count * max_per_row :])
+    return rows
+
+
+class ImageGridBlock(StructBlock):
+    """
+    An auto-responsive grid of photos, laid out with the same full-rows-
+    plus-balanced-tail centering as PersonCardGridBlock/CardGridBlock (via
+    `_full_rows_with_balanced_tail()`, capped at 4 per row) rather than
+    CardGridBlock's old fixed-breakpoint CSS grid — no count ever leaves
+    a lone photo on its own row, and a small photo count centers as one
+    row instead of stretching thin across the full width.
+    No per-image caption field — this is a grid, not a set of
+    individually captioned figures.
+
+    Not ContentPreviewMixin: no real page uses this block yet, so there is
+    nothing to harvest -- see _image_grid_preview_value().
+    """
+
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
+    images = ListBlock(
+        ImageGridItemBlock(),
+        min_num=2,
+        max_num=24,
+        label=_("Images"),
+    )
+
+    #: Photos are larger than logos, so a lower per-row cap than
+    #: LogoGridBlock's -- see _full_rows_with_balanced_tail().
+    #: (LogoGridBlock itself now uses _full_rows_merging_lone_remainder().)
+    MAX_PER_ROW = 4
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _full_rows_with_balanced_tail(value["images"], self.MAX_PER_ROW)
+        return ctx
+
+    class Meta:
+        icon = "grip"
+        label = _("Image Grid")
+        template = "wtrx/components/streamfield/blocks/image_grid_block.html"
+        description = _(
+            "An auto-responsive grid of 2-24 photos, cropped to a consistent "
+            "square shape. No per-image captions. There are no column controls."
+        )
+        preview_value = staticmethod(_image_grid_preview_value)
+
+
+class LogoGridItemBlock(StructBlock):
+    """
+    A single item in a LogoGridBlock's `logos` list: an image, an
+    organization name (used as the alt-text fallback and, if the logo
+    links out, its accessible label), and an optional link.
+    """
+
+    image = ImageChooserBlock(label=_("Logo"))
+    name = CharBlock(
+        label=_("Organization name"),
+        help_text=_(
+            "Used as alt text if the image has no description, and as the "
+            "logo's accessible label if it links out."
+        ),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal page link. Set only one of the two link fields."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set only one of the two link fields."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "site"
+        label = _("Logo")
+
+
+class LogoGridBlock(StructBlock):
+    """
+    A grid of partner/funder logos, sized consistently regardless of each
+    logo's own aspect ratio (a fixed-height cell, object-contain). Capped
+    denser than ImageGridBlock/PersonCardGridBlock at 5 per row since logos
+    are small marks rather than photos. Logos may optionally link out.
+
+    Row layout is `_full_rows_merging_lone_remainder()` — full rows at the
+    cap read better for a dense logo wall than evenly-spread rows do (see
+    `_full_rows_with_balanced_tail()`, used by CardGridBlock/
+    ImageGridBlock/PersonCardGridBlock, for that shared reasoning), and a
+    remainder of exactly 1 logo folds into the last row (`max_per_row + 1`
+    logos in it) rather than splitting the tail across two rows — see
+    `_full_rows_merging_lone_remainder()`'s own docstring for why that
+    tweak is logo-specific rather than shared with the other three grids.
+    Still never leaves a single logo alone on its own row.
+
+    Not ContentPreviewMixin: no real page uses this block yet, so there is
+    nothing to harvest -- see _logo_grid_preview_value().
+    """
+
+    heading = CharBlock(required=False, label=_("Heading"))
+    logos = ListBlock(
+        LogoGridItemBlock(),
+        min_num=2,
+        max_num=30,
+        label=_("Logos"),
+    )
+
+    #: Denser than ImageGridBlock's cap -- logos are small marks, not
+    #: photos -- see _full_rows_merging_lone_remainder().
+    MAX_PER_ROW = 5
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _full_rows_merging_lone_remainder(value["logos"], self.MAX_PER_ROW)
+        return ctx
+
+    class Meta:
+        icon = "grip"
+        label = _("Logo Grid")
+        template = "wtrx/components/streamfield/blocks/logo_grid_block.html"
+        description = _(
+            "A grid of 2-30 partner/funder logos, sized consistently. Logos "
+            "may optionally link out."
+        )
+        preview_value = staticmethod(_logo_grid_preview_value)
+
+
+class PersonCardGridBlock(StructBlock):
+    """
+    A grid of people (staff, spokespeople, board members), laid out so
+    there is never a lone card on its own row — see
+    _full_rows_with_balanced_tail(), called here with max_per_row=3.
+
+    Flexbox with justify-center, not CSS Grid like CardGridBlock: rows are
+    computed explicitly in Python and each renders as its own small flex
+    row, so a partial row (e.g. 2 people) centers naturally. Reuses
+    PersonCardBlock as the item block and person_card.html for per-item
+    rendering — the standalone `person_card` registration is unchanged,
+    for single-person spotlight use. CardGridBlock and ImageGridBlock use
+    the same technique (same _full_rows_with_balanced_tail() helper,
+    their own caps); LogoGridBlock uses its own
+    _full_rows_merging_lone_remainder() instead.
+
+    Not ContentPreviewMixin: no real page uses this block yet, so there is
+    nothing to harvest -- see _person_card_grid_preview_value(). 5 people
+    in that preview demonstrates the 3+2 row split (unchanged from
+    _balanced_rows(): at max_per_row=3 the two algorithms always agree —
+    see _full_rows_with_balanced_tail()'s own docstring — the visible
+    difference only shows up at a higher cap like ImageGridBlock's 4).
+    """
+
+    heading = CharBlock(required=False, label=_("Heading"))
+    people = ListBlock(
+        PersonCardBlock(),
+        min_num=1,
+        max_num=12,
+        label=_("People"),
+    )
+
+    MAX_PER_ROW = 3
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx["rows"] = _full_rows_with_balanced_tail(value["people"], self.MAX_PER_ROW)
+        return ctx
+
+    class Meta:
+        icon = "group"
+        label = _("Person Card Grid")
+        template = "wtrx/components/streamfield/blocks/person_card_grid_block.html"
+        description = _(
+            "A grid of up to 12 people, laid out automatically — never a "
+            "lone card on its own row. There are no column controls."
+        )
+        preview_value = staticmethod(_person_card_grid_preview_value)
+
+
+class ImageCardListItemBlock(StructBlock):
+    """
+    A single item in an ImageCardListBlock's `cards` list: a heading and a
+    description, nothing else — no icon/image/link, unlike CardBlock. This
+    layout's cards are plain bordered text boxes (see image_card_list_block.html),
+    so reusing CardBlock would expose fields the template never renders.
+
+    `content` used to be two fields — `heading` (CharBlock) and `description`
+    (a plain TextBlock, no markup) — condensed into one richtext field, same
+    treatment and same reasoning as CardBlock's own merge (heading typed as
+    an H3, matching the level this template already rendered it at).
+    Migration 0051_condense_card_heading_description folded every existing
+    item's heading/description pair into this field's HTML on upgrade.
+    """
+
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H3,
+        label=_("Content"),
+        help_text=_("Type your heading as an H3 at the top, then the supporting copy."),
+    )
+
+    class Meta:
+        icon = "doc-full"
+        label = _("Card")
+
+
+class ImageCardListBlock(ContentPreviewMixin, StructBlock):
+    """
+    A centered heading above a two-column split: an image on the left, a
+    vertical stack of simple text cards (ImageCardListItemBlock) on the
+    right. Both columns share the same height (image is object-cover'd to
+    match), single column on mobile — see image_card_list_block.html.
+
+    Full-bleed-ish width: special-cased in content_page.html/home_page.html
+    to skip the shared max-w-5xl wrapper, same width (max-w-7xl / 1280px) as
+    CalloutBlock — see that block's template comment for the two-tier
+    w-full-outer / max-w-inner pattern this reuses.
+    """
+
+    heading = CharBlock(
+        label=_("Heading"),
+        help_text=_("Centered heading above the image and cards."),
+    )
+    image = ImageChooserBlock(label=_("Image"))
+    cards = ListBlock(
+        ImageCardListItemBlock(),
+        min_num=2,
+        label=_("Cards"),
+    )
+    alignment = ChoiceBlock(
+        choices=IMAGE_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Image alignment"),
+        help_text=_("Which side the image sits on — the cards sit on the opposite side."),
+    )
+
+    class Meta:
+        icon = "grip"
+        label = _("Image Card List")
+        template = "wtrx/components/streamfield/blocks/image_card_list_block.html"
+
+
+class ImageTextBlock(ContentPreviewMixin, StructBlock):
+    """
+    A two-column split: an image on the left, a heading + richtext body on
+    the right, both vertically centered against each other. Single column
+    on mobile — see image_text_block.html.
+
+    The image defaults to force-cropped to a square (`aspect-square
+    object-cover`, `rounded-lg`) — the same treatment ImageCardListBlock's
+    and ImageGridBlock's images already use — rather than the old
+    `object-contain` letterbox inside a fixed 378x299 box. `crop` (default
+    True, so every existing page keeps today's look unchanged) opts a
+    single instance out of that: with it unchecked, the image renders at
+    its natural aspect ratio instead (a `max-...` resize spec plus
+    `h-auto`, no `aspect-square`/`object-cover`) — for images that read as
+    wrong when force-cropped, e.g. a wide logo. `rounded-lg` still applies
+    either way. No background is applied to the image or its wrapper.
+
+    Distinct from ImageCardListBlock: that one has a heading spanning
+    above both columns and a fixed list of bordered cards; this one has no
+    top heading at all — its heading sits inline in the text column — and
+    the "cards" are just one richtext field, for freeform paragraph copy
+    (e.g. a campaign pitch) rather than a repeatable list of short points.
+
+    `content` used to be two fields — `heading` (CharBlock) and `text`
+    (RichTextBlock) — condensed into this one richtext field so the editor
+    types the heading as an H2 at the top, the same convention SectionBlock's
+    own content list already uses. Migration 0045_condense_heading_text_blocks
+    folded every existing page's heading/text pair into this field's HTML on
+    upgrade; see that migration for the exact transform.
+
+    An optional CTA (link_text + one of link_page/link_url) renders under the
+    copy in the text column. Unlike CalloutBlock's, it is always the filled
+    primary style — this block has no background field, so the template has
+    no on_light flag to pick an outline variant with.
+
+    `size` controls the image column's fixed width (see
+    IMAGE_TEXT_SIZE_CHOICES); it defaults to "default" so harvested preview
+    JSON saved before this field existed (AGENTS.md rule #45 /
+    ContentPreviewMixin) still renders correctly — StructBlock.to_python()
+    falls back to a missing field's own default, not an error, for any key
+    absent from older stored data.
+    """
+
+    image = ImageChooserBlock(label=_("Image"))
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then the body text."),
+    )
+    alignment = ChoiceBlock(
+        choices=IMAGE_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Image alignment"),
+        help_text=_("Which side the image sits on — the text sits on the opposite side."),
+    )
+    size = ChoiceBlock(
+        choices=IMAGE_TEXT_SIZE_CHOICES,
+        default="default",
+        label=_("Image size"),
+        help_text=_("How wide the image column is."),
+    )
+    crop = BooleanBlock(
+        default=True,
+        required=False,
+        label=_("Crop to square"),
+        help_text=_(
+            "Uncheck to show the image at its natural aspect ratio instead of "
+            "cropping it to a square — useful for a logo or other image that "
+            "looks wrong cropped."
+        ),
+    )
+    # Flat link_text/link_page/link_url triple rather than a nested
+    # ButtonBlock: that is what CardBlock, FeaturePanelBlock,
+    # CardCarouselBlock, PageCardsBlock, QuoteBlock and CalloutBlock all do.
+    # ButtonBlock is only ever mounted inside a StreamBlock in this codebase,
+    # never as a StructBlock sub-field.
+    #
+    # Declared last on purpose. Wagtail's declarative metaclass orders a
+    # struct's admin form fields by a module-global creation counter rather
+    # than by MRO or declaration position within the class (AGENTS.md pitfall
+    # #45), so fields added at the end of the class body sort to the end of
+    # the form -- which is where a CTA belongs, under the copy it follows.
+    link_text = CharBlock(
+        required=False,
+        label=_("Link text"),
+        help_text=_("CTA button label. Leave blank to omit the button."),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+    link_style = ChoiceBlock(
+        choices=BUTTON_STYLE_CHOICES,
+        default="primary",
+        label=_("Link style"),
+        help_text=_("Button style for the CTA above."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "image"
+        label = _("Image + Text")
+        template = "wtrx/components/streamfield/blocks/image_text_block.html"
+
+
+class FeaturePanelBlock(ContentPreviewMixin, StructBlock):
+    """
+    A filled, rounded panel holding an image beside a text stack: optional
+    eyebrow pill, heading, optional body copy, optional CTA button with a
+    trailing arrow. Image side (left/right) and background (light/dark) are
+    both editor choices — see feature_panel_block.html.
+
+    Per Figma's Take Action page (node 1:1021), this is the block used both
+    above the card grid ("Featured Campaign" / light panel with a pill) and
+    below it ("Looking for more?" / dark panel without one). They are one
+    component with two configurations, not two blocks.
+
+    Distinct from ImageTextBlock: that block has no panel at all — image and
+    text sit directly on the page background, top-aligned, with no eyebrow.
+    (It does now carry an optional CTA of its own, so the button is no longer
+    the distinguishing feature; the panel is.) This one is a self-contained
+    card with its own fill, border radius and internal padding, and its
+    columns are vertically centered against each other.
+
+    Distinct from CalloutBlock: that block is text-only on a solid color
+    (any background image is a faint full-bleed watermark, not a subject);
+    this one gives the image its own column at full opacity.
+
+    At most one of link_page, link_url or anchor may be set; clean()
+    enforces this, same pattern as CardBlock and QuoteBlock. `anchor` exists
+    for the same reason it does on ButtonBlock — link_url is a URLBlock and
+    Django's URLValidator rejects a bare "#petition", so a panel whose CTA
+    scrolls to a signup block further down the same page had no way to
+    express that target at all.
+
+    `content` used to be two fields — `heading` (CharBlock) and `text`
+    (optional RichTextBlock) — condensed into this one richtext field so the
+    editor types the heading as an H2 at the top, same as ImageTextBlock.
+    `eyebrow` stays a separate field: it renders as its own pill, not part of
+    the text flow. Migration 0045_condense_heading_text_blocks folded every
+    existing page's heading/text pair into this field's HTML on upgrade.
+    """
+
+    eyebrow = CharBlock(
+        required=False,
+        label=_("Eyebrow"),
+        help_text=_(
+            "Optional short label shown in a pill above the heading, "
+            'e.g. "Featured Campaign". Leave blank to omit the pill.'
+        ),
+    )
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
+    )
+    image = ImageChooserBlock(label=_("Image"))
+    alignment = ChoiceBlock(
+        choices=IMAGE_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Alignment"),
+        help_text=_("Which side of the panel the image sits on."),
+    )
+    background = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="white",
+        label=_("Background"),
+        help_text=_(
+            "Panel fill. The dark colors invert the text, pill and button "
+            "colors; White and Light grey keep them dark."
+        ),
+    )
+    link_text = CharBlock(
+        required=False,
+        label=_("Button text"),
+        help_text=_("Optional CTA button label. Leave blank to omit the button."),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set only one of the three link fields."),
+    )
+    anchor = IdentifierBlock(
+        required=False,
+        label=_("Anchor"),
+        help_text=_(
+            "Jump to a block on this same page, by its Anchor ID and without "
+            "the # symbol (e.g. 'petition'). Set only one of the three link "
+            "fields."
+        ),
+    )
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {}, extra_fields=("anchor",))
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "image"
+        label = _("Feature Panel")
+        template = "wtrx/components/streamfield/blocks/feature_panel_block.html"
+
+
+class CardCarouselBlock(ContentPreviewMixin, StructBlock):
+    """
+    A heading + supporting copy, an optional CTA button, and a horizontally
+    scrollable row of cards with prev/next arrow controls.
+
+    Cards are manually authored (a ListBlock of CarouselCardBlock, not
+    pulled from pages) — minimum 3, no maximum. At most one of link_page or
+    link_url may be set; clean() enforces this, same pattern as CardBlock
+    and QuoteBlock.
+
+    `content` used to be two fields — `heading` (CharBlock) and `content`
+    (RichTextBlock) — condensed into this one richtext field, same
+    convention as ImageTextBlock/FeaturePanelBlock: the editor types the
+    heading as an H2 at the top, then the supporting copy. Migration
+    0045_condense_heading_text_blocks folded every existing page's
+    heading/content pair into this field's HTML on upgrade.
+    """
+
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then the supporting copy."),
+    )
+    link_text = CharBlock(
+        required=False,
+        label=_("Button text"),
+        help_text=_("Optional CTA button label. Leave blank to omit the button."),
+    )
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+    cards = ListBlock(
+        CarouselCardBlock(),
+        min_num=3,
+        label=_("Cards"),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "grip"
+        label = _("Card Carousel")
+        template = "wtrx/components/streamfield/blocks/card_carousel_block.html"
+
+
+class PageCardsBlock(ContentPreviewMixin, StructBlock):
+    """
+    A heading + optional subheading, and a row of cards auto-generated from
+    the most recently published child pages of a chosen index page, plus an
+    optional CTA button linking to that index page.
+
+    Unlike CardCarouselBlock, cards aren't manually authored — they're the 3
+    most recently published live/public children of index_page (same
+    get_children().live().public().specific() query IndexPage.get_context()
+    uses), converted to card dicts via the same page_as_card() tag
+    index_page.html uses, so this always reflects whatever's actually
+    published there.
+
+    Ordering follows whatever the chosen index page itself uses for its
+    listing. A Blogs page (blog posts and press releases) exposes that as
+    get_listing_queryset(), ordering by the editor-controlled published_at
+    — the same date the cards display — so a "Latest updates" row can't
+    disagree with the index it links to about which posts are newest. This
+    matters because Wagtail only sets first_published_at when a page is
+    published through the admin, so imported posts all carry NULL or an
+    import-time value there (see the backfill_first_published command).
+
+    A generic IndexPage has no such method and may mix child page types, so
+    it falls back to first_published_at, which every Page has — keeping
+    that case a single query. The date shown on each card still prefers
+    published_at whenever the child has one.
+
+    `content` used to be two fields — `heading` (CharBlock) and `subheading`
+    (RichTextBlock, rendered as a plain paragraph despite its name, not an
+    H3) — condensed into this one richtext field, same convention as
+    ImageTextBlock: the editor types the heading as an H2 at the top, then
+    the supporting copy. Migration 0047_condense_more_heading_text_blocks
+    folded every existing page's heading/subheading pair into this field's
+    HTML on upgrade.
+
+    `category` is optional and only meaningful when index_page resolves to
+    a Blogs instance — a generic IndexPage has no category concept (see
+    above), so it's silently ignored there rather than validated against
+    index_page's type, the same "degrade gracefully" pattern the rest of
+    this block already follows for a generic IndexPage's missing
+    get_listing_queryset(). When set, it's passed straight through to
+    Blogs.get_listing_queryset(category=...) — the one place both this
+    block's filtering and Blogs.get_context()'s own `?category=` filtering
+    now live, so a filtered "Latest updates" row can't disagree with the
+    Blogs page it links to about which posts match.
+    """
+
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        required=False,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
+    )
+    index_page = PageChooserBlock(
+        page_type=["wtrx.IndexPage", "wtrx.Blogs"],
+        label=_("Index page"),
+        help_text=_(
+            "The 3 most recently published pages under this index page are shown as cards."
+        ),
+    )
+    category = SnippetChooserBlock(
+        "wtrx.BlogCategory",
+        required=False,
+        label=_("Category"),
+        help_text=_(
+            "Optional. Only applies when Index page above is a Blog/press "
+            "releases index — shows only posts in this category."
+        ),
+    )
+    link_text = CharBlock(
+        required=False,
+        default=_("Read more"),
+        label=_("Button text"),
+        help_text=_(
+            "Optional CTA button below the cards. Always links to the index page above."
+        ),
+    )
+
+    def get_context(self, value, parent_context=None):
+        from wtrx.models import Blogs
+        from wtrx.templatetags.wtrx_tags import page_as_card
+
+        context = super().get_context(value, parent_context=parent_context)
+        index_page = value.get("index_page")
+        cards = []
+        if index_page is not None:
+            specific_index = index_page.specific
+            listing = getattr(specific_index, "get_listing_queryset", None)
+            if listing is not None:
+                category = value.get("category")
+                if category and isinstance(specific_index, Blogs):
+                    children = listing(category=category)[:3]
+                else:
+                    children = listing()[:3]
+            else:
+                children = (
+                    specific_index.get_children()
+                    .live()
+                    .public()
+                    .specific()
+                    .order_by("-first_published_at")[:3]
+                )
+            for child in children:
+                card = page_as_card(child)
+                get_card_image = getattr(child, "get_card_image", None)
+                if get_card_image is not None:
+                    card["image"] = get_card_image(parent=specific_index)
+                card["date"] = getattr(child, "published_at", None) or child.first_published_at
+                cards.append(card)
+        context["cards"] = cards
+        return context
+
+    class Meta:
+        icon = "grip"
+        label = _("Page Cards")
+        template = "wtrx/components/streamfield/blocks/page_cards_block.html"
+
+
+class AccordionBlock(ContentPreviewMixin, StructBlock):
     """
     A collapsible accordion (FAQ-style) list.
 
-    Minimum 1 item. No heading field — editors use a TextBlock h2 before
-    this block if a heading is needed.
+    Minimum 1 item. Heading is optional and rendered the same way as
+    CardGridBlock's — a centered display heading (font-heading, 48px at
+    lg:) sitting outside the accordion items' own always-light chrome.
     """
 
+    heading = CharBlock(
+        required=False,
+        label=_("Heading"),
+        help_text=_("Section heading, rendered as an H2."),
+    )
     items = ListBlock(
         AccordionItemBlock(),
         min_num=1,
@@ -513,15 +2472,39 @@ class AccordionBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/accordion_block.html"
 
 
-class CalloutBlock(StructBlock):
+def _quote_preview_value():
     """
-    An image or video + rich text side-by-side callout section.
+    Placeholder value for QuoteBlock's picker preview.
 
-    Stacks on mobile. Alignment (image-left / image-right) controls which
-    side the media appears on desktop. Optional CTA button link.
+    A function rather than a dict literal because it needs a real image from
+    the database, which must not be read at import time. Assigned to
+    `Meta.preview_value` via staticmethod() -- Wagtail instantiates the Meta
+    class, so a plain function there would be bound and called with `self`.
+    """
+    return {
+        "content": "<p>A short, punchy line lifted from the page and given room to breathe.</p>",
+        "image": preview_image(),
+        "link_text": _("Read the full story"),
+        "link_url": "https://example.com",
+        "alignment": "image-left",
+    }
+
+
+class QuoteBlock(StructBlock):
+    """
+    An image or video with highlighted (pull-quote-style) text overlaid on it.
+
+    The media renders at ~80% width; alignment (image-left / image-right)
+    controls which side it sits on, with the text on the opposite side.
+    Optional CTA button link.
 
     Exactly one of image or media_file must be set; clean() enforces this.
     At most one of link_page or link_url may be set; clean() enforces this.
+
+    Replaces an earlier, unrelated plain pull-quote block (quote text +
+    attribution, no image) that also used the "Quote" name/block key —
+    that one is gone, not renamed alongside this; this is the image-overlay
+    design becoming "Quote", nothing about it changed for the rename.
     """
 
     content = RichTextBlock(
@@ -556,9 +2539,13 @@ class CalloutBlock(StructBlock):
         help_text=_("External link. Set either this or Link page, not both."),
     )
     alignment = ChoiceBlock(
-        choices=CALLOUT_ALIGNMENT_CHOICES,
+        choices=IMAGE_ALIGNMENT_CHOICES,
         default="image-left",
         label=_("Media alignment"),
+        help_text=_(
+            "Which side the (~80%-width) image sits on — the text sits on "
+            "the opposite side."
+        ),
     )
 
     def clean(self, value):
@@ -583,38 +2570,46 @@ class CalloutBlock(StructBlock):
 
     class Meta:
         icon = "image"
-        label = _("Callout")
-        template = "wtrx/components/streamfield/blocks/callout_block.html"
+        label = _("Quote")
+        template = "wtrx/components/streamfield/blocks/quote_block.html"
+        description = _(
+            "A large pull-quote set beside an image or video, with an optional "
+            "button. Best used once on a page, for a testimonial or key line."
+        )
+        preview_value = staticmethod(_quote_preview_value)
 
 
-class HeroBlock(StructBlock):
+class CalloutBlock(ContentPreviewMixin, StructBlock):
     """
-    A mid-page hero section within the StreamField body.
+    A solid-color card: optional heading, optional subheading,
+    optional paragraph, optional CTA button, and an optional low-opacity
+    background image (a subtle texture/watermark behind the text, not a
+    full photo — see callout_block.html).
 
-    Distinct from HeroMixin (which provides a dedicated hero at the top of a
-    page). HeroBlock can appear anywhere in the body.
+    Text/button color (light vs dark) is derived from the chosen color, not
+    independently editable — navy/red/dark-grey/blue-gradient are all dark
+    enough to need light (white) text and a light-outline button; white and
+    light-grey need dark text and a dark-outline button. See
+    LIGHT_BACKGROUND_COLORS and main.css's .wtr-bg-{color} classes for that
+    pairing.
 
-    headline is a plain text field (mirroring HeroMixin). content is richtext
-    for the supporting copy below the headline. Uses the same component
-    template as the page-level hero (components/hero.html) via get_context(),
-    which normalises field names so the template needs no branch logic.
-
-    At most one of link_page or link_url may be set; clean() enforces this.
+    `content` used to be three fields — `heading` (H2), `subheading` (H3) and
+    `content` (paragraph) — condensed into this one richtext field, all
+    optional (a callout can be just a background + button). The editor types
+    an H2 and/or H3 at the top followed by the paragraph, same convention as
+    ImageTextBlock/FeaturePanelBlock. Migration
+    0045_condense_heading_text_blocks folded every existing page's
+    heading/subheading/content trio into this field's HTML on upgrade.
     """
 
-    headline = CharBlock(
-        label=_("Headline"),
-        help_text=_("The hero heading text."),
-    )
     content = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
+        features=RICHTEXT_FEATURES_HEADINGS_H2_H3,
         required=False,
         label=_("Content"),
-        help_text=_("Optional supporting copy below the headline."),
-    )
-    image = ImageChooserBlock(
-        required=False,
-        label=_("Image"),
+        help_text=_(
+            "Optional heading (H2) and/or subheading (H3) at the top, "
+            "followed by an optional paragraph and/or bulleted or numbered list."
+        ),
     )
     link_text = CharBlock(
         required=False,
@@ -631,22 +2626,19 @@ class HeroBlock(StructBlock):
         label=_("Link URL"),
         help_text=_("External link. Set either this or Link page, not both."),
     )
-
-    def get_context(self, value, parent_context=None):
-        ctx = super().get_context(value, parent_context=parent_context)
-        # Normalise to the same shape expected by components/hero.html.
-        ctx["hero"] = {
-            "headline": value.get("headline"),
-            "copy": value.get("content"),
-            "copy_is_block": False,
-            "image": value.get("image"),
-            "video": None,  # HeroBlock does not support video; key kept for template contract
-            "link_text": value.get("link_text"),
-            "link_page": value.get("link_page"),
-            "link_url": value.get("link_url"),
-        }
-        return ctx
-
+    color = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="navy",
+        label=_("Color"),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Background image"),
+        help_text=_(
+            "Optional. Rendered as a subtle, low-opacity texture behind the "
+            "text — not a full photo background."
+        ),
+    )
     def clean(self, value):
         cleaned = super().clean(value)
         errors = _validate_at_most_one_link(cleaned, {})
@@ -655,13 +2647,20 @@ class HeroBlock(StructBlock):
         return cleaned
 
     class Meta:
-        icon = "image"
-        label = _("Hero")
-        template = "wtrx/components/streamfield/blocks/hero_block.html"
+        icon = "pick"
+        label = _("Callout")
+        template = "wtrx/components/streamfield/blocks/callout_block.html"
+        description = _(
+            "A solid-colour panel with a heading and a call-to-action button. "
+            "Use it to break up a long page and push readers toward one action."
+        )
 
 
 # ---------------------------------------------------------------------------
 # Action blocks
+#
+# SectionBlock is defined after this section since its `content` field needs
+# to instantiate DonateBlock and SignupActionNetworkBlock.
 # ---------------------------------------------------------------------------
 
 
@@ -673,18 +2672,27 @@ class DonateBlock(StructBlock):
     IntegrationSettings at render time — not hardcoded here. The
     override_amounts and override_url fields let editors override the
     site-wide defaults on a per-block basis.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
+
+    Uses RICHTEXT_FEATURES_HEADINGS_H2_H3 (same as CalloutBlock) so editors
+    can add an optional H3 subheading below the H2 heading — the list
+    support (ol/ul) that comes bundled with it is a reasonable extra for a
+    donate ask (e.g. "your gift helps: X, Y, Z"), not scope creep.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADINGS_H2_H3,
         required=False,
-        label=_("Heading"),
-        help_text=_("Donation section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_(
+            "Type your heading as an H2 at the top, optionally followed by "
+            "an H3 subheading, then optional supporting copy."
+        ),
     )
     button_text = CharBlock(
         required=False,
@@ -710,10 +2718,282 @@ class DonateBlock(StructBlock):
         ),
     )
 
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        request = (parent_context or {}).get("request")
+        actblue_config = None
+        if request is not None:
+            try:
+                actblue_config = IntegrationSettings.for_request(request).get_integration_config(
+                    "actblue"
+                )
+            except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+                actblue_config = None
+
+        ctx["donation_base_url"] = actblue_config.get("base_url") if actblue_config else ""
+        suggested_amounts = actblue_config.get("suggested_amounts") if actblue_config else ""
+        if suggested_amounts:
+            try:
+                ctx["donation_suggested_amounts_list"] = [
+                    Decimal(x.strip()) for x in suggested_amounts.split(",") if x.strip()
+                ]
+            except (InvalidOperation, AttributeError):
+                ctx["donation_suggested_amounts_list"] = []
+        else:
+            ctx["donation_suggested_amounts_list"] = []
+        return ctx
+
     class Meta:
         icon = "pick"
         label = _("Donate")
         template = "wtrx/components/streamfield/blocks/donate_block.html"
+        description = _(
+            "A donation ask with suggested amounts, linking out to ActBlue. "
+            "Amounts and the destination come from Settings > Integrations "
+            "unless overridden here."
+        )
+        preview_value = {
+            "content": (
+                "<h2>Chip in to keep the pressure on</h2>"
+                "<p>Every contribution funds organisers, research and public campaigning.</p>"
+            ),
+            "button_text": _("Donate"),
+            "override_amounts": ["10", "25", "50", "100"],
+            "override_url": "https://example.com/donate",
+        }
+
+
+class FundraiseUpAdvancedSettingsBlock(StructBlock):
+    """
+    Optional per-block Fundraise Up form ID overrides for DonateFundraiseUpBlock.
+
+    Mirrors FundraiseUpConfigBlock's region fields exactly (same names, same
+    labels) so the two stay easy to reason about side by side, minus
+    `enabled`/`installation_code` -- those are site-wide concerns, not a
+    per-block one. Every field here is optional; when left blank it falls
+    through to that same field's value on the site-wide config (Settings >
+    Integrations > Fundraise Up). Leaving the whole section untouched
+    reproduces the site-wide behavior exactly, so this is additive, not a
+    replacement for FundraiseUpConfigBlock's own region map.
+
+    `element_id_default` here also becomes *this block's own* fallback for
+    any other region left blank above (before falling through further to
+    the site-wide default) -- see DonateFundraiseUpBlock.get_context()'s
+    region_value() for the exact per-field resolution order.
+
+    Meta.collapsed=True keeps this fieldset closed by default in the
+    editor: most donate blocks never need it, and its 7 fields would
+    otherwise dominate the form above the block's actual content fields.
+    """
+
+    element_id_us = IdentifierBlock(
+        required=False,
+        label=_("Form ID — United States visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_nl = IdentifierBlock(
+        required=False,
+        label=_("Form ID — Netherlands visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_ca = IdentifierBlock(
+        required=False,
+        label=_("Form ID — Canada visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_gb = IdentifierBlock(
+        required=False,
+        label=_("Form ID — United Kingdom visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    eu_country_codes = IdentifierBlock(
+        required=False,
+        label=_("Other European country codes"),
+        help_text=_(
+            "Comma-separated two-letter ISO country codes (e.g. DE,FR,ES,IT) "
+            "that should use the \"other European visitors\" form ID below, "
+            "for this block only. Leave blank to use the site-wide list."
+        ),
+    )
+    element_id_eu = IdentifierBlock(
+        required=False,
+        label=_("Form ID — all other European visitors"),
+        help_text=_(
+            "Overrides the site-wide value for this block only. Leave "
+            "blank to use the site default."
+        ),
+    )
+    element_id_default = IdentifierBlock(
+        required=False,
+        label=_("Form ID — all other visitors"),
+        help_text=_(
+            "Overrides the site-wide default for this block only, and "
+            "also becomes this block's own fallback for any region left "
+            "blank above. Leave entirely blank to use the site-wide "
+            "default everywhere."
+        ),
+    )
+
+    class Meta:
+        icon = "cogs"
+        label = _("Advanced settings")
+        collapsed = True
+
+
+class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
+    """
+    A Fundraise Up donate button.
+
+    Fundraise Up elements (buttons, forms, overlays) are created in Fundraise
+    Up's own dashboard, each yielding an opaque Element ID. Embedding one is
+    just a hidden anchor tag that Fundraise Up's installation script (loaded
+    site-wide via IntegrationSettings.head_html() when the Fundraise Up
+    integration is enabled) scans for and hydrates into a styled checkout-modal
+    trigger. The button's appearance and label are configured in the Fundraise
+    Up dashboard for that element, not here — unlike DonateBlock, there is no
+    button_text field.
+
+    Renders as a photo beside a dark panel (heading, description, the
+    Fundraise Up element) — use a Fundraise Up element configured as an
+    inline/embedded form in your dashboard, not a modal-trigger button, so
+    it actually renders inline in the panel rather than as a small button.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
+
+    There is no plain `element_id` field on this block: every instance
+    shows the visitor's region-specific Fundraise Up element, resolved
+    client-side from FundraiseUpConfigBlock's site-wide settings (see
+    wtrx/integrations/fundraiseup.py for the full geolocation mechanism and
+    why it has to be client-side on this cached site). A block author who
+    needs a *different* region map than the site-wide one for this one
+    instance — a single fixed element regardless of region, or a
+    campaign-specific override for one region only — uses the collapsed
+    "Advanced settings" section (FundraiseUpAdvancedSettingsBlock) instead:
+    each of its fields overrides its site-wide counterpart only when
+    filled in, so an untouched Advanced settings section is functionally
+    identical to not having one.
+
+    Uses RICHTEXT_FEATURES_HEADINGS_H2_H3 (same as CalloutBlock/DonateBlock)
+    so editors can add an optional H3 subheading below the H2 heading.
+    """
+
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADINGS_H2_H3,
+        required=False,
+        label=_("Content"),
+        help_text=_(
+            "Type your heading as an H2 at the top, optionally followed by "
+            "an H3 subheading, then optional supporting copy."
+        ),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
+    )
+    designation_id = IdentifierBlock(
+        required=False,
+        label=_("Designation ID"),
+        help_text=_(
+            "Optional Fundraise Up designation ID to route this donation to "
+            "a specific fund. Applies on top of whichever region-specific "
+            "form the visitor is shown."
+        ),
+    )
+    alignment = ChoiceBlock(
+        choices=IMAGE_ALIGNMENT_CHOICES,
+        default="image-left",
+        label=_("Image alignment"),
+        help_text=_(
+            "Which side the image sits on — the dark panel sits on the "
+            "opposite side. Has no effect when no image is set."
+        ),
+    )
+    advanced_settings = FundraiseUpAdvancedSettingsBlock(
+        required=False,
+        label=_("Advanced settings"),
+    )
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        request = (parent_context or {}).get("request")
+        # Wagtail's live-preview iframe (Page.serve_preview()) — distinct
+        # from `is_block_preview` above, which is the "Add block" picker's
+        # thumbnail preview. Fundraise Up's installation script is
+        # suppressed there along with every other integration's head/body
+        # injection (see base.html's request.is_preview guard and AGENTS.md
+        # pitfall #53), so the anchor below would never hydrate — the
+        # template shows an explanatory placeholder instead.
+        ctx["is_page_preview"] = bool(request is not None and getattr(request, "is_preview", False))
+        fundraiseup_config = None
+        if request is not None:
+            try:
+                fundraiseup_config = IntegrationSettings.for_request(request).get_integration_config(
+                    "fundraiseup"
+                )
+            except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+                fundraiseup_config = None
+
+        if fundraiseup_config:
+            advanced = value.get("advanced_settings") or {}
+
+            def site_val(field_name):
+                return fundraiseup_config.get(field_name, "") or ""
+
+            def block_val(field_name):
+                return advanced.get(field_name, "") or ""
+
+            # This block's own default: its own override if set, else the
+            # site-wide default. Also doubles as the fallback for any
+            # region below left blank on both this block and the site.
+            default_id = block_val("element_id_default") or site_val("element_id_default")
+            ctx["fundraiseup_default_element_id"] = default_id
+
+            def region_value(field_name):
+                return block_val(field_name) or site_val(field_name) or default_id
+
+            eu_codes_raw = block_val("eu_country_codes") or site_val("eu_country_codes")
+            eu_codes = [code.strip().upper() for code in eu_codes_raw.split(",") if code.strip()]
+            ctx["fundraiseup_region_map_json"] = json.dumps(
+                {
+                    "US": region_value("element_id_us"),
+                    "NL": region_value("element_id_nl"),
+                    "CA": region_value("element_id_ca"),
+                    "GB": region_value("element_id_gb"),
+                    "_eu": region_value("element_id_eu"),
+                    "_eu_countries": eu_codes,
+                    "_default": default_id,
+                }
+            )
+        else:
+            ctx["fundraiseup_default_element_id"] = ""
+            ctx["fundraiseup_region_map_json"] = json.dumps({"_default": ""})
+        return ctx
+
+    class Meta:
+        icon = "pick"
+        label = _("Donate (Fundraise Up)")
+        template = "wtrx/components/streamfield/blocks/donate_fundraiseup_block.html"
 
 
 class SignupWagtailFormsBlock(StructBlock):
@@ -723,18 +3003,19 @@ class SignupWagtailFormsBlock(StructBlock):
     AJAX submission posts to form_page.url. On success, the form is replaced
     with success_message (or a generic fallback). The form instance is
     instantiated in the template via form_page.get_form_class()().
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Signup section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     button_text = CharBlock(
         required=False,
@@ -759,6 +3040,12 @@ class SignupWagtailFormsBlock(StructBlock):
         icon = "form"
         label = _("Sign Up (Wagtail Forms)")
         template = "wtrx/components/streamfield/blocks/signup_wagtail_forms_block.html"
+        description = _(
+            "A form built in this CMS (a Form page), rendered inline. Use it "
+            "when the submissions should live here rather than on an external "
+            "platform."
+        )
+        preview_value = staticmethod(_signup_wagtail_forms_preview_value)
 
 
 class SuccessMessageBlock(StreamBlock):
@@ -766,8 +3053,11 @@ class SuccessMessageBlock(StreamBlock):
     StreamBlock for the optional thank-you content shown after a successful
     Action Network signup.
 
-    Intentionally limited to content blocks (text, image, button, quote) —
-    no action blocks, layout blocks, or section nesting.
+    Intentionally limited to content blocks (text, image, button) — no
+    action blocks, layout blocks, or section nesting. Previously also
+    offered a lightweight pull-quote block, removed when that block was
+    replaced by the (much heavier, image-required) image-overlay Quote
+    design — not a fit for this compact context.
 
     ``to_python`` coerces legacy non-list values (old RichTextBlock empty
     strings) to an empty list so existing pages load without error.
@@ -776,7 +3066,6 @@ class SuccessMessageBlock(StreamBlock):
     text = TextBlock()
     image = ImageBlock()
     button = ButtonBlock()
-    quote = QuoteBlock()
 
     @staticmethod
     def _coerce(value):
@@ -814,18 +3103,19 @@ class SignupActionNetworkBlock(StructBlock):
     default thank-you screen. When provided, a MutationObserver in the template
     detects the AN widget's blocks and replaces it with the custom StreamField
     content.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock. Migration
+    0047_condense_more_heading_text_blocks folded every existing page's
+    heading/description pair into this field's HTML on upgrade.
     """
 
-    heading = CharBlock(
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
         required=False,
-        label=_("Heading"),
-        help_text=_("Signup section heading."),
-    )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
     )
     action_url = URLBlock(
         label=_("Action Network URL"),
@@ -842,7 +3132,7 @@ class SignupActionNetworkBlock(StructBlock):
             "after a successful signup."
         ),
     )
-    anchor_id = CharBlock(
+    anchor_id = IdentifierBlock(
         required=False,
         label=_("Anchor ID"),
         help_text=_(
@@ -883,58 +3173,794 @@ class SignupActionNetworkBlock(StructBlock):
         icon = "form"
         label = _("Sign Up (Action Network)")
         template = "wtrx/components/streamfield/blocks/signup_action_network_block.html"
+        description = _(
+            "An Action Network form embedded in the page, from its public URL. "
+            "Supporters sign up without leaving the site."
+        )
+        preview_value = {
+            "content": (
+                "<h2>Add your name</h2>"
+                "<p>Join supporters around the world calling for an end to fossil fuel expansion.</p>"
+            ),
+            "action_url": "https://actionnetwork.org/forms/example-petition",
+        }
 
 
-class SignupLinkBlock(StructBlock):
+class PostSignupDonationBlock(StructBlock):
     """
-    A simple link-out signup CTA.
+    Optional Fundraise Up checkout opened after a successful ActionKit signup,
+    shared by SignupActionKitBlock and HeroSignupActionKitBlock.
 
-    Renders a heading, optional description, and a button that links to an
-    external signup URL. Use when the signup form is hosted elsewhere.
+    When a campaign code is set (and the Fundraise Up integration is enabled),
+    a successful signup hides the form and calls Fundraise Up's own
+    `FundraiseUp.openCheckout()` JS API in place of showing the block's
+    success message, prefilling the donor's name and email from the signup
+    form. A campaign code (a Fundraise Up campaign, e.g. FUNXXXXXXXX) is a
+    different thing from the element IDs DonateFundraiseUpBlock embeds — an
+    element renders inline, a campaign opens the checkout modal. If Fundraise
+    Up's script isn't on the page (integration disabled, live preview), the
+    success message shows as before.
+
+    The campaign can differ by the visitor's country: `campaign_code_us` and
+    `campaign_code_ca` each fall back to `campaign_code` (rest of world) when
+    blank. The country is resolved client-side, the same way
+    DonateFundraiseUpBlock does it (Cloudflare's /cdn-cgi/trace), so the
+    cached page stays identical for every visitor. `campaign_code` keeps its
+    original name, so blocks saved before the regional fields existed behave
+    exactly as before. Unlike DonateFundraiseUpBlock's overrides there is no
+    site-wide value underneath these — Settings > Integrations holds form IDs,
+    not campaign codes.
+
+    Meta.collapsed=True for the same reason as
+    FundraiseUpAdvancedSettingsBlock: most signup blocks never use it.
     """
 
-    heading = CharBlock(
+    campaign_code_us = IdentifierBlock(
         required=False,
-        label=_("Heading"),
-        help_text=_("Signup section heading."),
+        label=_("Campaign code — United States visitors"),
+        help_text=_(
+            "Optional. Fundraise Up campaign opened for visitors in the "
+            "United States. Leave blank to use the rest of world campaign."
+        ),
     )
-    description = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
+    campaign_code_ca = IdentifierBlock(
         required=False,
-        label=_("Description"),
-        help_text=_("Optional supporting text below the heading."),
+        label=_("Campaign code — Canada visitors"),
+        help_text=_(
+            "Optional. Fundraise Up campaign opened for visitors in Canada. "
+            "Leave blank to use the rest of world campaign."
+        ),
     )
-    button_text = CharBlock(
+    campaign_code = IdentifierBlock(
         required=False,
-        default=_("Sign Up"),
-        label=_("Button text"),
-        help_text=_("Leave blank to use the site default button label."),
+        label=_("Campaign code — rest of world"),
+        help_text=_(
+            "Optional. When set, a successful signup opens this Fundraise Up "
+            "campaign's donation checkout instead of showing the success "
+            "message. Used for every visitor without a country-specific "
+            "campaign above, and whenever the visitor's country can't be "
+            "determined. Use the campaign's code from Fundraise Up > Campaigns "
+            "(starts with FUN, e.g. FUNABCDEFGH) — not a Form ID like the "
+            "ones in Settings > Integrations, which won't open anything. "
+            "Requires the Fundraise Up integration to be enabled."
+        ),
     )
-    external_url = URLBlock(
-        label=_("External URL"),
-        help_text=_("The external signup URL."),
+    designation_id = IdentifierBlock(
+        required=False,
+        label=_("Designation ID"),
+        help_text=_("Optional Fundraise Up designation ID to route the donation to a specific fund."),
     )
-    anchor_id = CharBlock(
+
+    class Meta:
+        icon = "pick"
+        label = _("Donation after signup")
+        collapsed = True
+
+
+class SignupActionKitFormMixin:
+    """
+    Shared logic (no fields) for both SignupActionKitBlock (body/section
+    panel, with a heading/copy `content` field) and HeroSignupActionKitBlock
+    (the hero's inline CTA strip, which has no `content` field — see
+    HeroSignupActionKitBlock's docstring). Not a Block subclass itself, so
+    Wagtail's DeclarativeSubBlocksMetaclass never picks it up as a source of
+    child blocks — only fields declared directly on the two concrete classes
+    below apply.
+
+    Auto-renders an ActionKit page's own signup form.
+
+    Editors provide only the ActionKit page's short name. The block fetches
+    that page's form via ActionKit's ``form_only=1&abs_urls=1`` embed
+    mechanism (see wtrx.integrations.actionkit.fetch_embed_form_html) and
+    renders the returned HTML fragment directly — whatever fields that page
+    is actually configured with (name, email, custom survey questions, etc.)
+    show up automatically; nothing here enumerates them. The fragment has no
+    ActionKit page chrome or stylesheet, so styling is entirely ours, via CSS
+    targeting ActionKit's own semantic classes (each field wraps in a
+    ``{name}_box`` div carrying ``input-text``/``input-select``; text inputs
+    carry ``ak-userfield-input``; see main.css's .wtr-actionkit-embed-inline
+    rules, verified against a real fetched form).
+
+    The fetched HTML — and fetch failures — are cached, since a fetch hits
+    ActionKit's live server on every call. A failed fetch renders a fallback
+    message instead of breaking the page.
+    """
+
+    # Which panel fills the fetched ActionKit form's own chrome has to react
+    # to, mapped to the .wtr-ak-{tone} modifier class _actionkit_form.html
+    # puts on the embed wrapper (see main.css). The form's default chrome —
+    # a blue submit button and a --color-dark fine-print box — only reads
+    # correctly against a panel that is neither of those colors, which is
+    # navy and red; those two are deliberately absent here and take no
+    # modifier. The rest each collide with one piece of that chrome:
+    # "dark-grey" hides the fine-print box, "blue-gradient" hides the submit
+    # button and the checkbox/radio accent, and the two light fills invert the
+    # panel's own text, so the form's light-on-color labels have to invert
+    # with them.
+    #
+    # The two light fills get *separate* tones even though they share that
+    # text inversion, because the field boxes have to move in opposite
+    # directions to stay legible as a distinct surface. Their default fill is
+    # --color-neutral-50, which reads against light grey's --color-neutral-100
+    # only barely (the two are one step apart on the same neutral ramp — see
+    # main.css's .wtr-bg-light-grey), so "on-light" lifts the boxes to pure
+    # white — but the white panel *is* pure white, where that same rule would
+    # erase the boxes into the panel and leave only their hairline border.
+    # "on-white" therefore keeps the neutral-50 default and takes the text
+    # inversion alone.
+    #
+    # Keys are canonical BACKGROUND_COLOR_CHOICES keys — the lookup below
+    # runs the stored value through resolve_background() first, so a panel
+    # still holding the pre-palette "dark" key gets the "on-dark" chrome
+    # rather than silently falling through to no modifier at all.
+    PANEL_TONES = {
+        "dark-grey": "on-dark",
+        "blue-gradient": "on-primary",
+        "light-grey": "on-light",
+        "white": "on-white",
+    }
+
+    # Fetch-and-cache logic used to live here as _fetch_form_html(); moved to
+    # actionkit.fetch_and_cache_embed_form_html() so the footer newsletter
+    # signup box (which also auto-renders a fetched ActionKit form, but has
+    # no StreamField block of its own) shares the same cache key format and
+    # retry window instead of keeping a second copy of this logic — see that
+    # function's docstring in wtrx/integrations/actionkit.py.
+
+    #: Stand-in for the real ActionKit form in the block picker preview.
+    #: The live block fetches its form markup from the client's ActionKit
+    #: instance; doing that to render a preview would put third-party traffic
+    #: behind every click in the picker, and fail entirely offline or before
+    #: the integration is configured. The fields mirror a default ActionKit
+    #: signup form closely enough to show an editor what the block looks like.
+    PREVIEW_FORM_HTML = (
+        '<form class="ak-form" onsubmit="return false">'
+        '<div class="ak-field"><label>Email</label>'
+        '<input type="email" value="you@example.org" readonly></div>'
+        '<div class="ak-field"><label>First name</label>'
+        '<input type="text" value="Jane" readonly></div>'
+        '<div class="ak-field"><label>Last name</label>'
+        '<input type="text" value="Doe" readonly></div>'
+        '<div class="ak-field"><label>Country</label>'
+        '<select disabled><option>United States</option></select></div>'
+        '<button type="submit" class="ak-submit">Sign the petition</button>'
+        "</form>"
+    )
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        short_form_id = value.get("short_form_id", "")
+
+        request = (parent_context or {}).get("request")
+        hostname = ""
+        fundraiseup_config = None
+        if request is not None:
+            try:
+                integration_settings = IntegrationSettings.for_request(request)
+                config = integration_settings.get_integration_config("actionkit")
+                hostname = config.get("hostname", "") if config else ""
+                fundraiseup_config = integration_settings.get_integration_config("fundraiseup")
+            except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+                hostname = ""
+
+        # Only hand the campaign to the template when Fundraise Up's script
+        # will actually be in <head> — otherwise the form would vanish on
+        # success with nothing opening in its place.
+        donation = value.get("post_signup_donation") or {}
+
+        def campaign(field_name):
+            return (donation.get(field_name) or "") if fundraiseup_config else ""
+
+        # Rest of world, and the fallback for either country left blank.
+        campaign_code = campaign("campaign_code")
+        ctx["fundraiseup_campaign_code"] = campaign_code
+        ctx["fundraiseup_campaign_code_us"] = campaign("campaign_code_us") or campaign_code
+        ctx["fundraiseup_campaign_code_ca"] = campaign("campaign_code_ca") or campaign_code
+        has_campaign = bool(
+            campaign_code or ctx["fundraiseup_campaign_code_us"] or ctx["fundraiseup_campaign_code_ca"]
+        )
+        ctx["fundraiseup_designation_id"] = (donation.get("designation_id") or "") if has_campaign else ""
+
+        form_html = None
+        if (parent_context or {}).get("is_block_preview"):
+            # Never reach out to ActionKit to draw a block picker preview. The
+            # harvest captures the real form markup once (see
+            # `manage.py harvest_block_previews`) so the preview matches the
+            # page it came from; PREVIEW_FORM_HTML covers the case where it
+            # could not be captured.
+            entry = self._harvested_entry() or {}
+            form_html = entry.get("form_html") or self.PREVIEW_FORM_HTML
+        elif hostname and short_form_id:
+            form_html = actionkit.fetch_and_cache_embed_form_html(hostname, short_form_id)
+
+        # ActionKit's own intro copy (pretitle/title/description, and a
+        # petition's full text) is lifted out of the fragment rather than
+        # hidden in it, so the left-hand column can fall back to it when the
+        # editor leaves `content` blank — see _actionkit_intro.html.
+        ak_intro, form_html = actionkit.split_action_header(form_html)
+        if not (parent_context or {}).get("is_block_preview"):
+            form_html = actionkit.uniquify_form_ids(form_html, request)
+        ctx["ak_intro"] = ak_intro
+        ctx["form_html"] = form_html
+        # Wagtail's live-preview iframe, as on DonateFundraiseUpBlock: where
+        # ActionKit's copy or form has nothing to show, the templates mark the
+        # spot for the editor instead of leaving it empty.
+        ctx["is_page_preview"] = bool(request is not None and getattr(request, "is_preview", False))
+        ctx["actionkit_base_url"] = actionkit.base_url(hostname) if hostname else ""
+        # Needed client-side (not just server-side, where it already drove
+        # the form_html fetch above) so _actionkit_form.html's progress-bar
+        # script can hit ActionKit's own /context/<short_form_id> endpoint
+        # itself — see that template for why it can't reuse actionkit.js's
+        # own context-loading path.
+        ctx["short_form_id"] = short_form_id
+        ctx["success_message"] = value.get("success_message")
+        ctx["panel_tone"] = self.PANEL_TONES.get(
+            resolve_background(value.get("background"), default="dark-grey"), ""
+        )
+        return ctx
+
+
+class SignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, StructBlock):
+    """
+    The standalone ActionKit signup panel — see SignupActionKitFormMixin for
+    the shared form-fetching/caching/panel-tone logic.
+
+    `content` used to be two fields — `heading` (CharBlock) and
+    `description` (RichTextBlock), both optional — condensed into this one
+    richtext field, same convention as ImageTextBlock/FeaturePanelBlock.
+    `eyebrow` stays separate — it renders as its own pill, not part of the
+    text flow. Migration 0047_condense_more_heading_text_blocks folded every
+    existing page's heading/description pair into this field's HTML on
+    upgrade.
+
+    Distinct from HeroSignupActionKitBlock (mounted as HeroCTABlock's
+    "signup" choice): that one has no `content` field at all — the hero's
+    compact inline strip never rendered it, and the fields are otherwise
+    identical (both classes reuse SignupActionKitFormMixin).
+    """
+
+    eyebrow = CharBlock(
+        required=False,
+        label=_("Eyebrow"),
+        help_text=_(
+            "Optional short label shown as a pill above the heading "
+            "(e.g. 'Sign the Petition'). If Content is also left blank, the "
+            "ActionKit page's own pretitle is used."
+        ),
+    )
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        required=False,
+        label=_("Content"),
+        help_text=_(
+            "Type your heading as an H2 at the top, then optional supporting "
+            "copy, shown beside the ActionKit form. Leave blank to use the "
+            "ActionKit page's own title and description instead."
+        ),
+    )
+    background = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="dark-grey",
+        label=_("Background"),
+        help_text=_(
+            "Panel fill behind the heading, copy and form. The same palette "
+            "as the page hero banner, callout and section blocks."
+        ),
+    )
+    layout = ChoiceBlock(
+        choices=[
+            ("columns", _("Side by side")),
+            ("vertical", _("Stacked vertically")),
+        ],
+        default="columns",
+        label=_("Layout"),
+        help_text=_(
+            "Side by side splits copy and form into two columns (default). "
+            "Stacked vertically runs image, copy and form down a single "
+            "narrow column — better for long forms with many fields."
+        ),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
+    )
+    short_form_id = IdentifierBlock(
+        label=_("ActionKit Page Shortname"),
+        help_text=_(
+            "The ActionKit page's short name (e.g. 'join'). Its signup form "
+            "is fetched from ActionKit and rendered automatically — whatever "
+            "fields that page is configured with will appear, with no further "
+            "setup needed here."
+        ),
+    )
+    anchor_id = IdentifierBlock(
         required=False,
         label=_("Anchor ID"),
         help_text=_(
             "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
         ),
     )
+    success_message = SuccessMessageBlock(
+        required=False,
+        label=_("Success message"),
+        help_text=_(
+            "Optional. When set, a successful signup shows this message in "
+            "place of the form instead of redirecting to ActionKit's own "
+            "thank-you page."
+        ),
+    )
+    post_signup_donation = PostSignupDonationBlock(
+        required=False,
+        label=_("Donation after signup"),
+    )
 
     class Meta:
-        icon = "link"
-        label = _("Sign Up (Link)")
-        template = "wtrx/components/streamfield/blocks/signup_link_block.html"
+        icon = "form"
+        label = _("Sign Up (ActionKit)")
+        template = "wtrx/components/streamfield/blocks/signup_actionkit_block.html"
+
+
+class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, StructBlock):
+    """
+    The hero's inline ActionKit CTA strip — HeroCTABlock's "signup" choice
+    (components/hero.html). See SignupActionKitFormMixin for the shared
+    form-fetching/caching/panel-tone logic.
+
+    No `content` field: the hero's compact rendering is a single-line strip
+    sitting directly in the hero's own dark overlay, with no room (and no
+    real use in practice — every existing hero CTA signup panel has always
+    left it blank) for a heading/copy above the form. Use SignupActionKitBlock
+    (the standalone body/section panel) when a heading is actually needed.
+    Every other field carries over unchanged from SignupActionKitBlock,
+    including ones the hero's compact template doesn't currently render
+    (e.g. `eyebrow`) — only `content` was asked to go.
+    """
+
+    eyebrow = CharBlock(
+        required=False,
+        label=_("Eyebrow"),
+        help_text=_(
+            "Optional short label shown as a pill above the heading "
+            "(e.g. 'Sign the Petition')."
+        ),
+    )
+    background = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="dark-grey",
+        label=_("Background"),
+        help_text=_(
+            "Panel fill behind the heading, copy and form. The same palette "
+            "as the page hero banner, callout and section blocks."
+        ),
+    )
+    layout = ChoiceBlock(
+        choices=[
+            ("columns", _("Side by side")),
+            ("vertical", _("Stacked vertically")),
+        ],
+        default="columns",
+        label=_("Layout"),
+        help_text=_(
+            "Side by side splits copy and form into two columns (default). "
+            "Stacked vertically runs image, copy and form down a single "
+            "narrow column — better for long forms with many fields."
+        ),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_("Optional caption overlaid on the image, e.g. a photo credit."),
+    )
+    short_form_id = IdentifierBlock(
+        label=_("ActionKit Page Shortname"),
+        help_text=_(
+            "The ActionKit page's short name (e.g. 'join'). Its signup form "
+            "is fetched from ActionKit and rendered automatically — whatever "
+            "fields that page is configured with will appear, with no further "
+            "setup needed here."
+        ),
+    )
+    anchor_id = IdentifierBlock(
+        required=False,
+        label=_("Anchor ID"),
+        help_text=_(
+            "Optional. Adds an id attribute for deep-linking (e.g. 'contact' → #contact)."
+        ),
+    )
+    success_message = SuccessMessageBlock(
+        required=False,
+        label=_("Success message"),
+        help_text=_(
+            "Optional. When set, a successful signup shows this message in "
+            "place of the form instead of redirecting to ActionKit's own "
+            "thank-you page."
+        ),
+    )
+    post_signup_donation = PostSignupDonationBlock(
+        required=False,
+        label=_("Donation after signup"),
+    )
+
+    class Meta:
+        icon = "form"
+        label = _("Sign Up (ActionKit)")
+        template = "wtrx/components/streamfield/blocks/signup_actionkit_hero_block.html"
 
 
 # ---------------------------------------------------------------------------
-# Layout blocks continued — SectionBlock is defined here (after action blocks)
-# so its nested StreamBlock can instantiate DonateBlock and the signup classes.
+# Layout blocks continued — AnnouncementBarBlock, HeroCTABlock, HeroBlock,
+# and SectionBlock are defined here (after action blocks) so their
+# nested/optional fields can instantiate DonateBlock and the signup classes.
 # ---------------------------------------------------------------------------
 
 
-class SectionContentBlock(StreamBlock):
+class AnnouncementBarBlock(StructBlock):
+    """
+    A small badge/pill CTA, e.g. "Help 350.org turn things around for our
+    climate." One of HeroCTABlock's choices — currently commented out
+    there (see that class's docstring), so this class has no live callers
+    right now, but is kept defined and ready rather than deleted.
+
+    At most one of link_page or link_url may be set; clean() enforces this.
+    """
+
+    text = CharBlock(label=_("Text"))
+    link_page = PageChooserBlock(
+        required=False,
+        label=_("Link page"),
+        help_text=_("Internal link. Set either this or Link URL, not both."),
+    )
+    link_url = URLBlock(
+        required=False,
+        label=_("Link URL"),
+        help_text=_("External link. Set either this or Link page, not both."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        errors = _validate_at_most_one_link(cleaned, {})
+        if errors:
+            raise StructBlockValidationError(block_errors=errors)
+        return cleaned
+
+    class Meta:
+        icon = "info-circle"
+        label = _("Announcement bar")
+        template = "wtrx/components/streamfield/blocks/announcement_bar_block.html"
+
+
+class HeroCTABlock(StreamBlock):
+    """
+    The homepage's ("full" variant) optional call-to-action widget: at most
+    one of a plain link button or a signup bar. min_num=0/max_num=1 make
+    "at most one" a StreamField-level constraint — no clean() needed for it.
+
+    A donate block and an announcement-bar choice used to be offered here
+    too — commented out below (not deleted) per-page 2026-09 review, until
+    they're properly implemented for the hero. This is deliberately a
+    comment-out, not a removal: a live DB audit at the time confirmed no
+    page anywhere had either saved in a hero, so there was never any stored
+    data to preserve — the point is just to keep both `DonateBlock` and
+    `AnnouncementBarBlock` fully defined and ready, so restoring either
+    choice later is a two-line uncomment, not a rebuild from git history.
+    Uncommenting either line changes HeroCTABlock's block_lookup and needs
+    a fresh `makemigrations` the same as any other block-choice change.
+
+    Every non-homepage HeroMixin page type (ContentPage, IndexPage, Blogs)
+    uses BannerHeroCTABlock instead, not this class — see that class's own
+    docstring for why "banner" needed its own StreamBlock rather than just
+    a template-side restriction of this one.
+    """
+
+    button = ButtonBlock()
+    signup = HeroSignupActionKitBlock()
+    # donate = DonateBlock()
+    # announcement = AnnouncementBarBlock()
+
+    class Meta:
+        min_num = 0
+        max_num = 1
+        label = _("Call to action")
+
+
+class BannerHeroCTABlock(StreamBlock):
+    """
+    The "banner" hero variant's call-to-action widget — every HeroMixin
+    page type except HomePage (ContentPage, IndexPage, Blogs) — restricted
+    to a plain link button only.
+
+    Before this class existed, every HeroMixin page type shared one
+    `hero_cta` field/StreamBlock (HeroCTABlock), and the "Add block" picker
+    offered banner pages the same button/signup (formerly also donate/
+    announcement) choices the homepage gets — even though
+    components/hero.html's "banner" branch has only ever rendered the
+    `button` choice, silently no-op'ing anything else an editor picked
+    (see hero.html's own comment). That mismatch is what this class fixes:
+    each concrete HeroMixin subclass gets its own independent `hero_cta`
+    DB column (a normal consequence of HeroMixin being an *abstract* model
+    mixin — overriding a field declared on an abstract base in a concrete
+    subclass is ordinary Django, unlike overriding one from a *concrete*
+    parent), so ContentPage/IndexPage/Blogs can redeclare `hero_cta` to use
+    this restricted StreamBlock instead of HeroMixin's own HeroCTABlock-
+    typed field, and HomePage needs no change at all. A live DB audit
+    before this change confirmed the only hero_cta value ever saved on a
+    banner-variant page was a `button` (or none), so — like removing
+    donate/announcement above — this was a pure schema change, no data
+    migration needed.
+    """
+
+    button = ButtonBlock()
+
+    class Meta:
+        min_num = 0
+        max_num = 1
+        label = _("Call to action")
+
+
+class HeroBlock(StructBlock):
+    """
+    A mid-page hero banner within the StreamField body: headline + optional
+    copy in a solid-color panel beside an optional image, on components/
+    hero.html's "banner" variant (see CalloutBlock for the same 5-color
+    system this reuses).
+
+    Distinct from HeroMixin (which provides the dedicated hero at the top of
+    a page — "full" variant on HomePage, "banner" variant on ContentPage/
+    IndexPage). HeroBlock can appear anywhere in the body, on any page type,
+    and always renders as "banner" — there's no full-viewport option here,
+    so unlike HeroMixin there's no layout field (banner's text-left/image-
+    right structure is fixed) and no cta field (banner never renders one,
+    see components/hero.html).
+
+    headline is line-breaks-only rich text (mirroring HeroMixin). content is richtext
+    for the supporting copy below the headline. Uses the same component
+    template as the page-level hero (components/hero.html) via get_context(),
+    which normalises field names so the template needs no block-type branch
+    logic — only a variant branch.
+    """
+
+    headline = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADLINE,
+        label=_("Headline"),
+        help_text=_("The hero heading text. Press Enter for a line break."),
+    )
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_INLINE,
+        required=False,
+        label=_("Content"),
+        help_text=_("Optional supporting copy below the headline."),
+    )
+    image = ImageChooserBlock(
+        required=False,
+        label=_("Image"),
+    )
+    image_caption = CharBlock(
+        required=False,
+        label=_("Image caption"),
+        help_text=_("Optional caption overlaid at the bottom of the image, e.g. a photo credit."),
+    )
+    banner_color = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="navy",
+        label=_("Color"),
+    )
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        # Normalise to the same shape expected by components/hero.html.
+        ctx["hero"] = {
+            "variant": "banner",
+            # No pre-header on a mid-body hero: it is a page-opening device
+            # (see HeroMixin.hero_panels), not a section-level one.
+            "pre_header": None,
+            "headline": headline_html(value.get("headline")),
+            "copy": value.get("content"),
+            "copy_is_block": False,
+            "image": value.get("image"),
+            "video": None,  # HeroBlock does not support video; key kept for template contract
+            "image_caption": value.get("image_caption"),
+            "banner_color": value.get("banner_color"),
+            "cta": [],  # banner variant never renders a cta; key kept for template contract
+            "minimal": hero_is_minimal(copy=value.get("content"), video=None, cta=[]),
+            "jumbo": False,
+            # Mid-page HeroBlock, not a page-level HeroMixin hero. Only the
+            # gutter differs: in the body this block sits in a stack with
+            # image/image_text/callout and has to line its edges up with
+            # them, while the page-level hero keeps Figma's flat 16px
+            # wrapper. See components/hero.html.
+            "in_body": True,
+        }
+        return ctx
+
+    class Meta:
+        icon = "image"
+        label = _("Hero")
+        template = "wtrx/components/streamfield/blocks/hero_block.html"
+        description = _(
+            "A full-width banner with a headline, supporting copy and a "
+            "coloured background -- for opening a section mid-page. A page's "
+            "own hero is set on the page itself, not with this block."
+        )
+        preview_value = staticmethod(_hero_preview_value)
+
+
+def _hidden_block_names_for_current_request():
+    """
+    Block type names to exclude from the "Add block" picker for the site
+    currently being edited, per IntegrationSettings.
+
+    Reads wtrx.request_context.get_current_request() because Wagtail's
+    StreamBlockAdapter.js_args() -- which grouped_child_blocks()/
+    ordered_child_blocks() ultimately feed -- is called with no request
+    argument. See IntegrationGatedStreamBlockMixin below and
+    wtrx/request_context.py.
+
+    Deliberately returns an empty set (show everything) rather than raising
+    whenever there's no usable request/site context -- a management command
+    or test rendering a block with no request in scope should never crash
+    or silently hide content; per AGENTS.md's Error Handling conventions,
+    "nothing configured" degrades to "show everything," not an error.
+    """
+    from wagtail.models import Site
+
+    from wtrx.integrations.registry import all_integrations
+    from wtrx.request_context import get_current_request
+    from wtrx.site_settings import IntegrationSettings
+
+    request = get_current_request()
+    if request is None:
+        return frozenset()
+    try:
+        integration = IntegrationSettings.for_request(request)
+    except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+        return frozenset()
+    return frozenset(
+        block_name
+        for integration_type in all_integrations()
+        if not integration.is_integration_enabled(integration_type.slug)
+        for block_name in integration_type.content_block_names
+    )
+
+
+class IntegrationGatedStreamBlockMixin:
+    """
+    Mixin for BodyStreamBlock/SectionContentBlock: filters the "Add block"
+    picker to exclude block types gated by a disabled integration.
+
+    ordered_child_blocks()/grouped_child_blocks() are used by Wagtail core in
+    exactly one place server-side -- StreamBlockAdapter.js_args(), which
+    builds the JS StreamField widget's block-def payload. child_blocks
+    itself, which every other server-side path (value_from_datadict,
+    deserialization, rendering an already-placed block) reads directly, is
+    never touched.
+
+    That was originally believed to be the whole story, but the client-side
+    half of js_args()'s payload has two separate consumers, not one: the
+    "Add block" picker (StreamBlock.getBlockGroups(), which just reads
+    groupedChildBlockDefs back) *and* StreamBlockDefinition's own
+    constructor, which builds its childBlockDefsByName lookup from that same
+    (gated) groupedChildBlockDefs argument -- and childBlockDefsByName is
+    what an *already-placed* block's own hydration/insert() looks itself up
+    in when the widget loads a page's existing value, not just what the
+    picker offers to add. Filtering ordered_child_blocks() therefore also
+    broke loading any existing instance of a gated block once its
+    integration was disabled -- the widget crashed
+    (TypeError: Cannot read properties of undefined (reading 'name')) and
+    silently dropped that block and everything after it in the stream on
+    the next save. This is exactly what happened to /info/how-to-give/
+    (page 64) on 2026-09-01.
+
+    GatedStreamBlockAdapter (registered against SectionContentBlock and
+    BodyStreamBlock specifically, below) is the actual fix for that half —
+    it sends the JS layer the FULL ungated block-def list for
+    childBlockDefsByName, plus a separate hidden-names list a small client-
+    side subclass (wtrx/static/wtrx/admin/gated-stream-block.js) uses to
+    narrow the picker's own view afterwards. This mixin's
+    ordered_child_blocks() override still exists and is still correct for
+    every other server-side purpose (value_from_datadict, deserialization,
+    rendering), and the "always registered, only hidden from being added"
+    contract architecture rule #4 requires is now actually true end to end,
+    not just on the Python side.
+
+    Must appear before StreamBlock in the MRO so this plain method isn't
+    shadowed, but declares no Block-type class attributes itself, so it
+    plays no part in DeclarativeSubBlocksMetaclass's field collection
+    (architecture rule #9) — a fork subclassing BodyStreamBlock/
+    SectionContentBlock doesn't need to know this mixin exists.
+    """
+
+    def ordered_child_blocks(self):
+        blocks = super().ordered_child_blocks()
+        hidden = _hidden_block_names_for_current_request()
+        if not hidden:
+            return blocks
+        return [b for b in blocks if b.name not in hidden]
+
+
+class GatedStreamBlockAdapter(StreamBlockAdapter):
+    """
+    Telepath adapter for BodyStreamBlock/SectionContentBlock, registered
+    below (telepath's registry.find_adapter() walks the MRO, so this takes
+    precedence over the base StreamBlockAdapter registered for StreamBlock
+    itself -- see telepath.AdapterRegistry.find_adapter()).
+
+    Closes a gap IntegrationGatedStreamBlockMixin's own docstring didn't
+    account for: ordered_child_blocks()/grouped_child_blocks() aren't read
+    *only* by the "Add block" picker. StreamBlockAdapter.js_args() (the
+    base class) passes the same gated grouped_child_blocks() as the JS
+    StreamBlockDefinition constructor's groupedChildBlockDefs argument, and
+    that constructor builds its childBlockDefsByName lookup solely from
+    that argument (see the compiled wagtailadmin/js/telepath/blocks.js --
+    class J). childBlockDefsByName is what an *already-placed* block's own
+    insert()/hydration looks itself up in when the StreamField widget loads
+    a page's existing value, not just what the picker offers to add --
+    so a block placed while its integration was enabled crashed the widget
+    (TypeError: Cannot read properties of undefined (reading 'name')) the
+    moment that integration was later disabled, silently discarding that
+    block and everything after it in the stream on the next save. This is
+    exactly what happened to /info/how-to-give/ (page 64) on 2026-09-01.
+
+    Fix: pass the FULL (ungated) grouped child blocks here so
+    childBlockDefsByName is always complete, plus a separate list of
+    currently-hidden block names, and let a small client-side subclass
+    (wtrx/static/wtrx/admin/gated-stream-block.js) filter the picker's own
+    view from that list *after* the full lookup table is built -- see that
+    file for the other half of this fix.
+    """
+
+    js_constructor = "wtrx.blocks.GatedStreamBlock"
+
+    def js_args(self, block):
+        args = super().js_args(block)
+        # Rebuild grouped_child_blocks() against every real child block,
+        # ungated: StreamBlock.ordered_child_blocks() is called on the base
+        # class rather than through `block`'s own (gated) MRO, then grouped
+        # the same way Wagtail's own grouped_child_blocks() does (groups in
+        # first-appearance order, returned as dict items).
+        grouped = {}
+        for child_block in StreamBlock.ordered_child_blocks(block):
+            grouped.setdefault(child_block.meta.group, []).append(child_block)
+        args[1] = grouped.items()
+        args.append(sorted(_hidden_block_names_for_current_request()))
+        return args
+
+    @cached_property
+    def media(self):
+        return super().media + forms.Media(
+            js=[versioned_static("wtrx/admin/gated-stream-block.js")]
+        )
+
+
+class SectionContentBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     """
     StreamBlock used inside SectionBlock.
 
@@ -950,28 +3976,41 @@ class SectionContentBlock(StreamBlock):
     """
 
     text = TextBlock()
+    lead_text = LeadTextBlock()
+    heading = HeadingBlock()
+    spacer = SpacerBlock()
     image = ImageBlock()
     video = VideoBlock()
     button = ButtonBlock()
+    button_group = ButtonGroupBlock()
     quote = QuoteBlock()
     raw_html = RawHTMLBlock()
     table = TableBlock()
     card = CardBlock()
     person_card = PersonCardBlock()
+    person_card_grid = PersonCardGridBlock()
     card_grid = CardGridBlock()
+    image_grid = ImageGridBlock()
+    logo_grid = LogoGridBlock()
+    image_card_list = ImageCardListBlock()
+    image_text = ImageTextBlock()
+    feature_panel = FeaturePanelBlock()
+    card_carousel = CardCarouselBlock()
+    page_cards = PageCardsBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
     hero = HeroBlock()
     donate = DonateBlock()
+    donate_fundraiseup = DonateFundraiseUpBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
-    signup_link = SignupLinkBlock()
+    signup_actionkit = SignupActionKitBlock()
 
     class Meta:
         label = _("Content")
 
 
-class SectionBlock(StructBlock):
+class SectionBlock(ContentPreviewMixin, StructBlock):
     """
     A full-width page section with configurable background, padding, and content.
 
@@ -986,16 +4025,29 @@ class SectionBlock(StructBlock):
 
     content = SectionContentBlock()
     background = ChoiceBlock(
-        choices=SECTION_BACKGROUND_CHOICES,
-        default="light",
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="white",
         label=_("Background"),
+        help_text=_(
+            "Full-bleed fill behind the whole section. The dark colors "
+            "invert the text inside it."
+        ),
     )
     padding = ChoiceBlock(
         choices=SECTION_PADDING_CHOICES,
         default="md",
         label=_("Padding"),
     )
-    anchor_id = CharBlock(
+    width = ChoiceBlock(
+        choices=SECTION_WIDTH_CHOICES,
+        default="default",
+        label=_("Content width"),
+        help_text=_(
+            "How wide the section's content column is. Narrow suits a text + "
+            "accordion stack; wide suits a full-bleed video or image."
+        ),
+    )
+    anchor_id = IdentifierBlock(
         required=False,
         label=_("Anchor ID"),
         help_text=_(
@@ -1009,40 +4061,178 @@ class SectionBlock(StructBlock):
         template = "wtrx/components/streamfield/blocks/section_block.html"
 
 
+class TimelineYearContentBlock(SectionContentBlock):
+    """
+    StreamBlock used inside one TimelineYearBlock.
+
+    A named subclass (not a direct reuse of SectionContentBlock) so a fork
+    can override a child block inside a timeline year independently of
+    SectionBlock's own content list — same DeclarativeSubBlocksMetaclass
+    MRO-merge pattern as SectionContentBlock itself (architecture rule #9).
+    Starts out identical: every block type a Section can hold, a timeline
+    year can hold too, including `accordion` — that's what a "victory" list
+    (see import_350_our_impact.py) becomes.
+
+    `timeline` is deliberately NOT one of those block types — TimelineBlock
+    is registered only on BodyStreamBlock, the same "prevent infinite
+    nesting" treatment SectionContentBlock already gives `section` itself
+    (rule #9), and the only way to break the class-definition-order cycle
+    this file would otherwise have (TimelineYearContentBlock needs
+    SectionContentBlock defined first; SectionContentBlock would need
+    TimelineBlock defined first to reference it back).
+    """
+
+    class Meta:
+        label = _("Content")
+
+
+class TimelineYearBlock(StructBlock):
+    """
+    One year in a TimelineBlock. No separate heading field — the editor
+    types the year's thematic title as an h2 inside `content`, same
+    condensed-heading convention every other block in this file now follows
+    (AGENTS.md pitfall #46).
+    """
+
+    year = IdentifierBlock(
+        max_length=9,
+        label=_("Year"),
+        help_text=_("E.g. '2019'. Used to build the year-jump navigation and this year's anchor link."),
+    )
+    content = TimelineYearContentBlock()
+
+    class Meta:
+        icon = "date"
+        label = _("Year")
+
+
+def _timeline_preview_value():
+    """
+    Placeholder value for TimelineBlock's picker preview. Not
+    ContentPreviewMixin: no real page uses this brand-new block yet, so
+    there is nothing to harvest (AGENTS.md pitfall #45) — until
+    import_350_our_impact.py has populated a real page and
+    harvest_block_previews has been re-run.
+    """
+    img = preview_image()
+    return {
+        "years": [
+            {
+                "year": "2019",
+                "content": [
+                    (
+                        "text",
+                        "<h2>Millions strike for the climate</h2>"
+                        "<p>A short summary of the year's key milestone.</p>",
+                    ),
+                    ("image", {"image": img, "alt_text": "", "caption": ""}),
+                ],
+            },
+            {
+                "year": "2021",
+                "content": [
+                    (
+                        "text",
+                        "<h2>Keystone XL is cancelled</h2>"
+                        "<p>A short summary of the year's key milestone.</p>",
+                    ),
+                ],
+            },
+        ],
+    }
+
+
+class TimelineBlock(StructBlock):
+    """
+    A chronological timeline: a list of years, each with its own freely
+    composed content (any SectionContentBlock-shaped block, including
+    `accordion` for a "victories at a glance"-style list). The year-jump
+    navigation at the top is derived from `years` in get_context() — it is
+    never a separately edited field, so it can't drift out of sync with the
+    years actually present.
+
+    Not ContentPreviewMixin: no real page uses this brand-new block yet, so
+    there is nothing to harvest — see _timeline_preview_value() and AGENTS.md
+    pitfall #45. Switching to ContentPreviewMixin is a reasonable follow-up
+    once import_350_our_impact.py has populated a real page and
+    harvest_block_previews has been re-run — but don't combine the two on
+    one block (pitfall #31).
+    """
+
+    years = ListBlock(TimelineYearBlock(), min_num=1, label=_("Years"))
+
+    def get_context(self, value, parent_context=None):
+        context = super().get_context(value, parent_context=parent_context)
+        context["year_nav"] = [
+            {"year": item["year"], "anchor": f"timeline-year-{item['year']}"}
+            for item in value["years"]
+        ]
+        return context
+
+    class Meta:
+        icon = "date"
+        label = _("Timeline")
+        template = "wtrx/components/streamfield/blocks/timeline_block.html"
+        preview_value = staticmethod(_timeline_preview_value)
+
+
 # ---------------------------------------------------------------------------
 # BodyStreamBlock
 # ---------------------------------------------------------------------------
 
 
-class BodyStreamBlock(StreamBlock):
+class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     """
     The main StreamField block used on all page types.
 
     All block types — including all SignupBlock variants — are always
     registered here. Hiding irrelevant variants from editors is controlled
-    via wagtail_hooks.py, which reads IntegrationSettings at request time
-    and injects CSS to hide the block-type buttons. Never omit a block
-    here to hide it.
+    by IntegrationGatedStreamBlockMixin (above), which reads
+    IntegrationSettings at request time and filters the "Add block" picker
+    accordingly. Never omit a block here to hide it — child_blocks (used
+    for parsing/rendering/validating StreamField values) must always
+    contain every block type, or a page that already has one placed will
+    break the moment its integration is disabled.
     """
 
     text = TextBlock()
-    image = ImageBlock()
-    video = VideoBlock()
+    lead_text = LeadTextBlock()
+    heading = HeadingBlock()
+    spacer = SpacerBlock()
+    image = BodyImageBlock()
+    video = BodyVideoBlock()
     button = ButtonBlock()
+    button_group = ButtonGroupBlock()
     quote = QuoteBlock()
     raw_html = RawHTMLBlock()
     table = TableBlock()
     card = CardBlock()
     person_card = PersonCardBlock()
+    person_card_grid = PersonCardGridBlock()
     card_grid = CardGridBlock()
+    image_grid = ImageGridBlock()
+    logo_grid = LogoGridBlock()
+    image_card_list = ImageCardListBlock()
+    image_text = ImageTextBlock()
+    feature_panel = FeaturePanelBlock()
+    card_carousel = CardCarouselBlock()
+    page_cards = PageCardsBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
     hero = HeroBlock()
     section = SectionBlock()
+    timeline = TimelineBlock()
     donate = DonateBlock()
+    donate_fundraiseup = DonateFundraiseUpBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()
     signup_action_network = SignupActionNetworkBlock()
-    signup_link = SignupLinkBlock()
+    signup_actionkit = SignupActionKitBlock()
 
     class Meta:
         icon = "list-ul"
+
+
+# Registered here, after both classes exist, rather than right below
+# GatedStreamBlockAdapter's own definition -- see that class's docstring.
+register(GatedStreamBlockAdapter(), SectionContentBlock)
+register(GatedStreamBlockAdapter(), BodyStreamBlock)

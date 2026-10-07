@@ -6,10 +6,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
+<div class="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8 py-12">
 
     {% if page.intro %}
-        <div class="prose prose-neutral mx-auto max-w-2xl mb-10">
+        <div class="prose prose-neutral mx-auto max-w-2xl mb-10 text-lg sm:text-xl">
             {{ page.intro|richtext }}
         </div>
     {% endif %}
@@ -18,7 +18,7 @@
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {% for child in children %}
                 {% page_as_card child as card %}
-                {% include "wtrx/components/card.html" %}
+                {% include "wtrx/components/card.html" with heading_size="text-2xl" %}
             {% endfor %}
         </div>
 
@@ -28,9 +28,19 @@
     {% endif %}
 
     {% if page.body %}
-        <div class="mt-16 space-y-8">
+        {% comment %}
+        space-y-24 (96px) matches the inter-block spacing convention used
+        by content_page.html/post_page.html's body-block loop — see those
+        files' comments. Only home_page.html stays at the older 128px. IndexPage doesn't special-case wide block types
+        out of this max-w-[800px] wrapper the way those pages do, so wide
+        blocks here are narrower than on other page types; that's a
+        pre-existing IndexPage limitation, not something this fixes.
+        {% endcomment %}
+        <div class="wtr-body-stack mt-16 space-y-24">
             {% for block in page.body %}
-                {% include_block block %}
+                <div data-block-type="{{ block.block_type }}">
+                    {% include_block block %}
+                </div>
             {% endfor %}
         </div>
     {% endif %}

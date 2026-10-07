@@ -1,9 +1,21 @@
-.PHONY: help venv dev build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision
+.PHONY: help venv dev dev-server build build-prod watch migrate createsuperuser setup test load-data build-js build-fonts build-images test-page provision import-db import-media quickstart messages compile-messages locales
+
+# Catalogues are built for the languages that already have one, not for every
+# language in settings -- most are offered in the admin without being served
+# yet, and would otherwise gain 600 empty strings each. Add a new one
+# explicitly: `make messages LOCALES="ja nl"`.
+LOCALE_ARGS = $$(ls locale 2>/dev/null | sed 's/^/--locale=/' | tr '\n' ' ')
+
+TAILWIND := ./node_modules/.bin/tailwindcss
+CSS_IN := ./static_src/css/main.css
+CSS_OUT := ./static_compiled/css/main.css
 
 help:
 	@echo "Available commands:"
+	@echo "  make quickstart                  - Full local dev setup (venv + npm + build + migrate + optional setup)"
 	@echo "  make venv                        - Create .venv and install all dependencies"
-	@echo "  make dev                         - Run development server"
+	@echo "  make dev                         - Run development server + Tailwind watcher"
+	@echo "  make dev-server                  - Run development server only (no CSS watcher)"
 	@echo "  make build                       - Build CSS and JS (development)"
 	@echo "  make build-prod                  - Build CSS and JS (production, minified)"
 	@echo "  make watch                       - Watch and rebuild CSS on change"
@@ -16,8 +28,13 @@ help:
 	@echo "  make test                        - Run test suite"
 	@echo "  make load-data                   - Migrate + load demo fixtures"
 	@echo "  make test-page                   - Create (or refresh) the block test page"
+	@echo "  make locales [LOCALES=\"pt-br fr-fr\"] - Report locales, or create the named ones"
+	@echo "  make messages                    - Update .po translation catalogues from source"
+	@echo "  make compile-messages            - Compile .po catalogues to .mo (needs gettext)"
 	@echo "  make provision SITE=x ENV=y      - Provision AWS S3 bucket + IAM user (ENV: staging|production)"
 	@echo "                 [PROFILE=p]         Optional: AWS CLI profile (default: default)"
+	@echo "  make import-db BACKUP=path       - Restore a Postgres backup into local dev (DB=name, --force via FORCE=1)"
+	@echo "  make import-media BACKUP=path    - Import an object storage media backup into local dev (--force via FORCE=1)"
 
 venv:
 	python3 -m venv .venv
@@ -27,22 +44,34 @@ venv:
 	@echo "Virtual environment ready. Activate with: source .venv/bin/activate"
 
 dev:
-	python manage.py runserver
+	@if [ ! -x "$(TAILWIND)" ]; then \
+		echo "Tailwind CLI not found — run 'npm install' first (or use 'make dev-server')."; \
+		exit 1; \
+	fi
+	@mkdir -p $(dir $(CSS_OUT))
+	@echo "Starting Tailwind watcher + Django dev server (Ctrl-C stops both)..."
+	@$(TAILWIND) -i $(CSS_IN) -o $(CSS_OUT) --watch=always < /dev/null & \
+	CSS_WATCH_PID=$$!; \
+	trap 'kill $$CSS_WATCH_PID 2>/dev/null' EXIT INT TERM; \
+	.venv/bin/python manage.py runserver
+
+dev-server:
+	.venv/bin/python manage.py runserver
 
 build-js:
 	mkdir -p static_compiled/js
 	rm -rf static_compiled/js/*
-	cp -r static_src/js/ static_compiled/
+	cp -r static_src/js/. static_compiled/js/
 
 build-fonts:
 	mkdir -p static_compiled/fonts
 	rm -rf static_compiled/fonts/*
-	cp -r static_src/fonts/ static_compiled/
+	cp -r static_src/fonts/. static_compiled/fonts/
 
 build-images:
 	mkdir -p static_compiled/images
 	rm -rf static_compiled/images/*
-	cp -r static_src/images/ static_compiled/
+	cp -r static_src/images/. static_compiled/images/
 
 build: build-js build-fonts build-images
 	npm run build
@@ -51,30 +80,86 @@ build-prod: build-js build-fonts build-images
 	npm run build:prod
 
 watch:
-	npm run start
+	$(TAILWIND) -i $(CSS_IN) -o $(CSS_OUT) --watch
 
 migrate:
-	python manage.py migrate
+	.venv/bin/python manage.py migrate
 
 createsuperuser:
-	python manage.py createsuperuser
+	.venv/bin/python manage.py createsuperuser
 
 setup:
-	python manage.py setup_site
+	.venv/bin/python manage.py setup_site
 
 test:
-	python manage.py test wtrx wagtail_wtr
+	.venv/bin/python manage.py test wtrx wagtail_wtr
 
 load-data:
-	python manage.py migrate
-	@test -f fixtures/demo.json && python manage.py loaddata fixtures/demo.json || echo "No demo fixtures yet — skipping loaddata"
-	python manage.py collectstatic --noinput
+	.venv/bin/python manage.py migrate
+	@test -f fixtures/demo.json && .venv/bin/python manage.py loaddata fixtures/demo.json || echo "No demo fixtures yet — skipping loaddata"
+	.venv/bin/python manage.py collectstatic --noinput
 
 test-page:
-	python manage.py create_test_page --force
+	.venv/bin/python manage.py create_test_page --force
+
+# Locale rows are created by name, not wholesale: WAGTAIL_CONTENT_LANGUAGES
+# offers every language any 350 site might need, and only a few are real
+# content. With no LOCALES, this reports what exists and what is available.
+locales:
+	.venv/bin/python manage.py bootstrap_locales $(LOCALES)
+
+# UI-chrome translations ({% trans %} in templates, gettext_lazy in Python).
+# Editor-entered content is translated in the admin by wagtail-localize instead
+# — these catalogues never contain page content.
+#
+# Catalogues live in two places, both updated here: locale/ for templates/ and
+# wagtail_wtr/, and wtrx/locale/ for the app (Django finds an app's own
+# catalogue automatically, and wtrx ships as a package).
+# English is the source language and gets no catalogue. wtrx/ is ignored by the
+# project run and handled by its own, so each string lands in exactly one
+# catalogue.
+messages:
+	@mkdir -p locale wtrx/locale
+	@if [ -n "$(LOCALES)" ]; then \
+		for code in $(LOCALES); do mkdir -p locale/$$code wtrx/locale/$$code; done; \
+	fi
+	@LOCALES=$(LOCALE_ARGS); \
+	echo "Updating catalogues for:$$LOCALES"; \
+	.venv/bin/python manage.py makemessages $$LOCALES --no-obsolete \
+		--ignore=node_modules --ignore=.venv --ignore=static_compiled \
+		--ignore=.claude --ignore=wtrx; \
+	cd wtrx && ../.venv/bin/python ../manage.py makemessages $$LOCALES --no-obsolete
+
+# .mo files are build output (gitignored), generated here for local dev and by
+# the Dockerfile for deploys. Needs the gettext binary: apt install gettext.
+compile-messages:
+	.venv/bin/python manage.py compilemessages --ignore=.venv --ignore=node_modules
+
+quickstart: venv
+	npm install
+	$(MAKE) build
+	.venv/bin/python manage.py migrate
+	@echo ""
+	@printf "Run interactive site setup now? [y/N] "; read ans; [ "$${ans}" = "y" ] || [ "$${ans}" = "Y" ] && .venv/bin/python manage.py setup_site || true
+	@echo ""
+	@printf "Create a superuser now? [y/N] "; read ans; [ "$${ans}" = "y" ] || [ "$${ans}" = "Y" ] && .venv/bin/python manage.py createsuperuser || true
+	@echo ""
+	@echo "Setup complete. Activate the venv and start the dev server:"
+	@echo ""
+	@echo "  source .venv/bin/activate"
+	@echo "  make dev"
+	@echo ""
 
 provision:
 	@if [ -z "$(SITE)" ]; then echo "Error: SITE is required. Usage: make provision SITE=mysite ENV=production"; exit 1; fi
 	@bash bin/provision.sh "$(SITE)" "$(ENV)" $(if $(PROFILE),--profile "$(PROFILE)")
+
+import-db:
+	@if [ -z "$(BACKUP)" ]; then echo "Error: BACKUP is required. Usage: make import-db BACKUP=path/to/dump.dump"; exit 1; fi
+	@bash bin/import_db.sh "$(BACKUP)" $(if $(DB),"$(DB)") $(if $(FORCE),--force)
+
+import-media:
+	@if [ -z "$(BACKUP)" ]; then echo "Error: BACKUP is required. Usage: make import-media BACKUP=path/to/media-backup"; exit 1; fi
+	@bash bin/import_media.sh "$(BACKUP)" $(if $(FORCE),--force)
 
 ENV ?= production

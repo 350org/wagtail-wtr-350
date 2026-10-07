@@ -1,24 +1,72 @@
-{% load i18n wagtailimages_tags wagtailcore_tags %}
-<div class="wtr-callout flex flex-col gap-8 {% if value.alignment == 'image-right' %}md:flex-row-reverse{% else %}md:flex-row{% endif %} items-center">
-    <div class="w-full md:w-1/2 overflow-hidden rounded-lg">
-        {% if value.media_file %}
-            <video src="{{ value.media_file.url }}" controls preload="metadata"
-                   class="h-full w-full object-cover"
-                   {% if value.image %}{% image value.image fill-800x600 as poster_img %}poster="{{ poster_img.url }}"{% endif %}>
-            </video>
-        {% elif value.image %}
-            {% image value.image fill-800x600 as img %}
-            <img src="{{ img.url }}" width="{{ img.width }}" height="{{ img.height }}" alt="{{ value.image.title }}" class="h-full w-full object-cover" loading="lazy">
+{% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
+{% comment %}
+Solid-color card: optional heading (H2), optional subheading (H3), optional
+paragraph, optional CTA button, on a background chosen via value.color —
+one of the shared palette in main.css's .wtr-bg-{color} classes, the same
+set the section, feature panel, hero banner and signup panel offer.
+
+Full-bleed-ish width: special-cased in content_page.html/home_page.html
+(alongside section/card_carousel/donate_fundraiseup) to skip the shared
+max-w-5xl wrapper, same w-full-outer / max-w-inner two-tier pattern as
+donate_fundraiseup_block.html — see that file's comment for why a bare
+`50% - 50vw` bleed isn't used instead. Capped at max-w-[932px] (Figma's
+"About 351" card width) — narrower than the max-w-[1500px] used by the
+hero banner/card carousel/donate block, deliberately per design.
+
+No vertical padding on the w-full-outer wrapper — the 128px gap between
+body blocks comes from home_page.html/content_page.html's space-y-32 on
+the block loop, not from here. This div's px-4/6/8 is horizontal gutters
+only.
+
+Text/button color: white and light-grey are the palette's two light
+fills, needing dark text and a dark-outline button instead of light. That
+question is asked once via the `background_is_light` filter and held in
+`on_light` for the whole card — there is no single wrapper element here
+whose class alone flips both the prose and the button (the button is a
+separate include with its own style param), so the variable is read in
+three places, but the colour keys behind it are named only once.
+
+Background image: optional, absolutely positioned behind the text
+(z-index via stacking order — it's a plain z-0 sibling before the
+relative z-10 content, no explicit z-index math needed) at a fixed 20%
+opacity (main.css's .wtr-callout-bg-image) — a subtle texture/watermark
+per the reference design (a giant faint "350" numeral), not a full photo
+background; object-cover so it fills the card regardless of the card's
+own aspect ratio, which the image's own is unlikely to match.
+
+Heading, subheading and paragraph used to be three separate fields; now
+they're one richtext field (`content`, heading as H2, subheading as H3),
+with h2/h3 sizing pinned via .wtr-callout-content in main.css — see
+CalloutBlock's docstring for the field history.
+{% endcomment %}
+{% with on_light=value.color|background_is_light %}
+<div class="w-full px-4 sm:px-6 lg:px-8">
+    <div class="wtr-callout wtr-bg-{{ value.color|background_key }} relative mx-auto max-w-[932px] overflow-hidden rounded-lg px-6 py-10 sm:px-10 sm:py-14">
+        {% if value.image %}
+            {% image value.image fill-1600x900 as bg_img %}
+            <img src="{{ bg_img.url }}" alt="" class="wtr-callout-bg-image absolute inset-0 h-full w-full object-cover" aria-hidden="true">
         {% endif %}
-    </div>
-    <div class="w-full md:w-1/2">
-        <div class="prose prose-neutral max-w-none in-data-[bg=dark]:prose-invert in-data-[bg=primary]:prose-invert in-data-[bg=secondary]:prose-invert">
-            {{ value.content|richtext }}
+        <div class="relative max-w-[804px] {% if on_light %}text-dark{% else %}text-light{% endif %}">
+            {% if value.content %}
+                {% comment %}
+                prose-invert's body color is pinned to pure white centrally,
+                in main.css — see the .prose-invert rule there.
+                {% endcomment %}
+                <div class="wtr-callout-content prose max-w-none text-lg leading-[1.35] sm:text-xl lg:text-2xl
+                            {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
+                    {{ value.content|richtext }}
+                </div>
+            {% endif %}
+            {% if value.link_text %}
+                <div class="mt-6">
+                    {% if on_light %}
+                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline" size="lg" %}
+                    {% else %}
+                        {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="outline-light" size="lg" %}
+                    {% endif %}
+                </div>
+            {% endif %}
         </div>
-        {% if value.link_text %}
-            <div class="mt-6">
-                {% include "wtrx/components/button.html" with text=value.link_text link_page=value.link_page link_url=value.link_url style="primary" %}
-            </div>
-        {% endif %}
     </div>
 </div>
+{% endwith %}

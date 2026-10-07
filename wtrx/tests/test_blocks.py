@@ -1,41 +1,121 @@
 """
 Tests for StreamField blocks.
 
-Content blocks (ButtonBlock, VideoBlock), layout blocks (CalloutBlock,
-HeroBlock, SectionBlock), and action blocks (SignupLinkBlock,
-SignupActionNetworkBlock) are tested here with SimpleTestCase since their
+Content blocks (ButtonBlock, VideoBlock), layout blocks (QuoteBlock,
+HeroBlock, SectionBlock, CardCarouselBlock, CalloutBlock), and action blocks
+(SignupActionNetworkBlock) are tested here with SimpleTestCase since their
 clean() methods don't require a database.
 
-DonateBlock and SignupWagtailFormsBlock have no custom clean() — their fields
-are validated by Wagtail's built-in block validation, so no additional unit
-tests are needed here.
+DonateBlock, DonateFundraiseUpBlock, and SignupWagtailFormsBlock have no
+custom clean() — their fields are validated by Wagtail's built-in block
+validation, so only field-structure tests are needed for them.
+
+CardCarouselBlock and CalloutBlock both reuse the shared
+_validate_at_most_one_link() helper for their clean() methods (same as
+QuoteBlock) — its link/no-link/both-links behavior is exercised generically
+in TestQuoteBlockValidation, so per-block tests here only check field
+structure, not the link-validation logic itself. Both blocks also contain
+ImageChooserBlock fields (CalloutBlock.image, CardCarouselBlock's required
+CarouselCardBlock.image), so — like QuoteBlock — a full block.clean() call
+isn't exercised end-to-end here: resolving a real image PK needs a database,
+which SimpleTestCase doesn't have.
 """
 
+from datetime import timedelta
+import json
+import pathlib
+from unittest.mock import patch
+
+from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.utils import timezone
+from wagtail.blocks import RichTextBlock
+from wagtail.blocks.struct_block import StructBlockValidationError
+from wagtail.models import Page, Site
 
 from wtrx.blocks import (
+    BACKGROUND_COLOR_CHOICES,
+    IMAGE_ALIGNMENT_CHOICES,
+    LEGACY_BACKGROUND_VALUES,
+    LIGHT_BACKGROUND_COLORS,
+    AccordionBlock,
+    AccordionItemBlock,
+    AccordionItemContentBlock,
+    BannerHeroCTABlock,
+    BodyImageBlock,
     BodyStreamBlock,
+    BodyVideoBlock,
     ButtonBlock,
+    ButtonGroupBlock,
     CalloutBlock,
     CardBlock,
+    CardCarouselBlock,
+    CardGridBlock,
+    CarouselCardBlock,
+    DonateBlock,
+    DonateFundraiseUpBlock,
+    FeaturePanelBlock,
+    FundraiseUpAdvancedSettingsBlock,
+    GatedStreamBlockAdapter,
     HeroBlock,
+    HeroCTABlock,
+    HeroSignupActionKitBlock,
+    ImageBlock,
+    ImageCardListBlock,
+    ImageCardListItemBlock,
+    ImageGridBlock,
+    ImageGridItemBlock,
+    HeadingBlock,
+    ImageTextBlock,
+    LeadTextBlock,
+    LogoGridBlock,
+    LogoGridItemBlock,
+    PageCardsBlock,
+    PersonCardBlock,
+    PersonCardGridBlock,
+    QuoteBlock,
+    RAW_HTML_SECURITY_NOTICE,
+    BUTTON_STYLE_CHOICES,
+    RawHTMLBlock,
     SectionBlock,
     SectionContentBlock,
+    SignupActionKitBlock,
     SignupActionNetworkBlock,
-    SignupLinkBlock,
     SuccessMessageBlock,
+    TimelineBlock,
+    TimelineYearBlock,
+    TimelineYearContentBlock,
     VideoBlock,
+    _balanced_rows,
+    _full_rows_merging_lone_remainder,
+    _full_rows_with_balanced_tail,
     _validate_at_most_one_link,
+    background_is_light,
+    hero_is_minimal,
     parse_action_network_url,
+    resolve_background,
 )
+from wtrx.models import BlogCategory, Blogs, ContentPage, HomePage, IndexPage, Post
+from wtrx.request_context import _current_request
+from wtrx.site_settings import IntegrationSettings
 
 
 class TestButtonBlockValidation(SimpleTestCase):
-    """ButtonBlock.clean() must enforce exactly one of link_page or link_url."""
+    """
+    ButtonBlock.clean() must enforce exactly one of link_page, link_url or
+    anchor. anchor exists because link_url is a URLBlock and so cannot hold a
+    bare "#petition" — see ButtonBlock's docstring.
+    """
 
-    def _raw(self, link_url="", text="Click me", style="primary"):
-        return {"text": text, "link_page": None, "link_url": link_url, "style": style}
+    def _raw(self, link_url="", text="Click me", style="primary", anchor=""):
+        return {
+            "text": text,
+            "link_page": None,
+            "link_url": link_url,
+            "anchor": anchor,
+            "style": style,
+        }
 
     def test_valid_with_link_url(self):
         block = ButtonBlock()
@@ -58,6 +138,27 @@ class TestButtonBlockValidation(SimpleTestCase):
             cleaned = block.clean(value)
             self.assertEqual(cleaned["style"], style)
 
+    def test_size_defaults_to_regular(self):
+        block = ButtonBlock()
+        self.assertEqual(block.declared_blocks["size"].meta.default, "regular")
+
+    def test_size_choices(self):
+        # Only two tiers exist -- see BUTTON_SIZE_CHOICES. The third
+        # "small" tier (wtr-btn-sm) was removed rather than exposed here.
+        block = ButtonBlock()
+        choices = dict(block.declared_blocks["size"].field.choices)
+        self.assertEqual(set(choices.keys()), {"regular", "large"})
+
+    def test_all_sizes_accepted(self):
+        block = ButtonBlock()
+        for size in ("regular", "large"):
+            value = block.to_python(
+                self._raw(link_url="https://example.com")
+            )
+            value["size"] = size
+            cleaned = block.clean(value)
+            self.assertEqual(cleaned["size"], size)
+
     def test_text_is_required(self):
         block = ButtonBlock()
         value = block.to_python(
@@ -65,11 +166,202 @@ class TestButtonBlockValidation(SimpleTestCase):
                 "text": "",
                 "link_page": None,
                 "link_url": "https://example.com",
+                "anchor": "",
                 "style": "primary",
             }
         )
         with self.assertRaises(ValidationError):
             block.clean(value)
+
+    def test_valid_with_anchor(self):
+        block = ButtonBlock()
+        value = block.to_python(self._raw(anchor="petition"))
+        cleaned = block.clean(value)
+        self.assertEqual(cleaned["anchor"], "petition")
+
+    def test_invalid_anchor_and_url_raises(self):
+        block = ButtonBlock()
+        value = block.to_python(
+            self._raw(link_url="https://example.com", anchor="petition")
+        )
+        with self.assertRaises(ValidationError):
+            block.clean(value)
+
+
+class TestButtonGroupBlockFields(SimpleTestCase):
+    """ButtonGroupBlock field structure: a ListBlock of 1-5 ButtonBlocks, plus layout."""
+
+    def test_has_expected_fields(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"buttons", "layout"})
+
+    def test_buttons_min_num_is_one(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(block.declared_blocks["buttons"].meta.min_num, 1)
+
+    def test_buttons_max_num_is_five(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(block.declared_blocks["buttons"].meta.max_num, 5)
+
+    def test_buttons_child_block_is_button_block(self):
+        block = ButtonGroupBlock()
+        self.assertIsInstance(block.declared_blocks["buttons"].child_block, ButtonBlock)
+
+    def test_layout_defaults_to_horizontal(self):
+        block = ButtonGroupBlock()
+        self.assertEqual(block.declared_blocks["layout"].meta.default, "horizontal")
+
+    def test_layout_choices(self):
+        block = ButtonGroupBlock()
+        choices = dict(block.declared_blocks["layout"].field.choices)
+        self.assertEqual(set(choices.keys()), {"horizontal", "vertical"})
+
+    def test_max_per_row_is_three(self):
+        self.assertEqual(ButtonGroupBlock.MAX_PER_ROW, 3)
+
+    def test_get_context_computes_rows_for_horizontal(self):
+        block = ButtonGroupBlock()
+        value = {"buttons": [1, 2, 3, 4], "layout": "horizontal"}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [2, 2])
+
+    def test_get_context_has_no_rows_for_vertical(self):
+        block = ButtonGroupBlock()
+        value = {"buttons": [1, 2, 3], "layout": "vertical"}
+        ctx = block.get_context(value, parent_context={})
+        self.assertNotIn("rows", ctx)
+
+
+class TestButtonGroupBlockValidation(SimpleTestCase):
+    """
+    ButtonGroupBlock has no clean() of its own — ButtonBlock.clean() runs
+    per-item automatically via ListBlock.clean(), so an invalid button
+    inside the group still raises.
+    """
+
+    def _button(self, link_url="https://example.com", text="Click me"):
+        return {"text": text, "link_page": None, "link_url": link_url, "anchor": "", "style": "primary"}
+
+    def test_valid_buttons_pass(self):
+        block = ButtonGroupBlock()
+        value = block.to_python({"buttons": [self._button(), self._button(link_url="https://example.org")]})
+        cleaned = block.clean(value)
+        self.assertEqual(len(cleaned["buttons"]), 2)
+
+    def test_invalid_button_in_group_raises(self):
+        block = ButtonGroupBlock()
+        value = block.to_python({"buttons": [self._button(link_url="")]})
+        with self.assertRaises(ValidationError):
+            block.clean(value)
+
+
+class TestRawHTMLBlockValidation(SimpleTestCase):
+    """
+    RawHTMLBlock.clean() rejects HTML with mismatched or unclosed tags.
+    This checks tag balance only — not full HTML5 conformance or markup
+    safety (RawHTMLBlock output is still unsanitized by design).
+    """
+
+    def _clean(self, value):
+        block = RawHTMLBlock()
+        return block.clean(block.to_python(value))
+
+    def test_balanced_html_passes(self):
+        cleaned = self._clean("<div><p>text</p></div>")
+        self.assertEqual(cleaned, "<div><p>text</p></div>")
+
+    def test_unclosed_div_raises(self):
+        with self.assertRaises(ValidationError):
+            self._clean("<div><p>text</p>")
+
+    def test_mismatched_nesting_raises(self):
+        with self.assertRaises(ValidationError):
+            self._clean("<div><p>text</div></p>")
+
+    def test_void_elements_do_not_false_positive(self):
+        cleaned = self._clean('<img src="x"><br><input type="text">')
+        self.assertEqual(cleaned, '<img src="x"><br><input type="text">')
+
+    def test_self_closing_tag_does_not_false_positive(self):
+        cleaned = self._clean("<div/>")
+        self.assertEqual(cleaned, "<div/>")
+
+    def test_script_content_does_not_false_positive(self):
+        html = "<div><script>if (a < b && b > c) { console.log('x'); }</script></div>"
+        cleaned = self._clean(html)
+        self.assertEqual(cleaned, html)
+
+    def test_style_content_does_not_false_positive(self):
+        html = "<div><style>.a > .b { color: red; }</style></div>"
+        cleaned = self._clean(html)
+        self.assertEqual(cleaned, html)
+
+    def test_empty_value_does_not_raise_tag_balance_error(self):
+        # RawHTMLBlock is required by default, so an empty value still
+        # raises -- but for Wagtail's own "this field is required" reason,
+        # not from the tag-balance validator (the `if value and ...` guard
+        # in clean() skips the balance check entirely for a falsy value).
+        block = RawHTMLBlock(required=False)
+        cleaned = block.clean(block.to_python(""))
+        self.assertEqual(cleaned, "")
+
+
+class TestMediaWidthAndCaption(TestCase):
+    """Body-level image/video width choice, and the image caption."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from wagtail.images.tests.utils import get_test_image_file
+
+        from wtrx.images import CustomImage
+
+        cls.image = CustomImage.objects.create(
+            title="Photo", description="A photo", file=get_test_image_file()
+        )
+
+    def _render_image(self, block, **raw):
+        value = block.to_python({"image": self.image.pk, "caption": "A caption", **raw})
+        return block.render(value)
+
+    def test_only_body_blocks_offer_a_width(self):
+        self.assertIn("width", BodyImageBlock().child_blocks)
+        self.assertIn("width", BodyVideoBlock().child_blocks)
+        self.assertNotIn("width", ImageBlock().child_blocks)
+        self.assertNotIn("width", VideoBlock().child_blocks)
+        self.assertNotIn("width", SectionContentBlock().child_blocks["image"].child_blocks)
+
+    def test_body_stream_uses_the_width_variants(self):
+        children = BodyStreamBlock().child_blocks
+        self.assertIsInstance(children["image"], BodyImageBlock)
+        self.assertIsInstance(children["video"], BodyVideoBlock)
+
+    def test_image_defaults_to_full_width(self):
+        html = self._render_image(BodyImageBlock())
+        self.assertIn("max-w-[1500px]", html)
+
+    def test_image_width_choice_sets_the_container(self):
+        html = self._render_image(BodyImageBlock(), width="narrow")
+        self.assertIn("max-w-[800px]", html)
+        self.assertNotIn("max-w-[1500px]", html)
+
+    def test_image_without_a_width_field_keeps_the_full_container(self):
+        self.assertIn("max-w-[1500px]", self._render_image(ImageBlock()))
+
+    def test_caption_renders_below_the_image(self):
+        html = self._render_image(ImageBlock())
+        self.assertIn("A caption", html)
+        self.assertNotIn("wtr-image-caption", html)
+        self.assertLess(html.index("<img"), html.index("A caption"))
+
+    def test_video_container_only_at_body_level(self):
+        raw = {"embed_url": "", "media_file": None, "caption": ""}
+        body = BodyVideoBlock()
+        self.assertEqual(
+            body.get_context(body.to_python(raw))["container_class"],
+            "mx-auto max-w-[800px] px-4 sm:px-6 lg:px-0",
+        )
+        plain = VideoBlock()
+        self.assertIsNone(plain.get_context(plain.to_python(raw))["container_class"])
 
 
 class TestVideoBlockValidation(SimpleTestCase):
@@ -112,9 +404,9 @@ class TestVideoBlockValidation(SimpleTestCase):
         self.assertEqual(cleaned["caption"], "My video caption")
 
 
-class TestCalloutBlockValidation(SimpleTestCase):
+class TestQuoteBlockValidation(SimpleTestCase):
     """
-    CalloutBlock validation: exactly one of image/media_file, at most one link.
+    QuoteBlock validation: exactly one of image/media_file, at most one link.
 
     ImageChooserBlock and VideoChooserBlock both require a DB to resolve
     chooser values, so we cannot call block.clean() end-to-end in
@@ -124,7 +416,7 @@ class TestCalloutBlockValidation(SimpleTestCase):
     """
 
     def _run_media_validation(self, image, media_file):
-        """Mirror the media-exclusivity branch of CalloutBlock.clean()."""
+        """Mirror the media-exclusivity branch of QuoteBlock.clean()."""
         from django.core.exceptions import ValidationError as DjValidationError
         errors = {}
         has_image = bool(image)
@@ -185,7 +477,7 @@ class TestCalloutBlockValidation(SimpleTestCase):
         self.assertIn("media_file", errors)
 
     def test_block_has_expected_fields(self):
-        block = CalloutBlock()
+        block = QuoteBlock()
         self.assertIn("content", block.declared_blocks)
         self.assertIn("image", block.declared_blocks)
         self.assertIn("media_file", block.declared_blocks)
@@ -196,19 +488,31 @@ class TestCalloutBlockValidation(SimpleTestCase):
 
     def test_image_is_optional(self):
         """image must be optional (required=False) to allow media_file instead."""
-        block = CalloutBlock()
+        block = QuoteBlock()
         self.assertFalse(block.declared_blocks["image"].required)
 
     def test_media_file_is_optional(self):
         """media_file must be optional (required=False) to allow image instead."""
-        block = CalloutBlock()
+        block = QuoteBlock()
         self.assertFalse(block.declared_blocks["media_file"].required)
 
     def test_alignment_choices(self):
-        block = CalloutBlock()
+        block = QuoteBlock()
         choices = dict(block.declared_blocks["alignment"].field.choices)
         self.assertIn("image-left", choices)
         self.assertIn("image-right", choices)
+
+    def test_alignment_uses_shared_image_alignment_choices(self):
+        """
+        QuoteBlock and FeaturePanelBlock used to each define their own
+        byte-identical alignment choices list; both now share
+        IMAGE_ALIGNMENT_CHOICES (see wtrx/blocks/__init__.py) so the two
+        can't silently drift apart again.
+        """
+        quote_choices = QuoteBlock().declared_blocks["alignment"].field.choices
+        panel_choices = FeaturePanelBlock().declared_blocks["alignment"].field.choices
+        self.assertEqual(list(quote_choices), list(IMAGE_ALIGNMENT_CHOICES))
+        self.assertEqual(list(panel_choices), list(IMAGE_ALIGNMENT_CHOICES))
 
     # --- link validation (via shared helper) ---
 
@@ -233,37 +537,52 @@ class TestCalloutBlockValidation(SimpleTestCase):
         errors = _validate_at_most_one_link({"link_page": None, "link_url": ""}, {})
         self.assertEqual(errors, {})
 
-
-class TestHeroBlockValidation(SimpleTestCase):
-    """
-    HeroBlock uses the same _validate_at_most_one_link helper.
-
-    HeroBlock has an optional ImageChooserBlock but a required RichTextBlock
-    whose content is hard to construct without a template context. We test
-    the link validation helper directly and verify field structure.
-    """
-
-    def test_both_links_raises(self):
+    def test_anchor_alone_is_allowed_when_declared_as_an_extra_field(self):
         errors = _validate_at_most_one_link(
-            {"link_page": object(), "link_url": "https://example.com"}, {}
-        )
-        self.assertIn("link_page", errors)
-        self.assertIn("link_url", errors)
-
-    def test_only_link_url_no_error(self):
-        errors = _validate_at_most_one_link(
-            {"link_page": None, "link_url": "https://example.com"}, {}
+            {"link_page": None, "link_url": "", "anchor": "petition"},
+            {},
+            extra_fields=("anchor",),
         )
         self.assertEqual(errors, {})
 
+    def test_anchor_conflicts_with_a_page_link(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "", "anchor": "petition"},
+            {},
+            extra_fields=("anchor",),
+        )
+        self.assertEqual(set(errors), {"link_page", "anchor"})
+
+    def test_anchor_is_ignored_by_callers_that_do_not_declare_it(self):
+        """
+        The two-field callers (QuoteBlock, CardCarouselBlock's own CTA)
+        have no anchor field at all, so a stray key must not be treated as
+        a competing link target.
+        """
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "", "anchor": "petition"}, {}
+        )
+        self.assertEqual(errors, {})
+
+
+class TestHeroBlockFields(SimpleTestCase):
+    """
+    HeroBlock has an optional ImageChooserBlock but a required RichTextBlock
+    whose content is hard to construct without a template context. We just
+    verify field structure here.
+    """
+
     def test_block_has_expected_fields(self):
+        """
+        No layout or cta fields — HeroBlock always renders as hero.html's
+        "banner" variant, which has a fixed layout and never renders a cta
+        (see HeroBlock's docstring).
+        """
         block = HeroBlock()
-        self.assertIn("headline", block.declared_blocks)
-        self.assertIn("content", block.declared_blocks)
-        self.assertIn("image", block.declared_blocks)
-        self.assertIn("link_text", block.declared_blocks)
-        self.assertIn("link_page", block.declared_blocks)
-        self.assertIn("link_url", block.declared_blocks)
+        self.assertEqual(
+            set(block.declared_blocks.keys()),
+            {"headline", "content", "image", "image_caption", "banner_color"},
+        )
 
     def test_image_is_not_required(self):
         """The image field should be optional (required=False)."""
@@ -271,52 +590,233 @@ class TestHeroBlockValidation(SimpleTestCase):
         image_block = block.declared_blocks["image"]
         self.assertFalse(image_block.required)
 
+    def test_banner_color_default_is_navy(self):
+        block = HeroBlock()
+        self.assertEqual(block.declared_blocks["banner_color"].meta.default, "navy")
 
-class TestSignupLinkBlockValidation(SimpleTestCase):
-    """SignupLinkBlock requires external_url; heading and anchor_id are optional."""
+    def test_get_context_always_variant_banner(self):
+        block = HeroBlock()
+        value = block.to_python(
+            {"headline": "Take Action", "content": "", "image": None, "banner_color": "red"}
+        )
+        ctx = block.get_context(value)
+        self.assertEqual(ctx["hero"]["variant"], "banner")
+        self.assertEqual(ctx["hero"]["headline"], "Take Action")
+        self.assertEqual(ctx["hero"]["banner_color"], "red")
+        self.assertEqual(ctx["hero"]["cta"], [])
+        self.assertIsNone(ctx["hero"]["video"])
 
-    def _raw(self, heading="Sign Up", external_url="https://example.com"):
-        return {
-            "heading": heading,
-            "description": "",
-            "button_text": "",
-            "external_url": external_url,
-            "anchor_id": "",
-        }
+    def test_get_context_minimal_true_when_headline_only(self):
+        block = HeroBlock()
+        value = block.to_python(
+            {"headline": "Take Action", "content": "", "image": None, "banner_color": "red"}
+        )
+        ctx = block.get_context(value)
+        self.assertTrue(ctx["hero"]["minimal"])
 
-    def test_valid(self):
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw())
-        cleaned = block.clean(value)
-        self.assertEqual(cleaned["external_url"], "https://example.com")
+    def test_get_context_minimal_false_when_content_present(self):
+        block = HeroBlock()
+        value = block.to_python(
+            {
+                "headline": "Take Action",
+                "content": "<p>Some supporting copy.</p>",
+                "image": None,
+                "banner_color": "red",
+            }
+        )
+        ctx = block.get_context(value)
+        self.assertFalse(ctx["hero"]["minimal"])
 
-    def test_heading_optional(self):
-        """heading is now optional — omitting it must not raise."""
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw(heading=""))
-        cleaned = block.clean(value)
-        self.assertEqual(cleaned["heading"], "")
 
-    def test_external_url_required(self):
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw(external_url=""))
-        with self.assertRaises(ValidationError):
-            block.clean(value)
+class TestHeroCTABlock(SimpleTestCase):
+    """
+    HeroCTABlock is HomePage's ("full" variant) hero_cta block type: at
+    most one of button or signup (ActionKit). donate/announcement are
+    commented out as choices here (not deleted -- see the class's own
+    docstring) until properly implemented; every other HeroMixin page type
+    ("banner" variant) uses BannerHeroCTABlock instead -- see
+    TestBannerHeroCTABlock.
+    """
 
-    def test_button_text_optional(self):
-        block = SignupLinkBlock()
-        value = block.to_python(self._raw())
-        cleaned = block.clean(value)
-        self.assertEqual(cleaned["button_text"], "")
+    def test_button_choice_is_button_block(self):
+        block = HeroCTABlock()
+        self.assertIsInstance(block.declared_blocks["button"], ButtonBlock)
 
-    def test_anchor_id_optional(self):
-        block = SignupLinkBlock()
-        self.assertFalse(block.declared_blocks["anchor_id"].required)
+    def test_signup_choice_is_actionkit(self):
+        block = HeroCTABlock()
+        self.assertIsInstance(block.declared_blocks["signup"], HeroSignupActionKitBlock)
 
-    def test_has_expected_fields(self):
-        block = SignupLinkBlock()
-        expected = {"heading", "description", "button_text", "external_url", "anchor_id"}
-        self.assertEqual(set(block.declared_blocks.keys()), expected)
+    def test_signup_choice_has_no_content_field(self):
+        """
+        The hero's inline CTA strip has no room (and no real use in
+        practice) for a heading/copy above the form — see
+        HeroSignupActionKitBlock's docstring.
+        """
+        block = HeroCTABlock()
+        self.assertNotIn("content", block.declared_blocks["signup"].declared_blocks)
+
+    def test_donate_and_announcement_are_not_choices(self):
+        block = HeroCTABlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"button", "signup"})
+
+    def test_at_most_one_item(self):
+        self.assertEqual(HeroCTABlock().meta.max_num, 1)
+
+    def test_zero_items_allowed(self):
+        self.assertEqual(HeroCTABlock().meta.min_num, 0)
+
+
+class TestBannerHeroCTABlock(SimpleTestCase):
+    """
+    BannerHeroCTABlock is the "banner" hero variant's hero_cta block type
+    (ContentPage/IndexPage/Blogs, via their own field override) — button
+    only, since components/hero.html's "banner" branch has only ever
+    rendered that one choice. See the class's own docstring.
+    """
+
+    def test_only_choice_is_button(self):
+        block = BannerHeroCTABlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"button"})
+
+    def test_button_choice_is_button_block(self):
+        block = BannerHeroCTABlock()
+        self.assertIsInstance(block.declared_blocks["button"], ButtonBlock)
+
+    def test_at_most_one_item(self):
+        self.assertEqual(BannerHeroCTABlock().meta.max_num, 1)
+
+    def test_zero_items_allowed(self):
+        self.assertEqual(BannerHeroCTABlock().meta.min_num, 0)
+
+
+class TestSectionBlockWidth(SimpleTestCase):
+    """
+    SectionBlock.width picks the inner content column's measure — see
+    SECTION_WIDTH_CHOICES for why the section owns this rather than each
+    child block.
+    """
+
+    def test_default_is_default(self):
+        block = SectionBlock()
+        self.assertEqual(block.child_blocks["width"].get_default(), "default")
+
+    def test_all_choices_available(self):
+        block = SectionBlock()
+        choices = {value for value, _label in block.child_blocks["width"].field.choices}
+        self.assertEqual(choices, {"narrow", "default", "wide"})
+
+
+class TestSignupActionKitBlockPanelFields(SimpleTestCase):
+    """
+    The eyebrow pill and background fill added for Figma's petition panel
+    (node 1:1239) — see signup_actionkit_block.html.
+    """
+
+    def test_eyebrow_is_optional(self):
+        block = SignupActionKitBlock()
+        self.assertFalse(block.child_blocks["eyebrow"].required)
+
+    def test_background_defaults_to_dark_grey(self):
+        block = SignupActionKitBlock()
+        self.assertEqual(block.child_blocks["background"].get_default(), "dark-grey")
+
+    def test_layout_defaults_to_columns(self):
+        block = SignupActionKitBlock()
+        self.assertEqual(block.child_blocks["layout"].get_default(), "columns")
+
+    def test_layout_choices(self):
+        block = SignupActionKitBlock()
+        choices = dict(block.child_blocks["layout"].field.choices)
+        self.assertEqual(set(choices.keys()), {"columns", "vertical"})
+
+    def test_panel_tones_cover_only_the_colliding_fills(self):
+        """
+        Navy and red take no tone modifier: the stacked form's default
+        chrome (blue submit button, dark fine-print box, light text) already
+        reads against them. The rest each collide with one piece of it —
+        see SignupActionKitBlock.PANEL_TONES.
+
+        The two light fills take *separate* tones despite sharing the text
+        inversion, because the field boxes have to move opposite ways: on
+        light grey they lift to white to stay a distinct surface, and on
+        white that same lift would dissolve them into the panel.
+        """
+        self.assertEqual(
+            SignupActionKitBlock.PANEL_TONES,
+            {
+                "dark-grey": "on-dark",
+                "blue-gradient": "on-primary",
+                "light-grey": "on-light",
+                "white": "on-white",
+            },
+        )
+
+    def test_white_and_light_grey_take_different_tones(self):
+        """
+        Guards the distinction above specifically: collapsing these back to
+        one tone is what made the field boxes invisible on a white panel.
+        """
+        block = SignupActionKitBlock()
+        white = block.get_context({"short_form_id": "ppg", "background": "white"}, parent_context={})
+        light = block.get_context({"short_form_id": "ppg", "background": "light-grey"}, parent_context={})
+        self.assertEqual(white["panel_tone"], "on-white")
+        self.assertEqual(light["panel_tone"], "on-light")
+        self.assertNotEqual(white["panel_tone"], light["panel_tone"])
+
+    def test_every_palette_background_resolves_to_a_defined_tone_or_none(self):
+        """
+        A tone that is not one of the four .wtr-ak-on-* rules in main.css
+        would emit a class matching nothing, silently leaving the form's
+        chrome in its default state on a fill that collides with it.
+        """
+        known_tones = {"on-dark", "on-primary", "on-light", "on-white"}
+        block = SignupActionKitBlock()
+        for key, _label in BACKGROUND_COLOR_CHOICES:
+            tone = block.get_context(
+                {"short_form_id": "ppg", "background": key}, parent_context={}
+            )["panel_tone"]
+            self.assertIn(tone, known_tones | {""}, f"{key} produced an unknown tone {tone!r}")
+
+    def test_get_context_passes_the_panel_tone_for_the_background(self):
+        block = SignupActionKitBlock()
+        value = {"short_form_id": "ppg", "background": "light-grey"}
+        self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "on-light")
+
+    def test_get_context_panel_tone_is_blank_for_uncolliding_backgrounds(self):
+        block = SignupActionKitBlock()
+        value = {"short_form_id": "ppg", "background": "red"}
+        self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "")
+
+    def test_get_context_resolves_the_legacy_dark_key_to_a_tone(self):
+        """
+        A panel saved before the palette merge still stores "dark". It has to
+        reach the same on-dark chrome as "dark-grey" does, not fall through
+        to no modifier at all — see resolve_background().
+        """
+        block = SignupActionKitBlock()
+        value = {"short_form_id": "ppg", "background": "dark"}
+        self.assertEqual(block.get_context(value, parent_context={})["panel_tone"], "on-dark")
+
+
+class TestSignupActionKitBlockContentField(SimpleTestCase):
+    """
+    content (heading+description merged) is optional; eyebrow stays a
+    separate field, since it renders as its own pill.
+    """
+
+    def test_content_is_optional(self):
+        block = SignupActionKitBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = SignupActionKitBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_eyebrow_stays_separate(self):
+        block = SignupActionKitBlock()
+        self.assertIn("eyebrow", block.declared_blocks)
+        self.assertNotIn("heading", block.declared_blocks)
+        self.assertNotIn("description", block.declared_blocks)
 
 
 class TestSectionBlockStructure(SimpleTestCase):
@@ -327,22 +827,35 @@ class TestSectionBlockStructure(SimpleTestCase):
 
     EXPECTED_BLOCK_NAMES = {
         "text",
+        "lead_text",
+        "heading",
         "image",
         "video",
         "button",
+        "button_group",
         "quote",
         "raw_html",
         "table",
         "card",
         "person_card",
+        "person_card_grid",
         "card_grid",
+        "image_grid",
+        "logo_grid",
+        "image_card_list",
+        "image_text",
+        "feature_panel",
+        "card_carousel",
+        "page_cards",
         "accordion",
         "callout",
         "hero",
         "donate",
+        "donate_fundraiseup",
         "signup_wagtail_forms",
         "signup_action_network",
-        "signup_link",
+        "signup_actionkit",
+        "spacer",
     }
 
     def test_content_block_names(self):
@@ -370,12 +883,1750 @@ class TestCardBlockFields(SimpleTestCase):
 
     def test_has_expected_fields(self):
         block = CardBlock()
-        expected = {"icon", "heading", "description", "image", "link_page", "link_url"}
+        expected = {
+            "tag",
+            "icon",
+            "content",
+            "image",
+            "link_page",
+            "link_url",
+            "link_document",
+            "modal",
+            "link_text",
+        }
         self.assertEqual(set(block.declared_blocks.keys()), expected)
 
-    def test_heading_is_required(self):
+    def test_content_is_required(self):
         block = CardBlock()
+        self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_content_supports_h3(self):
+        block = CardBlock()
+        self.assertIn("h3", block.declared_blocks["content"].features)
+
+    def test_content_has_no_document_link_feature(self):
+        """
+        document-link used to live inline in `content` as a Draftail
+        feature; it's now the structured `link_document` field below,
+        alongside link_page/link_url, so it must not also remain here.
+        """
+        block = CardBlock()
+        self.assertNotIn("document-link", block.declared_blocks["content"].features)
+
+    def test_link_document_is_optional(self):
+        block = CardBlock()
+        self.assertFalse(block.declared_blocks["link_document"].required)
+
+    def test_link_document_alone_no_error(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": None, "link_url": "", "link_document": object()},
+            {},
+            extra_fields=("link_document",),
+        )
+        self.assertEqual(errors, {})
+
+    def test_link_document_conflicts_with_link_url(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": None, "link_url": "https://example.com", "link_document": object()},
+            {},
+            extra_fields=("link_document",),
+        )
+        self.assertEqual(set(errors), {"link_url", "link_document"})
+
+    def test_link_document_conflicts_with_link_page(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "", "link_document": object()},
+            {},
+            extra_fields=("link_document",),
+        )
+        self.assertEqual(set(errors), {"link_page", "link_document"})
+
+    def test_modal_is_optional(self):
+        block = CardBlock()
+        self.assertFalse(block.declared_blocks["modal"].required)
+
+    def test_modal_alone_is_valid(self):
+        block = CardBlock()
+        value = block.to_python({
+            "content": "<h3>Stock</h3>",
+            "modal": [{"type": "text", "value": "<p>Transfer details.</p>"}],
+        })
+        block.clean(value)
+
+    def test_modal_conflicts_with_link_url(self):
+        block = CardBlock()
+        value = block.to_python({
+            "content": "<h3>Stock</h3>",
+            "link_url": "https://example.com",
+            "modal": [{"type": "text", "value": "<p>Transfer details.</p>"}],
+        })
+        with self.assertRaises(StructBlockValidationError) as ctx:
+            block.clean(value)
+        self.assertEqual(set(ctx.exception.block_errors), {"link_url", "modal"})
+
+    def test_modal_renders_trigger_and_dialog(self):
+        block = CardBlock()
+        value = block.to_python({
+            "content": "<h3>Stock</h3>",
+            "link_text": "Here's how",
+            "modal": [
+                {"type": "text", "value": "<p>Transfer details.</p>"},
+                {"type": "raw_html", "value": "<div id='widget'></div>"},
+            ],
+        })
+        html = block.render(value)
+        self.assertIn("data-card-modal-trigger", html)
+        self.assertIn("<dialog", html)
+        self.assertIn("Transfer details.", html)
+        self.assertIn("<div id='widget'></div>", html)
+        self.assertNotIn("<a href", html)
+
+
+class TestImageGridItemBlockFields(SimpleTestCase):
+    def test_has_expected_fields(self):
+        block = ImageGridItemBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"image", "alt_text"})
+
+    def test_alt_text_is_optional(self):
+        block = ImageGridItemBlock()
+        self.assertFalse(block.declared_blocks["alt_text"].required)
+
+
+class TestCardGridBlockFields(SimpleTestCase):
+    """
+    CardGridBlock field structure and its dynamic row-balancing via
+    _full_rows_with_balanced_tail() (previously _balanced_rows() -- see
+    AGENTS.md pitfall #44 and _full_rows_with_balanced_tail()'s own
+    docstring). At max_per_row=3 the two algorithms always agree (see
+    TestPersonCardGridBlockFields), so these assertions are unchanged from
+    when this block used _balanced_rows().
+    """
+
+    def test_has_expected_fields(self):
+        block = CardGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "cards"})
+
+    def test_cards_min_num_is_two(self):
+        block = CardGridBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.min_num, 2)
+
+    def test_cards_max_num_is_12(self):
+        block = CardGridBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.max_num, 12)
+
+    def test_cards_child_block_is_card_block(self):
+        block = CardGridBlock()
+        self.assertIsInstance(block.declared_blocks["cards"].child_block, CardBlock)
+
+    def test_max_per_row_is_three(self):
+        self.assertEqual(CardGridBlock.MAX_PER_ROW, 3)
+
+    def test_get_context_computes_rows(self):
+        block = CardGridBlock()
+        value = {"heading": "", "cards": [1, 2, 3, 4]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [2, 2])
+
+    def test_get_context_has_no_orphan_row_at_seven(self):
+        """
+        The regression case: the old CSS-only special case (2 or 4 cards
+        get lg:grid-cols-2, everything else lg:grid-cols-3) rendered 7
+        cards as an unbalanced 3+3+1. _balanced_rows() gives 3+2+2.
+        """
+        block = CardGridBlock()
+        value = {"heading": "", "cards": [1, 2, 3, 4, 5, 6, 7]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2, 2])
+
+
+class TestImageGridBlockFields(SimpleTestCase):
+    """ImageGridBlock field structure: heading + images (min 2, max 24)."""
+
+    def test_has_expected_fields(self):
+        block = ImageGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "images"})
+
+    def test_heading_is_optional(self):
+        block = ImageGridBlock()
+        self.assertFalse(block.declared_blocks["heading"].required)
+
+    def test_images_min_num_is_two(self):
+        block = ImageGridBlock()
+        self.assertEqual(block.declared_blocks["images"].meta.min_num, 2)
+
+    def test_images_max_num_is_24(self):
+        block = ImageGridBlock()
+        self.assertEqual(block.declared_blocks["images"].meta.max_num, 24)
+
+    def test_images_child_block_is_image_grid_item(self):
+        block = ImageGridBlock()
+        self.assertIsInstance(block.declared_blocks["images"].child_block, ImageGridItemBlock)
+
+    def test_max_per_row_is_four(self):
+        self.assertEqual(ImageGridBlock.MAX_PER_ROW, 4)
+
+    def test_get_context_computes_rows(self):
+        block = ImageGridBlock()
+        value = {"heading": "", "images": [1, 2, 3, 4, 5]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2])
+
+    def test_get_context_full_rows_before_balanced_tail_at_nine(self):
+        """
+        Unlike CardGridBlock/PersonCardGridBlock (max_per_row=3, where
+        _full_rows_with_balanced_tail() and the old _balanced_rows() always
+        agree), ImageGridBlock's max_per_row=4 is wide enough for the two
+        to genuinely diverge: _balanced_rows() would spread 9 images across
+        3 rows evenly as [3, 3, 3]; _full_rows_with_balanced_tail() instead
+        keeps the first row full at the cap and only balances the tail,
+        giving [4, 3, 2].
+        """
+        block = ImageGridBlock()
+        value = {"heading": "", "images": list(range(9))}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [4, 3, 2])
+
+
+class TestLogoGridItemBlockFields(SimpleTestCase):
+    def test_has_expected_fields(self):
+        block = LogoGridItemBlock()
+        self.assertEqual(
+            set(block.declared_blocks.keys()), {"image", "name", "link_page", "link_url"}
+        )
+
+    def test_name_is_required(self):
+        block = LogoGridItemBlock()
+        self.assertTrue(block.declared_blocks["name"].required)
+
+    def test_links_are_optional(self):
+        block = LogoGridItemBlock()
+        self.assertFalse(block.declared_blocks["link_page"].required)
+        self.assertFalse(block.declared_blocks["link_url"].required)
+
+
+class TestLogoGridItemBlockValidation(SimpleTestCase):
+    """LogoGridItemBlock.clean() permits zero links but rejects two."""
+
+    def _raw(self, link_page=None, link_url=""):
+        return {"image": None, "name": "Example Org", "link_page": link_page, "link_url": link_url}
+
+    def test_neither_link_is_valid(self):
+        block = LogoGridItemBlock()
+        value = block.to_python(self._raw())
+        # Only exercising the link-count check here, not image resolution
+        # (that needs a database) -- call the shared helper directly via
+        # the fields clean() touches.
+        cleaned = {"link_page": value["link_page"], "link_url": value["link_url"]}
+        self.assertEqual(_validate_at_most_one_link(cleaned, {}), {})
+
+    def test_one_link_is_valid(self):
+        cleaned = {"link_page": None, "link_url": "https://example.com"}
+        self.assertEqual(_validate_at_most_one_link(cleaned, {}), {})
+
+    def test_both_links_raises(self):
+        cleaned = {"link_page": object(), "link_url": "https://example.com"}
+        errors = _validate_at_most_one_link(cleaned, {})
+        self.assertIn("link_page", errors)
+        self.assertIn("link_url", errors)
+
+
+class TestLogoGridBlockFields(SimpleTestCase):
+    """LogoGridBlock field structure: heading + logos (min 2, max 30)."""
+
+    def test_has_expected_fields(self):
+        block = LogoGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "logos"})
+
+    def test_logos_min_num_is_two(self):
+        block = LogoGridBlock()
+        self.assertEqual(block.declared_blocks["logos"].meta.min_num, 2)
+
+    def test_logos_max_num_is_30(self):
+        block = LogoGridBlock()
+        self.assertEqual(block.declared_blocks["logos"].meta.max_num, 30)
+
+    def test_logos_child_block_is_logo_grid_item(self):
+        block = LogoGridBlock()
+        self.assertIsInstance(block.declared_blocks["logos"].child_block, LogoGridItemBlock)
+
+    def test_max_per_row_is_five(self):
+        self.assertEqual(LogoGridBlock.MAX_PER_ROW, 5)
+
+    def test_get_context_computes_rows(self):
+        """
+        6 logos at cap 5 folds into one row of 6 (via
+        _full_rows_merging_lone_remainder()), not two rows of 3 --
+        LogoGridBlock's own tweak on top of the shared
+        full-rows-plus-balanced-tail approach; see that function's
+        docstring for why this differs from CardGridBlock/ImageGridBlock/
+        PersonCardGridBlock.
+        """
+        block = LogoGridBlock()
+        value = {"heading": "", "logos": [1, 2, 3, 4, 5, 6]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [6])
+
+    def test_get_context_computes_rows_with_a_lead_full_row(self):
+        """11 logos at cap 5: a full lead row, then the remainder folds into one row of 6."""
+        block = LogoGridBlock()
+        value = {"heading": "", "logos": list(range(11))}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [5, 6])
+
+
+class TestHeroIsMinimal(SimpleTestCase):
+    """
+    hero_is_minimal() drives components/hero.html's compact "banner"
+    treatment (see its docstring in wtrx/blocks) -- True only when a hero
+    has nothing but a headline (image doesn't count against it).
+    """
+
+    def test_true_when_only_headline(self):
+        self.assertTrue(hero_is_minimal(copy="", video=None, cta=[]))
+
+    def test_image_is_not_a_parameter(self):
+        """The function has no `image` argument -- image presence never affects minimal."""
+        import inspect
+
+        self.assertNotIn("image", inspect.signature(hero_is_minimal).parameters)
+
+    def test_false_when_copy_present(self):
+        self.assertFalse(hero_is_minimal(copy="<p>Some text</p>", video=None, cta=[]))
+
+    def test_true_when_copy_is_empty_paragraph_tag(self):
+        """
+        Draftail can persist "<p></p>" for a "cleared" richtext field -- that
+        string is truthy in Python but visually empty, so it must not count
+        as real copy (same strip_tags pattern as Blogs.get_related_intro()).
+        """
+        self.assertTrue(hero_is_minimal(copy="<p></p>", video=None, cta=[]))
+
+    def test_false_when_video_present(self):
+        self.assertFalse(hero_is_minimal(copy="", video=object(), cta=[]))
+
+    def test_false_when_cta_present(self):
+        self.assertFalse(hero_is_minimal(copy="", video=None, cta=[{"type": "button"}]))
+
+    def test_false_when_tag_present(self):
+        self.assertFalse(hero_is_minimal(copy="", video=None, cta=[], tag="Blog"))
+
+    def test_false_when_published_at_present(self):
+        self.assertFalse(
+            hero_is_minimal(copy="", video=None, cta=[], published_at=timezone.now())
+        )
+
+
+class TestBalancedRows(SimpleTestCase):
+    """
+    _balanced_rows(items, max_per_row) -- never a row of 1 for
+    len(items) > max_per_row, see its docstring for the proof this
+    encodes as an executable check. No longer called directly by any grid
+    block's get_context() (CardGridBlock/ImageGridBlock/PersonCardGridBlock
+    use _full_rows_with_balanced_tail(), which calls this internally to
+    balance its own tail; LogoGridBlock uses its own
+    _full_rows_merging_lone_remainder() instead) -- ButtonGroupBlock is
+    the only remaining direct caller. See TestFullRowsWithBalancedTail and
+    TestFullRowsMergingLoneRemainder for those.
+    """
+
+    def _items(self, n):
+        return list(range(n))
+
+    def test_count_1_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(1), 3), [[0]])
+
+    def test_count_2_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(2), 3), [[0, 1]])
+
+    def test_count_at_cap_is_single_row(self):
+        self.assertEqual(_balanced_rows(self._items(3), 3), [[0, 1, 2]])
+
+    def test_cap_3_count_4_is_2x2(self):
+        rows = _balanced_rows(self._items(4), 3)
+        self.assertEqual([len(r) for r in rows], [2, 2])
+
+    def test_cap_3_count_5_is_3_plus_2(self):
+        rows = _balanced_rows(self._items(5), 3)
+        self.assertEqual([len(r) for r in rows], [3, 2])
+
+    def test_cap_3_count_6_is_3_plus_3(self):
+        rows = _balanced_rows(self._items(6), 3)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+
+    def test_cap_3_count_7_has_no_orphan_row(self):
+        """
+        The key regression test: a naive uniform 2-or-3-column rule fails
+        for count=7 (both give a trailing row of 1) -- this is exactly
+        what CardGridBlock's old CSS-only special case did. The
+        evenly-distributed algorithm produces [3, 2, 2] instead.
+        """
+        rows = _balanced_rows(self._items(7), 3)
+        self.assertEqual([len(r) for r in rows], [3, 2, 2])
+
+    def test_cap_3_count_10(self):
+        rows = _balanced_rows(self._items(10), 3)
+        self.assertEqual([len(r) for r in rows], [3, 3, 2, 2])
+
+    def test_cap_4_count_5_is_3_plus_2(self):
+        """ImageGridBlock's cap (4): a count just over it still balances."""
+        rows = _balanced_rows(self._items(5), 4)
+        self.assertEqual([len(r) for r in rows], [3, 2])
+
+    def test_cap_4_count_9_has_no_orphan_row(self):
+        """A uniform 4-column grid would leave [4, 4, 1] here."""
+        rows = _balanced_rows(self._items(9), 4)
+        self.assertEqual([len(r) for r in rows], [3, 3, 3])
+
+    def test_cap_5_count_6_is_3_plus_3(self):
+        """LogoGridBlock's cap (5): a count just over it still balances."""
+        rows = _balanced_rows(self._items(6), 5)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+
+    def test_cap_5_count_11_has_no_orphan_row(self):
+        """A uniform 5-column grid would leave [5, 5, 1] here."""
+        rows = _balanced_rows(self._items(11), 5)
+        self.assertEqual([len(r) for r in rows], [4, 4, 3])
+
+    def test_no_row_of_one_for_a_spread_of_counts_and_caps(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) >= 2 for r in rows))
+
+    def test_no_row_exceeds_the_cap(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) <= max_per_row for r in rows))
+
+    def test_rows_cover_every_item_exactly_once(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(1, 30):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _balanced_rows(self._items(n), max_per_row)
+                    flattened = [p for row in rows for p in row]
+                    self.assertEqual(flattened, self._items(n))
+
+    def test_works_with_an_object_that_only_supports_int_indexing(self):
+        """
+        Regression test: Wagtail's real ListValue.__getitem__ only handles
+        integer indices, not slice objects -- items[i:j] on one silently
+        returns garbage (a plain list has .value called on it) rather than
+        raising, so a plain-list-only test suite can't catch it. This
+        stand-in reproduces that restriction to prove _balanced_rows()
+        converts to a real list before slicing.
+        """
+
+        class IntOnlyIndexable:
+            def __init__(self, items):
+                self._items = items
+
+            def __len__(self):
+                return len(self._items)
+
+            def __getitem__(self, i):
+                if not isinstance(i, int):
+                    raise TypeError("only int indices supported")
+                return self._items[i]
+
+        wrapped = IntOnlyIndexable(list(range(7)))
+        rows = _balanced_rows(wrapped, 3)
+        self.assertEqual([len(r) for r in rows], [3, 2, 2])
+        self.assertEqual([p for row in rows for p in row], list(range(7)))
+
+
+class TestFullRowsWithBalancedTail(SimpleTestCase):
+    """
+    _full_rows_with_balanced_tail(items, max_per_row) is CardGridBlock/
+    ImageGridBlock/PersonCardGridBlock's shared row-layout algorithm: full
+    rows at the cap, except the last one or two rows, which balance evenly
+    rather than ever leaving a single item alone on its own row. See its
+    docstring for why this is deliberately not folded into the shared
+    _balanced_rows(), and for why LogoGridBlock uses its own
+    _full_rows_merging_lone_remainder() instead (TestFullRowsMergingLoneRemainder)
+    rather than this function.
+
+    Examples below use max_per_row=5 as a convenient round number, not
+    because any current caller uses that cap — CardGridBlock/
+    PersonCardGridBlock are 3, ImageGridBlock is 4 (see
+    TestImageGridBlockFields for max_per_row=4 specifically, where this
+    function's behaviour actually diverges from _balanced_rows()'s).
+    """
+
+    def _items(self, n):
+        return list(range(n))
+
+    def test_count_at_or_under_cap_is_single_row(self):
+        self.assertEqual(_full_rows_with_balanced_tail(self._items(3), 5), [[0, 1, 2]])
+        self.assertEqual(
+            _full_rows_with_balanced_tail(self._items(5), 5), [[0, 1, 2, 3, 4]]
+        )
+
+    def test_exact_multiple_of_cap_is_all_full_rows(self):
+        rows = _full_rows_with_balanced_tail(self._items(10), 5)
+        self.assertEqual([len(r) for r in rows], [5, 5])
+
+    def test_remainder_of_two_or_more_is_a_full_row_plus_a_shorter_last_row(self):
+        """
+        8 items at cap 5: a full first row, then whatever's left -- unlike
+        _balanced_rows(), which would instead spread these evenly as
+        [4, 4].
+        """
+        rows = _full_rows_with_balanced_tail(self._items(8), 5)
+        self.assertEqual([len(r) for r in rows], [5, 3])
+
+    def test_remainder_of_one_balances_the_last_two_rows_instead_of_a_lone_item(self):
+        """
+        The one case this exists to handle: 6 items at cap 5 would naively
+        be [5, 1] -- an item alone on its own row. Instead the final full
+        row and the leftover item balance evenly as [3, 3]. (LogoGridBlock
+        specifically prefers folding this into one row of 6 instead -- see
+        _full_rows_merging_lone_remainder() -- but that's a deliberate
+        logo-specific divergence from this function, not a bug here.)
+        """
+        rows = _full_rows_with_balanced_tail(self._items(6), 5)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+
+    def test_remainder_of_one_with_more_rows_only_rebalances_the_tail(self):
+        """
+        11 items at cap 5 (n // max_per_row == 2, remainder 1): the first
+        row stays full at the cap; only the last two rows -- what would
+        naively have been [5, 1] -- balance evenly instead, per the
+        function's whole point.
+        """
+        rows = _full_rows_with_balanced_tail(self._items(11), 5)
+        self.assertEqual([len(r) for r in rows], [5, 3, 3])
+
+    def test_no_row_of_one_for_a_spread_of_counts_and_caps(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) >= 2 for r in rows))
+
+    def test_no_row_exceeds_the_cap(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) <= max_per_row for r in rows))
+
+    def test_rows_cover_every_item_exactly_once_in_order(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(1, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    flattened = [p for row in rows for p in row]
+                    self.assertEqual(flattened, self._items(n))
+
+    def test_every_row_but_the_last_two_is_full_at_the_cap(self):
+        """
+        The defining difference from _balanced_rows(): every row is
+        packed to max_per_row except (at most) the final one or two.
+        """
+        for max_per_row in (3, 4, 5):
+            for n in range(max_per_row + 1, 60):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_with_balanced_tail(self._items(n), max_per_row)
+                    for row in rows[:-2]:
+                        self.assertEqual(len(row), max_per_row)
+
+    def test_works_with_an_object_that_only_supports_int_indexing(self):
+        """Same ListValue-slicing hazard _balanced_rows() guards against."""
+
+        class IntOnlyIndexable:
+            def __init__(self, items):
+                self._items = items
+
+            def __len__(self):
+                return len(self._items)
+
+            def __getitem__(self, i):
+                if not isinstance(i, int):
+                    raise TypeError("only int indices supported")
+                return self._items[i]
+
+        wrapped = IntOnlyIndexable(list(range(6)))
+        rows = _full_rows_with_balanced_tail(wrapped, 5)
+        self.assertEqual([len(r) for r in rows], [3, 3])
+        self.assertEqual([p for row in rows for p in row], list(range(6)))
+
+
+class TestFullRowsMergingLoneRemainder(SimpleTestCase):
+    """
+    _full_rows_merging_lone_remainder(items, max_per_row) is
+    LogoGridBlock's own row-layout algorithm — like
+    _full_rows_with_balanced_tail() (full rows at the cap, never a lone
+    item of 1), but a remainder of exactly 1 folds into the last row
+    (max_per_row + 1 items) instead of balancing across two rows. See its
+    docstring for why this is logo-specific rather than a change to
+    _full_rows_with_balanced_tail() itself.
+    """
+
+    def _items(self, n):
+        return list(range(n))
+
+    def test_count_at_or_under_cap_is_single_row(self):
+        self.assertEqual(
+            _full_rows_merging_lone_remainder(self._items(3), 5), [[0, 1, 2]]
+        )
+        self.assertEqual(
+            _full_rows_merging_lone_remainder(self._items(5), 5), [[0, 1, 2, 3, 4]]
+        )
+
+    def test_exact_multiple_of_cap_is_all_full_rows(self):
+        rows = _full_rows_merging_lone_remainder(self._items(10), 5)
+        self.assertEqual([len(r) for r in rows], [5, 5])
+
+    def test_remainder_of_two_or_more_is_a_full_row_plus_a_shorter_last_row(self):
+        """Same as _full_rows_with_balanced_tail(): unaffected by the tweak."""
+        rows = _full_rows_merging_lone_remainder(self._items(8), 5)
+        self.assertEqual([len(r) for r in rows], [5, 3])
+
+    def test_remainder_of_one_folds_into_a_single_wider_last_row(self):
+        """
+        The defining difference from _full_rows_with_balanced_tail(): 26
+        logos at cap 5 (n // max_per_row == 5, remainder 1) reads as
+        5,5,5,5,6 — one row one logo over the cap — not 5,5,5,5,3,3.
+        """
+        rows = _full_rows_merging_lone_remainder(self._items(26), 5)
+        self.assertEqual([len(r) for r in rows], [5, 5, 5, 5, 6])
+
+    def test_remainder_of_one_just_over_the_cap_is_a_single_row(self):
+        """
+        6 logos at cap 5 (no full row ahead of the remainder at all):
+        one row of 6, not a lone logo split off, and not two rows of 3
+        the way _full_rows_with_balanced_tail() would give.
+        """
+        rows = _full_rows_merging_lone_remainder(self._items(6), 5)
+        self.assertEqual([len(r) for r in rows], [6])
+
+    def test_no_row_of_one_for_a_spread_of_counts_and_caps(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_merging_lone_remainder(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) >= 2 for r in rows))
+
+    def test_no_row_exceeds_the_cap_by_more_than_one(self):
+        """
+        Unlike _full_rows_with_balanced_tail(), a row here can be
+        max_per_row + 1 (the merged-remainder case) but never more.
+        """
+        for max_per_row in (3, 4, 5):
+            for n in range(2, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_merging_lone_remainder(self._items(n), max_per_row)
+                    self.assertTrue(all(len(r) <= max_per_row + 1 for r in rows))
+
+    def test_rows_cover_every_item_exactly_once_in_order(self):
+        for max_per_row in (3, 4, 5):
+            for n in range(1, 40):
+                with self.subTest(max_per_row=max_per_row, count=n):
+                    rows = _full_rows_merging_lone_remainder(self._items(n), max_per_row)
+                    flattened = [p for row in rows for p in row]
+                    self.assertEqual(flattened, self._items(n))
+
+    def test_works_with_an_object_that_only_supports_int_indexing(self):
+        """Same ListValue-slicing hazard _balanced_rows() guards against."""
+
+        class IntOnlyIndexable:
+            def __init__(self, items):
+                self._items = items
+
+            def __len__(self):
+                return len(self._items)
+
+            def __getitem__(self, i):
+                if not isinstance(i, int):
+                    raise TypeError("only int indices supported")
+                return self._items[i]
+
+        wrapped = IntOnlyIndexable(list(range(26)))
+        rows = _full_rows_merging_lone_remainder(wrapped, 5)
+        self.assertEqual([len(r) for r in rows], [5, 5, 5, 5, 6])
+        self.assertEqual([p for row in rows for p in row], list(range(26)))
+
+
+class TestPersonCardGridBlockFields(SimpleTestCase):
+    """
+    PersonCardGridBlock field structure: heading + people (min 1, max 12).
+    Row layout is _full_rows_with_balanced_tail() (max_per_row=3) — same
+    algorithm CardGridBlock/ImageGridBlock/LogoGridBlock use, their own
+    caps. At max_per_row=3 it always agrees with the older _balanced_rows()
+    this block used to call (see TestFullRowsWithBalancedTail), so the
+    below is unchanged from before that switch.
+    """
+
+    def test_has_expected_fields(self):
+        block = PersonCardGridBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"heading", "people"})
+
+    def test_people_min_num_is_one(self):
+        block = PersonCardGridBlock()
+        self.assertEqual(block.declared_blocks["people"].meta.min_num, 1)
+
+    def test_people_max_num_is_12(self):
+        block = PersonCardGridBlock()
+        self.assertEqual(block.declared_blocks["people"].meta.max_num, 12)
+
+    def test_people_child_block_is_person_card(self):
+        block = PersonCardGridBlock()
+        self.assertIsInstance(block.declared_blocks["people"].child_block, PersonCardBlock)
+
+    def test_get_context_computes_rows(self):
+        block = PersonCardGridBlock()
+        value = {"heading": "", "people": [1, 2, 3, 4, 5]}
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual([len(r) for r in ctx["rows"]], [3, 2])
+
+
+class TestImageCardListItemBlockFields(SimpleTestCase):
+    """ImageCardListItemBlock field structure: content (heading+description merged) only."""
+
+    def test_has_expected_fields(self):
+        block = ImageCardListItemBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"content"})
+
+    def test_content_is_required(self):
+        block = ImageCardListItemBlock()
+        self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_content_supports_h3(self):
+        block = ImageCardListItemBlock()
+        self.assertIn("h3", block.declared_blocks["content"].features)
+
+
+class TestImageCardListBlockFields(SimpleTestCase):
+    """ImageCardListBlock field structure: heading + image + cards (min 2)."""
+
+    def test_has_expected_fields(self):
+        block = ImageCardListBlock()
+        self.assertEqual(
+            set(block.declared_blocks.keys()), {"heading", "image", "cards", "alignment"}
+        )
+
+    def test_heading_is_required(self):
+        block = ImageCardListBlock()
         self.assertTrue(block.declared_blocks["heading"].required)
+
+    def test_image_is_required(self):
+        block = ImageCardListBlock()
+        self.assertTrue(block.declared_blocks["image"].required)
+
+    def test_cards_min_num_is_two(self):
+        block = ImageCardListBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.min_num, 2)
+
+    def test_cards_have_no_max_num(self):
+        block = ImageCardListBlock()
+        self.assertIsNone(block.declared_blocks["cards"].meta.max_num)
+
+    def test_cards_child_block_is_image_card_list_item(self):
+        block = ImageCardListBlock()
+        self.assertIsInstance(block.declared_blocks["cards"].child_block, ImageCardListItemBlock)
+
+    def test_alignment_choices(self):
+        block = ImageCardListBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = ImageCardListBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+
+class TestSpacerBlock(SimpleTestCase):
+    def test_sizes_render_their_height(self):
+        from wtrx.blocks import SpacerBlock
+
+        block = SpacerBlock()
+        for size, height in [("small", "h-8"), ("medium", "h-16"), ("large", "h-32")]:
+            html = block.render(block.to_python({"size": size}))
+            self.assertIn("wtr-spacer", html)
+            self.assertIn(height, html)
+            self.assertIn('aria-hidden="true"', html)
+
+    def test_gap_after_a_spacer_is_zeroed(self):
+        css = (pathlib.Path(settings.BASE_DIR) / "static_src" / "css" / "main.css").read_text()
+        self.assertRegex(css, r"\.wtr-body-stack > \[data-block-type='spacer'\],\s*\.wtr-spacer \{\s*margin-block-end: 0;")
+
+
+class TestHeadlineHtml(SimpleTestCase):
+    def test_paragraphs_and_breaks_become_br(self):
+        from wtrx.blocks import headline_html
+
+        self.assertEqual(
+            headline_html('<p data-block-key="a">First line<br/>second</p><p data-block-key="b">third</p>'),
+            "First line<br>second<br>third",
+        )
+
+    def test_other_markup_is_dropped_and_text_escaped(self):
+        from wtrx.blocks import headline_html
+
+        self.assertEqual(headline_html("<p><b>Bold</b> &amp; <i>more</i></p>"), "Bold &amp; more")
+
+    def test_plain_text_is_escaped(self):
+        from wtrx.blocks import headline_html
+
+        self.assertEqual(headline_html("Fish & chips"), "Fish &amp; chips")
+
+    def test_empty_values(self):
+        from wtrx.blocks import headline_html
+
+        for value in (None, "", "<p></p>", '<p data-block-key="x"> </p>'):
+            self.assertEqual(headline_html(value), "")
+
+
+class TestLeadTextBlock(SimpleTestCase):
+    """LeadTextBlock: inline marks plus lists, no headings."""
+
+    def test_allows_lists_but_not_headings(self):
+        features = LeadTextBlock().features
+        self.assertIn("ul", features)
+        self.assertIn("ol", features)
+        self.assertNotIn("h2", features)
+
+    def test_renders_a_list(self):
+        block = LeadTextBlock()
+        html = block.render(block.to_python("<ul><li>One</li><li>Two</li></ul>"))
+        self.assertIn("<ul>", html)
+        self.assertIn("wtr-lead-text", html)
+
+
+class TestHeadingBlock(SimpleTestCase):
+    """HeadingBlock: a single required CharBlock rendering a centered H2."""
+
+    def test_has_expected_fields(self):
+        self.assertEqual(set(HeadingBlock().declared_blocks.keys()), {"heading"})
+
+    def test_heading_is_required(self):
+        with self.assertRaises(ValidationError):
+            HeadingBlock().clean({"heading": ""})
+
+    def test_clean_accepts_a_heading(self):
+        cleaned = HeadingBlock().clean({"heading": "Our campaigns"})
+        self.assertEqual(cleaned["heading"], "Our campaigns")
+
+    def test_renders_a_centered_h2_matching_the_card_row_heading(self):
+        html = HeadingBlock().render(
+            HeadingBlock().to_python({"heading": "Our campaigns"})
+        )
+        self.assertIn("<h2", html)
+        self.assertIn("mx-auto max-w-3xl text-center", html)
+        # Same type ramp as card_grid_block.html's own heading.
+        self.assertIn("text-3xl", html)
+        self.assertIn("sm:text-4xl", html)
+        self.assertIn("lg:text-5xl", html)
+        self.assertIn("Our campaigns", html)
+
+    def test_registered_in_both_stream_blocks(self):
+        self.assertIn("heading", BodyStreamBlock().child_blocks)
+        self.assertIn("heading", SectionContentBlock().child_blocks)
+
+    def test_h2_carries_no_bottom_margin_utility(self):
+        """
+        The 40px below a standalone heading comes from main.css's
+        data-block-type='heading' body-stack rule, not from an mb-* on the
+        h2 itself -- in the page body loop the gap between two blocks is
+        the earlier block's margin-block-end, so an mb-10 here would sum
+        with the loop's own space-y-24/32 to 136px instead of replacing it.
+        card_grid_block.html's h2 DOES carry mb-10, because there the 40px
+        is internal to one block (see AGENTS.md pitfalls #39/#64).
+        """
+        html = HeadingBlock().render(
+            HeadingBlock().to_python({"heading": "Our campaigns"})
+        )
+        self.assertNotRegex(html, r'class="[^"]*\bmb-\d')
+
+    def test_body_stack_rule_matches_the_card_row_heading_gap(self):
+        """
+        The two headings have to sit the same distance off their content or
+        a page carrying both reads with two heading rhythms. Nothing in
+        code links them (AGENTS.md pitfall #64), so this pins the pair:
+        card_grid_block.html's own mb-10 and main.css's 2.5rem rule are
+        both 40px, and a change to either alone fails here.
+        """
+        css = (
+            pathlib.Path(settings.BASE_DIR) / "static_src" / "css" / "main.css"
+        ).read_text()
+        self.assertRegex(
+            css,
+            r"\.wtr-body-stack > \[data-block-type='heading'\] \{\s*"
+            r"margin-block-end: 2\.5rem;",
+        )
+
+        card_grid = (
+            pathlib.Path(settings.BASE_DIR)
+            / "wtrx"
+            / "templates"
+            / "wtrx"
+            / "components"
+            / "streamfield"
+            / "blocks"
+            / "card_grid_block.html"
+        ).read_text()
+        self.assertIn("mb-10", card_grid)  # 2.5rem == mb-10 == 40px
+
+
+class TestRawHTMLBlockSecurityNotice(SimpleTestCase):
+    """
+    The notice has to reach an editor who opened an existing block rather
+    than coming through the picker, so it is the field's help_text as well
+    as part of Meta.description.
+    """
+
+    def test_help_text_is_the_notice(self):
+        self.assertEqual(
+            str(RawHTMLBlock().field.help_text), str(RAW_HTML_SECURITY_NOTICE)
+        )
+
+    def test_description_leads_with_the_same_notice(self):
+        self.assertTrue(
+            str(RawHTMLBlock().get_description()).startswith(
+                str(RAW_HTML_SECURITY_NOTICE)
+            )
+        )
+
+    def test_registrations_inherit_it(self):
+        for stream in (BodyStreamBlock(), SectionContentBlock()):
+            with self.subTest(stream=type(stream).__name__):
+                block = stream.child_blocks["raw_html"]
+                self.assertEqual(
+                    str(block.field.help_text), str(RAW_HTML_SECURITY_NOTICE)
+                )
+
+
+class TestImageTextBlockCTA(SimpleTestCase):
+    """
+    ImageTextBlock's optional CTA — the same flat link_text/link_page/link_url
+    triple CardBlock, FeaturePanelBlock, CardCarouselBlock, PageCardsBlock,
+    QuoteBlock and CalloutBlock all use.
+
+    The both-links rule is exercised through _validate_at_most_one_link
+    directly rather than through StructBlock.clean(), matching how the other
+    link-bearing blocks are tested here: a full clean() needs a RichText
+    value and a real Page row for the chooser, neither of which this rule
+    depends on.
+    """
+
+    def test_link_style_offers_the_shared_button_choices(self):
+        """
+        Same set ButtonBlock offers (BUTTON_STYLE_CHOICES), defaulting to
+        primary so harvested preview JSON and existing content saved before
+        this field existed revive unchanged.
+        """
+        field = ImageTextBlock().declared_blocks["link_style"]
+        self.assertEqual(
+            [c[0] for c in field.field.choices if c[0]],
+            [c[0] for c in BUTTON_STYLE_CHOICES],
+        )
+        self.assertEqual(field.get_default(), "primary")
+
+    def test_declares_the_link_triple(self):
+        fields = ImageTextBlock().declared_blocks
+        for name in ("link_text", "link_page", "link_url"):
+            self.assertIn(name, fields)
+
+    def test_link_fields_are_all_optional(self):
+        fields = ImageTextBlock().declared_blocks
+        for name in ("link_text", "link_page", "link_url"):
+            self.assertFalse(fields[name].required, name)
+
+    def test_clean_is_wired_up(self):
+        """clean() is overridden here, not inherited from StructBlock."""
+        self.assertIn("clean", ImageTextBlock.__dict__)
+
+    def test_both_page_and_url_is_rejected(self):
+        errors = _validate_at_most_one_link(
+            {"link_page": object(), "link_url": "https://example.com"}, {}
+        )
+        self.assertIn("link_page", errors)
+        self.assertIn("link_url", errors)
+
+    def test_no_link_at_all_is_allowed(self):
+        errors = _validate_at_most_one_link({"link_page": None, "link_url": ""}, {})
+        self.assertEqual(errors, {})
+
+
+class TestImageTextBlockFields(SimpleTestCase):
+    """ImageTextBlock field structure: image + content (heading+text merged), plus an optional CTA."""
+
+    def test_has_expected_fields(self):
+        block = ImageTextBlock()
+        self.assertEqual(
+            set(block.declared_blocks.keys()),
+            {
+                "image",
+                "content",
+                "alignment",
+                "size",
+                "crop",
+                "link_text",
+                "link_page",
+                "link_url",
+                "link_style",
+            },
+        )
+
+    def test_crop_defaults_to_true(self):
+        """
+        Defaulting True preserves every existing page's current
+        force-cropped look — see ImageTextBlock's docstring.
+        """
+        block = ImageTextBlock()
+        self.assertTrue(block.declared_blocks["crop"].get_default())
+
+    def test_crop_is_not_required(self):
+        block = ImageTextBlock()
+        self.assertFalse(block.declared_blocks["crop"].required)
+
+    def test_missing_crop_in_stored_value_falls_back_to_true(self):
+        # Same "old data keeps rendering" contract as the size field's own
+        # equivalent test below -- crop didn't exist before this field was
+        # added.
+        block = ImageTextBlock()
+        value = block.to_python(
+            {"image": None, "content": "<p>Hi</p>", "alignment": "image-left", "size": "default"}
+        )
+        self.assertTrue(value["crop"])
+
+    def test_image_is_required(self):
+        block = ImageTextBlock()
+        self.assertTrue(block.declared_blocks["image"].required)
+
+    def test_content_is_required(self):
+        block = ImageTextBlock()
+        self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_content_is_richtext(self):
+        block = ImageTextBlock()
+        self.assertIsInstance(block.declared_blocks["content"], RichTextBlock)
+
+    def test_content_supports_h2(self):
+        block = ImageTextBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_alignment_choices(self):
+        block = ImageTextBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = ImageTextBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+    def test_size_choices(self):
+        block = ImageTextBlock()
+        choices = dict(block.declared_blocks["size"].field.choices)
+        self.assertEqual(set(choices.keys()), {"small", "default", "large"})
+
+    def test_size_defaults_to_default(self):
+        block = ImageTextBlock()
+        self.assertEqual(block.declared_blocks["size"].meta.default, "default")
+
+    def test_missing_size_in_stored_value_falls_back_to_default(self):
+        # Simulates harvested preview JSON (or a real page) saved before the
+        # `size` field existed -- StructBlock.to_python() must fall back to
+        # the field's own default for a missing key, not raise, so old data
+        # keeps rendering. See ImageTextBlock's docstring / AGENTS.md rule #45.
+        block = ImageTextBlock()
+        value = block.to_python({"image": None, "content": "<p>Hi</p>", "alignment": "image-left"})
+        self.assertEqual(value["size"], "default")
+
+
+class TestFeaturePanelBlockFields(SimpleTestCase):
+    """
+    FeaturePanelBlock field structure. Link-validation logic (clean() wraps
+    _validate_at_most_one_link) is covered generically in
+    TestQuoteBlockValidation — see module docstring. The block's required
+    ImageChooserBlock means block.clean() can't be exercised end-to-end
+    without a database, same as QuoteBlock/CalloutBlock.
+    """
+
+    def test_has_expected_fields(self):
+        block = FeaturePanelBlock()
+        expected = {
+            "eyebrow",
+            "content",
+            "image",
+            "alignment",
+            "background",
+            "link_text",
+            "link_page",
+            "link_url",
+            "anchor",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_is_required(self):
+        """content carries the required heading, typed as an H2 at the top."""
+        block = FeaturePanelBlock()
+        self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_image_is_required(self):
+        block = FeaturePanelBlock()
+        self.assertTrue(block.declared_blocks["image"].required)
+
+    def test_optional_fields_are_optional(self):
+        """Everything but content/image is optional — the Figma dark panel
+        has no eyebrow."""
+        block = FeaturePanelBlock()
+        for name in ("eyebrow", "link_text", "link_page", "link_url", "anchor"):
+            with self.subTest(field=name):
+                self.assertFalse(block.declared_blocks[name].required)
+
+    def test_content_is_richtext(self):
+        block = FeaturePanelBlock()
+        self.assertIsInstance(block.declared_blocks["content"], RichTextBlock)
+
+    def test_content_supports_h2(self):
+        block = FeaturePanelBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_alignment_choices(self):
+        block = FeaturePanelBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = FeaturePanelBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+    def test_background_defaults_to_white(self):
+        """
+        The fills themselves are asserted once, against every block that has
+        them, in TestSharedBackgroundPalette — only the per-block default is
+        this block's own business.
+        """
+        block = FeaturePanelBlock()
+        self.assertEqual(block.declared_blocks["background"].meta.default, "white")
+
+
+class TestCardCarouselBlockFields(SimpleTestCase):
+    """
+    CardCarouselBlock field structure. Link-validation logic (clean()
+    wraps _validate_at_most_one_link) is covered generically in
+    TestQuoteBlockValidation — see module docstring.
+    """
+
+    def test_has_expected_fields(self):
+        block = CardCarouselBlock()
+        expected = {"content", "link_text", "link_page", "link_url", "cards"}
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_is_required(self):
+        """content carries the required heading, typed as an H2 at the top."""
+        block = CardCarouselBlock()
+        self.assertTrue(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = CardCarouselBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_link_fields_are_optional(self):
+        block = CardCarouselBlock()
+        self.assertFalse(block.declared_blocks["link_text"].required)
+        self.assertFalse(block.declared_blocks["link_page"].required)
+        self.assertFalse(block.declared_blocks["link_url"].required)
+
+    def test_cards_min_num_is_three(self):
+        block = CardCarouselBlock()
+        self.assertEqual(block.declared_blocks["cards"].meta.min_num, 3)
+
+    def test_cards_have_no_max_num(self):
+        block = CardCarouselBlock()
+        self.assertIsNone(block.declared_blocks["cards"].meta.max_num)
+
+    def test_carousel_card_image_is_required(self):
+        """
+        CarouselCardBlock overrides CardBlock.image to be required — every
+        carousel card needs one, unlike the general-purpose CardBlock.
+        """
+        block = CardCarouselBlock()
+        card_block = block.declared_blocks["cards"].child_block
+        self.assertTrue(card_block.declared_blocks["image"].required)
+
+
+class TestCalloutBlockFields(SimpleTestCase):
+    """
+    CalloutBlock field structure. Link-validation logic (clean() wraps
+    _validate_at_most_one_link) is covered generically in
+    TestQuoteBlockValidation — see module docstring.
+    """
+
+    def test_has_expected_fields(self):
+        block = CalloutBlock()
+        expected = {
+            "content",
+            "link_text",
+            "link_page",
+            "link_url",
+            "color",
+            "image",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_is_optional(self):
+        """A callout can be just a background + button, per its docstring."""
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2_and_h3(self):
+        block = CalloutBlock()
+        features = block.declared_blocks["content"].features
+        self.assertIn("h2", features)
+        self.assertIn("h3", features)
+
+    def test_content_supports_lists(self):
+        block = CalloutBlock()
+        features = block.declared_blocks["content"].features
+        self.assertIn("ol", features)
+        self.assertIn("ul", features)
+
+    def test_image_is_optional(self):
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["image"].required)
+
+    def test_link_fields_are_optional(self):
+        block = CalloutBlock()
+        self.assertFalse(block.declared_blocks["link_text"].required)
+        self.assertFalse(block.declared_blocks["link_page"].required)
+        self.assertFalse(block.declared_blocks["link_url"].required)
+
+    def test_color_default_is_navy(self):
+        block = CalloutBlock()
+        self.assertEqual(block.declared_blocks["color"].meta.default, "navy")
+
+    def test_color_defaults_to_navy(self):
+        """
+        The fills themselves are asserted once, against every block that has
+        them, in TestSharedBackgroundPalette — only the per-block default is
+        this block's own business.
+        """
+        block = CalloutBlock()
+        self.assertEqual(block.declared_blocks["color"].meta.default, "navy")
+
+
+class TestDonateBlockFields(SimpleTestCase):
+    """DonateBlock field structure: content (heading+description merged), all optional."""
+
+    def test_has_expected_fields(self):
+        block = DonateBlock()
+        expected = {
+            "content",
+            "button_text",
+            "override_amounts",
+            "override_url",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_is_optional(self):
+        block = DonateBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = DonateBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_content_supports_h3(self):
+        # Editors can add an optional H3 subheading below the H2 heading,
+        # same as CalloutBlock (RICHTEXT_FEATURES_HEADINGS_H2_H3).
+        block = DonateBlock()
+        self.assertIn("h3", block.declared_blocks["content"].features)
+
+
+class TestDonateFundraiseUpBlockFields(SimpleTestCase):
+    """
+    DonateFundraiseUpBlock field structure. No custom clean() — every field
+    is optional, so no separate validation test class is needed. There is no
+    plain element_id field: every instance shows the visitor's
+    region-specific Fundraise Up element, resolved from
+    FundraiseUpConfigBlock's site-wide settings, optionally overridden
+    per-block via the collapsed advanced_settings section (see
+    wtrx/integrations/fundraiseup.py).
+    """
+
+    def test_has_expected_fields(self):
+        block = DonateFundraiseUpBlock()
+        expected = {
+            "content",
+            "image",
+            "image_caption",
+            "designation_id",
+            "alignment",
+            "advanced_settings",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_all_fields_are_optional(self):
+        block = DonateFundraiseUpBlock()
+        for name in ("content", "image", "image_caption", "designation_id"):
+            self.assertFalse(block.declared_blocks[name].required, f"{name} should be optional")
+
+    def test_content_supports_h2(self):
+        block = DonateFundraiseUpBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_content_supports_h3(self):
+        # Editors can add an optional H3 subheading below the H2 heading,
+        # same as CalloutBlock/DonateBlock.
+        block = DonateFundraiseUpBlock()
+        self.assertIn("h3", block.declared_blocks["content"].features)
+
+    def test_alignment_choices(self):
+        block = DonateFundraiseUpBlock()
+        choices = dict(block.declared_blocks["alignment"].field.choices)
+        self.assertEqual(set(choices.keys()), {"image-left", "image-right"})
+
+    def test_alignment_defaults_to_image_left(self):
+        block = DonateFundraiseUpBlock()
+        self.assertEqual(block.declared_blocks["alignment"].meta.default, "image-left")
+
+    def test_advanced_settings_is_collapsed_by_default(self):
+        # Most donate blocks never need a region override — the fieldset
+        # shouldn't dominate the form above the block's actual content.
+        block = DonateFundraiseUpBlock()
+        self.assertTrue(block.declared_blocks["advanced_settings"].meta.collapsed)
+
+
+class TestFundraiseUpAdvancedSettingsBlockFields(SimpleTestCase):
+    """
+    FundraiseUpAdvancedSettingsBlock mirrors FundraiseUpConfigBlock's region
+    fields exactly (same names/labels), minus enabled/installation_code —
+    those are site-wide concerns, not a per-block one.
+    """
+
+    def test_has_expected_fields(self):
+        block = FundraiseUpAdvancedSettingsBlock()
+        expected = {
+            "element_id_us",
+            "element_id_nl",
+            "element_id_ca",
+            "element_id_gb",
+            "eu_country_codes",
+            "element_id_eu",
+            "element_id_default",
+        }
+        self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_all_fields_are_optional(self):
+        block = FundraiseUpAdvancedSettingsBlock()
+        for name in block.declared_blocks:
+            self.assertFalse(block.declared_blocks[name].required, f"{name} should be optional")
+
+
+class TestDonateFundraiseUpBlockGeolocationContext(TestCase):
+    """
+    DonateFundraiseUpBlock.get_context() builds the region → element ID map
+    consumed client-side by donate_fundraiseup_block.html's inline script.
+    See FundraiseUpConfigBlock's docstring (wtrx/integrations/fundraiseup.py)
+    for why this resolution has to happen client-side rather than here.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+
+    def _set_fundraiseup_config(self, **overrides):
+        config = {
+            "enabled": True,
+            "installation_code": "<script>fru</script>",
+            "element_id_us": "US_ID",
+            "element_id_nl": "NL_ID",
+            "element_id_ca": "CA_ID",
+            "element_id_gb": "GB_ID",
+            "eu_country_codes": "DE,FR,ES",
+            "element_id_eu": "EU_ID",
+            "element_id_default": "DEFAULT_ID",
+        }
+        config.update(overrides)
+        self.integration.integrations = [("fundraiseup", config)]
+        self.integration.save()
+
+    def _get_context(self):
+        block = DonateFundraiseUpBlock()
+        request = RequestFactory().get("/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        return block.get_context({"designation_id": ""}, parent_context={"request": request})
+
+    def test_default_element_id_is_used_as_the_initial_href_target(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context()
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_region_map_carries_every_configured_region(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "US_ID")
+        self.assertEqual(regions["NL"], "NL_ID")
+        self.assertEqual(regions["CA"], "CA_ID")
+        self.assertEqual(regions["GB"], "GB_ID")
+        self.assertEqual(regions["_eu"], "EU_ID")
+        self.assertEqual(regions["_default"], "DEFAULT_ID")
+        self.assertEqual(regions["_eu_countries"], ["DE", "FR", "ES"])
+
+    def test_eu_country_codes_are_split_trimmed_and_uppercased(self):
+        self._set_fundraiseup_config(eu_country_codes=" de, fr ,es")
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["_eu_countries"], ["DE", "FR", "ES"])
+
+    def test_blank_region_field_falls_back_to_the_default(self):
+        """An editor who's only filled in some regions still gets a working
+        form for everyone else, rather than an empty element ID."""
+        self._set_fundraiseup_config(element_id_gb="", element_id_eu="")
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["GB"], "DEFAULT_ID")
+        self.assertEqual(regions["_eu"], "DEFAULT_ID")
+
+    def test_no_fundraiseup_config_yields_blank_defaults(self):
+        """Fundraise Up not configured/enabled at all — no request crash,
+        just an empty default (the anchor stays hidden, same as an
+        unconfigured ActionKit/ActBlue integration elsewhere)."""
+        self.integration.integrations = []
+        self.integration.save()
+        ctx = self._get_context()
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+        self.assertEqual(json.loads(ctx["fundraiseup_region_map_json"]), {"_default": ""})
+
+    def test_no_request_in_parent_context_does_not_crash(self):
+        """Mirrors DonateBlock's own ActBlue lookup — get_context() must
+        tolerate being called without a request (e.g. direct block-preview
+        rendering in tests) rather than raising."""
+        block = DonateFundraiseUpBlock()
+        ctx = block.get_context({"designation_id": ""}, parent_context={})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+
+    def _get_context_with_advanced(self, advanced_settings):
+        block = DonateFundraiseUpBlock()
+        request = RequestFactory().get("/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        return block.get_context(
+            {"designation_id": "", "advanced_settings": advanced_settings},
+            parent_context={"request": request},
+        )
+
+    def test_no_advanced_settings_key_behaves_like_no_override(self):
+        """A value dict with no advanced_settings key at all (e.g. content
+        saved before this field existed) must resolve identically to an
+        untouched one -- not crash on a missing key."""
+        self._set_fundraiseup_config()
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "US_ID")
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_empty_advanced_settings_behaves_like_no_override(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "US_ID")
+        self.assertEqual(regions["NL"], "NL_ID")
+        self.assertEqual(regions["_eu"], "EU_ID")
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_advanced_settings_overrides_one_region_only(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({"element_id_us": "BLOCK_US"})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "BLOCK_US")
+        # Every other region still resolves from the site-wide config.
+        self.assertEqual(regions["NL"], "NL_ID")
+        self.assertEqual(regions["_eu"], "EU_ID")
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+
+    def test_advanced_settings_default_overrides_site_default(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({"element_id_default": "BLOCK_DEFAULT"})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "BLOCK_DEFAULT")
+
+    def test_advanced_settings_default_is_this_blocks_own_fallback(self):
+        """A region left blank on both this block and the site config falls
+        back through the block's own default before the site's."""
+        self._set_fundraiseup_config(element_id_gb="")
+        ctx = self._get_context_with_advanced({"element_id_default": "BLOCK_DEFAULT"})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["GB"], "BLOCK_DEFAULT")
+
+    def test_advanced_settings_eu_country_codes_override_independently(self):
+        self._set_fundraiseup_config()
+        ctx = self._get_context_with_advanced({"eu_country_codes": "IT,PT"})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["_eu_countries"], ["IT", "PT"])
+        # element_id_eu itself is untouched, still from the site config.
+        self.assertEqual(regions["_eu"], "EU_ID")
+
+    def test_advanced_settings_ignored_when_integration_not_configured(self):
+        self.integration.integrations = []
+        self.integration.save()
+        ctx = self._get_context_with_advanced({"element_id_us": "BLOCK_US"})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+        self.assertEqual(json.loads(ctx["fundraiseup_region_map_json"]), {"_default": ""})
+
+
+class TestPageCardsBlockFields(SimpleTestCase):
+    """
+    content (heading+subheading merged) is optional. subheading used to
+    render as a plain paragraph despite its name, not an H3 — the merged
+    field only needs h2 support.
+    """
+
+    def test_content_is_optional(self):
+        block = PageCardsBlock()
+        self.assertFalse(block.declared_blocks["content"].required)
+
+    def test_content_supports_h2(self):
+        block = PageCardsBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
+
+    def test_no_separate_heading_or_subheading_fields(self):
+        block = PageCardsBlock()
+        self.assertNotIn("heading", block.declared_blocks)
+        self.assertNotIn("subheading", block.declared_blocks)
+
+    def test_category_is_optional(self):
+        block = PageCardsBlock()
+        self.assertFalse(block.declared_blocks["category"].required)
+
+
+class TestPageCardsBlockGetContext(TestCase):
+    """
+    PageCardsBlock.get_context() must pull the 3 most recently published
+    live/public children of index_page, newest first, as page_as_card()
+    dicts with a "date" key added.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-pcb")
+        root.add_child(instance=home)
+        cls.index = IndexPage(title="Blog", slug="blog-pcb")
+        home.add_child(instance=cls.index)
+
+        base_time = timezone.now() - timedelta(days=10)
+        cls.children = []
+        for i in range(5):
+            child = ContentPage(title=f"Post {i}", slug=f"post-pcb-{i}")
+            cls.index.add_child(instance=child)
+            child.first_published_at = base_time + timedelta(days=i)
+            child.save()
+            cls.children.append(child)
+
+        cls.draft_child = ContentPage(title="Draft Post", slug="draft-post-pcb", live=False)
+        cls.index.add_child(instance=cls.draft_child)
+
+    def test_returns_three_most_recent_cards_newest_first(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Post 4", "Post 3", "Post 2"])
+
+    def test_excludes_non_live_children(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertNotIn("Draft Post", headings)
+
+    def test_card_date_is_first_published_at(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        newest_card = context["cards"][0]
+        self.assertEqual(newest_card["date"], self.children[4].first_published_at)
+
+    def test_card_link_page_is_the_child_page(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.index})
+        newest_card = context["cards"][0]
+        self.assertEqual(newest_card["link_page"].pk, self.children[4].pk)
+
+    def test_no_index_page_returns_no_cards(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": None})
+        self.assertEqual(context["cards"], [])
+
+
+class TestPageCardsBlockBlogsOrdering(TestCase):
+    """
+    Pointed at a Blogs page (blog posts / press releases), the block must
+    order by the editor-controlled published_at — the date the cards
+    themselves show, and the order the Blogs listing uses — not by
+    Wagtail's first_published_at, which imported posts don't carry
+    meaningfully.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-pcb-blogs")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-pcb-blogs")
+        home.add_child(instance=cls.blogs)
+
+        now = timezone.now()
+        # published_at deliberately runs opposite to first_published_at, so
+        # a result ordered by the wrong field is unambiguous.
+        for i, title in enumerate(["Oldest", "Middle", "Newest", "Ancient"]):
+            post = Post(
+                title=title,
+                slug=f"post-pcb-blogs-{i}",
+                published_at=now - timedelta(days=[30, 20, 1, 400][i]),
+            )
+            cls.blogs.add_child(instance=post)
+            post.first_published_at = now - timedelta(days=i)
+            post.save()
+
+    def test_orders_by_published_at(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs})
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Newest", "Middle", "Oldest"])
+
+    def test_card_date_is_published_at(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs})
+        newest = Post.objects.get(slug="post-pcb-blogs-2")
+        self.assertEqual(context["cards"][0]["date"], newest.published_at)
+
+
+class TestBlogsGetListingQuerysetCategory(TestCase):
+    """
+    Blogs.get_listing_queryset(category=...) is the one place both
+    Blogs.get_context()'s own `?category=` filtering and PageCardsBlock's
+    optional category field draw from — see either's docstring. A filtered
+    "Latest updates" card row and this page's own filtered listing must
+    never disagree about which posts match a category.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-blogs-cat")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-blogs-cat")
+        home.add_child(instance=cls.blogs)
+
+        cls.climate = BlogCategory.objects.create(name="Climate", slug="climate-cat")
+        cls.justice = BlogCategory.objects.create(name="Justice", slug="justice-cat")
+
+        cls.climate_post = Post(title="Climate Post", slug="climate-post-cat")
+        cls.blogs.add_child(instance=cls.climate_post)
+        # ParentalManyToManyField.add() only updates the in-memory cluster —
+        # an explicit save() is needed to persist the M2M rows (see
+        # TestPageCardsBlockCategoryFilter's identical fixture below, and
+        # test_pages.py's own version of this same gotcha).
+        cls.climate_post.categories.add(cls.climate)
+        cls.climate_post.save()
+
+        cls.justice_post = Post(title="Justice Post", slug="justice-post-cat")
+        cls.blogs.add_child(instance=cls.justice_post)
+        cls.justice_post.categories.add(cls.justice)
+        cls.justice_post.save()
+
+        cls.uncategorized_post = Post(title="Uncategorized Post", slug="uncategorized-post-cat")
+        cls.blogs.add_child(instance=cls.uncategorized_post)
+
+    def test_no_category_returns_every_post(self):
+        titles = {p.title for p in self.blogs.get_listing_queryset()}
+        self.assertEqual(
+            titles, {"Climate Post", "Justice Post", "Uncategorized Post"}
+        )
+
+    def test_category_filters_to_matching_posts_only(self):
+        titles = {
+            p.title for p in self.blogs.get_listing_queryset(category=self.climate)
+        }
+        self.assertEqual(titles, {"Climate Post"})
+
+    def test_category_with_no_posts_returns_empty(self):
+        empty_category = BlogCategory.objects.create(name="Empty", slug="empty-cat")
+        qs = self.blogs.get_listing_queryset(category=empty_category)
+        self.assertEqual(list(qs), [])
+
+
+class TestPageCardsBlockCategoryFilter(TestCase):
+    """
+    PageCardsBlock.category is optional and only meaningful when
+    index_page resolves to a Blogs instance -- see the block's own
+    docstring. Reuses the same Blogs/BlogCategory fixture shape as
+    TestBlogsGetListingQuerysetCategory.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        home = HomePage(title="Home", slug="home-pcb-cat")
+        root.add_child(instance=home)
+        cls.blogs = Blogs(title="Blog", slug="blog-pcb-cat")
+        home.add_child(instance=cls.blogs)
+
+        cls.climate = BlogCategory.objects.create(name="Climate", slug="climate-pcb")
+
+        cls.climate_post = Post(title="Climate Post", slug="climate-post-pcb")
+        cls.blogs.add_child(instance=cls.climate_post)
+        # ParentalManyToManyField.add() only updates the in-memory cluster —
+        # save() is needed to persist it (see TestBlogsGetListingQuerysetCategory).
+        cls.climate_post.categories.add(cls.climate)
+        cls.climate_post.save()
+
+        cls.other_post = Post(title="Other Post", slug="other-post-pcb")
+        cls.blogs.add_child(instance=cls.other_post)
+
+        # A generic IndexPage has no category concept -- category must be
+        # silently ignored there rather than raise.
+        cls.index = IndexPage(title="Generic Index", slug="generic-index-pcb")
+        home.add_child(instance=cls.index)
+        cls.index_child = ContentPage(title="Index Child", slug="index-child-pcb")
+        cls.index.add_child(instance=cls.index_child)
+
+    def test_no_category_returns_all_posts(self):
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs, "category": None})
+        headings = {card["heading"] for card in context["cards"]}
+        self.assertEqual(headings, {"Climate Post", "Other Post"})
+
+    def test_category_filters_cards_to_matching_posts_only(self):
+        block = PageCardsBlock()
+        context = block.get_context(
+            {"index_page": self.blogs, "category": self.climate}
+        )
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Climate Post"])
+
+    def test_category_is_ignored_for_a_generic_index_page(self):
+        """
+        A generic IndexPage has no get_listing_queryset(category=...) --
+        setting a category must not raise, it should just fall back to the
+        page's normal unfiltered listing.
+        """
+        block = PageCardsBlock()
+        context = block.get_context(
+            {"index_page": self.index, "category": self.climate}
+        )
+        headings = [card["heading"] for card in context["cards"]]
+        self.assertEqual(headings, ["Index Child"])
+
+    def test_excludes_non_live_posts(self):
+        draft = Post(
+            title="Draft",
+            slug="post-pcb-blogs-draft",
+            live=False,
+            published_at=timezone.now(),
+        )
+        self.blogs.add_child(instance=draft)
+        block = PageCardsBlock()
+        context = block.get_context({"index_page": self.blogs})
+        self.assertNotIn("Draft", [card["heading"] for card in context["cards"]])
 
 
 class TestSectionContentBlockExtensibility(SimpleTestCase):
@@ -402,12 +2653,162 @@ class TestSectionContentBlockExtensibility(SimpleTestCase):
         self.assertIn("donate", block.child_blocks)
 
     def test_body_stream_block_matches_section_content_plus_section(self):
-        """BodyStreamBlock should have all SectionContentBlock types plus 'section'."""
+        """
+        BodyStreamBlock should have all SectionContentBlock types plus
+        'section' and 'timeline' — both are deliberately excluded from
+        SectionContentBlock (and so from TimelineYearContentBlock, which
+        subclasses it) to prevent infinite self-nesting, same reasoning for
+        both.
+        """
         body = BodyStreamBlock()
         section_content = SectionContentBlock()
         body_names = set(body.child_blocks.keys())
         section_names = set(section_content.child_blocks.keys())
-        self.assertEqual(body_names - section_names, {"section"})
+        self.assertEqual(body_names - section_names, {"section", "timeline"})
+
+
+class TestAccordionItemBlockContent(SimpleTestCase):
+    """
+    AccordionItemBlock.content (a StreamBlock, AccordionItemContentBlock --
+    see TimelineBlock/import_350_our_impact.py) replaced separate image/
+    video StructBlock fields, since ImageBlock.image (a required
+    ImageChooserBlock) and VideoBlock.clean() (always demands exactly one
+    of embed_url/media_file) each ignored the outer field's own
+    required=False and tripped a validation error on any item genuinely
+    missing an image or video -- most real items, per this class's own
+    documented "an item may set neither, either" intent. A StreamBlock
+    expresses "no image"/"no video" as "no such block in the list", which
+    isn't a validation edge case at all. See AGENTS.md pitfall #51.
+    """
+
+    def test_has_expected_fields(self):
+        block = AccordionItemBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"title", "content"})
+
+    def test_content_is_an_accordion_item_content_block(self):
+        block = AccordionItemBlock()
+        self.assertIsInstance(block.declared_blocks["content"], AccordionItemContentBlock)
+
+    def test_content_accepts_text_image_and_video_block_types(self):
+        content_block = AccordionItemContentBlock()
+        self.assertEqual(set(content_block.declared_blocks.keys()), {"text", "image", "video"})
+
+    def test_accordion_block_items_child_block_is_accordion_item_block(self):
+        block = AccordionBlock()
+        self.assertIsInstance(block.declared_blocks["items"].child_block, AccordionItemBlock)
+
+    def _clean(self, content_value):
+        block = AccordionItemBlock()
+        value = block.to_python({"title": "Item", "content": content_value})
+        return block.clean(value)
+
+    def test_an_item_with_neither_image_nor_video_is_valid(self):
+        self._clean([{"type": "text", "value": "<p>hello</p>", "id": "1"}])
+
+    def test_an_item_with_no_content_at_all_is_invalid(self):
+        # content itself is still required (StreamBlock's own default) --
+        # only the image/video block types within it are independently
+        # optional. An item needs at least some body content (e.g. a
+        # "text" entry), just not necessarily an image or a video.
+        with self.assertRaises(ValidationError):
+            self._clean([])
+
+    def test_an_item_with_an_embed_url_video_is_valid(self):
+        cleaned = self._clean(
+            [
+                {
+                    "type": "video",
+                    "value": {"embed_url": "https://www.youtube.com/watch?v=abc", "media_file": None, "caption": ""},
+                    "id": "1",
+                }
+            ]
+        )
+        self.assertEqual(cleaned["content"][0].block_type, "video")
+
+    def test_a_video_block_present_in_content_still_goes_through_videoblocks_own_clean(self):
+        # Patches VideoBlock.clean() to fail, rather than constructing a
+        # real invalid (both embed_url + media_file) value -- resolving a
+        # media_file chooser value needs a DB, which SimpleTestCase
+        # disallows. Confirms a "video" entry that IS present in the
+        # content stream still gets validated, i.e. the "skip validation
+        # when the whole item has no image/video" fix isn't accidentally
+        # skipping validation for one that's actually there.
+        with patch.object(VideoBlock, "clean", side_effect=ValidationError("boom")):
+            with self.assertRaises(ValidationError):
+                self._clean(
+                    [
+                        {
+                            "type": "video",
+                            "value": {
+                                "embed_url": "https://www.youtube.com/watch?v=abc",
+                                "media_file": None,
+                                "caption": "",
+                            },
+                            "id": "1",
+                        }
+                    ]
+                )
+
+
+class TestTimelineBlock(SimpleTestCase):
+    """
+    TimelineBlock: a list of years, each with a freely composed
+    TimelineYearContentBlock stream, plus a year-jump nav computed in
+    get_context() from whichever years are actually present (AGENTS.md
+    pitfall #44's derived-context pattern, same as CardGridBlock's rows).
+    """
+
+    def test_has_expected_fields(self):
+        block = TimelineBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"years"})
+
+    def test_years_min_num_is_one(self):
+        block = TimelineBlock()
+        self.assertEqual(block.declared_blocks["years"].meta.min_num, 1)
+
+    def test_years_child_block_is_timeline_year_block(self):
+        block = TimelineBlock()
+        self.assertIsInstance(block.declared_blocks["years"].child_block, TimelineYearBlock)
+
+    def test_year_block_has_expected_fields(self):
+        block = TimelineYearBlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"year", "content"})
+
+    def test_year_content_is_timeline_year_content_block(self):
+        block = TimelineYearBlock()
+        self.assertIsInstance(block.declared_blocks["content"], TimelineYearContentBlock)
+
+    def test_timeline_year_content_block_matches_section_content_block(self):
+        """
+        TimelineYearContentBlock starts identical to SectionContentBlock
+        (same DeclarativeSubBlocksMetaclass pattern, rule #9) and must not
+        include 'timeline' itself -- that would let a year's content embed
+        another timeline, which is exactly the self-nesting SectionContentBlock
+        already avoids by excluding 'section'.
+        """
+        year_content = TimelineYearContentBlock()
+        section_content = SectionContentBlock()
+        self.assertEqual(
+            set(year_content.child_blocks.keys()), set(section_content.child_blocks.keys())
+        )
+        self.assertNotIn("timeline", year_content.child_blocks)
+
+    def test_get_context_builds_year_nav_from_years_in_order(self):
+        block = TimelineBlock()
+        value = {
+            "years": [
+                {"year": "2019", "content": []},
+                {"year": "2021", "content": []},
+            ]
+        }
+        ctx = block.get_context(value, parent_context={})
+        self.assertEqual(
+            ctx["year_nav"],
+            [
+                {"year": "2019", "anchor": "timeline-year-2019"},
+                {"year": "2021", "anchor": "timeline-year-2021"},
+            ],
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -507,11 +2908,12 @@ class TestSignupActionNetworkBlockValidation(SimpleTestCase):
     """SignupActionNetworkBlock.clean() validates the pasted Action Network URL."""
 
     def _raw(
-        self, action_url="https://actionnetwork.org/forms/join-30", heading="Sign Up"
+        self,
+        action_url="https://actionnetwork.org/forms/join-30",
+        content="<h2>Sign Up</h2>",
     ):
         return {
-            "heading": heading,
-            "description": "",
+            "content": content,
             "action_url": action_url,
             "success_message": "",
             "anchor_id": "",
@@ -551,12 +2953,12 @@ class TestSignupActionNetworkBlockValidation(SimpleTestCase):
         with self.assertRaises(ValidationError):
             block.clean(value)
 
-    def test_heading_optional(self):
-        """heading is now optional — omitting it must not raise."""
+    def test_content_optional(self):
+        """content is optional — omitting it must not raise."""
         block = SignupActionNetworkBlock()
-        value = block.to_python(self._raw(heading=""))
+        value = block.to_python(self._raw(content=""))
         cleaned = block.clean(value)
-        self.assertEqual(cleaned["heading"], "")
+        self.assertEqual(str(cleaned["content"]), "")
 
     def test_action_url_required(self):
         block = SignupActionNetworkBlock()
@@ -577,8 +2979,12 @@ class TestSignupActionNetworkBlockValidation(SimpleTestCase):
 
     def test_has_expected_fields(self):
         block = SignupActionNetworkBlock()
-        expected = {"heading", "description", "action_url", "success_message", "anchor_id"}
+        expected = {"content", "action_url", "success_message", "anchor_id"}
         self.assertEqual(set(block.declared_blocks.keys()), expected)
+
+    def test_content_supports_h2(self):
+        block = SignupActionNetworkBlock()
+        self.assertIn("h2", block.declared_blocks["content"].features)
 
 
 class TestSignupActionNetworkBlockContext(SimpleTestCase):
@@ -689,3 +3095,402 @@ class TestSuccessMessageBlock(SimpleTestCase):
         )
         self.assertTrue(results[0])
         self.assertFalse(results[1])
+
+
+class TestSharedBackgroundPalette(SimpleTestCase):
+    """
+    Every block with a background choice offers the same fills. Before the
+    palette was unified each carried its own list, so the same visual
+    decision was made from a different vocabulary depending on which block
+    an editor was standing in — see BACKGROUND_COLOR_CHOICES.
+    """
+
+    # (block class, name of its background field). CalloutBlock and
+    # HeroBlock call theirs "color"/"banner_color" rather than "background";
+    # the field name is per-block, the choices are not.
+    BACKGROUND_FIELDS = [
+        (SectionBlock, "background"),
+        (CalloutBlock, "color"),
+        (FeaturePanelBlock, "background"),
+        (HeroBlock, "banner_color"),
+        (SignupActionKitBlock, "background"),
+    ]
+
+    def test_every_background_field_offers_the_whole_palette(self):
+        expected = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        for block_class, field_name in self.BACKGROUND_FIELDS:
+            with self.subTest(block=block_class.__name__):
+                block = block_class()
+                choices = {
+                    value
+                    for value, _label in block.child_blocks[field_name].field.choices
+                }
+                self.assertEqual(choices, expected)
+
+    def test_every_default_is_a_palette_key(self):
+        """
+        Defaults are allowed to differ per block — a section defaults to the
+        plain page background, a hero banner to navy — but every one of them
+        has to name a fill that actually exists.
+        """
+        keys = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        for block_class, field_name in self.BACKGROUND_FIELDS:
+            with self.subTest(block=block_class.__name__):
+                block = block_class()
+                self.assertIn(block.child_blocks[field_name].get_default(), keys)
+
+    def test_legacy_values_map_onto_real_palette_keys(self):
+        keys = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        self.assertTrue(set(LEGACY_BACKGROUND_VALUES.values()) <= keys)
+        # A legacy key must not also be a live one, or resolution would
+        # silently rewrite a value an editor deliberately chose.
+        self.assertFalse(set(LEGACY_BACKGROUND_VALUES) & keys)
+
+    def test_light_fills_are_palette_keys(self):
+        keys = {value for value, _label in BACKGROUND_COLOR_CHOICES}
+        self.assertTrue(LIGHT_BACKGROUND_COLORS <= keys)
+
+
+class TestBackgroundResolution(SimpleTestCase):
+    """
+    resolve_background() / background_is_light() — the render-path fallback
+    that keeps pre-palette values working. Migration 0040 rewrites the ones
+    stored on live pages, but reverting to an old page revision republishes
+    that revision's JSON verbatim, so legacy keys can always come back.
+    """
+
+    def test_canonical_values_pass_through(self):
+        for value, _label in BACKGROUND_COLOR_CHOICES:
+            with self.subTest(value=value):
+                self.assertEqual(resolve_background(value), value)
+
+    def test_legacy_values_are_translated(self):
+        self.assertEqual(resolve_background("light"), "white")
+        self.assertEqual(resolve_background("dark"), "dark-grey")
+        self.assertEqual(resolve_background("muted"), "light-grey")
+        self.assertEqual(resolve_background("primary"), "blue-gradient")
+        self.assertEqual(resolve_background("secondary"), "navy")
+
+    def test_unknown_values_fall_back_rather_than_emitting_a_dead_class(self):
+        """
+        An unrecognised key must not reach the template: `.wtr-bg-<junk>`
+        matches no rule, leaving a transparent panel with light text on it.
+        """
+        self.assertEqual(resolve_background("chartreuse"), "white")
+        self.assertEqual(resolve_background(None), "white")
+        self.assertEqual(resolve_background("chartreuse", default="navy"), "navy")
+
+    def test_light_fills_are_the_ones_needing_dark_text(self):
+        self.assertTrue(background_is_light("white"))
+        self.assertTrue(background_is_light("light-grey"))
+        for value in ("dark-grey", "navy", "red", "blue-gradient"):
+            with self.subTest(value=value):
+                self.assertFalse(background_is_light(value))
+
+    def test_legacy_light_values_are_light(self):
+        self.assertTrue(background_is_light("light"))
+        self.assertTrue(background_is_light("muted"))
+        self.assertFalse(background_is_light("dark"))
+
+
+class TestIntegrationGatedStreamBlockVisibility(TestCase):
+    """
+    IntegrationGatedStreamBlockMixin (wtrx/blocks/__init__.py) filters
+    BodyStreamBlock/SectionContentBlock's "Add block" picker
+    (ordered_child_blocks()/grouped_child_blocks()) by IntegrationSettings,
+    without ever touching child_blocks itself — see the mixin's docstring
+    for why that split matters.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+
+    def _set_integrations(self, data):
+        self.integration.integrations = data
+        self.integration.save()
+
+    def _set_current_request(self):
+        request = RequestFactory().get("/admin/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        token = _current_request.set(request)
+        self.addCleanup(_current_request.reset, token)
+
+    def test_no_request_context_shows_everything(self):
+        """
+        A management command or test with no request in scope must never
+        silently hide content — see
+        _hidden_block_names_for_current_request()'s docstring.
+        """
+        self._set_integrations([])
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
+        self.assertIn("donate", names)
+        self.assertIn("signup_actionkit", names)
+
+    def test_disabled_integration_hides_its_block_from_picker(self):
+        self._set_integrations([])
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
+        self.assertNotIn("donate", names)  # actblue disabled
+        self.assertNotIn("signup_actionkit", names)  # actionkit disabled
+
+    def test_enabled_integration_keeps_its_block_in_picker(self):
+        self._set_integrations(
+            [
+                (
+                    "actblue",
+                    {
+                        "enabled": True,
+                        "base_url": "",
+                        "suggested_amounts": "",
+                        "default_recurring": False,
+                    },
+                )
+            ]
+        )
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
+        self.assertIn("donate", names)
+        self.assertNotIn("donate_fundraiseup", names)
+
+    def test_wagtail_forms_visible_by_default(self):
+        self._set_integrations([])
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
+        self.assertIn("signup_wagtail_forms", names)
+
+    def test_disabling_wagtail_forms_hides_it(self):
+        self._set_integrations([("wagtail_forms", {"enabled": False})])
+        self._set_current_request()
+        names = {b.name for b in BodyStreamBlock().ordered_child_blocks()}
+        self.assertNotIn("signup_wagtail_forms", names)
+
+    def test_child_blocks_always_contains_every_block_regardless_of_context(self):
+        """
+        The critical safety property: hiding a block from the picker must
+        never affect child_blocks, which parsing/rendering/validation read
+        directly — see IntegrationGatedStreamBlockMixin's docstring.
+        """
+        self._set_integrations([])
+        self._set_current_request()
+        block = BodyStreamBlock()
+        self.assertNotIn("donate", {b.name for b in block.ordered_child_blocks()})
+        self.assertIn("donate", block.child_blocks)
+
+    def test_existing_content_of_a_now_hidden_block_type_still_round_trips(self):
+        """
+        A page that already has a `donate` block placed while ActBlue was
+        enabled must keep rendering correctly after ActBlue is disabled —
+        this is the whole reason child_blocks is never filtered.
+        """
+        self._set_integrations([])  # actblue disabled
+        self._set_current_request()
+        block = BodyStreamBlock()
+        donate_block = block.child_blocks["donate"]
+        default_value = donate_block.get_default()
+        stream_value = block.to_python(
+            [
+                {
+                    "type": "donate",
+                    "value": donate_block.get_prep_value(default_value),
+                    "id": "test-id",
+                }
+            ]
+        )
+        self.assertEqual(stream_value[0].block_type, "donate")
+
+    def test_section_content_block_also_filters(self):
+        self._set_integrations([])
+        self._set_current_request()
+        names = {b.name for b in SectionContentBlock().ordered_child_blocks()}
+        self.assertNotIn("donate", names)
+
+
+class TestGatedStreamBlockAdapter(TestCase):
+    """
+    GatedStreamBlockAdapter (wtrx/blocks/__init__.py) is the fix for the gap
+    documented in AGENTS.md pitfall #52: the JS StreamField widget uses
+    js_args()'s groupedChildBlockDefs argument for two things, not one --
+    the "Add block" picker AND childBlockDefsByName, which an
+    already-placed block's own hydration looks itself up in. Filtering that
+    argument (what the base StreamBlockAdapter does) hides a gated block
+    from the picker but also breaks loading an existing page that already
+    has one placed.
+
+    These tests can only exercise the Python side (what gets sent to the
+    client) -- the actual hydration crash this fixes happened inside the
+    compiled admin JS bundle and can only be reproduced/verified in a real
+    browser (see AGENTS.md pitfall #52 and the how-to-give workstream in
+    the review-follow-ups plan for the manual verification steps). What's
+    provable here is the contract the JS fix depends on: the full,
+    ungated block-def list must always reach the client, regardless of
+    what's hidden from the picker.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+        self.integration.integrations = []  # actblue, actionkit both disabled
+        self.integration.save()
+        request = RequestFactory().get("/admin/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        token = _current_request.set(request)
+        self.addCleanup(_current_request.reset, token)
+
+    def _flattened_names(self, grouped_child_block_defs):
+        names = set()
+        for _group_name, group in grouped_child_block_defs:
+            for child_block in group:
+                names.add(child_block.name)
+        return names
+
+    def test_js_args_sends_full_ungated_block_defs(self):
+        """
+        The critical safety property this whole adapter exists for: even
+        though `donate` is hidden from the picker (actblue is disabled),
+        it must still be present in the block-def list js_args() sends --
+        that's what childBlockDefsByName gets built from client-side, and
+        what an already-placed `donate` block's hydration depends on.
+        """
+        block = BodyStreamBlock()
+        adapter = GatedStreamBlockAdapter()
+        args = adapter.js_args(block)
+        names = self._flattened_names(args[1])
+        self.assertIn("donate", names)
+        self.assertIn("signup_actionkit", names)
+        # Sanity check against the (correctly filtered) picker, to prove
+        # this isn't just "filtering silently did nothing":
+        picker_names = {b.name for b in block.ordered_child_blocks()}
+        self.assertNotIn("donate", picker_names)
+
+    def test_js_args_appends_hidden_block_names(self):
+        block = BodyStreamBlock()
+        adapter = GatedStreamBlockAdapter()
+        args = adapter.js_args(block)
+        hidden_names = args[4]
+        self.assertIn("donate", hidden_names)
+        self.assertIn("signup_actionkit", hidden_names)
+        self.assertNotIn("signup_wagtail_forms", hidden_names)
+
+    def test_js_constructor_is_the_custom_client_side_class(self):
+        self.assertEqual(
+            GatedStreamBlockAdapter().js_constructor, "wtrx.blocks.GatedStreamBlock"
+        )
+
+    def test_gated_stream_blocks_resolve_to_the_custom_adapter(self):
+        """
+        Telepath's registry walks the MRO (registry.find_adapter()), so
+        registering GatedStreamBlockAdapter against BodyStreamBlock/
+        SectionContentBlock specifically must take precedence over the
+        base StreamBlockAdapter registered for StreamBlock itself -- or
+        this whole fix silently never runs.
+        """
+        from wagtail.admin.telepath import registry
+        from wtrx.blocks import BodyStreamBlock, SectionContentBlock
+
+        self.assertIsInstance(
+            registry.find_adapter(BodyStreamBlock), GatedStreamBlockAdapter
+        )
+        self.assertIsInstance(
+            registry.find_adapter(SectionContentBlock), GatedStreamBlockAdapter
+        )
+
+
+class TestSignupActionKitPostSignupDonation(TestCase):
+    """
+    PostSignupDonationBlock: both ActionKit signup blocks hand a Fundraise Up
+    campaign code to _actionkit_form.html, which opens its checkout in place
+    of the thank-you box — but only while the Fundraise Up integration is
+    enabled, since its script is what makes openCheckout() exist.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+
+    def _set_fundraiseup(self, enabled=True):
+        self.integration.integrations = [
+            ("fundraiseup", {"enabled": enabled, "installation_code": "<script>fru</script>"})
+        ]
+        self.integration.save()
+
+    def _get_context(self, block_class, donation):
+        block = block_class()
+        request = RequestFactory().get("/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        value = block.to_python({"short_form_id": "join", "post_signup_donation": donation})
+        return block.get_context(value, parent_context={"request": request})
+
+    def test_both_signup_blocks_offer_the_field(self):
+        for block_class in (SignupActionKitBlock, HeroSignupActionKitBlock):
+            self.assertIn("post_signup_donation", block_class().child_blocks)
+            self.assertFalse(block_class().child_blocks["post_signup_donation"].required)
+
+    def test_campaign_and_designation_reach_the_template_when_enabled(self):
+        self._set_fundraiseup()
+        for block_class in (SignupActionKitBlock, HeroSignupActionKitBlock):
+            ctx = self._get_context(block_class, {"campaign_code": "FUNABC", "designation_id": "EDEF"})
+            self.assertEqual(ctx["fundraiseup_campaign_code"], "FUNABC")
+            self.assertEqual(ctx["fundraiseup_designation_id"], "EDEF")
+
+    def test_campaign_is_dropped_when_fundraiseup_is_disabled(self):
+        self._set_fundraiseup(enabled=False)
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code": "FUNABC", "designation_id": "EDEF"})
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "")
+        self.assertEqual(ctx["fundraiseup_designation_id"], "")
+
+    def test_blank_section_leaves_the_thank_you_flow_alone(self):
+        self._set_fundraiseup()
+        ctx = self._get_context(SignupActionKitBlock, {})
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "")
+
+    def test_country_campaigns_reach_the_template(self):
+        self._set_fundraiseup()
+        ctx = self._get_context(
+            SignupActionKitBlock,
+            {"campaign_code": "FUNROW", "campaign_code_us": "FUNUS", "campaign_code_ca": "FUNCA"},
+        )
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "FUNROW")
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "FUNUS")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "FUNCA")
+
+    def test_blank_country_campaign_falls_back_to_rest_of_world(self):
+        """Also what a block saved before the country fields existed looks like."""
+        self._set_fundraiseup()
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code": "FUNROW", "campaign_code_ca": "FUNCA"})
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "FUNROW")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "FUNCA")
+
+    def test_country_only_campaign_keeps_its_designation(self):
+        """No rest of world campaign: only that country gets a checkout."""
+        self._set_fundraiseup()
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code_us": "FUNUS", "designation_id": "EDEF"})
+        self.assertEqual(ctx["fundraiseup_campaign_code"], "")
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "FUNUS")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "")
+        self.assertEqual(ctx["fundraiseup_designation_id"], "EDEF")
+
+    def test_country_campaigns_are_dropped_when_fundraiseup_is_disabled(self):
+        self._set_fundraiseup(enabled=False)
+        ctx = self._get_context(SignupActionKitBlock, {"campaign_code_us": "FUNUS", "campaign_code_ca": "FUNCA"})
+        self.assertEqual(ctx["fundraiseup_campaign_code_us"], "")
+        self.assertEqual(ctx["fundraiseup_campaign_code_ca"], "")
+
+    def test_campaign_code_is_not_translatable(self):
+        """Pitfall #66: an identifier handed to a translator comes back broken."""
+        from wtrx.blocks import IdentifierBlock, PostSignupDonationBlock
+
+        for name, child in PostSignupDonationBlock().child_blocks.items():
+            self.assertIsInstance(child, IdentifierBlock, name)

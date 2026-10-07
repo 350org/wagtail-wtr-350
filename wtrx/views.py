@@ -1,17 +1,162 @@
-from django.shortcuts import render
+import logging
 
-from wagtail.models import Page
+import requests
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.utils.translation import gettext as _
+from django.views.decorators.http import require_POST
+
+from wagtail.models import Locale, Page, Site
+
+from .integrations import actionkit
+from .integrations.actionkit import ActionKitError
+from .site_settings import IntegrationSettings
+
+logger = logging.getLogger(__name__)
+
+# Hidden bookkeeping fields ActionKit's own fragment adds to the form —
+# not donor data, so excluded before map_form_fields turns unrecognised
+# keys into user_<name> custom fields on the ActionKit record.
+_ACTIONKIT_BOOKKEEPING_FIELDS = {
+    "page",
+    "utf8",
+    "form_name",
+    "url",
+    "js",
+    "auto_country",
+    "csrfmiddlewaretoken",
+}
+
+# Attribution values the form's script copies in from the page URL, the way
+# actionkit.js's onContextLoaded() does on an ActionKit-hosted page. Sent to
+# ActionKit under their own names: as user_<name> custom fields they would
+# record nothing ActionKit reports on.
+_ACTIONKIT_TRACKING_FIELDS = (
+    "source",
+    "akid",
+    "referring_akid",
+    "aktmid",
+    "action_id",
+)
+
+
+@require_POST
+def actionkit_inline_signup(request):
+    """
+    Same-origin AJAX endpoint for SignupActionKitBlock's inline success_message mode.
+
+    ActionKit's normal submission is a full-page POST straight to ActionKit's
+    own server, which redirects to its thank-you page on success — there's no
+    client-side success/failure signal to hook a "show a message instead"
+    feature onto. When a block has success_message configured, its template
+    posts the form here instead, and we forward it server-side via the
+    already-tested integrations.actionkit.submit_action REST call (the same
+    one FormPage.process_form_submission uses), which gives an actual
+    success/failure result to respond with. This path does not go through
+    ActionKit's own recaptcha check — the same trade-off FormPage forwarding
+    already accepts.
+    """
+    short_form_id = request.POST.get("page", "").strip()
+    if not short_form_id:
+        return JsonResponse(
+            {"success": False, "message": _("Missing ActionKit page.")}, status=400
+        )
+
+    try:
+        integration = IntegrationSettings.for_request(request)
+    except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+        return JsonResponse(
+            {"success": False, "message": _("Signup is not configured.")}, status=503
+        )
+
+    actionkit_config = integration.get_integration_config("actionkit")
+    if not actionkit_config:
+        return JsonResponse(
+            {"success": False, "message": _("Signup is not configured.")}, status=503
+        )
+
+    posted = {
+        key: value
+        for key, value in request.POST.items()
+        if key not in _ACTIONKIT_BOOKKEEPING_FIELDS
+        and key not in _ACTIONKIT_TRACKING_FIELDS
+    }
+    fields = actionkit.map_form_fields(posted)
+    for name in _ACTIONKIT_TRACKING_FIELDS:
+        value = request.POST.get(name, "").strip()
+        if value:
+            fields[name] = value
+    if not fields.get("email"):
+        return JsonResponse(
+            {"success": False, "message": _("Email address is required.")}, status=400
+        )
+
+    try:
+        action = actionkit.submit_action(
+            actionkit_config.get("hostname"),
+            actionkit_config.get("api_username"),
+            integration.get_actionkit_api_password(),
+            short_form_id,
+            fields,
+        )
+    except (ActionKitError, requests.RequestException):
+        logger.exception(
+            "ActionKit inline signup forwarding failed for page %s.", short_form_id
+        )
+        return JsonResponse(
+            {
+                "success": False,
+                "message": _("Something went wrong. Please try again."),
+            },
+            status=502,
+        )
+
+    payload = {"success": True}
+    redirect = actionkit.signup_redirect(
+        actionkit_config.get("hostname"), short_form_id, action
+    )
+    if redirect:
+        (
+            payload["redirect_url"],
+            payload["redirect_is_actionkit"],
+            payload["redirect_is_default"],
+        ) = redirect
+    return JsonResponse(payload)
+
+
+def no_cms_access(request):
+    """
+    Landing page for a logged-in user with no Wagtail admin access.
+
+    Google SSO auto-creates an account for anyone in the allowed domain
+    (see allauth_adapter.py), but that alone grants no CMS permissions — a
+    superuser still has to add them to an Editor/Moderator group. Before
+    that happens, allauth's default post-login redirect
+    (NoSignupAccountAdapter.get_login_redirect_url) sends them here instead
+    of Django's default `/accounts/profile/`, which isn't a real page in
+    this project and 404s.
+    """
+    return render(request, "wtrx/no_cms_access.html")
 
 
 def search(request):
     search_query = request.GET.get("query", None)
 
     if search_query:
-        # Search all live pages, then post-filter pages that have opted out.
-        # hide_from_search sits on each concrete BasePage subclass table, so a
-        # single-query ORM filter is not possible without a raw join. The
-        # post-filter approach is the accepted Wagtail pattern.
-        raw_results = Page.objects.live().search(search_query)
+        # Scoped to the language being browsed. Each language is its own page
+        # tree (one per locale), so an unscoped search returns every site's
+        # content at once -- a visitor searching from /brasil/ would get mostly
+        # French and Indonesian pages, none of which they can read, and all at
+        # URLs outside the site they are on. `get_active()` follows the URL
+        # prefix via LocaleMiddleware and falls back to the default locale.
+        #
+        # Search all live pages in that locale, then post-filter pages that
+        # have opted out. hide_from_search sits on each concrete BasePage
+        # subclass table, so a single-query ORM filter is not possible without
+        # a raw join. The post-filter approach is the accepted Wagtail pattern.
+        raw_results = (
+            Page.objects.live().filter(locale=Locale.get_active()).search(search_query)
+        )
         search_results = [
             p for p in raw_results if not getattr(p.specific, "hide_from_search", False)
         ]

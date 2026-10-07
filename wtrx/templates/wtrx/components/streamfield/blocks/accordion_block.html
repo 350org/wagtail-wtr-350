@@ -1,10 +1,48 @@
-{% load i18n wagtailcore_tags %}
-<div class="wtr-accordion divide-y divide-neutral-200 rounded-lg border border-neutral-200" data-accordion>
+{% load i18n wagtailcore_tags wagtailimages_tags wagtailembeds_tags %}
+{% comment %}
+Per Figma's "Get the full picture." (node 1:1273): each item is its own
+filled, bordered card — not rows sharing one outer border with hairline
+dividers between them. The 16px gap between cards is the whole visual idea
+of the component, so the outer element carries no chrome at all and each
+.accordion-item carries the fill, border and radius instead.
+
+The cards are light (neutral-50 fill, neutral-200 border, dark text)
+regardless of what they sit on. Figma draws this stack on a dark section,
+and the cards stay light there — so unlike most blocks there is no
+in-data-[bg=dark] inversion on the item chrome itself, and the answer body
+doesn't invert either (see the "text" branch below): the answer panel is
+always bg-white, and `in-data-[bg-tone=dark]:prose-invert` reacts to *any*
+ancestor's data-bg-tone, not the nearest one — CSS descendant selectors
+have no "nearest ancestor wins" concept the way JS's .closest() does — so a
+dark-background SectionBlock several levels up would otherwise invert this
+always-light answer to white-on-white.
+{% endcomment %}
+{% if value.heading %}
+    {% comment %}
+    Same markup/classes as CardGridBlock's heading — centered display
+    heading, inverting with in-data-[bg-tone=dark] same as CardGridBlock's
+    (the heading sits outside the item chrome, which per the note above
+    always stays light regardless of section background).
+    {% endcomment %}
+    <div class="mx-auto max-w-3xl text-center">
+        <h2 class="font-heading text-3xl tracking-tight text-dark in-data-[bg-tone=dark]:text-light sm:text-4xl lg:text-5xl mb-10">{{ value.heading }}</h2>
+    </div>
+{% endif %}
+<div class="wtr-accordion flex flex-col gap-4" data-accordion>
     {% for item in value.items %}
-        <div class="accordion-item">
+        <div class="accordion-item overflow-hidden rounded-lg border-2 border-neutral-200 bg-neutral-50">
             <button
                 type="button"
-                class="flex w-full items-center justify-between px-5 py-4 text-left font-heading font-semibold hover:bg-neutral-50/20"
+                {% comment %}
+                py-6 unconditionally: the title keeps 24px above and below it
+                whether the item is open or shut. The answer panel below owns
+                its own matching 24px, so an expanded item reads as two
+                separately padded regions (48px between title and answer)
+                rather than one shared gap — an earlier version had the
+                button drop to pb-0 while expanded to make that 24px, which
+                left the title flush against the answer.
+                {% endcomment %}
+                class="flex w-full items-center justify-between gap-4 px-8 py-6 text-left font-body text-lg leading-[1.429] text-dark transition-colors hover:bg-neutral-200/50 sm:text-xl"
                 aria-expanded="false"
                 data-accordion-toggle
             >
@@ -13,8 +51,82 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <div class="hidden px-5 py-4 prose prose-neutral max-w-none in-data-[bg=dark]:prose-invert in-data-[bg=primary]:prose-invert in-data-[bg=secondary]:prose-invert" data-accordion-content>
-                {% include_block item.content %}
+            {% comment %}
+            The answer's inner spacing is this panel's own pt-6/pb-6, and
+            bg-white separates it from the card's neutral-50 fill so the two
+            padded regions read as distinct. That balance holds only while
+            prose's
+            `> :first-child { margin-top: 0 }` / `> :last-child
+            { margin-bottom: 0 }` resets actually bite. They are direct-child
+            rules, so a rich-text answer that opens or closes with a list
+            leaks its first/last <li>'s own 0.5em margin past the reset and
+            the answer sits ~7px lower in its card than it sits high — the
+            visible symptom on /take-action/renew-our-power/, whose answers
+            all end in a <ul>. The two arbitrary variants below extend the
+            same reset one level down, to the first/last grandchild, which is
+            as deep as rich text nests (li in ul/ol, p in blockquote).
+            {% endcomment %}
+            <div class="hidden bg-white px-8 pt-6 pb-6 prose prose-neutral max-w-none text-lg sm:text-xl
+                        [&>:first-child>:first-child]:mt-0 [&>:last-child>:last-child]:mb-0"
+                 data-accordion-content>
+                {% for block in item.content %}
+                    {% if block.block_type == "text" %}
+                        {% comment %}
+                        Rendered directly here rather than via {% include_block
+                        block %} -- text_block.html's own markup carries
+                        in-data-[bg-tone=dark]:prose-invert, which this answer
+                        panel must never pick up (see the comment above).
+                        Same wtr-text-block/prose classes otherwise, so a
+                        heading typed here still matches main.css's shared
+                        heading-size rules.
+                        {% endcomment %}
+                        <div class="wtr-text-block prose prose-neutral max-w-none text-lg sm:text-xl">
+                            {{ block.value|richtext }}
+                        </div>
+                    {% elif block.block_type == "image" %}
+                        {% comment %}
+                        Rendered directly here rather than via {% include_block
+                        block %} — ImageBlock's own template is built for
+                        full-bleed page-level placement (image_block.html's
+                        max-w-[1500px] wrapper), which would misalign inside
+                        this narrow, padded card. not-prose keeps Typography's
+                        own `.prose img` margins from fighting the explicit
+                        mt-6 here.
+                        {% endcomment %}
+                        {% image block.value.image width-1200 as img %}
+                        <img
+                            src="{{ img.url }}"
+                            width="{{ img.width }}"
+                            height="{{ img.height }}"
+                            alt="{{ block.value.alt_text|default:img.alt }}"
+                            class="not-prose mt-6 w-full rounded-lg"
+                            loading="lazy"
+                        />
+                        {% if block.value.caption %}
+                            <p class="not-prose mt-2 text-sm opacity-60">{{ block.value.caption }}</p>
+                        {% endif %}
+                    {% elif block.block_type == "video" %}
+                        <div class="not-prose relative mt-6 aspect-video w-full overflow-hidden rounded-lg [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:w-full [&>iframe]:h-full">
+                            {% if block.value.embed_url %}
+                                {% embed block.value.embed_url %}
+                            {% else %}
+                                <video
+                                    controls
+                                    class="h-full w-full"
+                                    {% if block.value.media_file.thumbnail %}poster="{{ block.value.media_file.thumbnail.url }}"{% endif %}
+                                >
+                                    {% for source in block.value.media_file.sources %}
+                                        <source src="{{ source.src }}" type="{{ source.type }}">
+                                    {% endfor %}
+                                    {% trans "Your browser does not support the video tag." %}
+                                </video>
+                            {% endif %}
+                        </div>
+                        {% if block.value.caption %}
+                            <p class="not-prose mt-2 text-sm opacity-60">{{ block.value.caption }}</p>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
             </div>
         </div>
     {% endfor %}

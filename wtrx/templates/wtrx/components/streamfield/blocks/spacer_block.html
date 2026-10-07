@@ -1,0 +1,6 @@
+{% comment %}
+Empty space only. Sizes are spelled out in full so Tailwind's scanner sees
+every class. The gap after it is zeroed in main.css ("Body-stack spacing"),
+so the spacer adds to the gap before it rather than doubling the stack's gap.
+{% endcomment %}
+<div class="wtr-spacer {% if value.size == 'small' %}h-8{% elif value.size == 'large' %}h-32{% else %}h-16{% endif %}" aria-hidden="true"></div>

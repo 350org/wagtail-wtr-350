@@ -1,7 +1,21 @@
-from django import template
-from django.utils.html import format_html
+import json
 
-from wtrx.site_settings import SOCIAL_PLATFORM_CHOICES
+from django import template
+from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.html import _json_script_escapes, format_html, strip_tags
+from django.utils.safestring import mark_safe
+from wagtail.models import Locale, Site
+
+from wtrx.blocks import background_is_light as _background_is_light, resolve_background
+from wtrx.integrations import actionkit
+from wtrx.site_settings import (
+    SOCIAL_PLATFORM_CHOICES,
+    BrandingSEOSettings,
+    FooterSettings,
+    IntegrationSettings,
+    NavigationSettings,
+)
 
 
 register = template.Library()
@@ -21,6 +35,252 @@ register = template.Library()
 #   settings.wtrx.BrandingSEOSettings.site_description
 #
 # Add project-specific template tags below.
+
+
+# ---------------------------------------------------------------------------
+# Background palette helpers
+# ---------------------------------------------------------------------------
+
+
+@register.filter
+def background_key(value):
+    """
+    Normalise a stored background value to its canonical palette key.
+
+    Every block with a background choice draws its fill from one shared
+    palette (BACKGROUND_COLOR_CHOICES) and renders it as a
+    `.wtr-bg-{key}` class. Content saved before the palette was unified —
+    and any page revision reverted to from before it — can still hold a
+    per-block legacy key ("light", "dark", "muted", ...), so the class name
+    is always built through this filter rather than interpolating the raw
+    value:
+
+        <div class="wtr-bg-{{ value.background|background_key }}">
+    """
+    return resolve_background(value)
+
+
+@register.filter
+def background_is_light(value):
+    """
+    True when a background needs dark text, a dark-outline button and an
+    inverted eyebrow pill instead of the light-on-color default.
+
+    Templates branch on this rather than testing colour keys inline, so
+    adding a light fill to the palette does not mean hunting down a
+    scattered `== 'light-grey'` check across five block templates:
+
+        {% if value.background|background_is_light %}text-dark{% else %}text-light{% endif %}
+    """
+    return _background_is_light(value)
+
+
+_RICHTEXT_NON_TEXT_CONTENT = ("<img", "<iframe", "<embed", "<hr")
+
+
+@register.filter
+def richtext_has_content(value):
+    """
+    True when a rich text value has something to show: text, or an image,
+    embed or rule.
+
+    Bare truthiness isn't enough. Draftail leaves an empty paragraph behind
+    when an editor clears a field, so a field that looks blank in the admin
+    still stores `<p data-block-key="..."></p>` and is truthy — which, on a
+    block that falls back to other copy when its field is blank, switches
+    the fallback off and renders nothing in its place.
+    """
+    source = str(getattr(value, "source", value) or "")
+    if strip_tags(source).replace("&nbsp;", " ").strip():
+        return True
+    return any(tag in source for tag in _RICHTEXT_NON_TEXT_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Navigation helpers
+# ---------------------------------------------------------------------------
+
+
+def _resolved_attr(resolved, name, default=""):
+    """
+    Read ``name`` off whatever NavigationSettings/FooterSettings.resolved_for_page()
+    returned — either the settings model instance itself (a real object, plain
+    ``getattr`` works) or a StructValue from an override entry (a bare
+    ``collections.OrderedDict`` with no attribute access at all). Django
+    templates paper over this by trying dict-lookup before ``getattr`` on
+    every ``{{ var.attr }}``, but that resolution only happens inside the
+    template engine — plain Python code (like a simple_tag's function body)
+    needs this explicitly, or a StructValue field silently reads back as the
+    default every time.
+    """
+    if isinstance(resolved, dict):
+        return resolved.get(name, default)
+    return getattr(resolved, name, default)
+
+
+@register.simple_tag(takes_context=True)
+def resolved_navigation(context):
+    """
+    Return the NavigationSettings-shaped object to render for the current
+    page: the site's default NavigationSettings, or the most specific
+    matching entry from its navigation_overrides if the current page falls
+    under one of their root pages. See
+    NavigationSettings.resolved_for_page().
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% resolved_navigation as nav %}
+    """
+    request = context.get("request")
+    if request is None:
+        return None
+    nav_settings = NavigationSettings.for_request(request)
+    return nav_settings.resolved_for_page(context.get("page"))
+
+
+@register.simple_tag(takes_context=True)
+def resolved_footer(context):
+    """
+    Return the FooterSettings-shaped object to render for the current page:
+    the site's default FooterSettings, or the most specific matching entry
+    from its footer_overrides if the current page falls under one of their
+    root pages. See FooterSettings.resolved_for_page().
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% resolved_footer as footer %}
+    """
+    request = context.get("request")
+    if request is None:
+        return None
+    footer_settings = FooterSettings.for_request(request)
+    return footer_settings.resolved_for_page(context.get("page"))
+
+
+@register.simple_tag(takes_context=True)
+def resolved_social(context):
+    """
+    Return the social links and display toggles for the current page: the
+    covering footer override's links when it has any, the site default's
+    otherwise. See FooterSettings.social_for_page().
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% resolved_social as social %}
+        {% if social.show_in_footer and social.social_links %}...{% endif %}
+    """
+    request = context.get("request")
+    footer_settings = FooterSettings.for_request(request)
+    return footer_settings.social_for_page(context.get("page"))
+
+
+@register.simple_tag(takes_context=True)
+def resolved_footer_newsletter_signup(context):
+    """
+    Fetch (and cache) the ActionKit form powering the footer's newsletter
+    signup box, for whichever footer is resolved for the current page — the
+    resolved footer's own newsletter_actionkit_shortname (site default or
+    footer override), the same auto-rendered-form mechanism
+    SignupActionKitBlock uses for its own panel (see
+    actionkit.fetch_and_cache_embed_form_html).
+
+    Returns a dict with `form_html`, `actionkit_base_url`, `short_form_id`
+    and `success_message` — suitable for including directly into
+    wtrx/components/streamfield/blocks/_actionkit_form.html — or None when
+    no shortname is configured for this page's footer, meaning no signup box
+    should render at all.
+
+    Unlike every other field on FooterOverrideBlock, `newsletter_success_message`
+    falls back to the site FooterSettings' own value when an override leaves
+    it blank, rather than resolving to nothing: _actionkit_form.html's inline
+    AJAX submit path (see its wireInlineSubmit()) only wires up when a success
+    message is present, and the footer box is scoped per-instance (see that
+    template) specifically so it works no matter where it sits relative to
+    other ActionKit embeds on the page — an override that forgets to set its
+    own message shouldn't silently regress to relying on ActionKit's own
+    script, which only ever binds the first embed in the DOM.
+
+    Usage in templates (after {% resolved_footer as footer %}):
+        {% load wtrx_tags %}
+        {% resolved_footer_newsletter_signup as newsletter %}
+    """
+    request = context.get("request")
+    footer = context.get("footer")
+    if request is None or footer is None:
+        return None
+    short_form_id = _resolved_attr(footer, "newsletter_actionkit_shortname", "")
+    if not short_form_id:
+        return None
+
+    hostname = ""
+    try:
+        config = IntegrationSettings.for_request(request).get_integration_config("actionkit")
+        hostname = config.get("hostname", "") if config else ""
+    except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+        hostname = ""
+
+    form_html = None
+    if hostname:
+        form_html = actionkit.fetch_and_cache_embed_form_html(hostname, short_form_id)
+        form_html = actionkit.uniquify_form_ids(form_html, request)
+
+    success_message = _resolved_attr(footer, "newsletter_success_message", "")
+    if not success_message:
+        try:
+            success_message = FooterSettings.for_request(request).newsletter_success_message
+        except (FooterSettings.DoesNotExist, Site.DoesNotExist):
+            success_message = ""
+
+    return {
+        "form_html": form_html,
+        "actionkit_base_url": actionkit.base_url(hostname) if hostname else "",
+        # For _actionkit_form.html's /context/ request (the opt-in's
+        # country list), same as SignupActionKitFormMixin passes it.
+        "short_form_id": short_form_id,
+        "success_message": success_message,
+    }
+
+
+def _page_is_within(page, target):
+    """
+    True when ``page`` is ``target`` itself or a descendant of it. Wagtail
+    stores tree paths as fixed-width segments, so a string prefix test is an
+    exact ancestry test (the same trick NavigationSettings.resolved_for_page()
+    uses to match override root pages).
+    """
+    if target is None:
+        return False
+    return page.path.startswith(target.path)
+
+
+@register.simple_tag(takes_context=True)
+def nav_item_is_active(context, item):
+    """
+    True when a primary-navigation item points at the section the visitor is
+    currently in — used to draw the active underline in header.html.
+
+    An internal link matches its own page and everything beneath it; a submenu
+    matches when any of its internal children does, so "Media & Resources"
+    stays underlined while you are reading a blog post under it. External and
+    anchor links never match: there is no reliable way to tell whether an
+    arbitrary URL or on-page anchor is "the current page".
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% nav_item_is_active item as is_active %}
+    """
+    page = context.get("page")
+    if page is None:
+        return False
+    if item.block_type == "internal":
+        return _page_is_within(page, item.value.get("page"))
+    if item.block_type == "submenu":
+        return any(
+            child.block_type == "internal"
+            and _page_is_within(page, child.value.get("page"))
+            for child in item.value.get("links")
+        )
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +390,24 @@ _SOCIAL_ICONS = {
         "1.06.638-1.06c.66-.999 1.65-1.498 2.96-1.498 1.13 0 2.043.395 2.74 1.164.675.77 "
         "1.012 1.81 1.012 3.12z"
     ),
+    "whatsapp": (
+        "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15"
+        "-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255"
+        "-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458"
+        ".13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198"
+        ".05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5"
+        "-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297"
+        "-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 "
+        "5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571"
+        "-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124"
+        "-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l"
+        "-.361-.214-3.741.982.999-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001"
+        "-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 "
+        "0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 "
+        "11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 "
+        "1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c"
+        "6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413"
+    ),
 }
 
 # Fallback: generic external link icon (Heroicons outline)
@@ -196,3 +474,248 @@ def page_as_card(page):
         "link_page": page,
         "link_url": None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Structured data (JSON-LD)
+# ---------------------------------------------------------------------------
+
+
+@register.simple_tag(takes_context=True)
+def organization_structured_data(context):
+    """
+    Render a <script type="application/ld+json"> Organization entry for
+    search engines (Google Knowledge Panel, sitelinks, etc.), built entirely
+    from existing Branding & SEO / Footer settings data — no dedicated
+    structured-data fields to keep in sync.
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        {% organization_structured_data %}
+
+    Returns an empty string if there's no site to resolve for the request.
+    """
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    site = Site.find_for_request(request)
+    if site is None:
+        return ""
+
+    branding = BrandingSEOSettings.for_request(request)
+    footer = FooterSettings.for_request(request)
+
+    data = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": site.site_name or site.hostname,
+        "url": request.build_absolute_uri("/"),
+    }
+    if branding.site_description:
+        data["description"] = branding.site_description
+    if branding.logo:
+        rendition = branding.logo.get_rendition("max-600x600")
+        data["logo"] = request.build_absolute_uri(rendition.url)
+
+    same_as = [item.value["url"] for item in footer.social_links if item.value["url"]]
+    if same_as:
+        data["sameAs"] = same_as
+
+    json_str = json.dumps(data, cls=DjangoJSONEncoder).translate(_json_script_escapes)
+    return mark_safe(f'<script type="application/ld+json">{json_str}</script>')
+
+
+@register.filter
+def absolute_uri(url, request):
+    """
+    Resolve `url` to an absolute URL against `request`.
+
+    Needed because Django template syntax can't pass an argument to
+    `request.build_absolute_uri` (`{{ request.build_absolute_uri }}` calls
+    it with zero args, returning the *current page's* URL, not the given
+    one). Calling it properly, as here, handles both storage backends
+    correctly: a relative path (local filesystem storage, e.g.
+    "/media/images/foo.jpg") resolves against the request's own scheme and
+    host; a URL that's already absolute (S3/CDN-backed storage in
+    production) is returned unchanged rather than getting a second
+    scheme+host prepended in front of it.
+
+    Usage in templates:
+        {% load wtrx_tags %}
+        <meta property="og:image" content="{{ og_img.url|absolute_uri:request }}" />
+    """
+    if not url:
+        return url
+    return request.build_absolute_uri(url)
+
+
+# ---------------------------------------------------------------------------
+# Languages
+# ---------------------------------------------------------------------------
+
+
+@register.simple_tag(takes_context=True)
+def language_links(context):
+    """
+    Links to this page in every other language that has content.
+
+    Each language is its own page tree under Root (see WAGTAIL_CONTENT_LANGUAGES
+    in settings/base.py), so "the same page in French" is a real, separately
+    editable page found through Wagtail's `translation_key` linkage, not a URL
+    with a different prefix. Where no translation of this page exists, the link
+    falls back to that language's home page -- a visitor who wants the French
+    site should land on the French site, not on a 404 for a page nobody has
+    translated yet.
+
+    This is deliberately NOT Django's `set_language` view. That view switches
+    the *interface* language and redirects to the same path, which in this
+    architecture points at a page in the wrong tree (translated pages have
+    translated slugs, so `/pt/about/` need not exist for `/about/`) or at the
+    wrong content entirely.
+
+    Returns a list of dicts: `code`, `label`, `url`, `is_current`. Languages
+    with neither a translation of this page nor a reachable home page are
+    omitted rather than linked to nothing. Distinct from the "Around the World"
+    regional switcher (regional_site_switcher.html), which goes to other
+    350.org *sites*.
+    """
+    page = context.get("page")
+    request = context.get("request")
+
+    locales = {locale.pk: locale for locale in Locale.objects.all()}
+    if len(locales) < 2:
+        return []
+
+    labels = dict(getattr(settings, "WAGTAIL_CONTENT_LANGUAGES", []))
+
+    # This page in each language, where it has been translated.
+    pages_by_locale = {}
+    if page is not None:
+        pages_by_locale[page.locale_id] = page
+        for translation_page in page.get_translations().live().select_related("locale"):
+            pages_by_locale[translation_page.locale_id] = translation_page
+
+    # Fallback target: each language's own home page (a translation of the
+    # site root), resolved once and only when something actually needs it.
+    homes_by_locale = None
+
+    links = []
+    for locale in locales.values():
+        label = labels.get(locale.language_code)
+        if label is None:
+            # A Locale row for a language no longer offered in settings.
+            continue
+
+        target = pages_by_locale.get(locale.pk)
+        if target is None:
+            if homes_by_locale is None:
+                homes_by_locale = _locale_home_pages(request)
+            target = homes_by_locale.get(locale.pk)
+        if target is None:
+            continue
+
+        url = target.get_url(request=request)
+        if not url:
+            continue
+
+        links.append(
+            {
+                "code": locale.language_code,
+                "label": label,
+                "url": url,
+                "is_current": page is not None and locale.pk == page.locale_id,
+            }
+        )
+
+    return links
+
+
+def _locale_home_pages(request):
+    """Map locale id -> that language's home page, for the current site."""
+    site = Site.find_for_request(request) if request else Site.objects.filter(is_default_site=True).first()
+    if site is None:
+        return {}
+    roots = site.root_page.get_translations(inclusive=True).live().select_related("locale")
+    return {root.locale_id: root for root in roots}
+
+
+@register.simple_tag(takes_context=True)
+def page_translation_alternates(context):
+    """
+    hreflang alternates for this page's real translations.
+
+    Unlike `language_links`, this never falls back to a language's home page:
+    an `<link rel="alternate" hreflang="fr">` pointing at the French home page
+    is a claim to search engines that the two pages are the same content, which
+    for an untranslated page is false. Only pages genuinely linked by
+    `translation_key` are emitted, along with the page itself, and the
+    default-language version additionally as `x-default`.
+
+    Returns a list of dicts: `code`, `url` (absolute, so the tag is usable in
+    `<head>`). Empty for an untranslated page — a lone self-referencing
+    alternate says nothing.
+    """
+    page = context.get("page")
+    if page is None:
+        return []
+
+    request = context.get("request")
+    translations = [
+        translation
+        for translation in page.get_translations().live().select_related("locale")
+        # Alias pages are excluded deliberately. wagtail-localize creates one
+        # whenever a translation needs an untranslated parent (translating
+        # /canada/ into French creates a French Home aliasing the English one),
+        # purely so the language tree has a root path. An alias mirrors its
+        # source rather than translating it, so advertising it as the French
+        # version of a page tells search engines that English content is a
+        # French translation of itself.
+        if translation.alias_of_id is None
+    ]
+    if not translations:
+        return []
+
+    default_code = getattr(settings, "LANGUAGE_CODE", "en")
+    alternates = []
+    default_url = None
+
+    for candidate in [page, *translations]:
+        url = candidate.get_full_url(request=request)
+        if not url:
+            continue
+        code = candidate.locale.language_code
+        alternates.append({"code": code, "url": url})
+        if code == default_code:
+            default_url = url
+
+    if default_url:
+        alternates.append({"code": "x-default", "url": default_url})
+
+    return alternates
+
+
+@register.filter
+def localized(page):
+    """
+    This page in the language currently being served, where it exists.
+
+    Navigation, footer and CTA links are chosen once in site settings
+    (`NavigationSettings`/`FooterSettings` are `BaseSiteSetting` — one row per
+    Site, shared by every language tree), so the page chooser holds the English
+    page. Rendering that link as-is sends a visitor reading `/pt/` back into the
+    English site on the first click.
+
+    Wagtail's own `Page.localized` resolves to the translation matching the
+    active language and falls back to the page itself when there is none, which
+    is exactly the behaviour wanted here: a translated destination is used, an
+    untranslated one still links somewhere real rather than 404ing. Costs one
+    query per link on pages outside the default language; none on English pages
+    (`localized` short-circuits when the locale already matches).
+
+    Usage:
+        <a href="{% pageurl item.value.page|localized %}">
+    """
+    if page is None:
+        return page
+    return getattr(page, "localized", page)
