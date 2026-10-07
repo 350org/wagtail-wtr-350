@@ -44,3 +44,17 @@ class UrlResolutionTests(TestCase):
         patterns are resolved once at import time, before any test overrides.
         """
         pass
+
+
+class RobotsTxtTests(TestCase):
+    def test_points_crawlers_at_the_sitemap(self):
+        response = self.client.get("/robots.txt")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/plain")
+        self.assertIn("Sitemap: http://testserver/sitemap.xml", response.content.decode().splitlines())
+
+    def test_keeps_crawlers_out_of_the_admin_only(self):
+        lines = self.client.get("/robots.txt").content.decode().splitlines()
+        self.assertEqual(lines[0], "User-agent: *")
+        self.assertIn("Disallow: /admin/", lines)
+        self.assertNotIn("Disallow: /", lines)

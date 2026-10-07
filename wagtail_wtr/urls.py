@@ -26,6 +26,7 @@ urlpatterns = [
         {"sitemaps": {"pages": AllLocalesSitemap}},
         name="sitemap",
     ),
+    path("robots.txt", views.robots_txt, name="robots_txt"),
     path("i18n/", include("django.conf.urls.i18n")),
     # Health check for zero-downtime deploys (Render, load balancers, etc.)
     path(

@@ -921,6 +921,14 @@ CLOUDFLARE_ZONE_ID=your-zone-id
    - Zone → Cache Purge → Purge
    - Zone Resources → Include → your specific zone (or all zones)
 
+### robots.txt and sitemap
+
+`/robots.txt` is generated (`wtrx.views.robots_txt`): it allows everything
+except the admin and login paths and points crawlers at `/sitemap.xml`, which
+lists every live public page in every language tree. It is the same on every
+environment, so keep a staging site out of search results some other way
+(Cloudflare Access, or basic auth).
+
 ### Cloudflare page caching (optional)
 
 Cloudflare caches no HTML on its own. The app marks every anonymous page view
