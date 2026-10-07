@@ -1778,3 +1778,27 @@ gate.
     - A redirect to an ActionKit-hosted page does **not** push: AK's
       thank-you page counts the signup from the `action_id` already on the
       URL, so pushing as well double-counts.
+
+90. **Anonymous pages are edge-cached, so nothing rendered into one may
+    differ per visitor.** `wtrx.edge_cache.EdgeCacheMiddleware` adds
+    `Cache-Control: public, max-age=0, s-maxage=<WTRX_EDGE_CACHE_SECONDS>`
+    to a GET that returns 200, unless the request carries a session cookie
+    or a logged-in user, the response sets a cookie, or the view set its own
+    `Cache-Control`. It sits directly under `SecurityMiddleware` so it sees
+    the cookies the session and CSRF middleware add on the way out. Two
+    rules follow:
+    - **`{% csrf_token %}` in a template that renders on ordinary pages
+      silently switches caching off for every page it appears on** (it sets
+      a cookie). That is why `/actionkit-signup/` is `csrf_exempt` and
+      `_actionkit_form.html` carries no token; `form_page.html` still has
+      one and so opts itself out, which is correct. A new public AJAX
+      endpoint should be exempt too, not given a token.
+    - **Don't branch on the visitor server-side** (cookie, country header,
+      `Accept-Language`) in a page template or block — the first visitor's
+      version is served to everyone. Do it in the browser, as Usercentrics
+      and Fundraise Up's country checks already do.
+    Cloudflare only honours the header through a Cache Rule (README,
+    "Cloudflare page caching"), which also bypasses the cache on a
+    `sessionid` cookie. Staleness is bounded by the purge-on-publish in
+    `wtrx/cache.py` for the page itself and by the lifetime for anything
+    else showing its content.

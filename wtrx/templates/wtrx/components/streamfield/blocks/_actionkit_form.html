@@ -101,13 +101,6 @@
          data-msg-network-error="{% trans 'Something went wrong. Please try again.' %}">
         {{ form_html|safe }}
     </div>
-    {% comment %}
-    Always rendered, not just alongside success_message: the submit handler
-    below now intercepts every instance's form unconditionally (see the
-    script's comment), and needs this token whether or not the block has a
-    custom success_message configured.
-    {% endcomment %}
-    <div data-wtr-ak-csrf style="display: none">{% csrf_token %}</div>
     {% if success_message or success_text %}
         {% comment %}
         The tone modifier rides along here as well as on the embed above,
@@ -180,7 +173,6 @@
             var form = formContainer && formContainer.querySelector('#action-form, [data-ak-id="action-form"]');
             if (!form) { return; }
             var thankYou = wrapper.querySelector("[data-thank-you]");
-            var csrfInput = wrapper.querySelector('[data-wtr-ak-csrf] input[name="csrfmiddlewaretoken"]');
             var msgRequired = formContainer.dataset.msgRequired;
             var msgEmail = formContainer.dataset.msgEmail;
             var msgNetworkError = formContainer.dataset.msgNetworkError;
@@ -559,7 +551,6 @@
                     method: "POST",
                     body: new FormData(form),
                     headers: {
-                        "X-CSRFToken": csrfInput ? csrfInput.value : "",
                         "X-Requested-With": "XMLHttpRequest"
                     }
                 }).then(function (response) {

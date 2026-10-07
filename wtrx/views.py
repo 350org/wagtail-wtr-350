@@ -4,6 +4,7 @@ import requests
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.translation import gettext as _
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from wagtail.models import Locale, Page, Site
@@ -40,10 +41,16 @@ _ACTIONKIT_TRACKING_FIELDS = (
 )
 
 
+@csrf_exempt
 @require_POST
 def actionkit_inline_signup(request):
     """
     Same-origin AJAX endpoint for SignupActionKitBlock's inline success_message mode.
+
+    CSRF-exempt on purpose: a token rendered into the form would make every
+    page carrying one set a per-visitor cookie, which is what stops the CDN
+    caching it (see wtrx/edge_cache.py). The endpoint is anonymous and touches
+    nothing tied to the visitor's session, so the token protected very little.
 
     ActionKit's normal submission is a full-page POST straight to ActionKit's
     own server, which redirects to its thank-you page on success — there's no

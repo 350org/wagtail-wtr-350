@@ -73,6 +73,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Marks anonymous page views as cacheable by the CDN. Listed above the
+    # session and CSRF middleware so it sees the cookies they set on the way
+    # out -- see wtrx/edge_cache.py.
+    "wtrx.edge_cache.EdgeCacheMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "wtrx.i18n.NamedPrefixLocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -424,6 +428,12 @@ SOCIALACCOUNT_PROVIDERS = {
 # wtrx integration secret overrides — take precedence over the DB-stored
 # value in the corresponding integration's config (Settings > Integrations)
 # so secrets aren't required to live in the database in production.
+# How long the CDN may serve an anonymous page view from its cache, in
+# seconds. 0 turns edge caching off. Publishing purges the page itself (see
+# wtrx/cache.py); anything else that shows its content (a card on the home
+# page, a related-posts row) catches up when this runs out.
+WTRX_EDGE_CACHE_SECONDS = int(os.environ.get("WTRX_EDGE_CACHE_SECONDS", "600"))
+
 WTRX_ACTION_NETWORK_API_KEY = os.environ.get("WTRX_ACTION_NETWORK_API_KEY", "")
 WTRX_ACTIONKIT_API_PASSWORD = os.environ.get("WTRX_ACTIONKIT_API_PASSWORD", "")
 
