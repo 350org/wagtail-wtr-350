@@ -141,11 +141,9 @@ def base_url(hostname):
 # for anything submitted through this endpoint (as opposed to a browser POST
 # straight to an ActionKit-hosted page, which it tags "website") -- both of
 # our submission paths (FormPage forwarding, SignupActionKitBlock's inline
-# endpoint) are really website visitors filling in our own embedded forms,
-# so a request-level "source" isn't collected to make this configurable.
-# ``fields`` is spread after this default, so a source ever present there
-# (there isn't one today -- map_form_fields has no "source" mapping) would
-# still win.
+# endpoint) are really website visitors filling in our own embedded forms.
+# ``fields`` is spread after this default, so a ``?source=`` from the page
+# URL (forwarded by the inline endpoint, see views.py) wins over it.
 DEFAULT_ACTION_SOURCE = "website"
 
 

@@ -873,6 +873,30 @@ class TestActionKitInlineSignupView(TestCase):
             self.assertNotIn(f"user_{bookkeeping_field}", fields)
 
     @patch("wtrx.views.actionkit.submit_action")
+    def test_forwards_tracking_fields_under_their_own_names(self, mock_submit):
+        self._configure_actionkit()
+        tracking = {
+            "source": "fb-ad",
+            "akid": "123.456.AbCdEf",
+            "referring_akid": ".789.GhIjKl",
+            "aktmid": "tm.1.2.xyz",
+            "action_id": "42",
+        }
+        self._post({"page": "web_join", "email": "a@b.com", **tracking})
+        fields = mock_submit.call_args[0][4]
+        for name, value in tracking.items():
+            self.assertEqual(fields[name], value)
+            self.assertNotIn(f"user_{name}", fields)
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_blank_tracking_fields_are_not_forwarded(self, mock_submit):
+        self._configure_actionkit()
+        self._post({"page": "web_join", "email": "a@b.com", "source": " ", "akid": ""})
+        fields = mock_submit.call_args[0][4]
+        self.assertNotIn("source", fields)
+        self.assertNotIn("akid", fields)
+
+    @patch("wtrx.views.actionkit.submit_action")
     def test_default_thanks_redirect_is_returned_flagged_as_default(self, mock_submit):
         mock_submit.return_value = {"redirect_url": "/cms/thanks/web_join?action_id=7"}
         self._configure_actionkit()

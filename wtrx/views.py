@@ -27,6 +27,18 @@ _ACTIONKIT_BOOKKEEPING_FIELDS = {
     "csrfmiddlewaretoken",
 }
 
+# Attribution values the form's script copies in from the page URL, the way
+# actionkit.js's onContextLoaded() does on an ActionKit-hosted page. Sent to
+# ActionKit under their own names: as user_<name> custom fields they would
+# record nothing ActionKit reports on.
+_ACTIONKIT_TRACKING_FIELDS = (
+    "source",
+    "akid",
+    "referring_akid",
+    "aktmid",
+    "action_id",
+)
+
 
 @require_POST
 def actionkit_inline_signup(request):
@@ -67,8 +79,13 @@ def actionkit_inline_signup(request):
         key: value
         for key, value in request.POST.items()
         if key not in _ACTIONKIT_BOOKKEEPING_FIELDS
+        and key not in _ACTIONKIT_TRACKING_FIELDS
     }
     fields = actionkit.map_form_fields(posted)
+    for name in _ACTIONKIT_TRACKING_FIELDS:
+        value = request.POST.get(name, "").strip()
+        if value:
+            fields[name] = value
     if not fields.get("email"):
         return JsonResponse(
             {"success": False, "message": _("Email address is required.")}, status=400

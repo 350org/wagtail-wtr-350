@@ -198,6 +198,34 @@
             populateUtmFields();
 
             {% comment %}
+            ActionKit's own attribution values, copied from the page URL
+            into hidden fields. actionkit.js does this in onContextLoaded(),
+            which only runs from forms.initForm() (never called here, see
+            the multi-instance comment above). A value already in the form
+            is kept, as actionkit.js keeps a page's own action_id.
+
+            Unlike actionkit.js, an akid is always sent as akid: the move to
+            referring_akid there depends on its recognised-user view, which
+            this form doesn't have.
+            {% endcomment %}
+            function populateTrackingFields() {
+                var params = new URLSearchParams(window.location.search);
+                ["source", "akid", "referring_akid", "aktmid", "action_id"].forEach(function (name) {
+                    var value = params.get(name);
+                    if (!value) { return; }
+                    var field = form.querySelector('input[name="' + name + '"]');
+                    if (!field) {
+                        field = document.createElement("input");
+                        field.type = "hidden";
+                        field.name = name;
+                        form.appendChild(field);
+                    }
+                    if (!field.value) { field.value = value; }
+                });
+            }
+            populateTrackingFields();
+
+            {% comment %}
             Country-dependent fields — a port of actionkit.js's own
             forms.reflectCountryChange(), which this form never gets because
             it only runs from forms.initForm() (see the multi-instance
