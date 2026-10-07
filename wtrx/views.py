@@ -1,8 +1,9 @@
 import logging
 
 import requests
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -14,6 +15,8 @@ from .integrations.actionkit import ActionKitError
 from .site_settings import IntegrationSettings
 
 logger = logging.getLogger(__name__)
+
+ROBOTS_DISALLOWED_PATHS = ("/admin/", "/django-admin/", "/accounts/")
 
 # Hidden bookkeeping fields ActionKit's own fragment adds to the form —
 # not donor data, so excluded before map_form_fields turns unrecognised
@@ -39,6 +42,17 @@ _ACTIONKIT_TRACKING_FIELDS = (
     "aktmid",
     "action_id",
 )
+
+
+def robots_txt(request):
+    """Tell crawlers where the sitemap is, and to stay out of the admin."""
+    lines = [
+        "User-agent: *",
+        *(f"Disallow: {path}" for path in ROBOTS_DISALLOWED_PATHS),
+        "",
+        f"Sitemap: {request.build_absolute_uri(reverse('sitemap'))}",
+    ]
+    return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
 
 
 @csrf_exempt
