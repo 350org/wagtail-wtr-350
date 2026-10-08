@@ -111,6 +111,21 @@ class TestMapFormFields(SimpleTestCase):
         result = actionkit.map_form_fields({"email": "a@b.com", "action_utm_source": ""})
         self.assertNotIn("action_utm_source", result)
 
+    def test_any_action_field_passes_through_unprefixed(self):
+        # A petition's comment box, and a name that would otherwise be caught
+        # by the "email" heuristic.
+        result = actionkit.map_form_fields(
+            {
+                "email": "a@b.com",
+                "action_comment": "Please act now.",
+                "action_email_friends": "yes",
+            }
+        )
+        self.assertEqual(result["action_comment"], "Please act now.")
+        self.assertEqual(result["action_email_friends"], "yes")
+        self.assertEqual(result["email"], "a@b.com")
+        self.assertNotIn("user_action_comment", result)
+
 
 class TestSubmitAction(SimpleTestCase):
     def _mock_response(self, status_code=201, text=""):
@@ -895,6 +910,37 @@ class TestActionKitInlineSignupView(TestCase):
         fields = mock_submit.call_args[0][4]
         self.assertNotIn("source", fields)
         self.assertNotIn("akid", fields)
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_form_display_config_is_not_forwarded(self, mock_submit):
+        self._configure_actionkit()
+        config = {"want_progress": "1", "privacy_show_if": "eu", "privacy_hidden": "1"}
+        self._post({"page": "web_join", "email": "a@b.com", **config})
+        fields = mock_submit.call_args[0][4]
+        for name in config:
+            self.assertNotIn(name, fields)
+            self.assertNotIn(f"user_{name}", fields)
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_forwards_consent_fields_under_their_own_names(self, mock_submit):
+        self._configure_actionkit()
+        consent = {
+            "privacy": "0",
+            "require_opt_in": "1",
+            "privacy_optout_unsub_all": "1",
+            "required": ["email", "privacy"],
+        }
+        self._post({"page": "web_join", "email": "a@b.com", **consent})
+        fields = mock_submit.call_args[0][4]
+        for name, value in consent.items():
+            self.assertEqual(fields[name], value)
+            self.assertNotIn(f"user_{name}", fields)
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_single_required_value_is_forwarded_as_a_string(self, mock_submit):
+        self._configure_actionkit()
+        self._post({"page": "web_join", "email": "a@b.com", "required": "email"})
+        self.assertEqual(mock_submit.call_args[0][4]["required"], "email")
 
     @patch("wtrx.views.actionkit.submit_action")
     def test_default_thanks_redirect_is_returned_flagged_as_default(self, mock_submit):

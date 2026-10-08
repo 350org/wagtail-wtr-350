@@ -29,6 +29,11 @@ _ACTIONKIT_BOOKKEEPING_FIELDS = {
     "js",
     "auto_country",
     "csrfmiddlewaretoken",
+    # Display config for ActionKit's own client script (the progress meter,
+    # and when to show the GDPR opt-in). Nothing the action processor needs.
+    "want_progress",
+    "privacy_show_if",
+    "privacy_hidden",
 }
 
 # Attribution values the form's script copies in from the page URL, the way
@@ -41,6 +46,19 @@ _ACTIONKIT_TRACKING_FIELDS = (
     "referring_akid",
     "aktmid",
     "action_id",
+)
+
+# The GDPR opt-in, posted only while the form shows it (see
+# _actionkit_form.html): the visitor's answer and the instructions telling
+# ActionKit how to act on it. Sent under their own names like the tracking
+# fields above. As user_<name> ActionKit rejects the whole signup, since no
+# such custom user fields exist; dropped, the signup would go through without
+# the visitor's consent choice.
+_ACTIONKIT_CONSENT_FIELDS = (
+    "privacy",
+    "require_opt_in",
+    "privacy_optout_unsub_all",
+    "required",
 )
 
 
@@ -101,12 +119,18 @@ def actionkit_inline_signup(request):
         for key, value in request.POST.items()
         if key not in _ACTIONKIT_BOOKKEEPING_FIELDS
         and key not in _ACTIONKIT_TRACKING_FIELDS
+        and key not in _ACTIONKIT_CONSENT_FIELDS
     }
     fields = actionkit.map_form_fields(posted)
     for name in _ACTIONKIT_TRACKING_FIELDS:
         value = request.POST.get(name, "").strip()
         if value:
             fields[name] = value
+    for name in _ACTIONKIT_CONSENT_FIELDS:
+        # `required` is posted once per required field, so keep every value.
+        values = [v.strip() for v in request.POST.getlist(name) if v.strip()]
+        if values:
+            fields[name] = values[0] if len(values) == 1 else values
     if not fields.get("email"):
         return JsonResponse(
             {"success": False, "message": _("Email address is required.")}, status=400

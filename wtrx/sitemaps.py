@@ -13,12 +13,36 @@ translation of the site root, which is exactly what gives it a URL
 (`Site.get_site_root_paths()` walks `root_page.get_translations()`). Anything
 under Root that is *not* such a translation has no URL either, so leaving it
 out is correct rather than an omission.
+
+It is also built from plain `Page` rows holding three columns, not from
+`.specific()` instances as Wagtail's is. With ~9,000 pages the specific fetch
+loads every column of every page type to produce one URL and one date each,
+and the live sitemap took about 30 seconds to generate. A URL needs only
+`url_path`. The one thing a specific instance added was `BasePage`'s
+`hide_from_search` check, which is done here as a query instead -- so a page
+type that overrides `get_sitemap_urls()` or `get_url_parts()` itself is not
+consulted, and would need handling here.
 """
 
 from django.db.models import Q
 
 from wagtail.contrib.sitemaps import Sitemap as WagtailSitemap
-from wagtail.models import Page
+from wagtail.models import Page, get_page_models
+
+#: Everything `Page.get_sitemap_urls()` reads. Anything else touched on an
+#: item is a deferred-field query per page.
+SITEMAP_FIELDS = ("url_path", "last_published_at", "latest_revision_created_at")
+
+
+def _hidden_page_ids():
+    """Primary keys of every page with `hide_from_search` set."""
+    from wtrx.models import BasePage
+
+    hidden = set()
+    for model in get_page_models():
+        if issubclass(model, BasePage):
+            hidden.update(model.objects.filter(hide_from_search=True).values_list("pk", flat=True))
+    return hidden
 
 
 class AllLocalesSitemap(WagtailSitemap):
@@ -41,7 +65,7 @@ class AllLocalesSitemap(WagtailSitemap):
             Page.objects.filter(subtrees)
             .live()
             .public()
+            .exclude(pk__in=_hidden_page_ids())
             .order_by("path")
-            .defer_streamfields()
-            .specific()
+            .only(*SITEMAP_FIELDS)
         )
