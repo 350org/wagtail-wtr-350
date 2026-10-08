@@ -914,20 +914,22 @@ class TestActionKitInlineSignupView(TestCase):
     @patch("wtrx.views.actionkit.submit_action")
     def test_form_display_config_is_not_forwarded(self, mock_submit):
         self._configure_actionkit()
-        config = {"want_progress": "1", "privacy_show_if": "eu", "privacy_hidden": "1"}
-        self._post({"page": "web_join", "email": "a@b.com", **config})
+        self._post({"page": "web_join", "email": "a@b.com", "want_progress": "1"})
         fields = mock_submit.call_args[0][4]
-        for name in config:
-            self.assertNotIn(name, fields)
-            self.assertNotIn(f"user_{name}", fields)
+        self.assertNotIn("want_progress", fields)
+        self.assertNotIn("user_want_progress", fields)
 
     @patch("wtrx.views.actionkit.submit_action")
     def test_forwards_consent_fields_under_their_own_names(self, mock_submit):
         self._configure_actionkit()
+        # The .ak-privacy inputs of a live act.350.org form.
         consent = {
-            "privacy": "0",
-            "require_opt_in": "1",
+            "privacy": "accabbf4db42d2b650cb43ee6817b22e9b38dcf8",
+            "privacy_hidden": "85758a036d426767163b2da4c367e6ca5e316120",
+            "privacy_show_if": "missing",
+            "privacy_radio_optin_lists": "1",
             "privacy_optout_unsub_all": "1",
+            "require_opt_in": "1",
             "required": ["email", "privacy"],
         }
         self._post({"page": "web_join", "email": "a@b.com", **consent})

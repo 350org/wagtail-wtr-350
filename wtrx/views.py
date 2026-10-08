@@ -29,11 +29,8 @@ _ACTIONKIT_BOOKKEEPING_FIELDS = {
     "js",
     "auto_country",
     "csrfmiddlewaretoken",
-    # Display config for ActionKit's own client script (the progress meter,
-    # and when to show the GDPR opt-in). Nothing the action processor needs.
+    # Tells ActionKit's own client script to fetch the progress meter.
     "want_progress",
-    "privacy_show_if",
-    "privacy_hidden",
 }
 
 # Attribution values the form's script copies in from the page URL, the way
@@ -49,15 +46,19 @@ _ACTIONKIT_TRACKING_FIELDS = (
 )
 
 # The GDPR opt-in, posted only while the form shows it (see
-# _actionkit_form.html): the visitor's answer and the instructions telling
-# ActionKit how to act on it. Sent under their own names like the tracking
+# _actionkit_form.html): the visitor's answer plus the inputs ActionKit reads
+# it with. The radio values are hashes, signed along with `privacy_hidden`, so
+# the set travels together. Sent under their own names like the tracking
 # fields above. As user_<name> ActionKit rejects the whole signup, since no
 # such custom user fields exist; dropped, the signup would go through without
 # the visitor's consent choice.
 _ACTIONKIT_CONSENT_FIELDS = (
     "privacy",
-    "require_opt_in",
+    "privacy_hidden",
+    "privacy_show_if",
+    "privacy_radio_optin_lists",
     "privacy_optout_unsub_all",
+    "require_opt_in",
     "required",
 )
 
