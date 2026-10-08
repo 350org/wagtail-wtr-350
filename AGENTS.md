@@ -1803,3 +1803,26 @@ gate.
     `sessionid` cookie. Staleness is bounded by the purge-on-publish in
     `wtrx/cache.py` for the page itself and by the lifetime for anything
     else showing its content.
+
+91. **The image edit page must not request an `original` rendition.**
+    Stock Wagtail does, twice (`images/edit.html` and
+    `images/_file_field.html`), only to print the dimensions and link the
+    file. A rendition is built the first time it is asked for: the source is
+    downloaded from S3, decoded, re-encoded at full size (as WebP, pitfall
+    #59) and uploaded — seconds per image, on a page most images are opened
+    on once. Both templates are overridden in `templates/wagtailimages/images/`
+    to read `image.width`/`image.height` and link `image.file.url`. The
+    `max-800x600` rendition stays: the focal-point chooser draws on it.
+
+92. **The sitemap is built from three columns of plain `Page` rows, never
+    `.specific()`.** With ~9,000 pages Wagtail's own approach (a specific
+    instance per page) took about 30 seconds on production, holding a
+    gunicorn worker for all of it. `AllLocalesSitemap.items()` uses
+    `.only(*SITEMAP_FIELDS)`, and `hide_from_search` — the one thing the
+    specific instance was needed for — is applied as a query
+    (`_hidden_page_ids()`). Two consequences: reading any other field on a
+    sitemap item is a query per page (a test pins the query count), and a
+    page type that overrides `get_sitemap_urls()`/`get_url_parts()` itself
+    is not consulted. The view also sets its own `s-maxage` of an hour in
+    `urls.py`, so `EdgeCacheMiddleware` leaves it alone; publishing does not
+    purge it.

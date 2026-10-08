@@ -15,9 +15,11 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.template import Context, Template
 from django.urls import reverse
 from django.test import Client, RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import translation
 from wagtail.blocks import CharBlock, RichTextBlock
 from wagtail.contrib.redirects.models import Redirect
@@ -923,3 +925,24 @@ class TestSitemapCoversEveryLanguageTree(TestCase):
     def test_hide_from_search_is_still_honoured_in_a_country_tree(self):
         paths = self._paths()
         self.assertNotIn("/brasil/hidden-sitemap/", paths)
+
+    def test_the_query_count_does_not_grow_with_the_number_of_pages(self):
+        """
+        The sitemap reads three columns of plain Page rows. Touching any other
+        field on an item costs a query per page, which at ~9,000 pages is the
+        difference between one second and thirty.
+        """
+        Client().get("/sitemap.xml")
+        with CaptureQueriesContext(connection) as before:
+            Client().get("/sitemap.xml")
+        for n in range(5):
+            self.home_pt.add_child(
+                instance=ContentPage(title=f"Extra {n}", slug=f"extra-sitemap-{n}", locale=self.pt_br)
+            )
+        with CaptureQueriesContext(connection) as after:
+            self.assertIn("/brasil/extra-sitemap-4/", self._paths())
+        self.assertEqual(len(after), len(before))
+
+    def test_it_is_edge_cached_for_longer_than_a_page(self):
+        response = Client().get("/sitemap.xml")
+        self.assertIn("s-maxage=3600", response["Cache-Control"])

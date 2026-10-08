@@ -1,0 +1,13 @@
+{% load i18n wagtailadmin_tags l10n %}
+{% comment %}
+    Overrides Wagtail's own template, which links to (and reads the
+    dimensions from) an `original` rendition. Building that on an image's
+    first open means downloading the source, re-encoding it at full size and
+    uploading the result. Link to the source file itself instead.
+{% endcomment %}
+{% rawformattedfield field=field %}
+    <a href="{{ image.file.url }}">{% icon name="image" classname="default" %}{{ image.filename }}</a> ({{ image.width|unlocalize }}x{{ image.height|unlocalize }})<br /><br />
+
+    {% trans "Change image file:" %}
+    {{ field }}
+{% endrawformattedfield %}

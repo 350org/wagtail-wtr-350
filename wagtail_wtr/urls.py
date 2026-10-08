@@ -3,6 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path
+from django.views.decorators.cache import cache_control
 
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
@@ -14,15 +15,20 @@ from wagtail.documents import urls as wagtaildocs_urls
 from wtrx import views
 from wtrx.i18n import named_i18n_patterns
 
+SITEMAP_EDGE_CACHE_SECONDS = 60 * 60
+
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
     # Every language tree, not just the default one -- see wtrx/sitemaps.py.
+    # Sets its own Cache-Control, so EdgeCacheMiddleware leaves it alone: a
+    # sitemap is expensive to build and an hour stale costs nothing, where a
+    # page's 10 minutes meant nearly every crawler fetch found it expired.
     path(
         "sitemap.xml",
-        sitemap,
+        cache_control(public=True, max_age=0, s_maxage=SITEMAP_EDGE_CACHE_SECONDS)(sitemap),
         {"sitemaps": {"pages": AllLocalesSitemap}},
         name="sitemap",
     ),

@@ -48,17 +48,13 @@ class ActionKitError(Exception):
         self.status_code = status_code
 
 
-# Field names ActionKit's own hosted forms already post under the
-# ``action_<name>`` convention — passed through verbatim (not re-prefixed
-# with ``user_``) so they land on the actual Action-model fields ActionKit
-# uses for campaign-attribution reporting, not as meaningless custom fields.
-ACTIONKIT_NATIVE_FIELDS = {
-    "action_utm_source",
-    "action_utm_medium",
-    "action_utm_campaign",
-    "action_utm_term",
-    "action_utm_content",
-}
+# ActionKit's convention for a custom *action* field: anything its forms post
+# as ``action_<name>`` (the UTM attribution fields, a petition's
+# ``action_comment``, ...) is stored on the action itself, and needs no
+# definition in ActionKit first. Passed through verbatim: re-prefixed as
+# ``user_action_<name>`` it would be a custom *user* field, which ActionKit
+# rejects the whole submission for unless one by that name exists.
+ACTIONKIT_ACTION_FIELD_PREFIX = "action_"
 
 
 # Wagtail form fields arrive keyed by their ``clean_name`` (a slug of the field
@@ -69,7 +65,7 @@ def map_form_fields(cleaned_data):
     Map a Wagtail form's ``cleaned_data`` to ActionKit action fields.
 
     Returns a dict suitable for merging into the ActionKit request body. Blank
-    values are dropped. ACTIONKIT_NATIVE_FIELDS pass through as-is; other
+    values are dropped. ``action_<name>`` fields pass through as-is; other
     unrecognised fields become ``user_<clean_name>`` custom fields. If no email
     is present the caller should skip forwarding — ActionKit requires an email
     to identify the user.
@@ -85,8 +81,8 @@ def map_form_fields(cleaned_data):
             continue
         key = raw_key.lower()
 
-        if key in ACTIONKIT_NATIVE_FIELDS:
-            result[key] = value
+        if key.startswith(ACTIONKIT_ACTION_FIELD_PREFIX):
+            result[raw_key] = value
         elif "email" in key:
             result.setdefault("email", value)
         elif ("first" in key and "name" in key) or key in ("firstname", "first_name"):
