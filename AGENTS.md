@@ -1570,7 +1570,7 @@ gate.
       `site.root_page.get_descendants(inclusive=True)`, which after the
       migration returned 7,055 English URLs and **zero** for the 2,947 pages
       across `/brasil/`, `/france/`, `/germany/`, `/indonesia/` and
-      `/canada/`. `wtrx/sitemaps.py`'s `AllLocalesSitemap` finds the trees the
+      `/canada/`. `wtrx/sitemaps.py` finds the trees the
       same way routing does — each language root is a translation of the site
       root — and unions their subtrees.
     - **The search view.** `Page.objects.live().search(...)` spans every
@@ -1814,20 +1814,26 @@ gate.
     to read `image.width`/`image.height` and link `image.file.url`. The
     `max-800x600` rendition stays: the focal-point chooser draws on it.
 
-92. **The sitemap is built from three columns of plain `Page` rows, never
-    `.specific()`.** With ~9,000 pages Wagtail's own approach (a specific
-    instance per page) took about 30 seconds on production, holding a
-    gunicorn worker for all of it. `AllLocalesSitemap.items()` uses
-    `.only(*SITEMAP_FIELDS)`, and `hide_from_search` — the one thing the
-    specific instance was needed for — is applied as a query
-    (`_hidden_page_ids()`). Two consequences: reading any other field on a
-    sitemap item is a query per page (a test pins the query count), and a
-    page type that overrides `get_sitemap_urls()`/`get_url_parts()` itself
-    is not consulted. The view also sets its own `s-maxage` of an hour in
-    `urls.py`, so `EdgeCacheMiddleware` leaves it alone; publishing does not
-    purge it.
+92. **`sitemap.xml` is our own view, written straight from database
+    values** (`wtrx/sitemaps.py`) — no model instances, no per-page
+    `reverse()`, no template, and not `wagtail.contrib.sitemaps`. The
+    production container is capped at about a third of a CPU (`cpu.max` is
+    `32000 100000`), so CPU-bound work takes roughly three times its CPU
+    time in wall time: Wagtail's sitemap cost 3.5 CPU-seconds for ~9,000
+    pages and took 13-30 seconds, holding a gunicorn worker throughout.
+    Wagtail still builds each language tree's base URL
+    (`root.get_full_url()`); a page's URL is that plus the rest of its
+    `url_path`, quoted as `reverse()` quotes it, and a test asserts it
+    equals `Page.full_url` for every page. What it gives up: a page type
+    overriding `get_sitemap_urls()`/`get_url_parts()` is not consulted
+    (`hide_from_search` is applied as a query), and there is no pagination
+    past the protocol's 50,000 URLs per file. The view sets its own
+    `s-maxage` of an hour, so `EdgeCacheMiddleware` leaves it alone and
+    publishing does not purge it. The same CPU cap is why anything
+    CPU-heavy in a request (image renditions, the page editor's block
+    definitions) is far slower on production than a local profile suggests.
 
-92. **An ActionKit embed's fields are forwarded under ActionKit's own
+93. **An ActionKit embed's fields are forwarded under ActionKit's own
     names; only a Wagtail form's are mapped.** `/actionkit-signup/` builds
     its payload with `views._actionkit_embed_fields()`, which passes every
     posted input through as named (core fields bare, `user_<name>`,

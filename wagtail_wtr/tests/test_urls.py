@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import resolve, reverse
 
-from wagtail.contrib.sitemaps.views import sitemap as sitemap_view
+from wtrx.sitemaps import sitemap as sitemap_view
 
 
 class UrlResolutionTests(TestCase):
