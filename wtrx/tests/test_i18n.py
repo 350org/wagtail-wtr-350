@@ -926,12 +926,30 @@ class TestSitemapCoversEveryLanguageTree(TestCase):
         paths = self._paths()
         self.assertNotIn("/brasil/hidden-sitemap/", paths)
 
+    def test_every_url_is_the_one_wagtail_would_build(self):
+        """
+        The sitemap assembles URLs itself rather than calling `get_full_url()`
+        on every page (see wtrx/sitemaps.py). This is what keeps that honest,
+        including for a slug that needs quoting.
+        """
+        accented = ContentPage(title="Olá", slug="olá-sitemap", locale=self.pt_br)
+        self.home_pt.add_child(instance=accented)
+        nested = ContentPage(title="Nested", slug="nested-sitemap", locale=self.pt_br)
+        accented.add_child(instance=nested)
+
+        response = Client().get("/sitemap.xml")
+        locs = re.findall(r"<loc>([^<]+)</loc>", response.content.decode())
+
+        roots = (self.home.path, self.home_pt.path)
+        expected = [
+            page.full_url
+            for page in Page.objects.live().order_by("path").specific()
+            if page.path.startswith(roots) and not page.hide_from_search
+        ]
+        self.assertIn(nested.full_url, locs)
+        self.assertEqual(locs, expected)
+
     def test_the_query_count_does_not_grow_with_the_number_of_pages(self):
-        """
-        The sitemap reads three columns of plain Page rows. Touching any other
-        field on an item costs a query per page, which at ~9,000 pages is the
-        difference between one second and thirty.
-        """
         Client().get("/sitemap.xml")
         with CaptureQueriesContext(connection) as before:
             Client().get("/sitemap.xml")
@@ -942,6 +960,15 @@ class TestSitemapCoversEveryLanguageTree(TestCase):
         with CaptureQueriesContext(connection) as after:
             self.assertIn("/brasil/extra-sitemap-4/", self._paths())
         self.assertEqual(len(after), len(before))
+
+    def test_the_file_is_well_formed_and_dated(self):
+        from xml.etree import ElementTree
+
+        root = ElementTree.fromstring(Client().get("/sitemap.xml").content)
+        namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        self.assertTrue(root.findall("s:url/s:loc", namespace))
+        for lastmod in root.findall("s:url/s:lastmod", namespace):
+            self.assertRegex(lastmod.text, r"^\d{4}-\d{2}-\d{2}$")
 
     def test_it_is_edge_cached_for_longer_than_a_page(self):
         response = Client().get("/sitemap.xml")
