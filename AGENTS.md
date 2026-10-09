@@ -1826,3 +1826,19 @@ gate.
     is not consulted. The view also sets its own `s-maxage` of an hour in
     `urls.py`, so `EdgeCacheMiddleware` leaves it alone; publishing does not
     purge it.
+
+92. **An ActionKit embed's fields are forwarded under ActionKit's own
+    names; only a Wagtail form's are mapped.** `/actionkit-signup/` builds
+    its payload with `views._actionkit_embed_fields()`, which passes every
+    posted input through as named (core fields bare, `user_<name>`,
+    `action_<name>`, tracking, the `privacy*`/`required` GDPR set) and
+    drops only `_ACTIONKIT_BOOKKEEPING_FIELDS`. `actionkit.map_form_fields()`
+    is for `FormPage` forwarding, where names are slugs of an editor's
+    labels and anything unrecognised becomes `user_<name>`. Don't route the
+    embed through it: ActionKit rejects a whole submission over one
+    `user_<name>` it has no custom user field for ("The user field X is not
+    allowed"), which is how `action_comment` and the GDPR inputs each broke
+    signups. As a backstop, `submit_action()` reads that error, drops the
+    named `user_` fields and resubmits once, logging a warning. A filled
+    honeypot (`action_honey`/`user_honey`) gets a success response and is
+    never forwarded, so the retry can't wave a bot through.

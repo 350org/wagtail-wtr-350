@@ -975,6 +975,99 @@ html {
     text-decoration: underline;
 }
 
+/* GDPR opt-in — .ak-privacy. Shown only to a visitor in one of ActionKit's
+ * privacy countries (see _actionkit_form.html): a question, a Yes/No radio
+ * pair, and #really-opt-out, the "Are you sure?" box ActionKit's own script
+ * fades in on "No". All of it arrives styled by utility classes from
+ * ActionKit's site stylesheet (text-small, bg-dkgray-trans, button
+ * bg-teal, ...), which the fetched fragment doesn't bring with it, so
+ * without these rules it is a run of unspaced text and the box's button is
+ * a bare line of copy.
+ *
+ * The radios are a required answer, not fine print, so they step up from
+ * the 13px the opt-in fields above use. They are drawn here, not native: a
+ * light disc with a dark dot when checked stays visible on every panel
+ * fill, where an accent colour would vanish on the fill it matches. */
+.wtr-actionkit-embed-stacked .ak-privacy {
+    margin-block: 0.5rem 1.25rem;
+}
+
+.wtr-actionkit-embed-stacked .ak-privacy .input-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    margin-block-start: 0.875rem;
+}
+
+.wtr-actionkit-embed-stacked .ak-privacy .input-radio {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 1rem;
+    font-weight: var(--font-weight-medium);
+}
+
+.wtr-actionkit-embed-stacked .ak-privacy .input-radio label {
+    cursor: pointer;
+}
+
+.wtr-actionkit-embed-stacked .ak-privacy .input-radio input[type='radio'] {
+    /* !important: ActionKit's fragment sets `#privacy_optin, #privacy_optout
+     * { -webkit-appearance: auto }` in a <style> of its own, by id. */
+    appearance: none !important;
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    background: var(--color-light) none;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    cursor: pointer;
+}
+
+.wtr-actionkit-embed-stacked .ak-privacy .input-radio input[type='radio']:checked {
+    background-color: var(--color-dark);
+    box-shadow: inset 0 0 0 0.25rem var(--color-light);
+}
+
+.wtr-actionkit-embed-stacked .ak-privacy .input-radio input[type='radio']:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}
+
+/* The id is suffixed on every embed after a page's first (pitfall #87). */
+.wtr-actionkit-embed-stacked :is(#really-opt-out, [data-ak-id='really-opt-out']) {
+    margin-block-start: 1rem;
+    padding: 1rem 1.25rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    background-color: rgb(0 0 0 / 0.22);
+    border-radius: 0.375rem;
+}
+
+.wtr-actionkit-embed-stacked :is(#really-opt-out, [data-ak-id='really-opt-out']) p {
+    margin: 0;
+}
+
+/* "Yes, keep me involved" is a <label for> the Yes radio, drawn as a small
+ * button: clicking it re-selects Yes, which also dismisses the box. */
+.wtr-actionkit-embed-stacked :is(#really-opt-out, [data-ak-id='really-opt-out']) label {
+    display: inline-block;
+    margin-block-start: 0.75rem;
+    padding: 0.375rem 1rem;
+    font-family: var(--font-heading);
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--color-dark);
+    background-color: var(--color-light);
+    border-radius: var(--radius-button);
+    cursor: pointer;
+}
+
+.wtr-actionkit-embed-stacked :is(#really-opt-out, [data-ak-id='really-opt-out']) label:hover {
+    opacity: 0.85;
+}
+
 /* ------------------------------------------------------------
  * Panel-fill modifiers — .wtr-ak-on-{tone}
  * ------------------------------------------------------------
@@ -1042,6 +1135,23 @@ html {
 .wtr-actionkit-embed-stacked.wtr-ak-on-light .input-select,
 .wtr-actionkit-embed-stacked.wtr-ak-on-light .input-textarea {
     background-color: var(--color-light);
+}
+
+/* Both light panels: the opt-in's light-on-colour pieces invert with the
+ * text. An unchecked radio gets an outline (white on white otherwise), and
+ * the "Are you sure?" box swaps its dark scrim and light button for a faint
+ * tint and a dark button. */
+.wtr-actionkit-embed-stacked:is(.wtr-ak-on-light, .wtr-ak-on-white) .ak-privacy .input-radio input[type='radio'] {
+    border-color: var(--color-dark);
+}
+
+.wtr-actionkit-embed-stacked:is(.wtr-ak-on-light, .wtr-ak-on-white) :is(#really-opt-out, [data-ak-id='really-opt-out']) {
+    background-color: rgb(0 0 0 / 0.07);
+}
+
+.wtr-actionkit-embed-stacked:is(.wtr-ak-on-light, .wtr-ak-on-white) :is(#really-opt-out, [data-ak-id='really-opt-out']) label {
+    color: var(--color-light);
+    background-color: var(--color-dark);
 }
 
 /* ============================================================

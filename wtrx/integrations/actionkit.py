@@ -143,16 +143,35 @@ def base_url(hostname):
 DEFAULT_ACTION_SOURCE = "website"
 
 
+# ActionKit's response when a submission carries a ``user_<name>`` field that
+# isn't one of its allowed custom user fields. It names the fields without
+# their prefix: "The user field action_comment is not allowed." / "The user
+# fields a,b are not allowed."
+_REJECTED_USER_FIELDS_RE = re.compile(r"The user fields? ([\w\-, ]+?) (?:is|are) not allowed")
+
+
+def rejected_user_fields(response_text):
+    """Return the custom user field names an ActionKit error says it won't accept."""
+    match = _REJECTED_USER_FIELDS_RE.search(response_text or "")
+    if not match:
+        return []
+    return [name.strip() for name in match.group(1).split(",") if name.strip()]
+
+
 def submit_action(hostname, username, password, page, fields, timeout=5):
     """
     POST an action to ActionKit's REST API.
 
-    ``fields`` is the mapped dict from :func:`map_form_fields` (must contain
-    ``email``). Returns ActionKit's JSON response body as a dict on success
-    (HTTP 2xx; empty when the body isn't a JSON object); raises
-    :class:`ActionKitError` on missing configuration or any non-2xx response.
-    Network errors from ``requests`` propagate to the caller, which is expected
-    to catch and log them.
+    ``fields`` is the dict to send (must contain ``email``). Returns
+    ActionKit's JSON response body as a dict on success (HTTP 2xx; empty when
+    the body isn't a JSON object); raises :class:`ActionKitError` on missing
+    configuration or any non-2xx response. Network errors from ``requests``
+    propagate to the caller, which is expected to catch and log them.
+
+    ActionKit refuses a whole submission over one ``user_<name>`` field it has
+    no custom user field for. When that is the reason given, the named fields
+    are dropped and the action is sent once more, so a stray field costs that
+    field and not the signup.
     """
     if not (hostname and username and page):
         raise ActionKitError(
@@ -162,17 +181,37 @@ def submit_action(hostname, username, password, page, fields, timeout=5):
     url = f"{base_url(hostname)}/rest/v1/action/"
     payload = {"page": page, "source": DEFAULT_ACTION_SOURCE, **fields}
 
-    response = requests.post(
-        url,
-        json=payload,
-        auth=(username, password),
-        headers={"Accept": "application/json"},
-        timeout=timeout,
-    )
+    def post():
+        return requests.post(
+            url,
+            json=payload,
+            auth=(username, password),
+            headers={"Accept": "application/json"},
+            timeout=timeout,
+        )
+
+    response = post()
+
+    if response.status_code == 400:
+        dropped = [
+            key
+            for key in (f"user_{name}" for name in rejected_user_fields(response.text))
+            if key in payload
+        ]
+        if dropped:
+            logger.warning(
+                "ActionKit page %s does not accept the user field(s) %s; resubmitting without them.",
+                page,
+                ", ".join(dropped),
+            )
+            for key in dropped:
+                del payload[key]
+            response = post()
 
     if not 200 <= response.status_code < 300:
         raise ActionKitError(
-            f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}"
+            f"ActionKit returned HTTP {response.status_code}: {response.text[:500]}",
+            status_code=response.status_code,
         )
 
     try:

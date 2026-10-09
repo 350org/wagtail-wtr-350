@@ -202,6 +202,61 @@ class TestSubmitAction(SimpleTestCase):
             actionkit.submit_action("", "u", "p", "join", {"email": "a@b.com"})
 
     @patch("wtrx.integrations.actionkit.requests.post")
+    def test_resubmits_without_user_fields_actionkit_rejects(self, mock_post):
+        rejected = self._mock_response(
+            400,
+            text='"Unable to process action: Unexpected error: '
+            'The user fields shoe_size,nickname are not allowed."',
+        )
+        mock_post.side_effect = [rejected, self._mock_response(201)]
+        with self.assertLogs("wtrx.integrations.actionkit", level="WARNING"):
+            actionkit.submit_action(
+                "myorg.actionkit.com",
+                "u",
+                "p",
+                "join",
+                {"email": "a@b.com", "user_shoe_size": "9", "user_nickname": "Al", "user_ok": "1"},
+            )
+        self.assertEqual(mock_post.call_count, 2)
+        resent = mock_post.call_args.kwargs["json"]
+        self.assertNotIn("user_shoe_size", resent)
+        self.assertNotIn("user_nickname", resent)
+        self.assertEqual(resent["user_ok"], "1")
+        self.assertEqual(resent["email"], "a@b.com")
+
+    @patch("wtrx.integrations.actionkit.requests.post")
+    def test_a_rejection_naming_a_single_field_is_retried_too(self, mock_post):
+        rejected = self._mock_response(400, text="The user field shoe_size is not allowed.")
+        mock_post.side_effect = [rejected, self._mock_response(201)]
+        with self.assertLogs("wtrx.integrations.actionkit", level="WARNING"):
+            actionkit.submit_action(
+                "myorg.actionkit.com", "u", "p", "join", {"email": "a@b.com", "user_shoe_size": "9"}
+            )
+        self.assertNotIn("user_shoe_size", mock_post.call_args.kwargs["json"])
+
+    @patch("wtrx.integrations.actionkit.requests.post")
+    def test_a_second_rejection_is_raised_not_retried_again(self, mock_post):
+        mock_post.return_value = self._mock_response(
+            400, text="The user field shoe_size is not allowed."
+        )
+        with self.assertLogs("wtrx.integrations.actionkit", level="WARNING"):
+            with self.assertRaises(ActionKitError):
+                actionkit.submit_action(
+                    "myorg.actionkit.com", "u", "p", "join", {"email": "a@b.com", "user_shoe_size": "9"}
+                )
+        self.assertEqual(mock_post.call_count, 2)
+
+    @patch("wtrx.integrations.actionkit.requests.post")
+    def test_other_400s_are_not_retried(self, mock_post):
+        mock_post.return_value = self._mock_response(400, text="Email is invalid.")
+        with self.assertRaises(ActionKitError) as raised:
+            actionkit.submit_action(
+                "myorg.actionkit.com", "u", "p", "join", {"email": "nope", "user_shoe_size": "9"}
+            )
+        self.assertEqual(mock_post.call_count, 1)
+        self.assertEqual(raised.exception.status_code, 400)
+
+    @patch("wtrx.integrations.actionkit.requests.post")
     def test_returns_the_response_body(self, mock_post):
         resp = self._mock_response(201)
         resp.json.return_value = {"id": 7, "redirect_url": "/cms/thanks/join?action_id=7"}
@@ -912,37 +967,47 @@ class TestActionKitInlineSignupView(TestCase):
         self.assertNotIn("akid", fields)
 
     @patch("wtrx.views.actionkit.submit_action")
-    def test_form_display_config_is_not_forwarded(self, mock_submit):
+    def test_forwards_a_live_forms_fields_under_their_own_names(self, mock_submit):
         self._configure_actionkit()
-        self._post({"page": "web_join", "email": "a@b.com", "want_progress": "1"})
-        fields = mock_submit.call_args[0][4]
-        self.assertNotIn("want_progress", fields)
-        self.assertNotIn("user_want_progress", fields)
-
-    @patch("wtrx.views.actionkit.submit_action")
-    def test_forwards_consent_fields_under_their_own_names(self, mock_submit):
-        self._configure_actionkit()
-        # The .ak-privacy inputs of a live act.350.org form.
-        consent = {
+        # What act.350.org's no-pipelines-burning-planet form posts for a
+        # visitor shown the GDPR opt-in.
+        posted = {
+            "action_comment": "Please act now.",
+            "country": "Germany",
+            "postal": "10115",
+            "action_utm_source": "newsletter",
+            "action_referring_element": "hero",
+            "user_volunteer": "1",
             "privacy": "accabbf4db42d2b650cb43ee6817b22e9b38dcf8",
             "privacy_hidden": "85758a036d426767163b2da4c367e6ca5e316120",
             "privacy_show_if": "missing",
             "privacy_radio_optin_lists": "1",
             "privacy_optout_unsub_all": "1",
             "require_opt_in": "1",
-            "required": ["email", "privacy"],
         }
-        self._post({"page": "web_join", "email": "a@b.com", **consent})
+        self._post(
+            {"page": "web_join", "email": "a@b.com", "want_progress": "1", **posted}
+        )
         fields = mock_submit.call_args[0][4]
-        for name, value in consent.items():
+        for name, value in posted.items():
             self.assertEqual(fields[name], value)
-            self.assertNotIn(f"user_{name}", fields)
+        self.assertEqual(
+            set(fields), {"email", *posted}, "nothing renamed, nothing extra forwarded"
+        )
 
     @patch("wtrx.views.actionkit.submit_action")
-    def test_single_required_value_is_forwarded_as_a_string(self, mock_submit):
+    def test_a_repeated_input_keeps_every_value(self, mock_submit):
         self._configure_actionkit()
-        self._post({"page": "web_join", "email": "a@b.com", "required": "email"})
-        self.assertEqual(mock_submit.call_args[0][4]["required"], "email")
+        self._post({"page": "web_join", "email": "a@b.com", "required": ["email", "privacy"]})
+        self.assertEqual(mock_submit.call_args[0][4]["required"], ["email", "privacy"])
+
+    @patch("wtrx.views.actionkit.submit_action")
+    def test_a_filled_honeypot_is_answered_but_never_forwarded(self, mock_submit):
+        self._configure_actionkit()
+        for honeypot in ("action_honey", "user_honey"):
+            response = self._post({"page": "web_join", "email": "a@b.com", honeypot: "x"})
+            self.assertEqual(response.json(), {"success": True})
+        mock_submit.assert_not_called()
 
     @patch("wtrx.views.actionkit.submit_action")
     def test_default_thanks_redirect_is_returned_flagged_as_default(self, mock_submit):

@@ -18,9 +18,8 @@ logger = logging.getLogger(__name__)
 
 ROBOTS_DISALLOWED_PATHS = ("/admin/", "/django-admin/", "/accounts/")
 
-# Hidden bookkeeping fields ActionKit's own fragment adds to the form —
-# not donor data, so excluded before map_form_fields turns unrecognised
-# keys into user_<name> custom fields on the ActionKit record.
+# Hidden bookkeeping fields ActionKit's own fragment adds to the form for its
+# own client script and hosted form handler. Not signup data, so not forwarded.
 _ACTIONKIT_BOOKKEEPING_FIELDS = {
     "page",
     "utf8",
@@ -29,38 +28,46 @@ _ACTIONKIT_BOOKKEEPING_FIELDS = {
     "js",
     "auto_country",
     "csrfmiddlewaretoken",
-    # Tells ActionKit's own client script to fetch the progress meter.
     "want_progress",
 }
 
-# Attribution values the form's script copies in from the page URL, the way
-# actionkit.js's onContextLoaded() does on an ActionKit-hosted page. Sent to
-# ActionKit under their own names: as user_<name> custom fields they would
-# record nothing ActionKit reports on.
-_ACTIONKIT_TRACKING_FIELDS = (
-    "source",
-    "akid",
-    "referring_akid",
-    "aktmid",
-    "action_id",
-)
+# ActionKit's spam honeypots: inputs hidden from people (main.css), so only a
+# bot fills one in.
+_ACTIONKIT_HONEYPOT_FIELDS = ("action_honey", "user_honey")
 
-# The GDPR opt-in, posted only while the form shows it (see
-# _actionkit_form.html): the visitor's answer plus the inputs ActionKit reads
-# it with. The radio values are hashes, signed along with `privacy_hidden`, so
-# the set travels together. Sent under their own names like the tracking
-# fields above. As user_<name> ActionKit rejects the whole signup, since no
-# such custom user fields exist; dropped, the signup would go through without
-# the visitor's consent choice.
-_ACTIONKIT_CONSENT_FIELDS = (
-    "privacy",
-    "privacy_hidden",
-    "privacy_show_if",
-    "privacy_radio_optin_lists",
-    "privacy_optout_unsub_all",
-    "require_opt_in",
-    "required",
-)
+
+def _actionkit_embed_fields(post):
+    """
+    The fields of a submitted ActionKit embed, ready for ActionKit's REST API.
+
+    The form is ActionKit's own fragment, so its inputs already carry the names
+    ActionKit expects: core user fields bare, ``user_<name>`` for custom user
+    fields, ``action_<name>`` for action fields, plus tracking (``source``,
+    ``akid``) and the GDPR opt-in set (``privacy*``, ``required``). They are
+    forwarded under those names, so a field ActionKit adds to a page needs no
+    change here. Renaming them (as map_form_fields does for a Wagtail form,
+    whose names are an editor's labels) turns anything unlisted into a
+    ``user_<name>`` field ActionKit rejects the whole signup for.
+
+    Blank values are dropped. An input posted more than once (``required``,
+    once per required field) keeps every value, as a list.
+    """
+    fields = {}
+    for key in post:
+        if key in _ACTIONKIT_BOOKKEEPING_FIELDS or key in _ACTIONKIT_HONEYPOT_FIELDS:
+            continue
+        values = [value.strip() for value in post.getlist(key) if value.strip()]
+        if values:
+            fields[key] = values[0] if len(values) == 1 else values
+
+    # ActionKit's forms ask for one "name"; its REST API takes the two parts.
+    name = fields.pop("name", None)
+    if isinstance(name, str):
+        first_name, _sep, last_name = name.partition(" ")
+        fields.setdefault("first_name", first_name)
+        if last_name.strip():
+            fields.setdefault("last_name", last_name.strip())
+    return fields
 
 
 def robots_txt(request):
@@ -115,23 +122,11 @@ def actionkit_inline_signup(request):
             {"success": False, "message": _("Signup is not configured.")}, status=503
         )
 
-    posted = {
-        key: value
-        for key, value in request.POST.items()
-        if key not in _ACTIONKIT_BOOKKEEPING_FIELDS
-        and key not in _ACTIONKIT_TRACKING_FIELDS
-        and key not in _ACTIONKIT_CONSENT_FIELDS
-    }
-    fields = actionkit.map_form_fields(posted)
-    for name in _ACTIONKIT_TRACKING_FIELDS:
-        value = request.POST.get(name, "").strip()
-        if value:
-            fields[name] = value
-    for name in _ACTIONKIT_CONSENT_FIELDS:
-        # `required` is posted once per required field, so keep every value.
-        values = [v.strip() for v in request.POST.getlist(name) if v.strip()]
-        if values:
-            fields[name] = values[0] if len(values) == 1 else values
+    if any(request.POST.get(name, "").strip() for name in _ACTIONKIT_HONEYPOT_FIELDS):
+        # Answer as a real signup would, so a bot learns nothing.
+        return JsonResponse({"success": True})
+
+    fields = _actionkit_embed_fields(request.POST)
     if not fields.get("email"):
         return JsonResponse(
             {"success": False, "message": _("Email address is required.")}, status=400
