@@ -17,10 +17,13 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TestCase
 
+import httpx
+from anthropic import BadRequestError
 from wagtail.images.tests.utils import get_test_image_file
 
 from wtrx.images import CustomImage
@@ -133,6 +136,44 @@ class BackfillImageDescriptionsTest(TestCase):
         cache = self._cache()
         self.assertNotIn(str(first.pk), cache)
         self.assertEqual(cache[str(second.pk)]["description"], "A fine description.")
+
+    def test_an_image_the_api_rejects_does_not_stop_the_batch(self):
+        first = self._image(title="rejected")
+        second = self._image(title="fine")
+        response = httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+        rejected = BadRequestError("media_type: Input should be 'image/jpeg'", response=response, body=None)
+
+        out = StringIO()
+        with patch(
+            "wagtail_ai.agents.basic_prompt.BasicPromptAgent.execute",
+            side_effect=[rejected, "A fine description."],
+        ):
+            call_command(
+                "backfill_image_descriptions",
+                cache_file=str(self.cache_path),
+                stdout=out,
+                stderr=out,
+            )
+
+        cache = self._cache()
+        self.assertNotIn(str(first.pk), cache)
+        self.assertEqual(cache[str(second.pk)]["description"], "A fine description.")
+
+    def test_svgs_are_skipped_without_calling_the_model(self):
+        svg = CustomImage.objects.create(
+            title="logo",
+            file=ContentFile(b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>', name="logo.svg"),
+            width=10,
+            height=10,
+        )
+        photo = self._image(title="photo")
+
+        out, mock_execute = self._run()
+
+        self.assertEqual(mock_execute.call_count, 1)
+        self.assertEqual(list(self._cache().keys()), [str(photo.pk)])
+        self.assertIn("SKIPPED", out)
+        self.assertIn(str(svg.pk), out)
 
     def test_image_id_filters_to_a_single_image(self):
         wanted = self._image(title="wanted")

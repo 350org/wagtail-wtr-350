@@ -23,7 +23,8 @@ generated, so an interrupted run loses at most the call in flight.
 
 Idempotent: only ever targets images whose description is still blank, so
 partial runs (--limit, Ctrl-C, a restart, an API failure) are always safe to
-re-run. On PostgreSQL only one run proceeds at a time; a second exits
+re-run. SVGs are skipped: the model only accepts JPEG, PNG, GIF and WebP,
+and an SVG's rendition is still an SVG. On PostgreSQL only one run proceeds at a time; a second exits
 immediately rather than paying for the same images twice.
 """
 
@@ -35,6 +36,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
+from anthropic import BadRequestError
 from any_llm.exceptions import AnyLLMError
 from wagtail_ai.agents.base import get_agent_settings
 from wagtail_ai.agents.basic_prompt import BasicPromptAgent
@@ -143,6 +145,9 @@ class Command(BaseCommand):
             image = CustomImage.objects.filter(pk=pk, description="").first()
             if image is None:
                 continue
+            if entry is None and image.is_svg():
+                self.stdout.write("SKIPPED %5s %-40s -> SVG, write its description by hand" % (pk, image.title[:40]))
+                continue
             if entry is None:
                 description = self._generate(agent, prompt_text, max_length, image)
                 generated += 1
@@ -207,7 +212,9 @@ class Command(BaseCommand):
                 prompt=prompt_text,
                 context={"image": image.pk, "max_length": max_length},
             )
-        except (ValidationError, AnyLLMError) as exc:
+        # BadRequestError: the API rejected this one image (unsupported or
+        # unreadable file); any-llm does not always wrap it.
+        except (ValidationError, AnyLLMError, BadRequestError) as exc:
             self.stderr.write(self.style.WARNING(
                 "FAILED  %5s %-40s -> %s" % (image.pk, image.title[:40], exc)
             ))
