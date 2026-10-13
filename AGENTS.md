@@ -1715,8 +1715,9 @@ gate.
     page load, only when a country has its own campaign; until it answers,
     or if it can't, the visitor gets the rest of world campaign. There is
     no site-wide value beneath these, unlike the donate block's overrides. On success `_actionkit_form.html` hides the
-    form and calls `FundraiseUp.openCheckout()`, prefilling name and email
-    from the signup. `get_context()` passes the code only while the
+    form and calls `FundraiseUp.openCheckout()`, prefilling the name
+    from the signup — never the email, which Fundraise Up would record the
+    moment the checkout opened. `get_context()` passes the code only while the
     Fundraise Up integration is enabled, and the JS falls back to the
     thank-you box whenever `window.FundraiseUp.openCheckout` is missing
     (defined by the installation snippet's stub, which live preview

@@ -3194,8 +3194,9 @@ class PostSignupDonationBlock(StructBlock):
     When a campaign code is set (and the Fundraise Up integration is enabled),
     a successful signup hides the form and calls Fundraise Up's own
     `FundraiseUp.openCheckout()` JS API in place of showing the block's
-    success message, prefilling the donor's name and email from the signup
-    form. A campaign code (a Fundraise Up campaign, e.g. FUNXXXXXXXX) is a
+    success message, prefilling the donor's name from the signup form (not
+    their email — the donor types that into the checkout themselves). A
+    campaign code (a Fundraise Up campaign, e.g. FUNXXXXXXXX) is a
     different thing from the element IDs DonateFundraiseUpBlock embeds — an
     element renders inline, a campaign opens the checkout modal. If Fundraise
     Up's script isn't on the page (integration disabled, live preview), the

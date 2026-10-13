@@ -470,10 +470,14 @@
                     firstName = parts.shift() || "";
                     lastName = parts.join(" ");
                 }
+                {% comment %}
+                The email is deliberately not passed on. Fundraise Up
+                records a prefilled email as soon as the checkout opens,
+                before the visitor has chosen to give it to Fundraise Up.
+                {% endcomment %}
                 var supporter = {};
                 if (firstName) { supporter.firstName = firstName; }
                 if (lastName) { supporter.lastName = lastName; }
-                if (data.get("email")) { supporter.email = String(data.get("email")).trim(); }
                 var options = { supporter: supporter };
                 if (fundraiseupDesignation) { options.designations = [{ id: fundraiseupDesignation }]; }
                 formContainer.classList.add("hidden");
