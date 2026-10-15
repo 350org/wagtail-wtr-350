@@ -256,6 +256,10 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 
 # Wagtail settings
 WAGTAIL_SITE_NAME = "350.org"
+# Hosts whose links stay in the same tab; every other http(s) link opens in a
+# new one (static_src/js/components/external-links.js). The current request
+# host is always included, so staging and local dev need no entry here.
+WTRX_INTERNAL_LINK_HOSTS = ["350.org", "www.350.org"]
 # WAGTAILADMIN_BASE_URL is set in dev.py and production.py
 WAGTAILIMAGES_IMAGE_MODEL = "wtrx.CustomImage"
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]

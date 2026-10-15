@@ -1849,3 +1849,18 @@ gate.
     named `user_` fields and resubmits once, logging a warning. A filled
     honeypot (`action_honey`/`user_honey`) gets a success response and is
     never forwarded, so the retry can't wave a bot through.
+
+94. **External links open in a new tab, decided in the browser.**
+    `static_src/js/components/external-links.js` gives every http(s) link
+    whose host is neither the current one nor in `WTRX_INTERNAL_LINK_HOSTS`
+    (`350.org`, `www.350.org`) `target="_blank"`, `noopener noreferrer` and
+    a visually hidden, translated "(opens in a new tab)" (appended to
+    `aria-label` instead when the link has one, since that label replaces
+    its content). It reads both from `<body>`'s `data-internal-hosts`/
+    `data-new-tab-hint`. Doing it client-side covers template links, rich
+    text, raw HTML and ActionKit's fetched fragment in one place, and keeps
+    the cached page identical for every visitor (pitfall #90). Subdomains
+    are hosts like any other: `act.350.org` and `canada.350.org` are
+    external unless added to the setting. A link that already sets
+    `target`, or has `download`, is left alone, as are links added to the
+    page after load.
