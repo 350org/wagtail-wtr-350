@@ -207,8 +207,7 @@ class TestCreateTestPageCoverage(TestCase):
     def test_background_palette_is_fully_covered(self):
         """
         Every colour in BACKGROUND_COLOR_CHOICES appears as a section
-        background, a callout colour, a hero banner colour and an ActionKit
-        signup background.
+        background, a callout colour and an ActionKit signup background.
         """
         from wtrx.blocks import BACKGROUND_COLOR_CHOICES
 
@@ -216,7 +215,6 @@ class TestCreateTestPageCoverage(TestCase):
         seen = {
             "section": set(),
             "callout": set(),
-            "hero": set(),
             "signup_actionkit": set(),
         }
         for child in self.page.body:
@@ -224,8 +222,6 @@ class TestCreateTestPageCoverage(TestCase):
                 seen["section"].add(child.value["background"])
             elif child.block_type == "callout":
                 seen["callout"].add(child.value["color"])
-            elif child.block_type == "hero":
-                seen["hero"].add(child.value["banner_color"])
             elif child.block_type == "signup_actionkit":
                 seen["signup_actionkit"].add(child.value["background"])
 
@@ -461,12 +457,6 @@ class TestCreateTestPageRendering(TestCase):
         html = response.content.decode()
         for colour in ("white", "light-grey", "dark-grey", "navy", "red", "blue-gradient"):
             self.assertIn(f"Callout ({colour})", html)
-
-    def test_hero_block_renders_every_colour(self):
-        response = self._get()
-        html = response.content.decode()
-        for colour in ("white", "light-grey", "dark-grey", "navy", "red", "blue-gradient"):
-            self.assertIn(f"Hero Block ({colour})", html)
 
     # --- sections ---
 

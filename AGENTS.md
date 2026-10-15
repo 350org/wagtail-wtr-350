@@ -212,26 +212,29 @@ ES modules, 4-space indent, semicolons required.
    Editors shouldn't be able to build arbitrary column layouts.
 3. **i18n from day one**: every hardcoded UI string is translatable
    (`{% trans %}` in templates, `gettext_lazy` in Python) from the start.
-4. **`HeroMixin` vs `HeroBlock`**: `HeroMixin` is a page-model mixin
-   providing a dedicated hero at the top of a page (`HomePage`,
-   `ContentPage`, etc.); `HeroBlock` places a hero-style section *within*
-   the body StreamField. Both render `components/hero.html` and must pass a
-   `hero` context dict with exactly these keys: `variant`, `pre_header`,
+4. **The hero only ever comes from the page's own hero fields**:
+   `HeroMixin` (and `BannerHeroMixin`, for `Post`) is a page-model mixin
+   providing the dedicated hero at the top of a page (`HomePage`,
+   `ContentPage`, etc.). There is **no hero block** for the body: the old
+   mid-page `HeroBlock` was removed from `BodyStreamBlock` and
+   `SectionContentBlock` (migration `0101`), and `0102` deleted every
+   stored `hero` body block from pages and revisions.
+   `components/hero.html` takes a `hero` context dict with exactly these
+   keys: `variant`, `pre_header`,
    `headline`, `copy`, `copy_is_block`, `image`, `video`, `image_caption`,
    `banner_color`, `cta`, `tag`, `tag_url`, `author`, `published_at`,
-   `minimal`, `jumbo`, `in_body`. `jumbo` is the banner pages' "Jumbo
+   `minimal`, `jumbo`. `jumbo` is the banner pages' "Jumbo
    headline" toggle (`hero_jumbo_headline`, in `banner_hero_fields`),
    scaling the banner `h1` from `lg:` with its text column (`16cqi` on an
    `@container` column, 56–96px) instead of the fixed 48px;
-   `BannerHeroMixin`/`HeroBlock` pin it `False`. `in_body=True` only for `HeroBlock`, and it no
-   longer changes the gutter — every hero and every full-width block now
+   `BannerHeroMixin` pins it `False`. Every hero and every full-width block
    shares one container, `mx-auto max-w-[1500px] px-4` (flat 16px at every
    breakpoint). The nav (`header.html`) deliberately still steps
    `px-4 sm:px-6 lg:px-8`, so from `sm:` up the header's content is inset
    8–16px further than the hero beneath it. `pre_header` is an uppercase
    overline above the headline, editable on `HomePage` only
    (`HeroMixin.hero_panels`; `banner_hero_panels` omits it, and
-   `BannerHeroMixin`/`HeroBlock` pin it `None`). In the "full" variant it
+   `BannerHeroMixin` pins it `None`). In the "full" variant it
    sits on a translucent dark scrim (`.wtr-hero-pre-header` in `main.css`,
    which owns its padding and 6px radius) for contrast against the
    background photo — the hero's own gradient fades to transparent at the
@@ -242,8 +245,8 @@ ES modules, 4-space indent, semicolons required.
    the banner variant's text column sits on a flat `banner_color` fill and
    flips to `text-dark` on a light banner, where a dark scrim would be
    wrong. It is the site's only non-heading user of `font-heavy`
-   (pitfall #34). `hero` and `quote` must stay in each page
-   template's full-bleed block-type list (both own a `max-w-[1500px]`
+   (pitfall #34). `quote` must stay in each page
+   template's full-bleed block-type list (it owns a `max-w-[1500px]`
    wrapper that's unreachable inside the shared body column). When
    `hero.video` is a wagtailmedia `Media`, the template switches to a
    two-column layout (text left, video right; stacked on mobile), hiding
@@ -251,8 +254,7 @@ ES modules, 4-space indent, semicolons required.
    `hero.image` at `fill-1280x720` → none. `image_caption` is an optional
    caption pill overlaid at the bottom of whichever of `image`/`video` is
    showing (`.wtr-image-caption`, same chrome as `SignupActionKitBlock`/
-   `ImageBlock`) — `HeroBlock` has no video, so it's image-only there.
-   "banner" variant only: `HomePage` (the only "full" variant page)
+   `ImageBlock`). "banner" variant only: `HomePage` (the only "full" variant page)
    omits the field from `hero_panels`, and the "full" section of
    `hero.html` has no caption chrome at all.
 5. **`wtrx/` extraction readiness**: concrete page models ship their own
@@ -1213,8 +1215,7 @@ gate.
     `my-16 sm:my-32` (64px on phones, 128px from `sm:`). An unlayered rule
     in `main.css` ("Hero -> first full-bleed block") overrides
     `margin-block-start` to 16px, but only when **both** hold:
-    `body:has(.wtr-page-hero)` (set by `hero.html` only when `in_body` is
-    false, so a mid-body `HeroBlock` never triggers it) **and** the
+    `body:has(.wtr-page-hero)` (set by `hero.html`) **and** the
     stack's `:first-child` is one of exactly four
     panel-shaped types: `section`, `signup_actionkit`,
     `donate_fundraiseup`, `feature_panel`. Those four render as filled
@@ -1235,9 +1236,8 @@ gate.
     hero's panel would have started.
     **That margin is the only source of the gap below a hero.** The hero
     wrapper in `components/hero.html` used to carry a `pb-4` of its own as
-    well, which summed with this rule to a visible 32px wherever it fired
-    (and gave a mid-body `HeroBlock` a stray 16px under it that no other
-    block in the stack has). Both hero variants now end flush at their
+    well, which summed with this rule to a visible 32px wherever it fired.
+    Both hero variants now end flush at their
     panel edge — don't reintroduce vertical padding there to "fix" a gap;
     change this margin instead.
 
@@ -1636,7 +1636,7 @@ gate.
 
 78. **The hero headline is line-breaks-only rich text, rendered through
     `headline_html()`** (`wtrx/blocks/__init__.py`). `HeroMixin`/
-    `BannerHeroMixin.hero_headline` and `HeroBlock.headline` use
+    `BannerHeroMixin.hero_headline` use
     `RICHTEXT_FEATURES_HEADLINE = []` — no toolbar, Enter/Shift+Enter only.
     `headline_html()` flattens paragraphs and `<br>`s to `<br>`-joined,
     escaped text for the `<h1>` and drops any other markup, so nothing an

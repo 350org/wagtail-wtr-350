@@ -2,7 +2,7 @@
 Tests for StreamField blocks.
 
 Content blocks (ButtonBlock, VideoBlock), layout blocks (QuoteBlock,
-HeroBlock, SectionBlock, CardCarouselBlock, CalloutBlock), and action blocks
+SectionBlock, CardCarouselBlock, CalloutBlock), and action blocks
 (SignupActionNetworkBlock) are tested here with SimpleTestCase since their
 clean() methods don't require a database.
 
@@ -58,7 +58,6 @@ from wtrx.blocks import (
     FeaturePanelBlock,
     FundraiseUpAdvancedSettingsBlock,
     GatedStreamBlockAdapter,
-    HeroBlock,
     HeroCTABlock,
     HeroSignupActionKitBlock,
     ImageBlock,
@@ -565,67 +564,16 @@ class TestQuoteBlockValidation(SimpleTestCase):
         self.assertEqual(errors, {})
 
 
-class TestHeroBlockFields(SimpleTestCase):
+class TestNoHeroBodyBlock(SimpleTestCase):
     """
-    HeroBlock has an optional ImageChooserBlock but a required RichTextBlock
-    whose content is hard to construct without a template context. We just
-    verify field structure here.
+    A hero only ever comes from the page's own hero fields (HeroMixin /
+    BannerHeroMixin). No body stream offers one, at any nesting level.
     """
 
-    def test_block_has_expected_fields(self):
-        """
-        No layout or cta fields — HeroBlock always renders as hero.html's
-        "banner" variant, which has a fixed layout and never renders a cta
-        (see HeroBlock's docstring).
-        """
-        block = HeroBlock()
-        self.assertEqual(
-            set(block.declared_blocks.keys()),
-            {"headline", "content", "image", "image_caption", "banner_color"},
-        )
-
-    def test_image_is_not_required(self):
-        """The image field should be optional (required=False)."""
-        block = HeroBlock()
-        image_block = block.declared_blocks["image"]
-        self.assertFalse(image_block.required)
-
-    def test_banner_color_default_is_navy(self):
-        block = HeroBlock()
-        self.assertEqual(block.declared_blocks["banner_color"].meta.default, "navy")
-
-    def test_get_context_always_variant_banner(self):
-        block = HeroBlock()
-        value = block.to_python(
-            {"headline": "Take Action", "content": "", "image": None, "banner_color": "red"}
-        )
-        ctx = block.get_context(value)
-        self.assertEqual(ctx["hero"]["variant"], "banner")
-        self.assertEqual(ctx["hero"]["headline"], "Take Action")
-        self.assertEqual(ctx["hero"]["banner_color"], "red")
-        self.assertEqual(ctx["hero"]["cta"], [])
-        self.assertIsNone(ctx["hero"]["video"])
-
-    def test_get_context_minimal_true_when_headline_only(self):
-        block = HeroBlock()
-        value = block.to_python(
-            {"headline": "Take Action", "content": "", "image": None, "banner_color": "red"}
-        )
-        ctx = block.get_context(value)
-        self.assertTrue(ctx["hero"]["minimal"])
-
-    def test_get_context_minimal_false_when_content_present(self):
-        block = HeroBlock()
-        value = block.to_python(
-            {
-                "headline": "Take Action",
-                "content": "<p>Some supporting copy.</p>",
-                "image": None,
-                "banner_color": "red",
-            }
-        )
-        ctx = block.get_context(value)
-        self.assertFalse(ctx["hero"]["minimal"])
+    def test_hero_not_registered_in_any_body_stream(self):
+        for stream_class in (BodyStreamBlock, SectionContentBlock, TimelineYearContentBlock):
+            with self.subTest(stream=stream_class.__name__):
+                self.assertNotIn("hero", stream_class().child_blocks)
 
 
 class TestHeroCTABlock(SimpleTestCase):
@@ -849,7 +797,6 @@ class TestSectionBlockStructure(SimpleTestCase):
         "page_cards",
         "accordion",
         "callout",
-        "hero",
         "donate",
         "donate_fundraiseup",
         "signup_wagtail_forms",
@@ -3105,14 +3052,13 @@ class TestSharedBackgroundPalette(SimpleTestCase):
     an editor was standing in — see BACKGROUND_COLOR_CHOICES.
     """
 
-    # (block class, name of its background field). CalloutBlock and
-    # HeroBlock call theirs "color"/"banner_color" rather than "background";
+    # (block class, name of its background field). CalloutBlock calls its
+    # field "color" rather than "background";
     # the field name is per-block, the choices are not.
     BACKGROUND_FIELDS = [
         (SectionBlock, "background"),
         (CalloutBlock, "color"),
         (FeaturePanelBlock, "background"),
-        (HeroBlock, "banner_color"),
         (SignupActionKitBlock, "background"),
     ]
 

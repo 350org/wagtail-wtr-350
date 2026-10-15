@@ -1,15 +1,16 @@
 {% load i18n wagtailimages_tags wagtailcore_tags wtrx_tags %}
 {% comment %}
-  Shared hero component used by both HeroMixin (page-level) and HeroBlock (StreamField).
+  The page-level hero, rendered from HeroMixin / BannerHeroMixin (a page's own
+  hero fields). There is no hero block for the body StreamField.
 
   Expects a `hero` dict (or object) with these keys/attributes:
     variant       — "full" (HomePage's page-level hero only) or "banner"
-                    (every other HeroMixin page, and always for HeroBlock)
+                    (every other HeroMixin page)
     pre_header    — optional short line rendered above the headline as a
                     plain uppercase overline (no pill chrome), e.g.
                     "Welcome to 350 Canada". Exposed as an editable field
                     on HomePage only (HeroMixin.hero_panels); pinned None
-                    by BannerHeroMixin (Post) and HeroBlock.
+                    by BannerHeroMixin (Post).
     headline      — the heading text (str)
     copy          — optional richtext value (rendered via |richtext or include_block)
     copy_is_block — True if copy should be rendered via include_block, False for |richtext
@@ -73,8 +74,6 @@
   identical, just at different sizes (video_class/poster_img).
 
   Page templates pass `hero` via the template context (set in get_context()).
-  HeroBlock.get_context() builds this dict automatically (video is always
-  None there — HeroBlock has no video field, only a page's own hero does).
 
   Height (full variant only): viewport height minus the site nav's height
   (h-16 = 4rem in header.html).
@@ -88,12 +87,6 @@
     Flat px-4 (16px), no vertical padding. Figma's Content Hero wrapper
     specifies pb-[16px]; that 16px lives on base.html's <main> instead.
     The gap above comes from header.html's own py-6.
-
-    This also applies when this same template renders as a mid-page
-    HeroBlock inside page.body instead of the page-level HeroMixin hero:
-    with no top padding here, the gap above a mid-page hero now comes
-    purely from space-y-32's own 128px, consistent with every other block
-    — previously py-8 stacked an extra 32px on top of that.
     {% endcomment %}
     {% with on_light=hero.banner_color|background_is_light %}
     {% comment %}
@@ -103,15 +96,11 @@
     deliberately still steps px-4 sm:px-6 lg:px-8, so from sm: up its
     content is inset further than the hero beneath it.
 
-    "hero" is in the page templates' full-bleed list so the 1500px cap is
-    actually reachable — without it the block was wrapped in max-w-5xl and
-    rendered 1024px wide against the image block's 1500px.
-
     No bottom padding here, deliberately: the gap below the hero belongs
     entirely to base.html's <main> margin — see main.css's "Hero -> first
     full-bleed block".
     {% endcomment %}
-    <div class="{% if not hero.in_body %}wtr-page-hero {% endif %}mx-auto max-w-[1500px] px-4">
+    <div class="wtr-page-hero mx-auto max-w-[1500px] px-4">
         {% comment %}
         Height is normally a flat md:min-h-[385px], sized for two columns of
         real content. `minimal` (headline, and optionally an image, but no
@@ -167,7 +156,7 @@
                     {% comment %}
                     hero.published_at is only ever set by Post (via BannerHeroMixin's
                     get_banner_hero_context()'s **extra) — every other "banner" hero
-                    producer (ContentPage/IndexPage's HeroMixin, HeroBlock) leaves it
+                    producer (ContentPage/IndexPage's HeroMixin) leaves it
                     unset, so this compact date/40px-headline/author layout only ever
                     applies to Post, per Figma's smaller "Content Hero" instance there.
                     {% endcomment %}
@@ -268,18 +257,15 @@
                         {% elif hero.image %}
                             {% image hero.image fill-1000x800 as bg %}
                             {% comment %}
-                            A page-level hero (not hero.in_body) is always
-                            above the fold and usually the LCP element --
-                            loading="lazy" here was actively deferring the
-                            site's own LCP image. An in-body HeroBlock isn't
-                            guaranteed to be above the fold, so it keeps
-                            lazy-loading.
+                            The hero is always above the fold and usually
+                            the LCP element -- loading="lazy" here was
+                            actively deferring the site's own LCP image.
                             {% endcomment %}
                             <img src="{{ bg.url }}" width="{{ bg.width }}" height="{{ bg.height }}"
                                  alt="{{ hero.image.description }}"{% if not hero.image.description %} role="presentation"{% endif %}
                                  class="absolute inset-0 h-full w-full object-cover"
                                  style="{{ hero.image.object_position_style }}"
-                                 {% if hero.in_body %}loading="lazy"{% else %}loading="eager" fetchpriority="high"{% endif %}>
+                                 loading="eager" fetchpriority="high">
                         {% endif %}
                         {% comment %}Blends the color panel into the media — see main.css; picks the
                            matching-color fade class so the seam between panel and media
@@ -327,7 +313,7 @@
     panel carries rounded-lg/overflow-hidden/bg-dark, so a gutter applied
     there would pad the inside of the rounded panel instead of insetting it.
     {% endcomment %}
-    <div class="{% if not hero.in_body %}wtr-page-hero {% endif %}mx-auto max-w-[1500px] px-4">
+    <div class="wtr-page-hero mx-auto max-w-[1500px] px-4">
         <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col rounded-lg justify-end
                     min-h-[calc(100vh-4rem)]"
              {% if hero.video %}data-hero{% endif %}>
@@ -339,9 +325,7 @@
             {% elif hero.image %}
                 {% image hero.image fill-1600x700 as bg %}
                 {% comment %}
-                "full" is HomePage's page-level hero only (see hero.html's
-                docstring) -- always above the fold, so no hero.in_body branch
-                is needed here the way the "banner" variant above has one.
+                Always above the fold, like the "banner" variant above.
                 loading="lazy" here was actively deferring the site's own LCP
                 image.
                 {% endcomment %}
@@ -454,9 +438,8 @@
 
 {% endif %}
 {% if hero.video %}
-    {% comment %}Single script block per hero.html include — harmless if a page has multiple
-       heroes with video (page hero + HeroBlock(s) in the body), since it queries
-       every [data-hero] root and each root guards its own init with __wtrHeroInit.{% endcomment %}
+    {% comment %}Queries every [data-hero] root and each root guards its own init with
+       __wtrHeroInit, so a second include on the same page would be harmless.{% endcomment %}
     <script>
         (function () {
             document.querySelectorAll("[data-hero]").forEach(function (root) {

@@ -667,18 +667,6 @@ def _quote_block(image_id, alignment, with_cta=True):
     )
 
 
-def _hero_block(banner_color, image_id=None, with_copy=True):
-    return _sb(
-        "hero",
-        {
-            "headline": f"Hero Block ({banner_color})",
-            "content": _RICHTEXT_INLINE if with_copy else "",
-            "image": image_id,
-            "banner_color": banner_color,
-        },
-    )
-
-
 def _donate_block_full():
     """DonateBlock with override amounts and an override URL."""
     return _sb(
@@ -939,14 +927,6 @@ def _content_blocks(image_id, index_page_id, form_page_id):
     blocks += [
         _label("callout", "with a background image, no CTA"),
         _callout_block("navy", image_id=image_id, with_cta=False),
-    ]
-
-    blocks += [_label("hero", "one per background colour, with image")]
-    for color in _BACKGROUND_KEYS:
-        blocks.append(_hero_block(color, image_id=image_id))
-    blocks += [
-        _label("hero", "headline only — no copy, no image"),
-        _hero_block("navy", with_copy=False),
     ]
 
     blocks += [_heading("3. Action blocks")]
