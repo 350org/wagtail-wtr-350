@@ -32,7 +32,7 @@ wagtail-wtr/
 │   │   │                               #   QuoteBlock, RawHTMLBlock, TableBlock,
 │   │   │                               #   HeadingBlock
 │   │   ├── layout.py                   # SectionBlock, CardGridBlock, AccordionBlock
-│   │   ├── composite.py                # CalloutBlock, HeroBlock
+│   │   ├── composite.py                # CalloutBlock
 │   │   ├── cards.py                    # CardBlock, PersonCardBlock
 │   │   └── actions.py                  # DonateBlock, SignupBlock variants
 │   ├── models.py                       # BasePage, HeroMixin, HomePage, ContentPage,
@@ -144,7 +144,7 @@ wagtail-wtr/
 | Dark mode | No (post-MVP) | Reduces CSS complexity |
 | Multi-lingual | Yes, via `wagtail-localize` | One page tree per language under Root, each served at `/<code>/`; English unprefixed. Sites default to English, add languages as needed. |
 | Layout philosophy | Opinionated composite blocks, no raw columns | Editors can't break layouts |
-| Hero | HeroMixin on pages + HeroBlock in StreamField | Dedicated hero at top of page + mid-page hero sections |
+| Hero | HeroMixin on pages only (no hero block in the StreamField) | One dedicated hero at the top of each page |
 | Page title / h1 | Page title is the h1. `hero_headline` overrides if set. | Every page gets an h1 automatically |
 | Form submission | AJAX | Form stays on page, thank-you text replaces form on success |
 | Platform integrations | Pluggable registry (`wtrx/integrations/`); any number independently enabled via `IntegrationSettings.integrations` | Add a new integration without touching a shared god-object |
@@ -273,20 +273,9 @@ Image + rich text side by side. Stacks on mobile.
 
 Custom `clean()` validates at most one of `link_page` or `link_url` is set.
 
-**12. HeroBlock** (StructBlock)
-
-| Field | Type | Required |
-|---|---|---|
-| content | RichTextBlock | **Yes** |
-| image | ImageChooserBlock | No |
-| link_text | CharBlock | No |
-| link_page | PageChooserBlock | No |
-| link_url | URLBlock | No |
-
-Mid-page hero section. Uses RichTextBlock so editors can use h2/h3 for headings within.
-
-Custom `clean()` validates at most one of `link_page` or `link_url` is set
-(same validation as CalloutBlock).
+**12. HeroBlock** — removed. A hero only comes from the page's own hero
+fields (`HeroMixin`/`BannerHeroMixin`); migrations `0101`/`0102` took it out
+of the body streams and deleted stored instances.
 
 ### Card Blocks (2)
 
@@ -704,13 +693,12 @@ base.html
 - Image: `hero.image`
 - Video: `hero.video` (wagtailmedia Media instance) — when set, switches to two-column layout
 - CTA button: `hero.link_text` + `hero.link_page`/`hero.link_url`
-- Same template used by all page types and by `HeroBlock` (mid-page; video always None)
+- Same template used by all page types (there is no body hero block)
 
 **Context contract**: the template consumes a `hero` dict with keys:
 `headline`, `copy`, `copy_is_block`, `image`, `video`, `link_text`, `link_page`, `link_url`.
-Both `HeroBlock.get_context()` (Phase 2) and `HeroMixin` page `get_context()`
-(Phase 3) MUST build this dict. For both, `copy_is_block=False` because `copy`
-is either a `RichTextBlock` value or a `RichTextField` string — both use `|richtext`.
+`HeroMixin` page `get_context()` MUST build this dict. `copy_is_block=False`
+because `copy` is a `RichTextField` string, rendered with `|richtext`.
 
 **Video layout**: when `hero.video` is present, the template renders a two-column
 responsive grid (text left/right-aligned on md+, video right). On mobile both
@@ -895,7 +883,7 @@ root), SiteSettings records, and optionally loads demo fixtures. Creating the
 ### ✅ Phase 2: StreamField Blocks — COMPLETE (commit 28e0d1c)
 - [x] All 18 blocks consolidated in `wtrx/blocks/__init__.py` (single file)
 - [x] `ACTION_NETWORK_ACTION_TYPE_CHOICES` + `action_type` field on `SignupActionNetworkBlock`
-- [x] `HeroBlock.get_context()` normalises fields into `hero` dict (`copy_is_block=False`)
+- [x] `HeroBlock.get_context()` normalises fields into `hero` dict (`copy_is_block=False`) — HeroBlock since removed (migrations 0101/0102)
 - [x] `hero.html` branch-free component; `hero_block.html` simplified to `{% include %}`
 - [x] `table_block.html` fixed to use Wagtail's structured context variables
 - [x] Semantic color tokens (`bg-light/dark`, `text-light/dark`) applied across all templates
@@ -983,7 +971,7 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
   minimal, `CardGridBlock` at 3 and 4 cards (the 2x2 special case),
   `PersonCardBlock` full and minimal, `ButtonBlock` in all 3 styles plus an
   anchor link, `QuoteBlock` in both alignments, `FeaturePanelBlock` in both
-  alignments across 3 fills, `CalloutBlock` / `HeroBlock` / `SignupActionKitBlock`
+  alignments across 3 fills, `CalloutBlock` / `SignupActionKitBlock`
   once per colour in `BACKGROUND_COLOR_CHOICES`, `DonateBlock` with and without
   overrides, the Action Network and ActionKit signups with and without a custom
   success message, and `SectionBlock` across every background, every padding and

@@ -163,7 +163,7 @@ html {
     }
 }
 
-/* Wrapper for a HeroBlock.cta="signup" choice — see components/hero.html
+/* Wrapper for a HeroCTABlock "signup" choice — see components/hero.html
  * and signup_actionkit_block.html's compact=True branch. No card chrome
  * (unlike the standalone wtr-signup-actionkit default), since it sits
  * directly inside the hero's own dark-overlay area. */
@@ -1427,8 +1427,8 @@ h3, h4, h5, h6 {
  *
  * Both conditions are required, hence two :has() tests:
  *
- *  - .wtr-page-hero  — set by components/hero.html only when in_body is
- *    false, so a mid-body HeroBlock never triggers this. A page whose hero
+ *  - .wtr-page-hero  — set by components/hero.html, the page's own hero
+ *    (there is no hero block for the body). A page whose hero
  *    is switched off (ContentPage.hide_hero) renders no such class, and is
  *    handled by the no-hero rule below instead.
  *  - the first block is one of the four panel-shaped types listed below:
@@ -1610,8 +1610,7 @@ body.wtr-scroll-locked {
  * Hero numbered-list markers — .wtr-hero-copy ol
  * ============================================================
  * Editors can type an ordered list into hero copy (RICHTEXT_FEATURES_HERO
- * includes "ol"/"ul" — see constants.py; HeroBlock's own copy field does
- * not, so this only ever applies to a page-level HeroMixin hero). Replaces
+ * includes "ol"/"ul" — see constants.py). Replaces
  * Typography's default decimal marker with a filled circle badge, per
  * 350.org/science's "Climate science basics" numbered list (a translucent
  * circle, the number centered inside, beside the item text).

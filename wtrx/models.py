@@ -383,8 +383,8 @@ class HeroMixin(models.Model):
     def get_hero_context(self):
         """
         Build the context dict consumed by components/hero.html. Same shape
-        as HeroBlock.get_context()'s "hero" key so the template works
-        identically for pages and StreamField hero blocks.
+        as get_banner_hero_context()'s, so the template needs no branching
+        on which page type produced it.
 
         copy_is_block=False because hero_copy is a RichTextField (string),
         not a StreamField block value — the template renders it with |richtext.
@@ -980,7 +980,7 @@ def _first_image_in_body(value):
     and needs no changes when a new block type is added later.
 
     Every image-carrying block in this codebase names its ImageChooserBlock
-    field `image` (ImageBlock, ImageTextBlock, FeaturePanelBlock, HeroBlock,
+    field `image` (ImageBlock, ImageTextBlock, FeaturePanelBlock,
     QuoteBlock, CalloutBlock, DonateFundraiseUpBlock, SignupActionKitBlock/
     HeroSignupActionKitBlock, CardBlock, PersonCardBlock, ImageGridItemBlock,
     LogoGridItemBlock -- CardBlock's separate `icon` field is deliberately

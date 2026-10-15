@@ -14,7 +14,7 @@ Block categories (in definition order):
   Actions:  DonateBlock, SignupWagtailFormsBlock, SignupActionNetworkBlock,
             SignupActionKitBlock
   Layout²:  AnnouncementBarBlock, HeroCTABlock, BannerHeroCTABlock,
-            HeroBlock, SectionBlock (defined after action blocks so their
+            SectionBlock (defined after action blocks so their
             nested/optional fields can instantiate the action block classes)
 
 All blocks are assembled into BodyStreamBlock at the bottom of this file.
@@ -133,8 +133,8 @@ IMAGE_TEXT_SIZE_CHOICES = [
 # ---------------------------------------------------------------------------
 #
 # One palette, offered identically by every block that has a background
-# choice: SectionBlock, CalloutBlock, FeaturePanelBlock, HeroBlock /
-# HeroMixin's banner variant, and SignupActionKitBlock. Each of those used to
+# choice: SectionBlock, CalloutBlock, FeaturePanelBlock, HeroMixin's banner
+# variant, and SignupActionKitBlock. Each of those used to
 # carry its own list — Section offered light/dark/primary/secondary/muted,
 # the feature panel only light/dark, signup spelled dark grey "dark" — so
 # the same visual decision was made from a different vocabulary depending on
@@ -630,16 +630,6 @@ def preview_image(min_width=800):
     )
 
 
-def _hero_preview_value():
-    """Placeholder value for HeroBlock's picker preview."""
-    return {
-        "headline": _("A future powered by people"),
-        "content": "<p>Supporting copy introducing the section that follows.</p>",
-        "image": preview_image(),
-        "banner_color": "navy",
-    }
-
-
 def _person_card_preview_value():
     """Placeholder value for PersonCardBlock's picker preview."""
     return {
@@ -660,7 +650,7 @@ def _image_grid_preview_value():
     ContentPreviewMixin: no real page uses this brand-new block yet, so
     there is nothing to harvest -- see preview_image()'s docstring for why
     a hand-written preview_value is the right tool here, same as
-    HeroBlock/PersonCardBlock above. Reuses the one placeholder image
+    PersonCardBlock above. Reuses the one placeholder image
     across all four slots, same as any hand-authored multi-image preview
     in this file.
     """
@@ -3618,8 +3608,8 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
 
 
 # ---------------------------------------------------------------------------
-# Layout blocks continued — AnnouncementBarBlock, HeroCTABlock, HeroBlock,
-# and SectionBlock are defined here (after action blocks) so their
+# Layout blocks continued — AnnouncementBarBlock, HeroCTABlock and
+# SectionBlock are defined here (after action blocks) so their
 # nested/optional fields can instantiate DonateBlock and the signup classes.
 # ---------------------------------------------------------------------------
 
@@ -3725,93 +3715,6 @@ class BannerHeroCTABlock(StreamBlock):
         min_num = 0
         max_num = 1
         label = _("Call to action")
-
-
-class HeroBlock(StructBlock):
-    """
-    A mid-page hero banner within the StreamField body: headline + optional
-    copy in a solid-color panel beside an optional image, on components/
-    hero.html's "banner" variant (see CalloutBlock for the same 5-color
-    system this reuses).
-
-    Distinct from HeroMixin (which provides the dedicated hero at the top of
-    a page — "full" variant on HomePage, "banner" variant on ContentPage/
-    IndexPage). HeroBlock can appear anywhere in the body, on any page type,
-    and always renders as "banner" — there's no full-viewport option here,
-    so unlike HeroMixin there's no layout field (banner's text-left/image-
-    right structure is fixed) and no cta field (banner never renders one,
-    see components/hero.html).
-
-    headline is line-breaks-only rich text (mirroring HeroMixin). content is richtext
-    for the supporting copy below the headline. Uses the same component
-    template as the page-level hero (components/hero.html) via get_context(),
-    which normalises field names so the template needs no block-type branch
-    logic — only a variant branch.
-    """
-
-    headline = RichTextBlock(
-        features=RICHTEXT_FEATURES_HEADLINE,
-        label=_("Headline"),
-        help_text=_("The hero heading text. Press Enter for a line break."),
-    )
-    content = RichTextBlock(
-        features=RICHTEXT_FEATURES_INLINE,
-        required=False,
-        label=_("Content"),
-        help_text=_("Optional supporting copy below the headline."),
-    )
-    image = ImageChooserBlock(
-        required=False,
-        label=_("Image"),
-    )
-    image_caption = CharBlock(
-        required=False,
-        label=_("Image caption"),
-        help_text=_("Optional caption overlaid at the bottom of the image, e.g. a photo credit."),
-    )
-    banner_color = ChoiceBlock(
-        choices=BACKGROUND_COLOR_CHOICES,
-        default="navy",
-        label=_("Color"),
-    )
-
-    def get_context(self, value, parent_context=None):
-        ctx = super().get_context(value, parent_context=parent_context)
-        # Normalise to the same shape expected by components/hero.html.
-        ctx["hero"] = {
-            "variant": "banner",
-            # No pre-header on a mid-body hero: it is a page-opening device
-            # (see HeroMixin.hero_panels), not a section-level one.
-            "pre_header": None,
-            "headline": headline_html(value.get("headline")),
-            "copy": value.get("content"),
-            "copy_is_block": False,
-            "image": value.get("image"),
-            "video": None,  # HeroBlock does not support video; key kept for template contract
-            "image_caption": value.get("image_caption"),
-            "banner_color": value.get("banner_color"),
-            "cta": [],  # banner variant never renders a cta; key kept for template contract
-            "minimal": hero_is_minimal(copy=value.get("content"), video=None, cta=[]),
-            "jumbo": False,
-            # Mid-page HeroBlock, not a page-level HeroMixin hero. Only the
-            # gutter differs: in the body this block sits in a stack with
-            # image/image_text/callout and has to line its edges up with
-            # them, while the page-level hero keeps Figma's flat 16px
-            # wrapper. See components/hero.html.
-            "in_body": True,
-        }
-        return ctx
-
-    class Meta:
-        icon = "image"
-        label = _("Hero")
-        template = "wtrx/components/streamfield/blocks/hero_block.html"
-        description = _(
-            "A full-width banner with a headline, supporting copy and a "
-            "coloured background -- for opening a section mid-page. A page's "
-            "own hero is set on the page itself, not with this block."
-        )
-        preview_value = staticmethod(_hero_preview_value)
 
 
 def _hidden_block_names_for_current_request():
@@ -4000,7 +3903,6 @@ class SectionContentBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     page_cards = PageCardsBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
-    hero = HeroBlock()
     donate = DonateBlock()
     donate_fundraiseup = DonateFundraiseUpBlock()
     signup_wagtail_forms = SignupWagtailFormsBlock()
@@ -4220,7 +4122,6 @@ class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
     page_cards = PageCardsBlock()
     accordion = AccordionBlock()
     callout = CalloutBlock()
-    hero = HeroBlock()
     section = SectionBlock()
     timeline = TimelineBlock()
     donate = DonateBlock()

@@ -6,7 +6,7 @@
 {% comment %}
 Hero banner — same shape as hero.html's "banner" variant (color panel
 beside an image, wtr-bg-{color}/wtr-bg-fade-{color} pair) but hand-built
-rather than {% include %}'d: this page has no HeroMixin/HeroBlock behind
+rather than {% include %}'d: this page has no HeroMixin behind
 it (Django's default 404 view renders straight from urlconf, no page
 model, no get_context()), so there's no `hero` dict to pass. Lives in
 {% block hero %}, not {% block content %} — base.html wraps content in
