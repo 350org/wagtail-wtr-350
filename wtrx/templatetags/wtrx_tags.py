@@ -719,3 +719,15 @@ def localized(page):
     if page is None:
         return page
     return getattr(page, "localized", page)
+
+
+@register.simple_tag
+def internal_link_hosts() -> str:
+    """
+    Hosts that external-links.js treats as this site, comma-separated for
+    base.html's ``data-internal-hosts``. The current request host is always
+    internal too; the browser adds it itself, so the cached page never
+    varies by the host a visitor arrived on (pitfall #90).
+    """
+    hosts = getattr(settings, "WTRX_INTERNAL_LINK_HOSTS", [])
+    return ",".join(host.strip().lower() for host in hosts if host.strip())

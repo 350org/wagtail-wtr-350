@@ -4,11 +4,12 @@ Tests for custom template tags in wtrx_tags.py.
 
 from unittest.mock import MagicMock
 
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.conf import settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from wagtail.models import Page
 
 from wtrx.site_settings import NavigationSettings
-from wtrx.templatetags.wtrx_tags import absolute_uri, nav_item_is_active, page_as_card
+from wtrx.templatetags.wtrx_tags import absolute_uri, internal_link_hosts, nav_item_is_active, page_as_card
 
 
 class TestPageAsCard(SimpleTestCase):
@@ -200,3 +201,16 @@ class TestAbsoluteUri(SimpleTestCase):
         request = self.factory.get("/")
         self.assertEqual(absolute_uri("", request), "")
         self.assertIsNone(absolute_uri(None, request))
+
+
+class TestInternalLinkHosts(SimpleTestCase):
+    """Feeds base.html's data-internal-hosts for external-links.js."""
+
+    @override_settings(WTRX_INTERNAL_LINK_HOSTS=["350.org", " WWW.350.org ", ""])
+    def test_joins_normalised_hosts(self):
+        self.assertEqual(internal_link_hosts(), "350.org,www.350.org")
+
+    @override_settings()
+    def test_missing_setting_is_empty(self):
+        del settings.WTRX_INTERNAL_LINK_HOSTS
+        self.assertEqual(internal_link_hosts(), "")

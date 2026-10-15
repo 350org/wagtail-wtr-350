@@ -103,7 +103,7 @@
     {% endcomment %}
     {% if not request.is_preview %}{{ settings.wtrx.IntegrationSettings.head_html }}{% endif %}
 </head>
-<body class="font-body text-dark bg-light">
+<body class="font-body text-dark bg-light" data-internal-hosts="{% internal_link_hosts %}" data-new-tab-hint="{% trans '(opens in a new tab)' %}">
     {% comment %}
     Integration body-injection markup — e.g. Google Tag Manager's
     <noscript> fallback iframe (wtrx/integrations/gtm.py) — rendered as

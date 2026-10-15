@@ -10,7 +10,7 @@ import json
 from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.test import Client, RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from wagtail.images.tests.utils import get_test_image_file
 from wagtail.models import Locale, Page, Site
@@ -624,6 +624,29 @@ class TestBannerHeroRendering(TestCase):
     def test_hero_shown_by_default(self):
         content = self.client.get(self.full.url).content.decode()
         self.assertIn("wtr-page-hero", content)
+
+
+class TestExternalLinkConfigRendering(TestCase):
+    """base.html hands external-links.js its host list and new-tab hint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="external-links-home")
+        root.add_child(instance=cls.home)
+        Site.objects.create(
+            hostname="external-links-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="External Links Test",
+        )
+
+    @override_settings(WTRX_INTERNAL_LINK_HOSTS=["350.org", "www.350.org"])
+    def test_body_carries_hosts_and_hint(self):
+        client = Client(HTTP_HOST="external-links-test.localhost")
+        content = client.get(self.home.url).content.decode()
+        self.assertIn('data-internal-hosts="350.org,www.350.org"', content)
+        self.assertIn('data-new-tab-hint="(opens in a new tab)"', content)
 
 
 class TestContentPageMeta(TestCase):
