@@ -222,6 +222,9 @@ WTRX_LANGUAGE_URL_PREFIXES = {
     "es-fr": "france/es",
 }
 
+# Per-language DATE_FORMAT overrides (post dates); see wtrx/formats/.
+FORMAT_MODULE_PATH = ["wtrx.formats"]
+
 # Project-level catalogues for strings in templates/ and wagtail_wtr/; wtrx
 # ships its own under wtrx/locale/, which Django discovers automatically.
 LOCALE_PATHS = [os.path.join(BASE_DIR, "locale")]

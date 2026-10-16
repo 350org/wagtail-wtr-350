@@ -161,7 +161,7 @@
                     applies to Post, per Figma's smaller "Content Hero" instance there.
                     {% endcomment %}
                     {% if hero.published_at %}
-                        <p class="text-sm">{{ hero.published_at|date:"F j, Y" }}</p>
+                        <p class="text-sm">{{ hero.published_at|date:"DATE_FORMAT" }}</p>
                     {% endif %}
                     {% if hero.pre_header %}
                         {% comment %}
