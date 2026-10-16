@@ -54,7 +54,7 @@ doesn't set one — see PageCardsBlock.get_context() and Blogs/Post.get_context(
     <div class="grid flex-1 grid-cols-[1fr_auto] content-start gap-x-4 gap-y-[7px] px-4 pt-4 pb-4">
         {% if card.date %}
             <span class="col-start-1 w-fit rounded-full bg-neutral-200 px-4 py-3 font-heading text-base font-bold text-dark">
-                {{ card.date|date:"F j, Y" }}
+                {{ card.date|date:"DATE_FORMAT" }}
             </span>
         {% endif %}
         <h3 class="col-start-1 font-heading {{ heading_size|default:"text-2xl" }} font-bold text-dark">{{ card.heading }}</h3>

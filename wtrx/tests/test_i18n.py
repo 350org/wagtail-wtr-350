@@ -973,3 +973,28 @@ class TestSitemapCoversEveryLanguageTree(TestCase):
     def test_it_is_edge_cached_for_longer_than_a_page(self):
         response = Client().get("/sitemap.xml")
         self.assertIn("s-maxage=3600", response["Cache-Control"])
+
+
+class TestPostDateFormats(TestCase):
+    """Post dates follow each language's own order (wtrx/formats/)."""
+
+    TEMPLATE = Template('{{ d|date:"DATE_FORMAT" }}')
+
+    def render(self, language, d):
+        with translation.override(language):
+            return self.TEMPLATE.render(Context({'d': d}))
+
+    def test_each_language_orders_the_date_its_own_way(self):
+        from datetime import date
+
+        cases = {
+            'en': (date(2026, 8, 7), "August 7, 2026"),
+            'en-br': (date(2026, 8, 7), "August 7, 2026"),
+            'pt-br': (date(2026, 8, 7), "7 Agosto, 2026"),
+            'fr-fr': (date(2026, 9, 29), "29 septembre 2026"),
+            'fr-ca': (date(2026, 9, 29), "29 septembre 2026"),
+            'id': (date(2026, 8, 7), "7 Agustus 2026"),
+        }
+        for language, (d, expected) in cases.items():
+            with self.subTest(language=language):
+                self.assertEqual(self.render(language, d), expected)
