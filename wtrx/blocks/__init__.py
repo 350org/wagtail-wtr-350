@@ -2926,64 +2926,79 @@ class DonateFundraiseUpBlock(ContentPreviewMixin, StructBlock):
 
     def get_context(self, value, parent_context=None):
         ctx = super().get_context(value, parent_context=parent_context)
-        request = (parent_context or {}).get("request")
-        # Wagtail's live-preview iframe (Page.serve_preview()) — distinct
-        # from `is_block_preview` above, which is the "Add block" picker's
-        # thumbnail preview. Fundraise Up's installation script is
-        # suppressed there along with every other integration's head/body
-        # injection (see base.html's request.is_preview guard and AGENTS.md
-        # pitfall #53), so the anchor below would never hydrate — the
-        # template shows an explanatory placeholder instead.
-        ctx["is_page_preview"] = bool(request is not None and getattr(request, "is_preview", False))
-        fundraiseup_config = None
-        if request is not None:
-            try:
-                fundraiseup_config = IntegrationSettings.for_request(request).get_integration_config(
-                    "fundraiseup"
-                )
-            except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
-                fundraiseup_config = None
-
-        if fundraiseup_config:
-            advanced = value.get("advanced_settings") or {}
-
-            def site_val(field_name):
-                return fundraiseup_config.get(field_name, "") or ""
-
-            def block_val(field_name):
-                return advanced.get(field_name, "") or ""
-
-            # This block's own default: its own override if set, else the
-            # site-wide default. Also doubles as the fallback for any
-            # region below left blank on both this block and the site.
-            default_id = block_val("element_id_default") or site_val("element_id_default")
-            ctx["fundraiseup_default_element_id"] = default_id
-
-            def region_value(field_name):
-                return block_val(field_name) or site_val(field_name) or default_id
-
-            eu_codes_raw = block_val("eu_country_codes") or site_val("eu_country_codes")
-            eu_codes = [code.strip().upper() for code in eu_codes_raw.split(",") if code.strip()]
-            ctx["fundraiseup_region_map_json"] = json.dumps(
-                {
-                    "US": region_value("element_id_us"),
-                    "NL": region_value("element_id_nl"),
-                    "CA": region_value("element_id_ca"),
-                    "GB": region_value("element_id_gb"),
-                    "_eu": region_value("element_id_eu"),
-                    "_eu_countries": eu_codes,
-                    "_default": default_id,
-                }
-            )
-        else:
-            ctx["fundraiseup_default_element_id"] = ""
-            ctx["fundraiseup_region_map_json"] = json.dumps({"_default": ""})
+        ctx.update(_fundraiseup_embed_context(value, parent_context))
         return ctx
 
     class Meta:
         icon = "pick"
         label = _("Donate (Fundraise Up)")
         template = "wtrx/components/streamfield/blocks/donate_fundraiseup_block.html"
+
+
+def _fundraiseup_embed_context(value, parent_context) -> dict:
+    """
+    Template context for _fundraiseup_embed.html, shared by
+    DonateFundraiseUpBlock and HeroDonateFundraiseUpBlock: the region map the
+    embed's inline script resolves client-side, and whether this is a live
+    page preview.
+
+    `value` is the block's own value; only its `advanced_settings`
+    (FundraiseUpAdvancedSettingsBlock) is read. Each region resolves
+    independently: the block's override, else the site-wide value, else the
+    default (the block's own default override, else the site's).
+    """
+    request = (parent_context or {}).get("request")
+    # Wagtail's live-preview iframe (Page.serve_preview()) — distinct from
+    # `is_block_preview`, which is the "Add block" picker's thumbnail
+    # preview. Fundraise Up's installation script is suppressed there along
+    # with every other integration's head/body injection (see base.html's
+    # request.is_preview guard and AGENTS.md pitfall #53), so the anchor
+    # would never hydrate — the template shows an explanatory placeholder
+    # instead.
+    ctx = {"is_page_preview": bool(request is not None and getattr(request, "is_preview", False))}
+    fundraiseup_config = None
+    if request is not None:
+        try:
+            fundraiseup_config = IntegrationSettings.for_request(request).get_integration_config("fundraiseup")
+        except (IntegrationSettings.DoesNotExist, Site.DoesNotExist):
+            fundraiseup_config = None
+
+    if not fundraiseup_config:
+        ctx["fundraiseup_default_element_id"] = ""
+        ctx["fundraiseup_region_map_json"] = json.dumps({"_default": ""})
+        return ctx
+
+    advanced = value.get("advanced_settings") or {}
+
+    def site_val(field_name):
+        return fundraiseup_config.get(field_name, "") or ""
+
+    def block_val(field_name):
+        return advanced.get(field_name, "") or ""
+
+    # This block's own default: its own override if set, else the site-wide
+    # default. Also doubles as the fallback for any region below left blank
+    # on both this block and the site.
+    default_id = block_val("element_id_default") or site_val("element_id_default")
+    ctx["fundraiseup_default_element_id"] = default_id
+
+    def region_value(field_name):
+        return block_val(field_name) or site_val(field_name) or default_id
+
+    eu_codes_raw = block_val("eu_country_codes") or site_val("eu_country_codes")
+    eu_codes = [code.strip().upper() for code in eu_codes_raw.split(",") if code.strip()]
+    ctx["fundraiseup_region_map_json"] = json.dumps(
+        {
+            "US": region_value("element_id_us"),
+            "NL": region_value("element_id_nl"),
+            "CA": region_value("element_id_ca"),
+            "GB": region_value("element_id_gb"),
+            "_eu": region_value("element_id_eu"),
+            "_eu_countries": eu_codes,
+            "_default": default_id,
+        }
+    )
+    return ctx
 
 
 class SignupWagtailFormsBlock(StructBlock):
@@ -3607,10 +3622,95 @@ class HeroSignupActionKitBlock(SignupActionKitFormMixin, ContentPreviewMixin, St
         template = "wtrx/components/streamfield/blocks/signup_actionkit_hero_block.html"
 
 
+class HeroDonateFundraiseUpBlock(StructBlock):
+    """
+    The home hero's donate banner — HeroCTABlock's "donate_fundraiseup"
+    choice. Unlike the hero's other CTAs it does not sit in the headline
+    column: components/hero.html renders it as a full-width band attached to
+    the bottom of the hero panel, heading and copy on the left and an
+    embedded Fundraise Up form on the right.
+
+    Only offered on HomePage: HeroCTABlock is the "full" variant's CTA
+    StreamBlock, and every banner-variant page type uses BannerHeroCTABlock
+    (button only) instead.
+
+    The form resolves exactly as DonateFundraiseUpBlock's does — the
+    visitor's region-specific element from Settings > Integrations, chosen
+    client-side, with the same collapsed Advanced settings for per-block
+    overrides. Use a Fundraise Up element configured as an embedded form,
+    not a modal-trigger button. See _fundraiseup_embed_context().
+
+    `background_image` is shown at full strength over the fill, which shows
+    only while it loads; `background` still decides the text colour. It is
+    meant for a soft, low-contrast image made for the banner (the design's
+    orange forest photo), since the copy sits directly on it.
+    """
+
+    content = RichTextBlock(
+        features=RICHTEXT_FEATURES_HEADING_H2,
+        required=False,
+        label=_("Content"),
+        help_text=_("Type your heading as an H2 at the top, then optional supporting copy."),
+    )
+    background = ChoiceBlock(
+        choices=BACKGROUND_COLOR_CHOICES,
+        default="red",
+        label=_("Background"),
+        help_text=_("Fill behind the banner's copy and form."),
+    )
+    background_image = ImageChooserBlock(
+        required=False,
+        label=_("Background image"),
+        help_text=_(
+            "Optional. Covers the background colour behind the copy and form. "
+            "Use a soft, low-contrast image so the text stays readable, and "
+            "pick the background colour closest to it: that sets the text "
+            "colour and shows while the image loads."
+        ),
+    )
+    designation_id = IdentifierBlock(
+        required=False,
+        label=_("Designation ID"),
+        help_text=_(
+            "Optional Fundraise Up designation ID to route this donation to "
+            "a specific fund. Applies on top of whichever region-specific "
+            "form the visitor is shown."
+        ),
+    )
+    advanced_settings = FundraiseUpAdvancedSettingsBlock(
+        required=False,
+        label=_("Advanced settings"),
+    )
+
+    def get_context(self, value, parent_context=None):
+        ctx = super().get_context(value, parent_context=parent_context)
+        ctx.update(_fundraiseup_embed_context(value, parent_context))
+        return ctx
+
+    class Meta:
+        icon = "pick"
+        label = _("Donate banner (Fundraise Up)")
+        template = "wtrx/components/streamfield/blocks/hero_donate_fundraiseup_block.html"
+        description = _(
+            "A donation banner across the bottom of the hero: a heading and "
+            "copy beside an embedded Fundraise Up form."
+        )
+        preview_value = {
+            "content": (
+                "<h2>Help 350.org turn things around for our climate.</h2>"
+                "<p>We believe in a safe climate and a better future. "
+                "<b>Help us build that future by chipping in today.</b></p>"
+            ),
+            "background": "red",
+        }
+
+
 # ---------------------------------------------------------------------------
-# Layout blocks continued — AnnouncementBarBlock, HeroCTABlock and
-# SectionBlock are defined here (after action blocks) so their
+# Layout blocks continued — AnnouncementBarBlock, the hero CTA StreamBlocks
+# and SectionBlock are defined here (after action blocks) so their
 # nested/optional fields can instantiate DonateBlock and the signup classes.
+# HeroCTABlock sits further down, below IntegrationGatedStreamBlockMixin,
+# which it uses.
 # ---------------------------------------------------------------------------
 
 
@@ -3647,40 +3747,6 @@ class AnnouncementBarBlock(StructBlock):
         icon = "info-circle"
         label = _("Announcement bar")
         template = "wtrx/components/streamfield/blocks/announcement_bar_block.html"
-
-
-class HeroCTABlock(StreamBlock):
-    """
-    The homepage's ("full" variant) optional call-to-action widget: at most
-    one of a plain link button or a signup bar. min_num=0/max_num=1 make
-    "at most one" a StreamField-level constraint — no clean() needed for it.
-
-    A donate block and an announcement-bar choice used to be offered here
-    too — commented out below (not deleted) per-page 2026-09 review, until
-    they're properly implemented for the hero. This is deliberately a
-    comment-out, not a removal: a live DB audit at the time confirmed no
-    page anywhere had either saved in a hero, so there was never any stored
-    data to preserve — the point is just to keep both `DonateBlock` and
-    `AnnouncementBarBlock` fully defined and ready, so restoring either
-    choice later is a two-line uncomment, not a rebuild from git history.
-    Uncommenting either line changes HeroCTABlock's block_lookup and needs
-    a fresh `makemigrations` the same as any other block-choice change.
-
-    Every non-homepage HeroMixin page type (ContentPage, IndexPage, Blogs)
-    uses BannerHeroCTABlock instead, not this class — see that class's own
-    docstring for why "banner" needed its own StreamBlock rather than just
-    a template-side restriction of this one.
-    """
-
-    button = ButtonBlock()
-    signup = HeroSignupActionKitBlock()
-    # donate = DonateBlock()
-    # announcement = AnnouncementBarBlock()
-
-    class Meta:
-        min_num = 0
-        max_num = 1
-        label = _("Call to action")
 
 
 class BannerHeroCTABlock(StreamBlock):
@@ -3862,6 +3928,49 @@ class GatedStreamBlockAdapter(StreamBlockAdapter):
         return super().media + forms.Media(
             js=[versioned_static("wtrx/admin/gated-stream-block.js")]
         )
+
+
+class HeroCTABlock(IntegrationGatedStreamBlockMixin, StreamBlock):
+    """
+    The homepage's ("full" variant) optional call-to-action widget: at most
+    one of a plain link button, a signup bar or a Fundraise Up donate banner.
+    min_num=0/max_num=1 make "at most one" a StreamField-level constraint —
+    no clean() needed for it.
+
+    `donate_fundraiseup` (HeroDonateFundraiseUpBlock) is named after the
+    body's own Fundraise Up block so the integration registry's
+    content_block_names gates it here too: hidden from the picker while
+    Fundraise Up is disabled, via IntegrationGatedStreamBlockMixin and
+    GatedStreamBlockAdapter (registered for this class below), exactly as in
+    BodyStreamBlock.
+
+    An ActBlue donate block and an announcement-bar choice used to be offered
+    here too — commented out below (not deleted) per-page 2026-09 review, until
+    they're properly implemented for the hero. This is deliberately a
+    comment-out, not a removal: a live DB audit at the time confirmed no
+    page anywhere had either saved in a hero, so there was never any stored
+    data to preserve — the point is just to keep both `DonateBlock` and
+    `AnnouncementBarBlock` fully defined and ready, so restoring either
+    choice later is a two-line uncomment, not a rebuild from git history.
+    Uncommenting either line changes HeroCTABlock's block_lookup and needs
+    a fresh `makemigrations` the same as any other block-choice change.
+
+    Every non-homepage HeroMixin page type (ContentPage, IndexPage, Blogs)
+    uses BannerHeroCTABlock instead, not this class — see that class's own
+    docstring for why "banner" needed its own StreamBlock rather than just
+    a template-side restriction of this one.
+    """
+
+    button = ButtonBlock()
+    signup = HeroSignupActionKitBlock()
+    donate_fundraiseup = HeroDonateFundraiseUpBlock()
+    # donate = DonateBlock()
+    # announcement = AnnouncementBarBlock()
+
+    class Meta:
+        min_num = 0
+        max_num = 1
+        label = _("Call to action")
 
 
 class SectionContentBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
@@ -4138,3 +4247,4 @@ class BodyStreamBlock(IntegrationGatedStreamBlockMixin, StreamBlock):
 # GatedStreamBlockAdapter's own definition -- see that class's docstring.
 register(GatedStreamBlockAdapter(), SectionContentBlock)
 register(GatedStreamBlockAdapter(), BodyStreamBlock)
+register(GatedStreamBlockAdapter(), HeroCTABlock)

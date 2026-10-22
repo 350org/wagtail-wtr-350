@@ -1043,6 +1043,12 @@ Note: page models were later consolidated into `wtrx/` — see Phase 9 below.
 - [x] `first_published_at` set by the WordPress importers, plus
   `manage.py backfill_first_published` for content imported before that
   (NULLs sort first under `DESC` in PostgreSQL, which broke `PageCardsBlock`)
+- [x] Home hero donate banner: `HeroDonateFundraiseUpBlock`, HeroCTABlock's
+  `donate_fundraiseup` choice (HomePage only). A band across the bottom of the
+  hero panel with heading/copy beside an embedded Fundraise Up form, sharing
+  `DonateFundraiseUpBlock`'s region geolocation and Advanced settings via
+  `_fundraiseup_embed_context()` and `_fundraiseup_embed.html`; hidden from the
+  picker while Fundraise Up is disabled
 - [ ] `fixtures/demo.json` -- demo content (deferred)
 - [ ] Verify settings panels work
 - [ ] Verify AJAX form submission

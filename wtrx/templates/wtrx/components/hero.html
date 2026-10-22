@@ -24,8 +24,10 @@
                     field; "full" has no caption chrome — see HeroMixin).
     banner_color  — one of BACKGROUND_COLOR_CHOICES. "banner" variant only.
     cta           — optional HeroCTABlock stream value (0 or 1 items:
-                    button/signup/donate/announcement). The "full" variant
-                    renders whichever one is set; the "banner" variant renders
+                    button/signup/donate_fundraiseup). The "full" variant
+                    renders whichever one is set (a button or signup in the
+                    headline column, a donate_fundraiseup banner as a band
+                    across the bottom of the panel); the "banner" variant renders
                     only the `button` choice (the embedded widgets are sized for
                     "full"'s roomier layout and overflow banner's half-width
                     text column) — see HeroCTABlock's docstring.
@@ -314,9 +316,16 @@
     there would pad the inside of the rounded panel instead of insetting it.
     {% endcomment %}
     <div class="wtr-page-hero mx-auto max-w-[1500px] px-4">
-        <div class="wtr-hero relative overflow-hidden bg-dark flex flex-col rounded-lg justify-end
-                    min-h-[calc(100vh-4rem)]"
+        {% comment %}
+        Two stacked parts in one rounded panel: the media area (background
+        video/image, scrim, headline column), which keeps the full
+        viewport-minus-nav height on its own, and below it an optional
+        donate banner (HeroCTABlock's donate_fundraiseup choice) that
+        extends the panel rather than sitting in the headline column.
+        {% endcomment %}
+        <div class="wtr-hero relative flex flex-col overflow-hidden rounded-lg bg-dark"
              {% if hero.video %}data-hero{% endif %}>
+        <div class="relative flex min-h-[calc(100vh-4rem)] flex-col justify-end">
 
             {% if hero.video %}
                 {% image hero.image fill-1600x700 as hero_poster %}
@@ -412,10 +421,9 @@
                 {% endif %}
 
                 {% comment %}
-                hero.cta — at most one of a button or a signup bar (donate and
-                announcement-bar CTAs are commented out in HeroCTABlock's
-                definition until they're properly implemented — see
-                HeroCTABlock's docstring).
+                hero.cta — at most one of a button, a signup bar or a donate
+                banner. The donate banner is rendered below the media area
+                instead (after this column), not here.
 
                 Sizing is Figma's: 20px below the headline (its Content frame's
                 gap). Figma's Signup Horizontal measures 677px — two 250px
@@ -427,12 +435,20 @@
                 that room from the fields rather than giving it to the button.
                 {% endcomment %}
                 {% for cta_block in hero.cta %}
-                    <div class="mt-5 max-w-[1033px]">
-                        {% include_block cta_block with compact=True %}
-                    </div>
+                    {% if cta_block.block_type != "donate_fundraiseup" %}
+                        <div class="mt-5 max-w-[1033px]">
+                            {% include_block cta_block with compact=True %}
+                        </div>
+                    {% endif %}
                 {% endfor %}
 
             </div>
+        </div>
+        {% for cta_block in hero.cta %}
+            {% if cta_block.block_type == "donate_fundraiseup" %}
+                {% include_block cta_block %}
+            {% endif %}
+        {% endfor %}
         </div>
     </div>
 

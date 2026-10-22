@@ -1,3 +1,4 @@
+{% load i18n %}
 {% comment %}
 Usercentrics consent management — must be the first scripts in <head>.
 
@@ -12,6 +13,8 @@ Cloudflare Worker or Django involvement required.
 {% endcomment %}
 {% with uc=settings.wtrx.IntegrationSettings.get_usercentrics_config %}
 {% if uc and not usercentrics_disabled %}
+{% get_current_language as uc_request_language %}
+{% firstof page.locale.language_code uc_request_language "en" as uc_page_language %}
 {% comment %}1. Consent Mode v2 defaults — must be first.{% endcomment %}
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -43,6 +46,20 @@ silently hiding it.
 {% endcomment %}
 <script>
   (function () {
+    var PAGE_LANGUAGE = '{{ uc_page_language|escapejs }}'.toLowerCase().replace(/_/g, '-');
+    var UC_LANGUAGE_BY_LOCALE = {
+      'en': 'en',
+      'de': 'de',
+      'fr': 'fr',
+      'id': 'id',
+      'ja': 'ja',
+      'tr': 'tr',
+      'en-ca': 'en',
+      'fr-ca': 'fr',
+      'pt-br': 'pt_br',
+      'fr-fr': 'fr'
+    };
+    var UC_LANGUAGE = UC_LANGUAGE_BY_LOCALE[PAGE_LANGUAGE] || 'en';
     var FALLBACK_COUNTRY = '{{ uc.fallback_country|escapejs }}';
     var TRACE_TIMEOUT_MS = 1500;
 
@@ -53,6 +70,7 @@ silently hiding it.
       script.onload = function () {
         UsercentricsConsent.initConsent({
           settingsId: '{{ uc.settings_id|escapejs }}',
+          language: UC_LANGUAGE,
           onReady: function (info) {
             if (info && info.isGdpr === false) {
               gtag('consent', 'update', {

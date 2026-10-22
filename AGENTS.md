@@ -1864,3 +1864,26 @@ gate.
     external unless added to the setting. A link that already sets
     `target`, or has `download`, is left alone, as are links added to the
     page after load.
+
+95. **The home hero's donate banner renders outside the hero's text
+    column.** `HeroDonateFundraiseUpBlock` is `HeroCTABlock`'s
+    `donate_fundraiseup` choice, so it is offered on `HomePage` only
+    (banner-variant pages use `BannerHeroCTABlock`). `hero.html`'s "full"
+    variant is two stacked parts inside one rounded `.wtr-hero` panel: the
+    media area (video/image, scrim, headline column), which keeps
+    `min-h-[calc(100vh-4rem)]` on its own, and below it the banner. The
+    hero's CTA loop therefore runs twice — once in the headline column
+    skipping `donate_fundraiseup`, once after the media area rendering only
+    it. Its form resolves exactly like `DonateFundraiseUpBlock`'s: both
+    blocks' `get_context()` call `_fundraiseup_embed_context()` and both
+    templates include `_fundraiseup_embed.html`, so a change to the
+    geolocation or the Advanced settings resolution lands in both. The choice
+    is named after the body block so the Fundraise Up integration's
+    `content_block_names` gates it from the picker too: `HeroCTABlock` uses
+    `IntegrationGatedStreamBlockMixin` and has `GatedStreamBlockAdapter`
+    registered for it (pitfall #46), which is why it is defined below the
+    mixin rather than beside `BannerHeroCTABlock`. Its heading is Klima Bold,
+    not h2's usual Heavy (`.wtr-hero-donate-content h2`, unlayered, pitfall
+    #34). The look of the form itself (the white card, amount buttons, the
+    blue Donate button) is set on the element in Fundraise Up's dashboard,
+    not here.
