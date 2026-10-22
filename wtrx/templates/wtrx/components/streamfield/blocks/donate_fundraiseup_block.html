@@ -1,13 +1,7 @@
 {% load i18n wagtailcore_tags wagtailimages_tags %}
 {% comment %}
-    Fundraise Up's installation script (rendered site-wide in <head> via
-    IntegrationSettings.head_html() while this integration is enabled)
-    scans the page for anchors like the one below and hydrates them based
-    on how that element is configured in the Fundraise Up dashboard —
-    a modal-trigger button, or an inline/embedded form (amount grid,
-    give-once/monthly toggle, payment icons, all rendered by Fundraise Up
-    itself). The anchor stays hidden until Fundraise Up's script replaces
-    it — appearance and behavior are configured in their dashboard, not here.
+    The Fundraise Up element itself (and its region geolocation) is
+    _fundraiseup_embed.html, shared with the home hero's donate banner.
 
     Side-by-side split: image as the left column (stretches to match the
     right column's height via CSS Grid's default row-stretch), dark panel
@@ -56,113 +50,7 @@
                     </div>
                 {% endif %}
                 <div class="mt-8">
-                    {% if is_block_preview %}
-                        {% comment %}
-                        Fundraise Up's script is loaded site-wide in <head> and
-                        is deliberately absent from block previews, so nothing
-                        would hydrate the anchor below and the block would
-                        preview with an empty action area. This stand-in shows
-                        the shape of the control without loading, or calling,
-                        anything from Fundraise Up. The real appearance is
-                        configured in their dashboard, not here.
-                        {% endcomment %}
-                        <div class="wtr-fundraiseup-preview" role="presentation" aria-hidden="true">
-                            <div class="flex rounded-lg border border-light/30 p-1 text-base">
-                                <span class="flex-1 rounded-md bg-light px-4 py-2 text-center font-semibold text-dark">{% trans "One-time" %}</span>
-                                <span class="flex-1 px-4 py-2 text-center font-semibold opacity-70">{% trans "Monthly" %}</span>
-                            </div>
-                            <div class="mt-4 grid grid-cols-3 gap-3 text-lg font-semibold">
-                                <span class="rounded-lg border border-light/30 py-3 text-center">$10</span>
-                                <span class="rounded-lg border border-light/30 py-3 text-center">$25</span>
-                                <span class="rounded-lg border-2 border-light py-3 text-center">$50</span>
-                                <span class="rounded-lg border border-light/30 py-3 text-center">$100</span>
-                                <span class="rounded-lg border border-light/30 py-3 text-center">$250</span>
-                                <span class="rounded-lg border border-light/30 py-3 text-center">{% trans "Other" %}</span>
-                            </div>
-                            <span class="mt-4 block rounded-lg bg-primary-600 px-6 py-3 text-center text-lg font-semibold text-light">{% trans "Donate" %}</span>
-                        </div>
-                    {% elif is_page_preview %}
-                        {% comment %}
-                        Wagtail's live-preview iframe for a full page (distinct
-                        from is_block_preview above, the "Add block" picker's
-                        thumbnail). Fundraise Up's installation script is
-                        suppressed there too (base.html's request.is_preview
-                        guard, AGENTS.md pitfall #53), so the real anchor below
-                        would never hydrate — show an explanatory placeholder
-                        instead of a silently empty action area.
-                        {% endcomment %}
-                        <div class="wtr-fundraiseup-preview-notice rounded-lg border border-dashed border-light/30 px-4 py-6 text-center text-base text-light/70">
-                            {% trans "The Fundraise Up embed will be rendered here on the live site." %}
-                        </div>
-                    {% else %}
-                        {% comment %}
-                        Region geolocation — see FundraiseUpConfigBlock's
-                        docstring (wtrx/integrations/fundraiseup.py) for the
-                        full rationale. The anchor's initial href is
-                        `fundraiseup_default_element_id` — server-rendered,
-                        identical for every visitor, safe under this site's
-                        Cloudflare edge cache. The inline script below then
-                        best-effort swaps it client-side once the visitor's
-                        country is known via Cloudflare's /cdn-cgi/trace edge
-                        endpoint (never reaches Django, so it can't poison
-                        the page cache either). wtr-donate-fundraiseup scopes
-                        the script to its own anchor via document.currentScript,
-                        the same convention _actionkit_form.html uses, so a
-                        page carrying more than one of these blocks wires
-                        each one independently.
-                        {% endcomment %}
-                        <div class="wtr-donate-fundraiseup text-center">
-                            <a href="#{{ fundraiseup_default_element_id|cut:"#" }}{% if value.designation_id %}?designationId={{ value.designation_id|cut:"#" }}{% endif %}"
-                               data-fundraiseup-anchor
-                               data-fundraiseup-designation-id="{{ value.designation_id|cut:"#" }}"
-                               style="display: none"></a>
-                            <script type="application/json" data-fundraiseup-region-map>{{ fundraiseup_region_map_json|safe }}</script>
-                            <script>
-                                (function () {
-                                    var wrapper = document.currentScript.closest(".wtr-donate-fundraiseup");
-                                    if (!wrapper) { return; }
-                                    var anchor = wrapper.querySelector("[data-fundraiseup-anchor]");
-                                    var configEl = wrapper.querySelector("[data-fundraiseup-region-map]");
-                                    if (!anchor || !configEl) { return; }
-                                    var regions;
-                                    try {
-                                        regions = JSON.parse(configEl.textContent);
-                                    } catch (e) {
-                                        return;
-                                    }
-
-                                    function applyRegion(countryCode) {
-                                        var elementId;
-                                        if (countryCode === "US" || countryCode === "NL" || countryCode === "CA" || countryCode === "GB") {
-                                            elementId = regions[countryCode];
-                                        } else if (countryCode && regions._eu_countries && regions._eu_countries.indexOf(countryCode) !== -1) {
-                                            elementId = regions._eu;
-                                        } else {
-                                            elementId = regions._default;
-                                        }
-                                        if (!elementId) { return; }
-                                        var designationId = anchor.dataset.fundraiseupDesignationId || "";
-                                        anchor.setAttribute("href", "#" + elementId + (designationId ? "?designationId=" + designationId : ""));
-                                    }
-
-                                    {% comment %}
-                                    Best-effort only — see this block's own
-                                    comment above and FundraiseUpConfigBlock's
-                                    docstring for why this isn't guaranteed to
-                                    win the race against Fundraise Up's own
-                                    installation script.
-                                    {% endcomment %}
-                                    fetch("/cdn-cgi/trace")
-                                        .then(function (response) { return response.text(); })
-                                        .then(function (text) {
-                                            var match = text.match(/^loc=([A-Z]{2})$/m);
-                                            if (match) { applyRegion(match[1]); }
-                                        })
-                                        .catch(function () {});
-                                })();
-                            </script>
-                        </div>
-                    {% endif %}
+                    {% include "wtrx/components/streamfield/blocks/_fundraiseup_embed.html" %}
                 </div>
             </div>
         </div>

@@ -626,6 +626,76 @@ class TestBannerHeroRendering(TestCase):
         self.assertIn("wtr-page-hero", content)
 
 
+class TestHomeHeroDonateBanner(TestCase):
+    """
+    HeroCTABlock's donate_fundraiseup choice renders as a band below the
+    home hero's media area, inside the same rounded panel, rather than in
+    the headline column the hero's other CTAs share.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(
+            title="Home",
+            slug="hero-donate-home",
+            hero_headline="Let's build a world free of fossil fuels.",
+            hero_cta=[
+                (
+                    "donate_fundraiseup",
+                    {
+                        "content": "<h2>Help 350.org turn things around</h2><p>Chip in today.</p>",
+                        "background": "red",
+                        "designation_id": "",
+                        "advanced_settings": {"element_id_us": "BLOCK_US"},
+                    },
+                )
+            ],
+        )
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="hero-donate-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="Hero Donate Test",
+        )
+        from wtrx.site_settings import IntegrationSettings
+
+        integration, _ = IntegrationSettings.objects.get_or_create(site=cls.site)
+        integration.integrations = [
+            (
+                "fundraiseup",
+                {
+                    "enabled": True,
+                    "installation_code": "<script></script>",
+                    "element_id_us": "SITE_US",
+                    "element_id_default": "SITE_DEFAULT",
+                },
+            )
+        ]
+        integration.save()
+
+    def setUp(self):
+        self.content = Client(HTTP_HOST="hero-donate-test.localhost").get("/").content.decode()
+
+    def test_banner_renders_inside_the_hero_panel_after_the_headline(self):
+        hero = self.content.index("wtr-hero ")
+        headline = self.content.index("free of fossil fuels")
+        banner = self.content.index("wtr-hero-donate ")
+        self.assertLess(hero, headline)
+        self.assertLess(headline, banner)
+        self.assertLess(banner, self.content.index("<main"))
+        self.assertIn("Help 350.org turn things around", self.content)
+        self.assertIn("wtr-bg-red", self.content)
+
+    def test_form_falls_back_to_the_site_default_with_block_overrides(self):
+        self.assertIn('href="#SITE_DEFAULT"', self.content)
+        self.assertIn('"US": "BLOCK_US"', self.content)
+
+    def test_page_keeps_a_single_h1(self):
+        self.assertEqual(self.content.count("<h1"), 1)
+
+
 class TestExternalLinkConfigRendering(TestCase):
     """base.html hands external-links.js its host list and new-tab hint."""
 

@@ -200,14 +200,15 @@ class HeroMixin(models.Model):
       the same reason. See banner_hero_panels below.
     - hero_banner_color: background color/gradient. "banner" variant only —
       "full" never shows a solid color background.
-    - hero_cta: optional button/signup widget, at most one. HomePage
-      ("full" variant) uses HeroCTABlock (button or signup); every other
+    - hero_cta: optional CTA, at most one. HomePage ("full" variant) uses
+      HeroCTABlock (button, signup, or a Fundraise Up donate banner
+      attached to the bottom of the hero); every other
       HeroMixin page type ("banner" variant) redeclares this field to use
       BannerHeroCTABlock instead (button only) — see that class's own
       docstring for why banner needed a genuinely separate StreamBlock
-      rather than a template-side restriction of HeroCTABlock. A donate
-      block and an announcement bar are also possible choices here, but
-      commented out in HeroCTABlock's definition until they're properly
+      rather than a template-side restriction of HeroCTABlock. An ActBlue
+      donate block and an announcement bar are also possible choices here,
+      but commented out in HeroCTABlock's definition until they're properly
       implemented for the hero — see HeroCTABlock's docstring.
 
     There used to be an editable hero_layout field (centered vs. left-
@@ -314,7 +315,10 @@ class HeroMixin(models.Model):
         HeroCTABlock(),
         blank=True,
         verbose_name=_("hero call to action"),
-        help_text=_("Optional button or signup bar shown below the hero copy. At most one."),
+        help_text=_(
+            "Optional button or signup bar shown below the hero copy, or a donate "
+            "banner across the bottom of the hero. At most one."
+        ),
         use_json_field=True,
     )
 

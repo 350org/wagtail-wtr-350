@@ -1905,6 +1905,42 @@ body.wtr-scroll-locked {
     }
 }
 
+/* The home hero's donate banner (hero_donate_fundraiseup_block.html):
+ * 48px from xl:, one step above the body donate block, since it sits beside
+ * the hero rather than in the body stack. Bold rather than h2's usual Heavy,
+ * per the design, so it doesn't compete with the 96px hero headline just
+ * above it (an unlayered rule, since a weight utility on a heading does
+ * nothing — AGENTS.md pitfall #34). The copy keeps a 512px measure while the
+ * heading takes the column's full width. */
+.wtr-hero-donate-content h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-3xl);
+    font-weight: var(--font-weight-bold);
+    line-height: 1.15;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+}
+.wtr-hero-donate-content p {
+    max-width: 32rem;
+}
+@media (width >= 64rem) {
+    .wtr-hero-donate-content h2 {
+        font-size: var(--text-40);
+    }
+}
+@media (width >= 80rem) {
+    .wtr-hero-donate-content h2 {
+        font-size: var(--text-5xl);
+    }
+}
+
+/* Its optional background image, shown as-is over the fill (which shows only
+ * while it loads). Meant for a soft, low-contrast image made for the banner,
+ * like the design's orange forest photo; the copy sits directly on it. */
+.wtr-hero-donate-bg-image {
+    pointer-events: none;
+}
+
 /* Shared by signup_wagtail_forms_block.html and signup_action_network_block.html,
  * which render this identically. */
 .wtr-signup-panel-content h2 {

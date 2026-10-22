@@ -59,6 +59,7 @@ from wtrx.blocks import (
     FundraiseUpAdvancedSettingsBlock,
     GatedStreamBlockAdapter,
     HeroCTABlock,
+    HeroDonateFundraiseUpBlock,
     HeroSignupActionKitBlock,
     ImageBlock,
     ImageCardListBlock,
@@ -579,11 +580,11 @@ class TestNoHeroBodyBlock(SimpleTestCase):
 class TestHeroCTABlock(SimpleTestCase):
     """
     HeroCTABlock is HomePage's ("full" variant) hero_cta block type: at
-    most one of button or signup (ActionKit). donate/announcement are
-    commented out as choices here (not deleted -- see the class's own
-    docstring) until properly implemented; every other HeroMixin page type
-    ("banner" variant) uses BannerHeroCTABlock instead -- see
-    TestBannerHeroCTABlock.
+    most one of button, signup (ActionKit) or a Fundraise Up donate banner.
+    The ActBlue donate and announcement choices are commented out here (not
+    deleted -- see the class's own docstring) until properly implemented;
+    every other HeroMixin page type ("banner" variant) uses
+    BannerHeroCTABlock instead -- see TestBannerHeroCTABlock.
     """
 
     def test_button_choice_is_button_block(self):
@@ -603,9 +604,13 @@ class TestHeroCTABlock(SimpleTestCase):
         block = HeroCTABlock()
         self.assertNotIn("content", block.declared_blocks["signup"].declared_blocks)
 
-    def test_donate_and_announcement_are_not_choices(self):
+    def test_donate_fundraiseup_choice_is_the_hero_donate_banner(self):
         block = HeroCTABlock()
-        self.assertEqual(set(block.declared_blocks.keys()), {"button", "signup"})
+        self.assertIsInstance(block.declared_blocks["donate_fundraiseup"], HeroDonateFundraiseUpBlock)
+
+    def test_actblue_donate_and_announcement_are_not_choices(self):
+        block = HeroCTABlock()
+        self.assertEqual(set(block.declared_blocks.keys()), {"button", "signup", "donate_fundraiseup"})
 
     def test_at_most_one_item(self):
         self.assertEqual(HeroCTABlock().meta.max_num, 1)
@@ -2321,6 +2326,88 @@ class TestDonateFundraiseUpBlockGeolocationContext(TestCase):
         self.assertEqual(json.loads(ctx["fundraiseup_region_map_json"]), {"_default": ""})
 
 
+class TestHeroDonateFundraiseUpBlock(TestCase):
+    """
+    The home hero's donate banner resolves its Fundraise Up form exactly as
+    DonateFundraiseUpBlock does (both go through
+    _fundraiseup_embed_context()): the site-wide region map, with the same
+    per-field Advanced settings overrides.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = Site.objects.get(is_default_site=True)
+
+    def setUp(self):
+        self.integration, _ = IntegrationSettings.objects.get_or_create(site=self.site)
+        self.integration.integrations = [
+            (
+                "fundraiseup",
+                {
+                    "enabled": True,
+                    "installation_code": "<script>fru</script>",
+                    "element_id_us": "US_ID",
+                    "element_id_nl": "NL_ID",
+                    "element_id_ca": "CA_ID",
+                    "element_id_gb": "GB_ID",
+                    "eu_country_codes": "DE,FR",
+                    "element_id_eu": "EU_ID",
+                    "element_id_default": "DEFAULT_ID",
+                },
+            )
+        ]
+        self.integration.save()
+
+    def _get_context(self, **value):
+        request = RequestFactory().get("/")
+        request.META["HTTP_HOST"] = self.site.hostname
+        request.META["SERVER_PORT"] = str(self.site.port)
+        return HeroDonateFundraiseUpBlock().get_context(
+            {"designation_id": "", **value}, parent_context={"request": request}
+        )
+
+    def test_fields(self):
+        self.assertEqual(
+            set(HeroDonateFundraiseUpBlock().declared_blocks.keys()),
+            {"content", "background", "background_image", "designation_id", "advanced_settings"},
+        )
+
+    def test_advanced_settings_is_the_shared_override_block(self):
+        self.assertIsInstance(
+            HeroDonateFundraiseUpBlock().declared_blocks["advanced_settings"],
+            FundraiseUpAdvancedSettingsBlock,
+        )
+
+    def test_background_defaults_to_red(self):
+        self.assertEqual(HeroDonateFundraiseUpBlock().declared_blocks["background"].get_default(), "red")
+
+    def test_falls_back_to_the_site_wide_region_map(self):
+        ctx = self._get_context()
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "DEFAULT_ID")
+        self.assertEqual(regions["US"], "US_ID")
+        self.assertEqual(regions["_eu"], "EU_ID")
+        self.assertEqual(regions["_eu_countries"], ["DE", "FR"])
+
+    def test_advanced_settings_override_one_region(self):
+        ctx = self._get_context(advanced_settings={"element_id_us": "BLOCK_US"})
+        regions = json.loads(ctx["fundraiseup_region_map_json"])
+        self.assertEqual(regions["US"], "BLOCK_US")
+        self.assertEqual(regions["GB"], "GB_ID")
+
+    def test_disabled_integration_yields_blank_defaults(self):
+        self.integration.integrations = []
+        self.integration.save()
+        ctx = self._get_context(advanced_settings={"element_id_us": "BLOCK_US"})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+        self.assertEqual(json.loads(ctx["fundraiseup_region_map_json"]), {"_default": ""})
+
+    def test_no_request_does_not_crash(self):
+        ctx = HeroDonateFundraiseUpBlock().get_context({"designation_id": ""}, parent_context={})
+        self.assertEqual(ctx["fundraiseup_default_element_id"], "")
+        self.assertFalse(ctx["is_page_preview"])
+
+
 class TestPageCardsBlockFields(SimpleTestCase):
     """
     content (heading+subheading merged) is optional. subheading used to
@@ -3255,6 +3342,20 @@ class TestIntegrationGatedStreamBlockVisibility(TestCase):
         names = {b.name for b in SectionContentBlock().ordered_child_blocks()}
         self.assertNotIn("donate", names)
 
+    def test_hero_cta_hides_the_donate_banner_while_fundraiseup_is_disabled(self):
+        self._set_integrations([])
+        self._set_current_request()
+        names = {b.name for b in HeroCTABlock().ordered_child_blocks()}
+        self.assertNotIn("donate_fundraiseup", names)
+        self.assertIn("button", names)
+        self.assertIn("signup", names)
+
+    def test_hero_cta_offers_the_donate_banner_while_fundraiseup_is_enabled(self):
+        self._set_integrations([("fundraiseup", {"enabled": True, "installation_code": "<script></script>"})])
+        self._set_current_request()
+        names = {b.name for b in HeroCTABlock().ordered_child_blocks()}
+        self.assertIn("donate_fundraiseup", names)
+
 
 class TestGatedStreamBlockAdapter(TestCase):
     """
@@ -3347,6 +3448,9 @@ class TestGatedStreamBlockAdapter(TestCase):
         )
         self.assertIsInstance(
             registry.find_adapter(SectionContentBlock), GatedStreamBlockAdapter
+        )
+        self.assertIsInstance(
+            registry.find_adapter(HeroCTABlock), GatedStreamBlockAdapter
         )
 
 

@@ -1,0 +1,48 @@
+{% load i18n wagtailcore_tags wagtailimages_tags wtrx_tags %}
+{% comment %}
+HeroDonateFundraiseUpBlock — HeroCTABlock's "donate_fundraiseup" choice.
+components/hero.html renders it below the "full" hero's media area, inside
+the same rounded panel, so it carries no radius, gutter or container of its
+own: the hero's .wtr-hero panel clips it (overflow-hidden rounded-lg).
+
+Heading and copy on the left, the Fundraise Up form on the right, as one
+row from lg: (stacked below). The row is capped at 1112px and centred, which
+puts its edges 184px in from the panel's at Figma's 1512px frame. The form
+column is fixed-width; Fundraise Up's embedded form fills it.
+
+Text and the block-preview stand-in invert together on the palette's light
+fills via `on_light`, same as the hero banner and callout.
+
+The background image is decorative (alt=""), lazy-loaded because it sits
+below the fold on most screens, and shown at full strength over the fill.
+width-1920 rather than a fill crop: the banner is wide on desktop but tall
+once stacked on a phone, and object-cover crops for both from the uncropped
+rendition.
+{% endcomment %}
+{% with on_light=value.background|background_is_light %}
+<div class="wtr-hero-donate wtr-bg-{{ value.background|background_key }} relative overflow-hidden px-6 py-10 sm:px-10 sm:py-12 lg:px-16 lg:py-16
+            {% if on_light %}text-dark{% else %}text-light{% endif %}">
+    {% if value.background_image %}
+        {% image value.background_image width-1920 as bg_img %}
+        <img src="{{ bg_img.url }}" width="{{ bg_img.width }}" height="{{ bg_img.height }}" alt=""
+             class="wtr-hero-donate-bg-image absolute inset-0 h-full w-full object-cover"
+             style="{{ value.background_image.object_position_style }}" loading="lazy" aria-hidden="true">
+    {% endif %}
+    <div class="relative mx-auto flex max-w-[1112px] flex-col gap-8 lg:flex-row lg:items-center lg:gap-16">
+        {% if value.content %}
+            {% comment %}
+            Heading size and weight are pinned via .wtr-hero-donate-content in
+            main.css. prose-invert's body color is pinned to pure white
+            centrally, in main.css.
+            {% endcomment %}
+            <div class="wtr-hero-donate-content prose max-w-none text-lg leading-[1.4] sm:text-xl lg:flex-1
+                        {% if on_light %}prose-neutral{% else %}prose-invert{% endif %}">
+                {{ value.content|richtext }}
+            </div>
+        {% endif %}
+        <div class="w-full lg:w-[440px] lg:shrink-0 xl:w-[480px]{% if not value.content %} lg:mx-auto{% endif %}">
+            {% include "wtrx/components/streamfield/blocks/_fundraiseup_embed.html" %}
+        </div>
+    </div>
+</div>
+{% endwith %}
