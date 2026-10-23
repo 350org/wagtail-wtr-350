@@ -25,8 +25,8 @@ this site fronts every page with Cloudflare's edge cache
 into the HTML would get cached and served to every other visitor regardless
 of their own country. The donate block's own inline script resolves the
 visitor's country via Cloudflare's `/cdn-cgi/trace` edge endpoint (never
-reaches Django, so it can't poison the page cache) and swaps the anchor's
-target element ID client-side — the same approach already used for
+reaches Django, so it can't poison the page cache) and only then inserts the
+anchor for that region's element — the same approach already used for
 Usercentrics' country-gated consent banner (see
 wtrx/templates/wtrx/includes/usercentrics_head.html), reimplemented here
 rather than shared with it: the two have different fallback semantics
@@ -35,17 +35,20 @@ to `element_id_default`) and touching consent-banner code for an unrelated
 donation-forms feature isn't worth the coupling.
 
 Fundraise Up's own installation script (loaded unconditionally in <head> via
-head_html_field below) is deliberately **not** deferred to wait for that
-client-side lookup to resolve first — the two run concurrently. Fundraise Up
-scans the page for anchors and hydrates them on its own schedule; if that
-scan happens to run before the /cdn-cgi/trace fetch resolves, the visitor
-sees `element_id_default` (the anchor's server-rendered initial href, safe to
-cache since it's the same for every visitor) rather than their own region's
-form — never a broken state, just the non-regional default. Deferring
-Fundraise Up's script to eliminate that race entirely (mirroring how
-usercentrics_head.html defers loading the Usercentrics script until country
-is known) was considered and deliberately not done, to keep Fundraise Up
-loading exactly as fast as it does today.
+head_html_field below) is not deferred; the anchor is. Fundraise Up replaces
+an anchor with its form as soon as it finds one, and keeps watching for
+anchors added later, so the anchor must not exist until the region is known.
+It used to be server-rendered with `element_id_default` and swapped
+client-side afterwards, which lost whenever Fundraise Up got there first:
+the default form was already in place, and the swap changed the href of an
+anchor Fundraise Up had already consumed. The anchor now
+appears once the lookup answers; if it fails (no Cloudflare in front, as on
+staging and in local development) or takes longer than the template's
+LOOKUP_TIMEOUT_MS, `element_id_default` is inserted instead.
+
+`?fundraiseup_country=<ISO code>` on a page URL skips the lookup and shows
+that region's form, for QA without a VPN — and the only way to check the
+regions at all on an environment Cloudflare doesn't front.
 """
 
 from django.utils.translation import gettext_lazy as _
