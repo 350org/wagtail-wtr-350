@@ -321,11 +321,13 @@
         video/image, scrim, headline column), which keeps the full
         viewport-minus-nav height on its own, and below it an optional
         donate banner (HeroCTABlock's donate_fundraiseup choice) that
-        extends the panel rather than sitting in the headline column.
+        extends the panel rather than sitting in the headline column. With
+        the banner present the media area is shortened (.wtr-hero-media in
+        main.css) so the donate ask starts above the fold.
         {% endcomment %}
         <div class="wtr-hero relative flex flex-col overflow-hidden rounded-lg bg-dark"
              {% if hero.video %}data-hero{% endif %}>
-        <div class="relative flex min-h-[calc(100vh-4rem)] flex-col justify-end">
+        <div class="wtr-hero-media relative flex min-h-[calc(100vh-4rem)] flex-col justify-end">
 
             {% if hero.video %}
                 {% image hero.image fill-1600x700 as hero_poster %}
@@ -380,7 +382,7 @@
             content column in line with that instead of the one place still
             depending on implicit ordering.
             {% endcomment %}
-            <div class="relative z-10 w-full text-light px-6 py-10 text-left sm:px-10 sm:py-12 lg:px-32 lg:py-16">
+            <div class="relative z-10 w-full text-light px-6 pt-10 pb-7.5 text-left sm:px-10 sm:py-12 lg:px-32 lg:py-16">
 
                 {% if hero.pre_header %}
                     {% comment %}
@@ -405,8 +407,12 @@
                 and specifies no letter-spacing, so tracking-tight's -0.025em
                 (-2.4px per character at this size) is dropped here: the 1033px
                 cap is drawn against normal tracking.
+
+                44px on phones, not text-4xl's 36px: at 36px it barely
+                outranked a 30px section/donate h2 below it. The column's
+                pb-7.5 (30px, vs sm:'s 48px) sits it lower in the panel too.
                 {% endcomment %}
-                <h1 class="font-heading text-4xl text-balance sm:text-5xl lg:text-8xl lg:leading-[1.135] lg:max-w-[1033px]">
+                <h1 class="font-heading text-[2.75rem] leading-[1.1] text-balance sm:text-5xl lg:text-8xl lg:leading-[1.135] lg:max-w-[1033px]">
                     {{ hero.headline }}
                 </h1>
 

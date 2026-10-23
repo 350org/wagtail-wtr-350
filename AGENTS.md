@@ -1870,8 +1870,11 @@ gate.
     `donate_fundraiseup` choice, so it is offered on `HomePage` only
     (banner-variant pages use `BannerHeroCTABlock`). `hero.html`'s "full"
     variant is two stacked parts inside one rounded `.wtr-hero` panel: the
-    media area (video/image, scrim, headline column), which keeps
-    `min-h-[calc(100vh-4rem)]` on its own, and below it the banner. The
+    media area (`.wtr-hero-media`: video/image, scrim, headline column) and
+    below it the banner. The media area is `min-h-[calc(100vh-4rem)]`
+    alone, but with the banner present an unlayered `:has()` rule in
+    `main.css` cuts it to 60% of that (45% below `sm:`) so the donate ask
+    starts above the fold. The
     hero's CTA loop therefore runs twice — once in the headline column
     skipping `donate_fundraiseup`, once after the media area rendering only
     it. Its form resolves exactly like `DonateFundraiseUpBlock`'s: both

@@ -2416,3 +2416,37 @@ h3.victories-header {
     background-color: rgb(0 0 0 / 40%);
 }
 
+/* Roughly half size on phones, where the full chip took a large bite out
+ * of the top of the video. Still above WCAG's 24px minimum target. */
+@media (width < 40rem) {
+    .wtr-hero-video-toggle {
+        gap: 0.375rem;
+        padding: 0.25rem 0.625rem;
+        font-size: 0.75rem;
+    }
+    .wtr-hero-video-toggle svg {
+        width: 1rem;
+        height: 1rem;
+    }
+}
+
+/* ============================================================
+ * Home hero with a donate banner — .wtr-hero-media
+ * ============================================================
+ * The "full" hero's media area is viewport-minus-nav tall, which pushes a
+ * donate banner below it (hero_donate_fundraiseup_block.html) entirely
+ * below the fold. With the banner present the media area is cut to 60% of
+ * that (55% shorter on phones, where it is narrow and tall), so the donate
+ * ask starts on the first screen. A floor only: a long headline or
+ * pre-header still grows it. Unlayered, so it beats the template's
+ * min-h-[calc(100vh-4rem)] utility.
+ * ============================================================ */
+.wtr-hero:has(> .wtr-hero-donate) > .wtr-hero-media {
+    min-height: calc((100vh - 4rem) * 0.45);
+}
+@media (width >= 40rem) {
+    .wtr-hero:has(> .wtr-hero-donate) > .wtr-hero-media {
+        min-height: calc((100vh - 4rem) * 0.6);
+    }
+}
+
