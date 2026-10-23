@@ -2445,6 +2445,11 @@ h3.victories-header {
  * that cut off heads at the top edge, so the crop favours the top (20%
  * down), losing more from the bottom. Video only: a background image
  * keeps the editor's own focal point (object_position_style).
+ *
+ * From lg: the headline column's bottom padding halves (64px -> 32px),
+ * sitting the headline nearer the bottom edge so it reads like the
+ * full-height hero, just shallower. The column holds no CTA in this case:
+ * the banner is the hero's one CTA.
  * ============================================================ */
 .wtr-hero:has(> .wtr-hero-donate) > .wtr-hero-media {
     min-height: calc((100vh - 4rem) * 0.45);
@@ -2455,6 +2460,11 @@ h3.victories-header {
 @media (width >= 40rem) {
     .wtr-hero:has(> .wtr-hero-donate) > .wtr-hero-media {
         min-height: calc((100vh - 4rem) * 0.6);
+    }
+}
+@media (width >= 64rem) {
+    .wtr-hero:has(> .wtr-hero-donate) .wtr-hero-content {
+        padding-bottom: 2rem;
     }
 }
 

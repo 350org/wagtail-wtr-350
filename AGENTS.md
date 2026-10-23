@@ -1874,7 +1874,9 @@ gate.
     below it the banner. The media area is `min-h-[calc(100vh-4rem)]`
     alone, but with the banner present an unlayered `:has()` rule in
     `main.css` cuts it to 60% of that (45% below `sm:`) so the donate ask
-    starts above the fold. The
+    starts above the fold, crops the video from 20% down rather than
+    centred, and from `lg:` halves the headline column's bottom padding
+    (`.wtr-hero-content`, 64px to 32px). The
     hero's CTA loop therefore runs twice — once in the headline column
     skipping `donate_fundraiseup`, once after the media area rendering only
     it. Its form resolves exactly like `DonateFundraiseUpBlock`'s: both
