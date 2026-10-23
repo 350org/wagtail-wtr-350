@@ -2440,9 +2440,17 @@ h3.victories-header {
  * ask starts on the first screen. A floor only: a long headline or
  * pre-header still grows it. Unlayered, so it beats the template's
  * min-h-[calc(100vh-4rem)] utility.
+ *
+ * The shorter, wider box crops a 16:9 video top and bottom, and centred
+ * that cut off heads at the top edge, so the crop favours the top (20%
+ * down), losing more from the bottom. Video only: a background image
+ * keeps the editor's own focal point (object_position_style).
  * ============================================================ */
 .wtr-hero:has(> .wtr-hero-donate) > .wtr-hero-media {
     min-height: calc((100vh - 4rem) * 0.45);
+}
+.wtr-hero:has(> .wtr-hero-donate) > .wtr-hero-media > video {
+    object-position: 50% 20%;
 }
 @media (width >= 40rem) {
     .wtr-hero:has(> .wtr-hero-donate) > .wtr-hero-media {
