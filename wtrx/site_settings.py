@@ -135,6 +135,91 @@ def _primary_navigation_blocks():
     ]
 
 
+COUNTRY_CODE_LENGTH = 2
+
+
+def parse_country_codes(value: str) -> list[str]:
+    """Split a comma-separated list of country codes, uppercased, blanks dropped."""
+    return [code.strip().upper() for code in (value or "").split(",") if code.strip()]
+
+
+class CTACountryLinkBlock(StructBlock):
+    """
+    A country-specific destination for the header CTA button: visitors
+    geolocated to one of ``country_codes`` are sent to ``url`` instead of the
+    CTA's own link. Resolved in the browser by nav-cta-geolocation.js, never
+    server-side, since pages are edge-cached (pitfall #90).
+
+    A plain CharBlock rather than wtrx.blocks.IdentifierBlock (which imports
+    this module): navigation settings are not run through wagtail-localize,
+    so there is no translator to keep the codes away from.
+    """
+
+    country_codes = CharBlock(
+        label=_("Country codes"),
+        help_text=_(
+            "Two-letter ISO country codes, comma-separated, e.g. \"US\" or "
+            "\"AT, BE, DE, FR\". If a country is listed in more than one "
+            "entry, the first entry wins."
+        ),
+    )
+    url = URLBlock(
+        label=_("URL"),
+        help_text=_("Where the CTA button goes for visitors in these countries."),
+    )
+
+    def clean(self, value):
+        cleaned = super().clean(value)
+        codes = parse_country_codes(cleaned.get("country_codes"))
+        invalid = [code for code in codes if len(code) != COUNTRY_CODE_LENGTH or not code.isalpha()]
+        if not codes or invalid:
+            raise StructBlockValidationError(
+                block_errors={
+                    "country_codes": ValidationError(
+                        _("Enter two-letter country codes separated by commas, e.g. \"US, CA\".")
+                    )
+                }
+            )
+        cleaned["country_codes"] = ", ".join(codes)
+        return cleaned
+
+    class Meta:
+        icon = "site"
+        label = _("Country link")
+
+
+def _cta_country_links_block():
+    """
+    The CTA's per-country links, shared by NavigationSettings and
+    NavigationOverrideBlock. A fresh instance each call, as with
+    _primary_navigation_blocks().
+    """
+    return [("link", CTACountryLinkBlock())]
+
+
+CTA_COUNTRY_LINKS_HELP_TEXT = _(
+    "Optional. Send visitors in particular countries somewhere other than "
+    "the CTA's own link, e.g. a country-specific donation form. Everyone "
+    "else, and anyone whose country can't be determined, gets the CTA's own "
+    "link."
+)
+CTA_COUNTRY_LINKS_NEED_CTA_MESSAGE = _(
+    "Set the CTA button text and its link before adding country links."
+)
+
+
+def cta_country_links_map(country_links) -> dict[str, str]:
+    """
+    Flatten a CTA's country links into ``{country_code: url}`` for the
+    browser. The first entry naming a country wins.
+    """
+    urls = {}
+    for link in country_links or []:
+        for code in parse_country_codes(link.value.get("country_codes")):
+            urls.setdefault(code, link.value.get("url"))
+    return urls
+
+
 class NavigationOverrideBlock(StructBlock):
     """
     An alternate navigation (links, CTA button, layout) scoped to a root page
@@ -191,6 +276,12 @@ class NavigationOverrideBlock(StructBlock):
             "anchor on the current page."
         ),
     )
+    cta_country_links = StreamBlock(
+        _cta_country_links_block(),
+        required=False,
+        label=_("CTA country links"),
+        help_text=CTA_COUNTRY_LINKS_HELP_TEXT,
+    )
     collapse_desktop_menu = BooleanBlock(
         required=False,
         label=_("Collapse desktop menu"),
@@ -227,6 +318,8 @@ class NavigationOverrideBlock(StructBlock):
             errors["cta_text"] = ValidationError(
                 _("CTA button text is required when a CTA page, URL, or anchor is set.")
             )
+        if cleaned.get("cta_country_links") and not cleaned.get("cta_text"):
+            errors["cta_country_links"] = ValidationError(CTA_COUNTRY_LINKS_NEED_CTA_MESSAGE)
         if errors:
             raise StructBlockValidationError(block_errors=errors)
         return cleaned
@@ -565,6 +658,13 @@ class NavigationSettings(BaseSiteSetting):
             "Set this instead of CTA page or CTA URL to link to an anchor on the current page."
         ),
     )
+    cta_country_links = StreamField(
+        _cta_country_links_block(),
+        blank=True,
+        verbose_name=_("CTA country links"),
+        help_text=CTA_COUNTRY_LINKS_HELP_TEXT,
+        use_json_field=True,
+    )
     collapse_desktop_menu = models.BooleanField(
         default=False,
         verbose_name=_("Collapse desktop menu"),
@@ -595,6 +695,7 @@ class NavigationSettings(BaseSiteSetting):
                 FieldPanel("cta_page"),
                 FieldPanel("cta_url"),
                 FieldPanel("cta_anchor"),
+                FieldPanel("cta_country_links"),
             ],
             heading=_("CTA button"),
         ),
@@ -651,6 +752,8 @@ class NavigationSettings(BaseSiteSetting):
             errors["cta_text"] = _(
                 "CTA button text is required when a CTA page, URL, or anchor is set."
             )
+        if self.cta_country_links and not self.cta_text:
+            errors["cta_country_links"] = CTA_COUNTRY_LINKS_NEED_CTA_MESSAGE
         if errors:
             raise ValidationError(errors)
 
@@ -675,7 +778,7 @@ class NavigationSettings(BaseSiteSetting):
         The returned object exposes the same attribute names either way
         (``primary_navigation``, ``regional_label``, ``root_page``,
         ``cta_text``, ``cta_page``, ``cta_url``, ``cta_anchor``,
-        ``collapse_desktop_menu``), so templates don't need to care which one
+        ``cta_country_links``, ``collapse_desktop_menu``), so templates don't need to care which one
         they got. ``root_page`` only exists on an override — the ``root_page``
         property below supplies the ``None`` the site default would otherwise
         be missing.

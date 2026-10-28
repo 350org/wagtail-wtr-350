@@ -15,6 +15,7 @@ from wtrx.site_settings import (
     FooterSettings,
     IntegrationSettings,
     NavigationSettings,
+    cta_country_links_map,
 )
 
 
@@ -136,6 +137,20 @@ def resolved_navigation(context):
         return None
     nav_settings = NavigationSettings.for_request(request)
     return nav_settings.resolved_for_page(context.get("page"))
+
+
+@register.simple_tag
+def nav_cta_country_links(nav) -> str:
+    """
+    The header CTA's country links as a JSON ``{country_code: url}`` object
+    for its ``data-country-links`` attribute (read by
+    nav-cta-geolocation.js), or ``""`` when it has none.
+
+    Usage in templates:
+        {% nav_cta_country_links nav as cta_country_links %}
+    """
+    urls = cta_country_links_map(_resolved_attr(nav, "cta_country_links", None))
+    return json.dumps(urls) if urls else ""
 
 
 @register.simple_tag(takes_context=True)

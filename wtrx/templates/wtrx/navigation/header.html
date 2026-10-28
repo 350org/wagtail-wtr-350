@@ -177,22 +177,32 @@ mobile-menu.js already toggles) — no separate JS hook needed.
                 Bespoke red pill per Figma's nav spec (bg-callout-red, rounded 4px, px-4 py-3) —
                 deliberately not wtr-btn, whose blue fill and 8px radius belong to the general
                 button system, not this specific nav component.
+
+                data-country-links (the CTA's country links, if any) is read by
+                nav-cta-geolocation.js, which swaps the href for the visitor's
+                country in the browser. The server-rendered href is the
+                fallback for everyone else, so the cached page is the same for
+                every visitor (pitfall #90).
                 {% endcomment %}
                 {% if nav.cta_text %}
+                    {% nav_cta_country_links nav as cta_country_links %}
                     {% if nav.cta_page %}
                         <a href="{% pageurl nav.cta_page|localized %}"
-                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
+                           {% if cta_country_links %}data-country-links="{{ cta_country_links }}"{% endif %}
+                           class="wtr-nav-cta inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_url %}
                         <a href="{{ nav.cta_url }}"
                            rel="noopener noreferrer"
-                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
+                           {% if cta_country_links %}data-country-links="{{ cta_country_links }}"{% endif %}
+                           class="wtr-nav-cta inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_anchor %}
                         <a href="#{{ nav.cta_anchor }}"
-                           class="inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
+                           {% if cta_country_links %}data-country-links="{{ cta_country_links }}"{% endif %}
+                           class="wtr-nav-cta inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% endif %}
