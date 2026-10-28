@@ -14,7 +14,24 @@ both can import from it safely.
 from html.parser import HTMLParser
 
 from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.utils.translation import gettext_lazy as _
+
+_validate_http_url = URLValidator(schemes=["http", "https"])
+
+
+def validate_url_or_query_string(value):
+    """
+    Accept a full http(s) URL, or a bare query string such as
+    ``?form=FUNXXXXXXX`` — a link to the current page with those parameters,
+    which is how a Fundraise Up campaign checkout is opened on the page
+    itself (the header CTA, see nav-cta.js).
+    """
+    if value.startswith("?"):
+        if len(value) > 1 and not any(char.isspace() for char in value):
+            return
+        raise ValidationError(_("Enter a query string such as \"?form=FUNXXXXXXX\"."))
+    _validate_http_url(value)
 
 _VOID_ELEMENTS = {
     "area", "base", "br", "col", "embed", "hr", "img", "input",

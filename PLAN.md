@@ -506,9 +506,9 @@ class BasePage(Page):
 | primary_navigation | StreamField (InternalLinkBlock, ExternalLinkBlock, AnchorLinkBlock) | No |
 | cta_text | CharField | No |
 | cta_page | ForeignKey to Page | No |
-| cta_url | URLField | No |
+| cta_url | CharField (`validate_url_or_query_string`) | No — full URL, or `?form=FUNXXXXXXX` to open a Fundraise Up checkout in place |
 | cta_anchor | CharField | No — anchor ID (no #) for same-page CTA link |
-| cta_country_links | StreamField (CTACountryLinkBlock: country codes + URL) | No — per-country CTA destination, swapped client-side; needs cta_text |
+| cta_country_links | StreamField (CTACountryLinkBlock: country codes + URL or `?form=` query) | No — per-country CTA destination, swapped client-side; needs cta_text |
 | collapse_desktop_menu | BooleanField | No, default False — always show hamburger icon |
 
 ### Settings > Footer (`FooterSettings`)

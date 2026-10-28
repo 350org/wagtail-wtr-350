@@ -456,7 +456,7 @@ class TestNavigationOverrideRendersInHeader(TestCase):
 class TestCTACountryLinks(TestCase):
     """
     The header CTA's per-country destinations: validation, and the
-    {country: url} map header.html hands nav-cta-geolocation.js. Swapping the
+    {country: url} map header.html hands nav-cta.js. Swapping the
     href happens in the browser, so the server-rendered link is always the
     CTA's own.
     """
@@ -529,6 +529,32 @@ class TestCTACountryLinks(TestCase):
             CTACountryLinkBlock().to_python({"country_codes": " us,ca ,", "url": "https://example.com"})
         )
         self.assertEqual(value["country_codes"], "US, CA")
+
+    def test_country_link_accepts_a_fundraiseup_query_string(self):
+        block = CTACountryLinkBlock()
+        value = block.clean(block.to_python({"country_codes": "US", "url": "?form=FUNYEKJXZJF"}))
+        self.assertEqual(value["url"], "?form=FUNYEKJXZJF")
+
+    def test_cta_url_accepts_a_query_string_and_renders_it_as_a_same_page_link(self):
+        self.nav.cta_url = "?form=FUNYEKJXZJF"
+        self.nav.full_clean()
+        self.nav.save()
+        response = self.client.get(self.other.url)
+        self.assertContains(response, 'href="?form=FUNYEKJXZJF"')
+
+    def test_override_cta_url_accepts_a_query_string(self):
+        block = NavigationOverrideBlock()
+        value = block.to_python(
+            {
+                "root_page": self.canada.pk,
+                "primary_navigation": [
+                    {"type": "external", "value": {"text": "About", "url": "https://example.com/about"}}
+                ],
+                "cta_text": "Donate",
+                "cta_url": "?form=FUNYEKJXZJF",
+            }
+        )
+        self.assertEqual(block.clean(value)["cta_url"], "?form=FUNYEKJXZJF")
 
     def test_invalid_country_codes_are_rejected(self):
         block = CTACountryLinkBlock()

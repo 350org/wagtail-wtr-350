@@ -17,7 +17,7 @@
  * mailto:/tel:, download links and links that already set a target are
  * left alone.
  *
- * A component that changes a link's href after load (nav-cta-geolocation.js)
+ * A component that changes a link's href after load (nav-cta.js)
  * calls refresh() on it afterwards, which undoes this script's own marking
  * and decides again for the new href.
  */

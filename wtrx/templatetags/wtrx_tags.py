@@ -144,7 +144,7 @@ def nav_cta_country_links(nav) -> str:
     """
     The header CTA's country links as a JSON ``{country_code: url}`` object
     for its ``data-country-links`` attribute (read by
-    nav-cta-geolocation.js), or ``""`` when it has none.
+    nav-cta.js), or ``""`` when it has none.
 
     Usage in templates:
         {% nav_cta_country_links nav as cta_country_links %}
