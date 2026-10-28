@@ -22,12 +22,16 @@ Tests for wtrx.site_settings.
 """
 
 import base64
+import html
+import json
+import re
 from unittest.mock import patch
 
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase
+from wagtail.blocks import StructBlockValidationError
 from wagtail.models import Page, Site
 
 from wtrx.blocks import DonateBlock
@@ -36,8 +40,10 @@ from wtrx.integrations.actionkit import ActionKitError
 from wtrx.models import ContentPage, HomePage
 from wtrx.site_settings import (
     BrandingSEOSettings,
+    CTACountryLinkBlock,
     FooterSettings,
     IntegrationSettings,
+    NavigationOverrideBlock,
     NavigationSettings,
 )
 
@@ -445,6 +451,115 @@ class TestNavigationOverrideRendersInHeader(TestCase):
         content = response.content.decode()
         self.assertIn("Canada Only Link", content)
         self.assertNotIn("Default Link", content)
+
+
+class TestCTACountryLinks(TestCase):
+    """
+    The header CTA's per-country destinations: validation, and the
+    {country: url} map header.html hands nav-cta-geolocation.js. Swapping the
+    href happens in the browser, so the server-rendered link is always the
+    CTA's own.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        root = Page.objects.filter(depth=1).first()
+        cls.home = HomePage(title="Home", slug="cta-country-home")
+        root.add_child(instance=cls.home)
+        cls.site = Site.objects.create(
+            hostname="cta-country-test.localhost",
+            port=80,
+            root_page=cls.home,
+            site_name="CTA Country Test",
+        )
+        cls.canada = ContentPage(title="Canada", slug="canada")
+        cls.home.add_child(instance=cls.canada)
+        cls.other = ContentPage(title="Other", slug="other")
+        cls.home.add_child(instance=cls.other)
+
+        cls.nav, _ = NavigationSettings.objects.get_or_create(site=cls.site)
+        cls.nav.cta_text = "Donate"
+        cls.nav.cta_url = "https://example.com/donate"
+        cls.nav.cta_country_links = [
+            ("link", {"country_codes": "US", "url": "https://example.com/us"}),
+            ("link", {"country_codes": "CA, US", "url": "https://example.com/ca"}),
+        ]
+        cls.nav.navigation_overrides = [
+            (
+                "override",
+                {
+                    "root_page": cls.canada,
+                    "primary_navigation": [],
+                    "cta_text": "Donate",
+                    "cta_page": None,
+                    "cta_url": "https://example.com/canada-donate",
+                    "cta_anchor": "",
+                    "cta_country_links": [],
+                    "collapse_desktop_menu": False,
+                },
+            )
+        ]
+        cls.nav.save()
+
+    def setUp(self):
+        self.client = Client(HTTP_HOST="cta-country-test.localhost")
+
+    def _country_links(self, page):
+        content = self.client.get(page.url).content.decode()
+        match = re.search(r'class="wtr-nav-cta[^"]*"', content)
+        self.assertIsNotNone(match, "header CTA not rendered")
+        attr = re.search(r'data-country-links="([^"]*)"', content)
+        return json.loads(html.unescape(attr.group(1))) if attr else None
+
+    def test_header_renders_country_map_with_first_entry_winning(self):
+        self.assertEqual(
+            self._country_links(self.other),
+            {"US": "https://example.com/us", "CA": "https://example.com/ca"},
+        )
+
+    def test_fallback_href_is_the_ctas_own_link(self):
+        response = self.client.get(self.other.url)
+        self.assertContains(response, 'href="https://example.com/donate"')
+
+    def test_override_without_country_links_renders_no_map(self):
+        self.assertIsNone(self._country_links(self.canada))
+
+    def test_country_codes_are_normalised(self):
+        value = CTACountryLinkBlock().clean(
+            CTACountryLinkBlock().to_python({"country_codes": " us,ca ,", "url": "https://example.com"})
+        )
+        self.assertEqual(value["country_codes"], "US, CA")
+
+    def test_invalid_country_codes_are_rejected(self):
+        block = CTACountryLinkBlock()
+        for codes in ("USA", "U1", ","):
+            with self.subTest(codes=codes), self.assertRaises(StructBlockValidationError):
+                block.clean(block.to_python({"country_codes": codes, "url": "https://example.com"}))
+
+    def test_country_links_need_cta_text(self):
+        nav = NavigationSettings(
+            cta_country_links=[("link", {"country_codes": "US", "url": "https://example.com/us"})]
+        )
+        with self.assertRaises(ValidationError) as cm:
+            nav.clean()
+        self.assertIn("cta_country_links", cm.exception.message_dict)
+
+    def test_override_country_links_need_cta_text(self):
+        block = NavigationOverrideBlock()
+        value = block.to_python(
+            {
+                "root_page": self.canada.pk,
+                "primary_navigation": [
+                    {"type": "external", "value": {"text": "About", "url": "https://example.com/about"}}
+                ],
+                "cta_country_links": [
+                    {"type": "link", "value": {"country_codes": "US", "url": "https://example.com/us"}}
+                ],
+            }
+        )
+        with self.assertRaises(StructBlockValidationError) as cm:
+            block.clean(value)
+        self.assertIn("cta_country_links", cm.exception.block_errors)
 
 
 class TestRegionalLabelRendersInHeader(TestCase):

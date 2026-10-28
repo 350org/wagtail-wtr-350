@@ -8,6 +8,7 @@ import PersonBioModal from './components/person-bio-modal.js';
 import ActionKitPetitionModal from './components/actionkit-petition-modal.js';
 import CardModal from './components/card-modal.js';
 import ExternalLinks from './components/external-links.js';
+import NavCtaGeolocation from './components/nav-cta-geolocation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     MobileMenu.init();
@@ -19,4 +20,5 @@ document.addEventListener('DOMContentLoaded', () => {
     ActionKitPetitionModal.init();
     CardModal.init();
     ExternalLinks.init();
+    NavCtaGeolocation.init();
 });

@@ -316,7 +316,7 @@ class HomePage(BasePage, HeroMixin):
 ### Site settings (5 panels)
 
 - **Branding & SEO** — logo, favicon, default meta image, site description
-- **Navigation** — primary nav links, CTA button
+- **Navigation** — primary nav links, CTA button (with optional per-country links)
 - **Footer** — footer nav sections, copyright text, social platform links (overridable per country site)
 - **Integrations** — donation platform (ActBlue), signup platform (wagtail_forms / Action Network)
 

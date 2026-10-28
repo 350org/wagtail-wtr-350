@@ -1892,3 +1892,20 @@ gate.
     #34). The look of the form itself (the white card, amount buttons, the
     blue Donate button) is set on the element in Fundraise Up's dashboard,
     not here.
+
+96. **The header CTA's per-country links are swapped in the browser.**
+    `cta_country_links` (on `NavigationSettings` and
+    `NavigationOverrideBlock`, so a navigation override has its own) is a
+    list of `CTACountryLinkBlock`s: comma-separated ISO codes plus a URL.
+    `header.html` always renders the CTA's own link as the `href` and
+    carries the `{country: url}` map (`nav_cta_country_links`, first entry
+    naming a country wins) in `data-country-links`;
+    `nav-cta-geolocation.js` swaps the `href` once Cloudflare's
+    `/cdn-cgi/trace` answers, so the cached page is the same for everyone
+    (pitfall #90) and staging/local dev always show the fallback. It reads
+    the donate block's `?fundraiseup_country=XX` QA override too. Because
+    `ExternalLinks.init()` has already decided new-tab against the fallback
+    `href`, the swap calls `ExternalLinks.refresh()`, which undoes that
+    script's own marking (tracked by `data-external-marked`) and decides
+    again — any other script that rewrites a link's `href` after load
+    should do the same.

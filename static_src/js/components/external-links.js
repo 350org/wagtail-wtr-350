@@ -16,24 +16,47 @@
  * current host nor one of the internal hosts. Relative links, #anchors,
  * mailto:/tel:, download links and links that already set a target are
  * left alone.
+ *
+ * A component that changes a link's href after load (nav-cta-geolocation.js)
+ * calls refresh() on it afterwards, which undoes this script's own marking
+ * and decides again for the new href.
  */
 class ExternalLinks {
     static init() {
-        const body = document.body;
-        const internalHosts = new Set(
-            (body.dataset.internalHosts || '')
-                .split(',')
-                .map((host) => host.trim().toLowerCase())
-                .filter(Boolean)
-        );
-        internalHosts.add(window.location.hostname.toLowerCase());
-        const hint = body.dataset.newTabHint || '';
+        const internalHosts = ExternalLinks.internalHosts();
+        const hint = document.body.dataset.newTabHint || '';
 
         document.querySelectorAll('a[href]').forEach((link) => {
             if (ExternalLinks.isExternal(link, internalHosts)) {
                 ExternalLinks.markExternal(link, hint);
             }
         });
+    }
+
+    static refresh(link) {
+        if ('externalLabel' in link.dataset) {
+            link.setAttribute('aria-label', link.dataset.externalLabel);
+        }
+        if ('externalMarked' in link.dataset) {
+            link.removeAttribute('target');
+            link.querySelectorAll('.wtr-new-tab-hint').forEach((span) => span.remove());
+            delete link.dataset.externalMarked;
+            delete link.dataset.externalLabel;
+        }
+        if (ExternalLinks.isExternal(link, ExternalLinks.internalHosts())) {
+            ExternalLinks.markExternal(link, document.body.dataset.newTabHint || '');
+        }
+    }
+
+    static internalHosts() {
+        const internalHosts = new Set(
+            (document.body.dataset.internalHosts || '')
+                .split(',')
+                .map((host) => host.trim().toLowerCase())
+                .filter(Boolean)
+        );
+        internalHosts.add(window.location.hostname.toLowerCase());
+        return internalHosts;
     }
 
     static isExternal(link, internalHosts) {
@@ -43,6 +66,7 @@ class ExternalLinks {
     }
 
     static markExternal(link, hint) {
+        link.dataset.externalMarked = '';
         link.setAttribute('target', '_blank');
         const rel = new Set((link.getAttribute('rel') || '').split(/\s+/).filter(Boolean));
         rel.add('noopener');
@@ -54,11 +78,12 @@ class ExternalLinks {
         // so a visually hidden span would never be read; extend the label.
         const label = link.getAttribute('aria-label');
         if (label) {
+            link.dataset.externalLabel = label;
             link.setAttribute('aria-label', `${label} ${hint}`);
             return;
         }
         const span = document.createElement('span');
-        span.className = 'sr-only';
+        span.className = 'wtr-new-tab-hint sr-only';
         span.textContent = ` ${hint}`;
         link.appendChild(span);
     }

@@ -508,6 +508,7 @@ class BasePage(Page):
 | cta_page | ForeignKey to Page | No |
 | cta_url | URLField | No |
 | cta_anchor | CharField | No — anchor ID (no #) for same-page CTA link |
+| cta_country_links | StreamField (CTACountryLinkBlock: country codes + URL) | No — per-country CTA destination, swapped client-side; needs cta_text |
 | collapse_desktop_menu | BooleanField | No, default False — always show hamburger icon |
 
 ### Settings > Footer (`FooterSettings`)
