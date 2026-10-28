@@ -1900,7 +1900,7 @@ gate.
     `header.html` always renders the CTA's own link as the `href` and
     carries the `{country: url}` map (`nav_cta_country_links`, first entry
     naming a country wins) in `data-country-links`;
-    `nav-cta-geolocation.js` swaps the `href` once Cloudflare's
+    `nav-cta.js` swaps the `href` once Cloudflare's
     `/cdn-cgi/trace` answers, so the cached page is the same for everyone
     (pitfall #90) and staging/local dev always show the fallback. It reads
     the donate block's `?fundraiseup_country=XX` QA override too. Because
@@ -1909,3 +1909,14 @@ gate.
     script's own marking (tracked by `data-external-marked`) and decides
     again — any other script that rewrites a link's `href` after load
     should do the same.
+    **Every CTA URL field also takes a bare query string**
+    (`validate_url_or_query_string`, `wtrx/validators.py`): `cta_url` on
+    both, and each country link's `url`, so an editor can enter
+    `?form=FUNXXXXXXX`. Fundraise Up only documents `?form=` as opening its
+    checkout on page *load*, so `nav-cta.js` catches a plain left click on a
+    CTA whose href is this same page with a `form` parameter and calls
+    `FundraiseUp.openCheckout()` instead, with no reload. Without Fundraise
+    Up's stub on the page (integration disabled, live preview) the click is
+    left alone, and the reloaded page opens the checkout itself. `cta_url`
+    was a `URLField`; it is now a `CharField` at the same 200-character
+    limit, because `URLField`/`URLBlock` reject a relative value.

@@ -11,7 +11,7 @@ own docstring.
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
-from wtrx.validators import html_is_balanced, validate_balanced_html
+from wtrx.validators import html_is_balanced, validate_balanced_html, validate_url_or_query_string
 
 
 class TestHtmlIsBalanced(SimpleTestCase):
@@ -56,3 +56,20 @@ class TestValidateBalancedHtml(SimpleTestCase):
     def test_unbalanced_html_raises_validation_error(self):
         with self.assertRaises(ValidationError):
             validate_balanced_html("<div><span></div>")
+
+
+class TestValidateUrlOrQueryString(SimpleTestCase):
+    def test_accepts_full_urls_and_query_strings(self):
+        for value in (
+            "https://350.org/donate",
+            "http://example.com/?form=FUNX",
+            "?form=FUNYEKJXZJF",
+            "?form=FUNX&utm_source=nav",
+        ):
+            with self.subTest(value=value):
+                validate_url_or_query_string(value)
+
+    def test_rejects_anything_else(self):
+        for value in ("?", "? form=FUNX", "/donate", "javascript:alert(1)", "ftp://example.com", "donate"):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                validate_url_or_query_string(value)

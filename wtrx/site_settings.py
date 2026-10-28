@@ -30,7 +30,7 @@ from .integrations.gtm import GoogleTagManagerConfigBlock
 from .integrations.registry import all_integrations, get_integration
 from .integrations.usercentrics import UsercentricsConfigBlock
 from .integrations.wagtail_forms import WagtailFormsConfigBlock
-from .validators import validate_balanced_html
+from .validators import validate_balanced_html, validate_url_or_query_string
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +136,14 @@ def _primary_navigation_blocks():
 
 
 COUNTRY_CODE_LENGTH = 2
+# URLField's own default, kept when cta_url became a CharField.
+CTA_URL_MAX_LENGTH = 200
+CTA_URL_HELP_TEXT = _(
+    "Link for the CTA button: a full URL, or \"?form=\" and a Fundraise Up "
+    "campaign code (e.g. \"?form=FUNXXXXXXX\") to open that campaign's "
+    "checkout on the page itself. Set only one of CTA page, CTA URL, or CTA "
+    "anchor."
+)
 
 
 def parse_country_codes(value: str) -> list[str]:
@@ -147,7 +155,7 @@ class CTACountryLinkBlock(StructBlock):
     """
     A country-specific destination for the header CTA button: visitors
     geolocated to one of ``country_codes`` are sent to ``url`` instead of the
-    CTA's own link. Resolved in the browser by nav-cta-geolocation.js, never
+    CTA's own link. Resolved in the browser by nav-cta.js, never
     server-side, since pages are edge-cached (pitfall #90).
 
     A plain CharBlock rather than wtrx.blocks.IdentifierBlock (which imports
@@ -163,9 +171,16 @@ class CTACountryLinkBlock(StructBlock):
             "entry, the first entry wins."
         ),
     )
-    url = URLBlock(
+    url = CharBlock(
+        max_length=CTA_URL_MAX_LENGTH,
+        validators=[validate_url_or_query_string],
         label=_("URL"),
-        help_text=_("Where the CTA button goes for visitors in these countries."),
+        help_text=_(
+            "Where the CTA button goes for visitors in these countries: a "
+            "full URL, or \"?form=\" and a Fundraise Up campaign code (e.g. "
+            "\"?form=FUNXXXXXXX\") to open that campaign's checkout on the "
+            "page itself."
+        ),
     )
 
     def clean(self, value):
@@ -259,13 +274,12 @@ class NavigationOverrideBlock(StructBlock):
             "CTA anchor, not more than one."
         ),
     )
-    cta_url = URLBlock(
+    cta_url = CharBlock(
         required=False,
+        max_length=CTA_URL_MAX_LENGTH,
+        validators=[validate_url_or_query_string],
         label=_("CTA URL"),
-        help_text=_(
-            "External link for the CTA button. Set either this, CTA page, or "
-            "CTA anchor, not more than one."
-        ),
+        help_text=CTA_URL_HELP_TEXT,
     )
     cta_anchor = CharBlock(
         required=False,
@@ -642,12 +656,12 @@ class NavigationSettings(BaseSiteSetting):
             "Internal link for the CTA button. Set either this or CTA URL, not both."
         ),
     )
-    cta_url = models.URLField(
+    cta_url = models.CharField(
+        max_length=CTA_URL_MAX_LENGTH,
         blank=True,
+        validators=[validate_url_or_query_string],
         verbose_name=_("CTA URL"),
-        help_text=_(
-            "External link for the CTA button. Set either this or CTA page, not both."
-        ),
+        help_text=CTA_URL_HELP_TEXT,
     )
     cta_anchor = models.CharField(
         max_length=255,
