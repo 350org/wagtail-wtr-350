@@ -1864,6 +1864,12 @@ gate.
     external unless added to the setting. A link that already sets
     `target`, or has `download`, is left alone, as are links added to the
     page after load.
+    The hint is `sr-only`, so `position: absolute`: **every horizontal
+    scroller (`overflow-x-auto`) must be `position: relative`**, or a hint
+    on a link scrolled out of view escapes the scroller and widens the
+    page. On Android Chrome that widens the layout viewport, and the
+    Usercentrics banner (`position: fixed`) renders too wide and off
+    screen. `.wtr-card-carousel-track` and `table_block.html` carry it.
 
 95. **The home hero's donate banner renders outside the hero's text
     column.** `HeroDonateFundraiseUpBlock` is `HeroCTABlock`'s

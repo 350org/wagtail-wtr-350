@@ -2236,8 +2236,17 @@ h3.victories-header {
  * template are a progressive-enhancement layer on top, not a replacement.
  * Scrollbar is hidden since the arrow buttons are the intended control —
  * native scroll/swipe still works, just without visible scrollbar chrome.
+ *
+ * position: relative makes the track the containing block for absolutely
+ * positioned descendants, so its overflow clips them. Without it, an
+ * `sr-only` span inside a card scrolled out of view (the "(opens in a new
+ * tab)" hint external-links.js adds, pitfall #94) escapes the track and
+ * widens the whole page. On Android Chrome that grows the layout viewport,
+ * and position: fixed UI sized to it (the Usercentrics banner) renders
+ * too wide and below the visible screen.
  * ============================================================ */
 .wtr-card-carousel-track {
+    position: relative;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
     -ms-overflow-style: none;
