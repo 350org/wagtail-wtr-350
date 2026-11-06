@@ -210,7 +210,7 @@ WTRX_LANGUAGE_URL_PREFIXES = {
     "pt-br": "brasil",
     "fr-fr": "france",
     "en-ca": "canada",
-    "de": "germany",
+    "de": "deutschland",
     "id": "indonesia",
     "ja": "japan",
     "tr": "turkiye",
