@@ -1926,3 +1926,30 @@ gate.
     left alone, and the reloaded page opens the checkout itself. `cta_url`
     was a `URLField`; it is now a `CharField` at the same 200-character
     limit, because `URLField`/`URLBlock` reject a relative value.
+
+97. **Markdown for agents (`wagtail_markdown_agents`) is a pinned
+    third-party package configured almost entirely by its shipped 350.org
+    profile** (`wagtail_markdown_agents.profiles.wtrx`). The package
+    maintains that profile, so changing a block, page field or page type in
+    `wtrx/` can leave it behind. Run the package's "350.org profile drift"
+    workflow against the branch before deploying such a change. Four things
+    live here instead:
+    - **Middleware order:** `AgentMarkdownMiddleware` sits after
+      `NamedPrefixLocaleMiddleware` and before `CommonMiddleware`.
+      Listed before the locale middleware, a `/brasil/...` page resolves in
+      the wrong language and agents silently get HTML. Its checks
+      (`E002`/`E003`/`E007`) catch a wrong order.
+    - **Storage:** exports go in the `markdown_export` `STORAGES` alias:
+      a local folder in dev, and a **private** bucket in production
+      (`MARKDOWN_STORAGE_*`). They must never go in the media bucket,
+      because a public object URL bypasses the package's restriction and
+      exclusion checks. With no bucket set, production turns
+      `AUTO_GENERATE` off rather than writing to a disk that's wiped on
+      deploy.
+    - **Caching:** negotiated Markdown sends its own
+      `Cache-Control: private, no-store`, so `EdgeCacheMiddleware` (pitfall
+      #90) leaves it alone. HTML still gets edge-cached, so Cloudflare needs
+      a bypass rule for agent requests, or agents get the cached HTML.
+    - **The pin** is a commit archive URL in `pyproject.toml`, because the
+      Docker image has no `git`. Upgrade by changing the SHA, then run the
+      package INSTALL.md's "Upgrading" steps.
