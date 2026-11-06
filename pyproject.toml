@@ -37,6 +37,11 @@ dependencies = [
     # newer releases on a fresh install without this.
     "django-otp<1.7.1",
     "django-allauth[socialaccount]>=65.18,<66.0",
+    # Serves pages to AI agents as Markdown. No release is tagged yet, so this
+    # pins a reviewed commit on main. The archive form because the Docker image
+    # has no git. To upgrade: change the SHA, then follow the package's
+    # INSTALL.md "Upgrading" steps (migrate, check, agentmd_revoke_ineligible).
+    "wagtail-markdown-for-agents @ https://github.com/350org/Wagtail-Markdown-for-Agents-and-Statistics/archive/a0dccf6e8a2cd5eea863796a45bc4356c7251d36.zip",
 ]
 
 [project.optional-dependencies]
