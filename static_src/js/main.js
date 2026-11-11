@@ -9,8 +9,10 @@ import ActionKitPetitionModal from './components/actionkit-petition-modal.js';
 import CardModal from './components/card-modal.js';
 import ExternalLinks from './components/external-links.js';
 import NavCta from './components/nav-cta.js';
+import VisitedCookie from './components/visited-cookie.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    VisitedCookie.init();
     MobileMenu.init();
     Accordion.init();
     FormAjax.init();
