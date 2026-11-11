@@ -1953,3 +1953,21 @@ gate.
     - **The pin** is a commit archive URL in `pyproject.toml`, because the
       Docker image has no `git`. Upgrade by changing the SHA, then run the
       package INSTALL.md's "Upgrading" steps.
+
+98. **Media URLs need `AWS_S3_CUSTOM_DOMAIN`, or Bluesky shows no share
+    image.** Without it django-storages builds path-style URLs
+    (`https://s3.amazonaws.com/<bucket>/media/...`), so `og:image` points
+    at amazonaws.com. Browsers, Facebook and others load that fine, but
+    Bluesky's card service (`cardyb.bsky.app`) answers `400 "Unable to
+    serve image from URL"` and the post gets a title and no image. On
+    Divio the bucket is named after its own HTTPS host
+    (`<project>-<env>-<id>.divio-media.com`, behind Cloudflare), so each
+    environment sets `AWS_S3_CUSTOM_DOMAIN` to the bucket name. It is an
+    env var, not derived in `production.py`, because Render's AWS bucket
+    has no such host. The value is a bare host: `<bucket>.s3.amazonaws.com`
+    fails TLS for a dotted bucket name, which is why `addressing_style`
+    defaults to `path`. Stored rows hold relative paths, so the switch
+    needs no data change; old URLs keep working, and already cached pages
+    and Bluesky's own card cache pick it up as they expire. To check a URL:
+    `https://cardyb.bsky.app/v1/image?url=<urlencoded og:image>` should
+    return 200.
