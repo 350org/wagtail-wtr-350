@@ -1971,3 +1971,17 @@ gate.
     and Bluesky's own card cache pick it up as they expire. To check a URL:
     `https://cardyb.bsky.app/v1/image?url=<urlencoded og:image>` should
     return 200.
+
+99. **The country homepage redirect lives in Cloudflare and fires once per
+    browser.** Redirect Rules send `/` from BR/CA/FR/ID to `/brasil/`,
+    `/canada/`, `/france/`, `/indonesia/` (README, "Cloudflare country
+    redirects"), skipping any request whose cookie contains
+    `350_visited=1`. `visited-cookie.js` sets that cookie (one year,
+    `Path=/`) on every page load, first in `main.js`'s init list so an
+    error in another component can't skip it. Without it, staff and
+    supporters in those countries could never reach the English homepage,
+    and a footer "International" link would bounce them straight back.
+    Don't move the redirect or the cookie server-side: the homepage is
+    edge-cached (pitfall #90), and a 301 instead of a 302 would be cached
+    by the browser indefinitely. Renaming the cookie means editing all four
+    Cloudflare rules in the same deploy.

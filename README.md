@@ -951,6 +951,25 @@ header off). Publishing a page purges it and its parent listing, so the
 lifetime only bounds how stale *other* pages showing its content can get. Set
 the two purge variables above as well, or an edit waits out the full lifetime.
 
+### Cloudflare country redirects (optional)
+
+A visitor's first request for the homepage from Brazil, Canada, France or
+Indonesia goes to that country's site. These are Cloudflare Redirect Rules,
+not app code, so there is no flash of the English homepage and the cached
+page stays the same for everyone. Make one rule per country:
+
+- **When** (expression editor):
+  `(http.host in {"350.org" "www.350.org"} and http.request.uri.path eq "/" and ip.src.country eq "BR" and not http.cookie contains "350_visited=1")`
+- **Then:** Static, `https://350.org/brasil/`, **302**, *Preserve query
+  string* on. Use `CA` → `/canada/`, `FR` → `/france/`, `ID` → `/indonesia/`
+  for the others.
+
+`350_visited` is set by `static_src/js/components/visited-cookie.js` on any
+page load, so the redirect fires only once per browser: afterwards
+`350.org/` (typed, or a country footer's "International" link) shows the
+English homepage. Deploy the script before adding the cookie condition.
+Use 302, not 301, which browsers cache indefinitely.
+
 ### Markdown for AI agents
 
 [wagtail-markdown-for-agents](https://github.com/350org/Wagtail-Markdown-for-Agents-and-Statistics)
