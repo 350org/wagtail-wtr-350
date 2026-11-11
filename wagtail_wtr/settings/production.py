@@ -13,14 +13,8 @@ from .base import *  # noqa: F401, F403
 # deployments (which set discrete AWS_* vars against a real AWS bucket, no
 # DEFAULT_STORAGE_* vars involved) are unaffected.
 #
-# Deliberately does NOT map DEFAULT_STORAGE_CUSTOM_DOMAIN onto
-# AWS_S3_CUSTOM_DOMAIN — django-storages concatenates custom_domain directly
-# with "/{key}" (see its url() method), so a virtual-hosted-style domain
-# (bucket baked into the domain, e.g. "<bucket>.divio-media.com") breaks
-# HTTPS for any dotted domain (SSL cert mismatch). Leaving AWS_S3_CUSTOM_DOMAIN
-# unset lets django-storages build the URL itself via boto3 from bucket +
-# endpoint_url + addressing_style="path" (see the "path" default below),
-# which is correct regardless of the domain's shape.
+# DEFAULT_STORAGE_CUSTOM_DOMAIN is not mapped: set AWS_S3_CUSTOM_DOMAIN by
+# hand instead (see the S3 section below for why and to what).
 _DIVIO_STORAGE_ENV_MAP = {
     "AWS_STORAGE_BUCKET_NAME": "DEFAULT_STORAGE_BUCKET",
     "AWS_ACCESS_KEY_ID": "DEFAULT_STORAGE_ACCESS_KEY_ID",
@@ -122,6 +116,16 @@ WHITENOISE_MIMETYPES = {".pem": "application/x-pem-file"}
 # deployment where editors upload images or documents.
 # ---------------------------------------------------------------------------
 if _s3_bucket:
+    # The host media URLs are built on. Unset, django-storages builds them
+    # via boto3 as path-style S3 URLs (https://s3.amazonaws.com/<bucket>/...),
+    # which work in a browser but which some link-preview services refuse:
+    # Bluesky's card service answers "Unable to serve image from URL" for an
+    # og:image on s3.amazonaws.com, so shares get no image. On Divio the
+    # bucket is named after its own public hostname
+    # ("<project>-<env>-<id>.divio-media.com", served over HTTPS by
+    # Cloudflare), so set AWS_S3_CUSTOM_DOMAIN to the bucket name there.
+    # The value is a bare host, never "<bucket>.s3.amazonaws.com": a dotted
+    # bucket name under *.s3.amazonaws.com fails TLS (see addressing_style).
     _s3_custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN")
     _aws_expiry = 60 * 60 * 24 * 7  # 7 days
 
@@ -203,9 +207,9 @@ if _s3_bucket:
     # as-is) — it's vestigial for S3-backed media: urls.py only ever consumes
     # it inside `if settings.DEBUG`, which production never is, and Wagtail's
     # own image rendering calls the storage instance's .url() directly
-    # (django-storages' S3Storage.url(), which — since AWS_S3_CUSTOM_DOMAIN is
-    # unset above — builds the URL itself via boto3, correctly respecting
-    # addressing_style for any bucket name). A hand-built MEDIA_URL here would
+    # (django-storages' S3Storage.url(), which uses AWS_S3_CUSTOM_DOMAIN when
+    # set and otherwise builds the URL via boto3, respecting addressing_style
+    # for any bucket name). A hand-built MEDIA_URL here would
     # just be a second, easy-to-drift copy of that same logic — see git log
     # for a prior version of this file that got the dotted-bucket-name case
     # wrong by doing exactly that.
