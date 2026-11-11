@@ -41,7 +41,7 @@ dependencies = [
     # pins a reviewed commit on main. The archive form because the Docker image
     # has no git. To upgrade: change the SHA, then follow the package's
     # INSTALL.md "Upgrading" steps (migrate, check, agentmd_revoke_ineligible).
-    "wagtail-markdown-for-agents @ https://github.com/350org/Wagtail-Markdown-for-Agents-and-Statistics/archive/a0dccf6e8a2cd5eea863796a45bc4356c7251d36.zip",
+    "wagtail-markdown-for-agents @ https://github.com/350org/Wagtail-Markdown-for-Agents-and-Statistics/archive/f45e19fc972b4238e0f21e3b8063cc4615490a2f.zip",
 ]
 
 [project.optional-dependencies]
