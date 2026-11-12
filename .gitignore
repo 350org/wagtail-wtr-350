@@ -66,6 +66,3 @@ Thumbs.db
 htmlcov/
 
 .claude/*
-
-# wagtail_markdown_agents local exports (production uses a private bucket)
-/markdown_export/

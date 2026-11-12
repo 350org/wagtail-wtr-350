@@ -970,34 +970,6 @@ page load, so the redirect fires only once per browser: afterwards
 English homepage. Deploy the script before adding the cookie condition.
 Use 302, not 301, which browsers cache indefinitely.
 
-### Markdown for AI agents
-
-[wagtail-markdown-for-agents](https://github.com/350org/Wagtail-Markdown-for-Agents-and-Statistics)
-serves published pages to AI agents as Markdown, at the page's own URL
-(`?output_format=md`, `Accept: text/markdown`, or a known agent User-Agent)
-and under `/markdown/` (`/markdown/llms.txt`, `/markdown/<path>.md`). It
-uses the 350.org profile shipped with the package; the settings are
-`WAGTAIL_MARKDOWN_AGENTS` in `wagtail_wtr/settings/base.py`.
-
-- **Storage:** set `MARKDOWN_STORAGE_*` (see `.env.example`) to a **private**
-  bucket, never the media bucket. Without it, production doesn't generate
-  exports on publish, because the container's disk is wiped on deploy.
-- **The Wagtail `Site` hostname and port must match the environment's real
-  host**, or agents get HTML and exports carry the wrong URLs. A staging copy
-  of the production database needs its Site row edited.
-- **After the first deploy** (and after changing `PAGE_TYPES`):
-
-  ```bash
-  python manage.py migrate
-  python manage.py agentmd_generate --dry-run
-  python manage.py agentmd_generate
-  ```
-
-- **Cloudflare:** cached HTML is served to agents unless a Bypass cache rule
-  for agent requests sits *after* the page-caching rule above. Generate the
-  expression with `python -m wagtail_markdown_agents.cloudflare --host <domain>`
-  and see the package's `docs/cdn-caching.md`.
-
 ---
 
 ## License

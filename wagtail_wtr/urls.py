@@ -33,11 +33,6 @@ urlpatterns = [
         views.actionkit_inline_signup,
         name="actionkit_inline_signup",
     ),
-    # Markdown exports for AI agents: /markdown/llms.txt, /markdown/manifest.json
-    # and /markdown/<page path>.md. Outside named_i18n_patterns, so one prefix
-    # serves every language tree, and above Wagtail's catch-all, so it shadows
-    # any English page with the slug "markdown".
-    path("markdown/", include("wagtail_markdown_agents.urls")),
 ]
 
 urlpatterns += named_i18n_patterns(

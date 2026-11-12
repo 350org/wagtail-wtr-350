@@ -84,8 +84,6 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
-    # Replaced by a private bucket below when MARKDOWN_STORAGE_BUCKET is set.
-    "markdown_export": STORAGES["markdown_export"],  # noqa: F405
 }
 
 SECURE_SSL_REDIRECT = True
@@ -213,51 +211,6 @@ if _s3_bucket:
     # just be a second, easy-to-drift copy of that same logic — see git log
     # for a prior version of this file that got the dotted-bucket-name case
     # wrong by doing exactly that.
-
-# ---------------------------------------------------------------------------
-# Markdown exports for AI agents (wagtail_markdown_agents) -- a PRIVATE bucket
-#
-# Exports must survive deploys and be shared between instances, so they can't
-# stay on the container's disk. They must not go in the media bucket either:
-# media is publicly readable, and a public object URL would bypass the
-# package's restriction and exclusion checks, which only its own routes apply.
-#
-# On Divio, add a second Object Storage service for this; set its env vars
-# under the names below (the same five Divio gives the media service, with
-# MARKDOWN_ in place of DEFAULT_). No ACL is sent, so objects keep the bucket's
-# private default, and querystring_auth means any URL the storage builds is
-# signed rather than public.
-#
-# Without a bucket, exports would land on local disk and vanish on the next
-# deploy, leaving agents with HTML and no error. Routine generation on publish
-# is switched off instead, so nothing is written there to lose.
-# ---------------------------------------------------------------------------
-_markdown_bucket = os.environ.get("MARKDOWN_STORAGE_BUCKET")
-if _markdown_bucket:
-    _markdown_opts = {
-        "bucket_name": _markdown_bucket,
-        "region_name": os.environ.get("MARKDOWN_STORAGE_REGION", "us-east-1"),
-        "endpoint_url": os.environ.get("MARKDOWN_STORAGE_ENDPOINT_URL"),
-        "addressing_style": "path",  # see the media config above: dotted bucket names
-        "location": "markdown",
-        "default_acl": None,
-        "querystring_auth": True,
-        "file_overwrite": False,
-    }
-    if os.environ.get("MARKDOWN_STORAGE_ACCESS_KEY_ID"):
-        _markdown_secret = os.environ.get("MARKDOWN_STORAGE_SECRET_ACCESS_KEY")
-        if not _markdown_secret:
-            raise ImproperlyConfigured(
-                "MARKDOWN_STORAGE_ACCESS_KEY_ID is set but MARKDOWN_STORAGE_SECRET_ACCESS_KEY is missing."
-            )
-        _markdown_opts["access_key"] = os.environ["MARKDOWN_STORAGE_ACCESS_KEY_ID"]
-        _markdown_opts["secret_key"] = _markdown_secret
-    STORAGES["markdown_export"] = {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": _markdown_opts,
-    }
-else:
-    WAGTAIL_MARKDOWN_AGENTS = {**WAGTAIL_MARKDOWN_AGENTS, "AUTO_GENERATE": False}  # noqa: F405
 
 # ---------------------------------------------------------------------------
 # Email / SMTP (optional — omit EMAIL_HOST to fall back to console backend)
