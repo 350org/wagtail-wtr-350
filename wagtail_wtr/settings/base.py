@@ -24,9 +24,6 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     "wtrx",
-    # Serves published pages to AI agents as Markdown. Configured by
-    # WAGTAIL_MARKDOWN_AGENTS below.
-    "wagtail_markdown_agents",
     "wagtail_ai",
     "wagtail_2fa",
     "django_otp",
@@ -82,11 +79,6 @@ MIDDLEWARE = [
     "wtrx.edge_cache.EdgeCacheMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "wtrx.i18n.NamedPrefixLocaleMiddleware",
-    # Answers agents' requests for a page with its Markdown export. Must sit
-    # after the locale middleware, which activates the language a prefixed URL
-    # (/brasil/...) resolves in, and before CommonMiddleware; its system checks
-    # (E002/E003/E007) enforce both.
-    "wagtail_markdown_agents.middleware.AgentMarkdownMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -252,44 +244,6 @@ STATIC_URL = "/static/"
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
-
-# "markdown_export" holds wagtail_markdown_agents' exports. It is a local folder
-# outside MEDIA_ROOT here, never served directly: exports reach agents only
-# through the package's checked routes, which enforce restrictions and
-# exclusions. production.py swaps it for a private bucket, since a container's
-# disk doesn't survive a deploy. The other two entries are Django's defaults,
-# restated because defining STORAGES replaces the whole dict.
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-    "markdown_export": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-        "OPTIONS": {"location": os.path.join(BASE_DIR, "markdown_export")},
-    },
-}
-
-# wagtail-markdown-for-agents. The 350.org profile ships with the package and
-# sets the fields, frontmatter, image sizes and block renderers for wtrx's
-# models; a key set here overrides the profile's value as a whole.
-WAGTAIL_MARKDOWN_AGENTS = {
-    "PROFILE": "wagtail_markdown_agents.profiles.wtrx",
-    "STORAGE": "markdown_export",
-    # The page types the profile has renderers for. FormPage stays HTML-only.
-    "PAGE_TYPES": [
-        "wtrx.HomePage",
-        "wtrx.ContentPage",
-        "wtrx.IndexPage",
-        "wtrx.Post",
-        "wtrx.Blogs",
-    ],
-    # Regenerate a page's export when it's published (the package default,
-    # stated so it's a visible decision). Unpublish/delete always withdraw.
-    "AUTO_GENERATE": True,
-}
 
 # Django's default (1000) is too low for a content-heavy StreamField page --
 # each classic (non-Telepath-consolidated) sub-field of every block in a
