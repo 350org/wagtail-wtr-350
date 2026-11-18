@@ -123,6 +123,22 @@ class TestUsercentricsHeadRendering(TestCase):
         content = response.content.decode()
         self.assertIn("var FALLBACK_COUNTRY = 'FR';", content)
 
+    def test_checkout_gate_runs_before_fundraiseup_snippet(self):
+        # Fundraise Up's snippet records location.href when it runs, so the
+        # gate has to take ?form= off the URL before it, or the checkout opens
+        # on top of the consent banner.
+        self._set_usercentrics()
+        self.integration.integrations.append(
+            ("fundraiseup", {"enabled": True, "installation_code": "<script>/* FUNDRAISEUP-SNIPPET */</script>"})
+        )
+        self.integration.save()
+        content = self._get().content.decode()
+        gate = content.index("window.__wtrxReleaseCheckout = release")
+        self.assertLess(gate, content.index("FUNDRAISEUP-SNIPPET"))
+        self.assertLess(content.index("gtag('consent', 'default'"), gate)
+        # The non-GDPR path releases the checkout from onReady.
+        self.assertIn("window.__wtrxReleaseCheckout();", content)
+
     def test_no_standalone_cookie_settings_link(self):
         # The site-wide standalone ".uc-cookie-link" placeholder below the
         # footer (formerly rendered unconditionally in base.html) was removed

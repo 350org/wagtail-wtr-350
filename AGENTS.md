@@ -1985,3 +1985,18 @@ gate.
     edge-cached (pitfall #90), and a 301 instead of a 302 would be cached
     by the browser indefinitely. Renaming the cookie means editing all four
     Cloudflare rules in the same deploy.
+
+100. **A `?form=` checkout waits for the cookie choice.** Fundraise Up
+    opens a campaign's checkout as soon as its widget loads on a URL with
+    `?form=FUN...`, which put the modal on top of the Usercentrics banner
+    for GDPR visitors (ad landing links), so few answered it and GA4/Ads/Meta
+    got nothing. A script in `usercentrics_head.html`, before Fundraise
+    Up's snippet (which records `location.href` when it runs), takes `form`
+    off the URL and calls `FundraiseUp.openCheckout()` once the banner is
+    answered (Accept or Reject), a choice is already stored, no consent is
+    needed (`onReady`, non-GDPR), or the CMP hasn't initialised after 8s.
+    It only exists while Usercentrics is enabled. Usercentrics refuses
+    `127.0.0.1` (domain allow list) and shows no banner to HeadlessChrome's
+    user agent, so test the banner against a real 350.org page with a normal
+    user agent and `service_workers="block"` (a service worker otherwise
+    hides requests from Playwright routes).

@@ -29,7 +29,88 @@ Cloudflare Worker or Django involvement required.
   });
 </script>
 {% comment %}
-2. Visitor country, then load + init Usercentrics.
+2. Hold a ?form= checkout until the visitor has made a cookie choice.
+
+Fundraise Up opens a campaign's checkout as soon as its widget loads on a
+page whose URL carries ?form=FUNXXXXXXX (e.g. direct-ask ad links to
+350.org/?form=...). Its installation snippet records location.href when it
+runs, at the end of <head>, so the modal used to open on top of the
+Usercentrics banner, hiding its text and covering its buttons; visitors who
+never got to answer it left GA4, Google Ads and Meta with no data. This runs
+before that snippet: it takes `form` off the URL (history.replaceState, no
+reload) and calls FundraiseUp.openCheckout() itself once the banner is out
+of the way. That is the first of:
+  - no consent needed (outside the GDPR countries, onReady below);
+  - a choice already stored (returning visitor: __ucCmp.isConsentRequired()
+    is false once the CMP initialises);
+  - an explicit choice now (Usercentrics' UC_CONSENT event, or the
+    `consent_status` EXPLICIT push it makes to the dataLayer for GTM);
+  - the CMP not initialising within CMP_TIMEOUT_MS of page load (an ad
+    blocker, a CDN outage): a donor is never left without the checkout.
+Accept and deny both count — the point is that the banner was answered.
+Fundraise Up puts `form` back in the URL itself while its checkout is open.
+{% endcomment %}
+<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('form');
+    if (!code || !window.history || !window.history.replaceState) { return; }
+    params.delete('form');
+    var query = params.toString();
+    window.history.replaceState(window.history.state, '',
+      window.location.pathname + (query ? '?' + query : '') + window.location.hash);
+
+    var CMP_TIMEOUT_MS = 8000;
+    var released = false;
+    var cmpReady = false;
+
+    function release() {
+      if (released) { return; }
+      released = true;
+      if (window.FundraiseUp && typeof window.FundraiseUp.openCheckout === 'function') {
+        window.FundraiseUp.openCheckout(code);
+      } else {
+        // No Fundraise Up on this page: put the URL back as it arrived.
+        params.set('form', code);
+        window.history.replaceState(window.history.state, '',
+          window.location.pathname + '?' + params.toString() + window.location.hash);
+      }
+    }
+
+    function isExplicit(type) {
+      return typeof type === 'string' && type.toLowerCase() === 'explicit';
+    }
+
+    // Called from onReady below: outside the GDPR countries no banner is shown.
+    window.__wtrxReleaseCheckout = release;
+    setTimeout(function () { if (!cmpReady) { release(); } }, CMP_TIMEOUT_MS);
+
+    window.addEventListener('UC_UI_INITIALIZED', function () {
+      cmpReady = true;
+      if (window.__ucCmp && typeof window.__ucCmp.isConsentRequired === 'function') {
+        Promise.resolve(window.__ucCmp.isConsentRequired()).then(function (required) {
+          if (required === false) { release(); }
+        }).catch(function () {});
+      }
+    });
+    window.addEventListener('UC_CONSENT', function (event) {
+      var consent = event.detail && event.detail.consent;
+      if (consent && isExplicit(consent.type)) { release(); }
+    });
+
+    var dataLayer = window.dataLayer = window.dataLayer || [];
+    var push = dataLayer.push;
+    dataLayer.push = function () {
+      for (var i = 0; i < arguments.length; i++) {
+        var item = arguments[i];
+        if (item && item.event === 'consent_status' && isExplicit(item.type)) { release(); }
+      }
+      return push.apply(dataLayer, arguments);
+    };
+  })();
+</script>
+{% comment %}
+3. Visitor country, then load + init Usercentrics.
 
 When "Manual country override" is set on the integration (QA/local testing
 of a specific country), it's used directly and synchronously. Otherwise,
@@ -73,6 +154,7 @@ silently hiding it.
           language: UC_LANGUAGE,
           onReady: function (info) {
             if (info && info.isGdpr === false) {
+              if (window.__wtrxReleaseCheckout) { window.__wtrxReleaseCheckout(); }
               gtag('consent', 'update', {
                 ad_storage: 'granted',
                 analytics_storage: 'granted',
