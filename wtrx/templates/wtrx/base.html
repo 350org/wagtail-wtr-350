@@ -1,4 +1,4 @@
-{% load i18n wagtailcore_tags wagtailimages_tags wagtailuserbar static wtrx_tags %}{% wagtail_site as current_site %}<!DOCTYPE html>
+{% load i18n wagtailcore_tags wagtailimages_tags wagtailuserbar static wtrx_tags wagtail_markdown_agents %}{% wagtail_site as current_site %}<!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="utf-8" />
@@ -19,6 +19,11 @@
     {% for alternate in alternates %}
         <link rel="alternate" hreflang="{{ alternate.code }}" href="{{ alternate.url }}" />
     {% endfor %}
+    {% comment %}
+    Markdown alternate for agents (wagtail_markdown_agents, pitfall #97).
+    Emits nothing in preview or when the page has no eligible export.
+    {% endcomment %}
+    {% agent_markdown_link %}
     {% comment %}Open Graph / Twitter Card — only rendered when a page object is in context.{% endcomment %}
     {% if page %}
     {% with meta_img=page.meta_image|default:settings.wtrx.BrandingSEOSettings.default_meta_image og_title=page.seo_title|default:page.title og_desc=page.search_description|default:settings.wtrx.BrandingSEOSettings.site_description %}
