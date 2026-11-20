@@ -503,3 +503,6 @@ WTRX_USERCENTRICS_DISABLED = os.environ.get(
 ).lower() in ("true", "1", "yes")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+if os.environ.get("MARKDOWN_AGENTS_DISABLED", "").lower() in ("1", "true", "yes"):
+    WAGTAIL_MARKDOWN_AGENTS = {**WAGTAIL_MARKDOWN_AGENTS, "SITES": []}  # noqa: F405
