@@ -517,12 +517,32 @@ class TestCTACountryLinks(TestCase):
             {"US": "https://example.com/us", "CA": "https://example.com/ca"},
         )
 
-    def test_fallback_href_is_the_ctas_own_link(self):
+    def test_fallback_is_the_ctas_own_link(self):
         response = self.client.get(self.other.url)
-        self.assertContains(response, 'href="https://example.com/donate"')
+        self.assertContains(response, 'data-href="https://example.com/donate"')
 
     def test_override_without_country_links_renders_no_map(self):
         self.assertIsNone(self._country_links(self.canada))
+
+    def test_cta_with_country_links_has_no_href_until_the_country_is_known(self):
+        # Fundraise Up binds a checkout link with the campaign its href holds
+        # when the widget starts, so the link must not have one to bind
+        # until _nav_cta_country.html puts the visitor's link in place.
+        content = self.client.get(self.other.url).content.decode()
+        tag = re.search(r'<a [^>]*class="wtr-nav-cta[^"]*"[^>]*>', content).group(0)
+        self.assertNotRegex(tag, r'\shref=')
+        self.assertIn('data-href="https://example.com/donate"', tag)
+        # The swap script follows the link directly, so it runs as soon as
+        # the link is parsed.
+        after = content[content.index(tag):]
+        self.assertRegex(after, r'^<a [^>]*>[^<]*</a>\s*<script>')
+        self.assertIn("wtrx:nav-cta-ready", after.split("</script>")[0])
+
+    def test_cta_without_country_links_keeps_its_href(self):
+        response = self.client.get(self.canada.url)
+        self.assertContains(response, 'href="https://example.com/canada-donate"')
+        self.assertNotContains(response, "data-href=")
+        self.assertNotContains(response, "wtrx:nav-cta-ready")
 
     def test_country_codes_are_normalised(self):
         value = CTACountryLinkBlock().clean(

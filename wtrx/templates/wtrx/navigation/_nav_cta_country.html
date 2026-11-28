@@ -1,0 +1,68 @@
+{% comment %}
+Puts the visitor's country link on the header CTA (pitfall #96). Included
+by header.html right after a CTA that has country links, which renders with
+data-href (its fallback) and no href.
+
+Why no href until now: Fundraise Up's widget scans the page's a[href] once,
+when it starts, and binds its own click handler to every link it
+recognises as a checkout (?form=FUN..., #?form=FUN..., #FUN...), with the
+campaign that href held at that moment. It never reads the href again, so
+changing the href afterwards can't change what it opens. On a page that is
+slow to finish parsing it starts before any later script could swap the
+link, and so opened the fallback (350 Global) for US visitors.
+
+So nothing here changes an href. Once the country is known, this replaces
+the placeholder with a copy carrying the right href. Fundraise Up also
+watches for links added to the page, so it binds the copy (or finds it in
+its first scan, if it hasn't started yet) and handles the click itself,
+with its own reporting, exactly as for any other checkout link.
+
+The country comes from Cloudflare's /cdn-cgi/trace (or
+?fundraiseup_country=XX, the donate block's QA override), as in
+_fundraiseup_embed.html. It never reaches Django, so the edge-cached page is
+the same for everyone (pitfall #90). Without an answer within
+LOOKUP_TIMEOUT_MS (no Cloudflare in front, as on staging and in local
+development) the fallback goes in.
+
+A click on the placeholder, before the answer, is replayed on the copy a
+moment after it goes in, to give Fundraise Up time to bind it.
+nav-cta.js re-runs the new-tab check on the copy (wtrx:nav-cta-ready).
+{% endcomment %}
+<script>
+  (function () {
+    var LOOKUP_TIMEOUT_MS = 2000;
+    var REPLAY_DELAY_MS = 300;
+    var placeholder = document.currentScript.previousElementSibling;
+    if (!placeholder || !placeholder.classList.contains('wtr-nav-cta') || !placeholder.hasAttribute('data-href')) { return; }
+    var urls = {};
+    try { urls = JSON.parse(placeholder.getAttribute('data-country-links')) || {}; } catch (e) {}
+    var clicked = false;
+    var done = false;
+    placeholder.addEventListener('click', function (event) { event.preventDefault(); clicked = true; });
+
+    function insert(countryCode) {
+      if (done) { return; }
+      done = true;
+      var link = placeholder.cloneNode(true);
+      link.setAttribute('href', (countryCode && urls[countryCode]) || placeholder.getAttribute('data-href'));
+      link.removeAttribute('data-href');
+      placeholder.replaceWith(link);
+      document.dispatchEvent(new CustomEvent('wtrx:nav-cta-ready', { detail: link }));
+      if (clicked) { setTimeout(function () { link.click(); }, REPLAY_DELAY_MS); }
+    }
+
+    var override = new URLSearchParams(window.location.search).get('fundraiseup_country');
+    if (override) {
+      insert(override.trim().toUpperCase());
+      return;
+    }
+    setTimeout(function () { insert(null); }, LOOKUP_TIMEOUT_MS);
+    fetch('/cdn-cgi/trace')
+      .then(function (response) { return response.ok ? response.text() : ''; })
+      .then(function (text) {
+        var match = text.match(/^loc=([A-Z]{2})$/m);
+        insert(match ? match[1] : null);
+      })
+      .catch(function () { insert(null); });
+  })();
+</script>
