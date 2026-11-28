@@ -1899,33 +1899,48 @@ gate.
     blue Donate button) is set on the element in Fundraise Up's dashboard,
     not here.
 
-96. **The header CTA's per-country links are swapped in the browser.**
-    `cta_country_links` (on `NavigationSettings` and
+96. **The header CTA's per-country link goes in as a new element, never
+    as a changed `href`.** `cta_country_links` (on `NavigationSettings` and
     `NavigationOverrideBlock`, so a navigation override has its own) is a
     list of `CTACountryLinkBlock`s: comma-separated ISO codes plus a URL.
-    `header.html` always renders the CTA's own link as the `href` and
-    carries the `{country: url}` map (`nav_cta_country_links`, first entry
-    naming a country wins) in `data-country-links`;
-    `nav-cta.js` swaps the `href` once Cloudflare's
-    `/cdn-cgi/trace` answers, so the cached page is the same for everyone
-    (pitfall #90) and staging/local dev always show the fallback. It reads
-    the donate block's `?fundraiseup_country=XX` QA override too. Because
-    `ExternalLinks.init()` has already decided new-tab against the fallback
-    `href`, the swap calls `ExternalLinks.refresh()`, which undoes that
-    script's own marking (tracked by `data-external-marked`) and decides
-    again — any other script that rewrites a link's `href` after load
-    should do the same.
+    With any, `header.html` renders the CTA with `data-href` (its own link,
+    the fallback) and **no `href`**, plus the `{country: url}` map
+    (`nav_cta_country_links`, first entry naming a country wins) in
+    `data-country-links`. `navigation/_nav_cta_country.html`, an inline
+    script right after it, asks Cloudflare's `/cdn-cgi/trace` (or the
+    donate block's `?fundraiseup_country=XX` QA override), then replaces
+    the placeholder with a copy carrying the right `href`, falling back
+    after 2s (staging and local dev always get the fallback). The cached
+    page is the same for everyone (pitfall #90).
+    Why a copy: Fundraise Up's widget scans every `a[href]` once, at
+    start-up, saves the campaign each checkout link (`?form=`, `#?form=`,
+    `#FUN...`) held at that moment, binds its own click handler and never
+    reads the `href` again. It also binds links *added* later (a
+    `MutationObserver` on child nodes, not attributes). An `href` swapped
+    after its scan therefore changes nothing: on pages slow to finish
+    parsing (How to Give's synchronous DAFdirect widget, slow connections)
+    US visitors were sent to 350 Global. A link that only gets its `href`
+    as a new element is bound once, with the right campaign, and the click
+    stays Fundraise Up's own (its link reporting and its query params
+    included). Don't intercept the click and call
+    `FundraiseUp.openCheckout()` instead: it reports as a JS API launch and
+    drops the link's other parameters. Don't move the script into
+    `main.js` either: a module runs only once parsing ends.
+    A click on the placeholder before the answer is replayed on the copy
+    300ms after it goes in. A click before Fundraise Up has started follows
+    the link as a link: a `?form=` link reloads the page and Fundraise Up
+    opens it on load (a `#?form=` link, as the CTA anchor field produces,
+    only changes the hash).
+    `ExternalLinks.init()` only sees links that have an `href`, so the
+    script fires `wtrx:nav-cta-ready` and `nav-cta.js` runs
+    `ExternalLinks.refresh()` on the copy. Any other script that changes a
+    link's `href` after load should call `refresh()` too.
     **Every CTA URL field also takes a bare query string**
     (`validate_url_or_query_string`, `wtrx/validators.py`): `cta_url` on
     both, and each country link's `url`, so an editor can enter
-    `?form=FUNXXXXXXX`. Fundraise Up only documents `?form=` as opening its
-    checkout on page *load*, so `nav-cta.js` catches a plain left click on a
-    CTA whose href is this same page with a `form` parameter and calls
-    `FundraiseUp.openCheckout()` instead, with no reload. Without Fundraise
-    Up's stub on the page (integration disabled, live preview) the click is
-    left alone, and the reloaded page opens the checkout itself. `cta_url`
-    was a `URLField`; it is now a `CharField` at the same 200-character
-    limit, because `URLField`/`URLBlock` reject a relative value.
+    `?form=FUNXXXXXXX`. `cta_url` was a `URLField`;
+    it is now a `CharField` at the same 200-character limit, because
+    `URLField`/`URLBlock` reject a relative value.
 
 97. **Markdown for agents (`wagtail_markdown_agents`) is a pinned
     third-party package configured almost entirely by its shipped 350.org

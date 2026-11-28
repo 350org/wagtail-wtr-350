@@ -25,7 +25,7 @@ def validate_url_or_query_string(value):
     Accept a full http(s) URL, or a bare query string such as
     ``?form=FUNXXXXXXX`` — a link to the current page with those parameters,
     which is how a Fundraise Up campaign checkout is opened on the page
-    itself (the header CTA, see nav-cta.js).
+    itself (the header CTA, see navigation/_nav_cta_country.html).
     """
     if value.startswith("?"):
         if len(value) > 1 and not any(char.isspace() for char in value):

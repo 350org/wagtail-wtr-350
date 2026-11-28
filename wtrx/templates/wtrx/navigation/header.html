@@ -178,34 +178,34 @@ mobile-menu.js already toggles) — no separate JS hook needed.
                 deliberately not wtr-btn, whose blue fill and 8px radius belong to the general
                 button system, not this specific nav component.
 
-                data-country-links (the CTA's country links, if any) is read by
-                nav-cta.js, which swaps the href for the visitor's
-                country in the browser. The server-rendered href is the
-                fallback for everyone else, so the cached page is the same for
-                every visitor (pitfall #90).
+                With country links, the CTA renders with data-href instead of
+                href, and _nav_cta_country.html (right after it) puts the
+                visitor's link in place once their country is known. The
+                rendered page is the same for every visitor (pitfall #90).
                 {% endcomment %}
                 {% if nav.cta_text %}
                     {% nav_cta_country_links nav as cta_country_links %}
                     {% if nav.cta_page %}
-                        <a href="{% pageurl nav.cta_page|localized %}"
+                        <a {% if cta_country_links %}data-href{% else %}href{% endif %}="{% pageurl nav.cta_page|localized %}"
                            {% if cta_country_links %}data-country-links="{{ cta_country_links }}"{% endif %}
                            class="wtr-nav-cta inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_url %}
-                        <a href="{{ nav.cta_url }}"
+                        <a {% if cta_country_links %}data-href{% else %}href{% endif %}="{{ nav.cta_url }}"
                            rel="noopener noreferrer"
                            {% if cta_country_links %}data-country-links="{{ cta_country_links }}"{% endif %}
                            class="wtr-nav-cta inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% elif nav.cta_anchor %}
-                        <a href="#{{ nav.cta_anchor }}"
+                        <a {% if cta_country_links %}data-href{% else %}href{% endif %}="#{{ nav.cta_anchor }}"
                            {% if cta_country_links %}data-country-links="{{ cta_country_links }}"{% endif %}
                            class="wtr-nav-cta inline-flex items-center justify-center rounded bg-callout-red px-4 py-3 text-base leading-[18px] font-semibold tracking-[0.3px] text-white hover:opacity-90 transition-opacity">
                             {{ nav.cta_text }}
                         </a>
                     {% endif %}
+                    {% if cta_country_links %}{% include "wtrx/navigation/_nav_cta_country.html" %}{% endif %}
                 {% endif %}
 
                 {% comment %}
